@@ -1,0 +1,32 @@
+spring:
+  application:
+    name: thong-ke-cao-son
+  datasource:
+    url: jdbc:postgresql://localhost:5440/thong_ke?reWriteBatchedInserts=true
+    username: postgres
+    password: password
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        jdbc:
+          batch_size: 50
+        order_inserts: true
+        order_updates: true
+        format_sql: true      # bỏ ở production
+    show-sql: false           # bật true khi cần debug query
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwks-uri: http://localhost:8080/.well-known/jwks.json # endpoint lấy public key từ Portal
+
+server:
+  port: 8088
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+  api-docs:
+    path: /v3/api-docs

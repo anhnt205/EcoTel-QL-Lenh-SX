@@ -1,0 +1,89 @@
+# ======================================
+# Java / Spring Boot
+# ======================================
+target/
+build/
+out/
+
+!.mvn/wrapper/maven-wrapper.jar
+
+*.class
+*.log
+logs/
+
+.classpath
+.project
+.settings/
+
+# JVM crash
+*.hprof
+hs_err_pid*
+replay_pid*
+
+# ======================================
+# Spring Config
+# ======================================
+application-local.yml
+application-local.properties
+application-secret.yml
+application-secret.properties
+
+.env
+.env.*
+
+*.keystore
+.secret/
+
+# ======================================
+# React / Node
+# ======================================
+node_modules/
+dist/
+coverage/
+.cache/
+
+.next/
+.nuxt/
+.vite/
+
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+*.tsbuildinfo
+
+# ======================================
+# Docker
+# ======================================
+docker-compose.override.yml
+docker-compose.local.yml
+
+docker/mysql/data/
+docker/postgres/data/
+
+volume-data/
+postgres-data/
+pgdata/
+
+*.pid
+*.tar
+*.bak
+
+# ======================================
+# IntelliJ
+# ======================================
+.idea/
+*.iml
+
+# ======================================
+# VSCode
+# ======================================
+.vscode/
+.history/
+
+# ======================================
+# OS
+# ======================================
+.DS_Store
+Thumbs.db
