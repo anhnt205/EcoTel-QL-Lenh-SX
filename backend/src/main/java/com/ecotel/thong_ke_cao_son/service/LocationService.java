@@ -6,6 +6,7 @@ import com.ecotel.thong_ke_cao_son.mapper.LocationMapper;
 import com.ecotel.thong_ke_cao_son.model.Location;
 import com.ecotel.thong_ke_cao_son.repository.LocationRepository;
 import lombok.RequiredArgsConstructor;
+import com.ecotel.thong_ke_cao_son.dto.response.PageResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -17,9 +18,10 @@ public class LocationService {
     private final LocationRepository locationRepository;
     private final LocationMapper locationMapper;
 
-    public Page<LocationResponse> getAll(String keyword, Pageable pageable) {
-        return locationRepository.search(keyword, pageable)
+    public PageResponse<LocationResponse> getAll(String keyword, Pageable pageable) {
+        Page<LocationResponse> page = locationRepository.search(keyword, pageable)
                 .map(locationMapper::toResponse);
+        return PageResponse.from(page);
     }
 
     public LocationResponse getById(Long id) {

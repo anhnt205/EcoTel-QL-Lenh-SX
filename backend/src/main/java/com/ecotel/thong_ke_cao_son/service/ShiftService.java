@@ -6,6 +6,7 @@ import com.ecotel.thong_ke_cao_son.mapper.ShiftMapper;
 import com.ecotel.thong_ke_cao_son.model.Shift;
 import com.ecotel.thong_ke_cao_son.repository.ShiftRepository;
 import lombok.RequiredArgsConstructor;
+import com.ecotel.thong_ke_cao_son.dto.response.PageResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -17,9 +18,10 @@ public class ShiftService {
     private final ShiftRepository shiftRepository;
     private final ShiftMapper shiftMapper;
 
-    public Page<ShiftResponse> getAll(String keyword, Pageable pageable) {
-        return shiftRepository.search(keyword, pageable)
+    public PageResponse<ShiftResponse> getAll(String keyword, Pageable pageable) {
+        Page<ShiftResponse> page = shiftRepository.search(keyword, pageable)
                 .map(shiftMapper::toResponse);
+        return PageResponse.from(page);
     }
 
     public ShiftResponse getById(Long id) {

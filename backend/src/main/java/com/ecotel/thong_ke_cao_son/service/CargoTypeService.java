@@ -6,6 +6,7 @@ import com.ecotel.thong_ke_cao_son.mapper.CargoTypeMapper;
 import com.ecotel.thong_ke_cao_son.model.CargoType;
 import com.ecotel.thong_ke_cao_son.repository.CargoTypeRepository;
 import lombok.RequiredArgsConstructor;
+import com.ecotel.thong_ke_cao_son.dto.response.PageResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -17,9 +18,10 @@ public class CargoTypeService {
     private final CargoTypeRepository cargoTypeRepository;
     private final CargoTypeMapper cargoTypeMapper;
 
-    public Page<CargoTypeResponse> getAll(String keyword, Pageable pageable) {
-        return cargoTypeRepository.search(keyword, pageable)
+    public PageResponse<CargoTypeResponse> getAll(String keyword, Pageable pageable) {
+        Page<CargoTypeResponse> page = cargoTypeRepository.search(keyword, pageable)
                 .map(cargoTypeMapper::toResponse);
+        return PageResponse.from(page);
     }
 
     public CargoTypeResponse getById(Long id) {
