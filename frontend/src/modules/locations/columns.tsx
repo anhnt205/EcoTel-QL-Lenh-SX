@@ -30,6 +30,12 @@ export const getLocationColumns = ({
           return `${coords[0]} , ${coords[1]}`;
         }
         if (
+          (loc as any).longitude !== undefined &&
+          (loc as any).latitude !== undefined
+        ) {
+          return `${(loc as any).longitude} , ${(loc as any).latitude}`;
+        }
+        if (
           loc.coordinates?.lat !== undefined &&
           loc.coordinates?.lng !== undefined
         ) {

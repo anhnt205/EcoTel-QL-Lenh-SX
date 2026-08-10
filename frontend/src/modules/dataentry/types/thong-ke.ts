@@ -35,7 +35,7 @@ export interface TransportRecord {
 
   pickupLocation?: string; // Nơi nhận tải
   pickupBench?: string; // Tầng nhận tải
-  pickupBenchGroup?: number | string; // Nhóm tầng nhận tải (Calculated)
+  pickupBenchGroup?: string | number; // Nhóm tầng nhận tải
 
   unloadLocationName?: string; // Nơi dỡ tải
   unloadBench?: string; // Tầng dỡ tải
@@ -83,7 +83,7 @@ export interface MiningRecord {
   loadStatus?: string; // Loại hàng / Mức tải (Đủ tải / Roda (2/3) / Khác...)
   tempVolume?: number; // Khối lượng tạm tính (m3)
   tempWeight?: number; // Trọng lượng tạm tính (tấn)
-  vehicleManagementUnit?: string; // Đơn vị quản lý xe (Auto từ Số xe)
+  vehicleManagementUnit?: string; // Đơn vị quản lý thiết bị (Auto từ Số xe)
   vehicleType?: string; // Chủng loại xe (Auto từ Số xe)
 
   // C. Nhiên liệu (Chung theo máy xúc / ca)

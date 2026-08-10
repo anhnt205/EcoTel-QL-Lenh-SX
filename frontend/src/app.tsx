@@ -6,10 +6,6 @@ import { authRoutes } from "@/modules/auth/router";
 import { mainRoutes } from "@/modules/main/router";
 import { NotFoundPage } from "@/components/not-found-page";
 import { useEffect } from "react";
-if (import.meta.env.VITE_MOCK_API === "true") {
-  const { setupMockApi } = await import("@/lib/mock-api");
-  setupMockApi();
-}
 
 const queryClient = new QueryClient({
   defaultOptions: {

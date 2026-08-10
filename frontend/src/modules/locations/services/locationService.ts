@@ -1,59 +1,23 @@
 import api from "@/config/api.config";
 import type { Location } from "@/types";
 
+const cleanParams = (params?: Record<string, any>) => {
+  if (!params) return undefined;
+  const cleaned: Record<string, any> = {};
+  Object.keys(params).forEach((key) => {
+    const val = params[key];
+    if (val !== undefined && val !== null && val !== "") {
+      cleaned[key] = val;
+    }
+  });
+  return Object.keys(cleaned).length > 0 ? cleaned : undefined;
+};
+
 const LocationService = {
   getAll: async (params?: Record<string, any>): Promise<Location[]> => {
-    const res = await api.get("/locations", { params });
-    return res.data.data;
-  },
-  create: async (data: Partial<Location>): Promise<any> => {
-    const res = await api.post("/locations", data);
-    return res.data;
-  },
-  update: async (data: Partial<Location>): Promise<any> => {
-    const res = await api.put(`/locations/${data?._id}`, data);
-    return res.data;
-  },
-  delete: async (ids: string[]): Promise<any> => {
-    const res = await api.delete(`/locations`, { data: { ids } });
-    return res.data.message;
-  },
-  importFile: async (
-    formData: FormData,
-    onProgress?: (percent: number) => void,
-  ) => {
-    const res = await api.post("/locations/importFile", formData, {
-      headers: { "Content-Type": "multipart/form-data" },
-      onUploadProgress: (e) => {
-        if (!onProgress) return;
-        const total = e.total ?? 1;
-        const percent = Math.round((e.loaded * 100) / total);
-        onProgress(percent);
-      },
-    });
-    return res.data.message;
-  },
-  exportFile: async () => {
-    const res = await api.post(
-      "/locations/exportFile",
-      {},
-      {
-        responseType: "blob",
-      },
-    );
-    const blob = new Blob([res.data], {
-      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    });
-
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.setAttribute("download", `*.xlsx`);
-
-    document.body.appendChild(link);
-    link.click();
-    link.parentNode?.removeChild(link);
-    window.URL.revokeObjectURL(url);
+    const res = await api.get("/locations", { params: cleanParams(params) });
+    const data = res.data?.data?.content || res.data?.data || res.data?.result?.data || res.data;
+    return Array.isArray(data) ? data : [];
   },
 };
 

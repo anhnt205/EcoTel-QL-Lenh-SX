@@ -73,7 +73,7 @@ export const mapExcelRowToSystemFields = (row: Record<string, any>, role: RoleTy
     loadStatus: getVal('Loại hàng (mức tải)', 'Loại hàng', 'Mức tải', 'loadStatus') ?? 'Đủ tải',
     tempVolume: parseNum(getVal('Khối lượng tạm tính (m3)', 'Khối lượng tạm tính', 'tempVolume')) ?? 45,
     tempWeight: parseNum(getVal('Trọng lượng tạm tính (tấn)', 'Trọng lượng tạm tính', 'tempWeight')) ?? 90,
-    vehicleManagementUnit: getVal('Đơn vị quản lý xe', 'vehicleManagementUnit') ?? autoVehicle.vehicleManagementUnit,
+    vehicleManagementUnit: getVal('Đơn vị quản lý thiết bị', 'Đơn vị quản lý xe', 'vehicleManagementUnit') ?? autoVehicle.vehicleManagementUnit,
     vehicleType: getVal('Chủng loại xe', 'Loại xe', 'vehicleType') ?? autoVehicle.vehicleType,
     initialFuel,
     receivedFuel,

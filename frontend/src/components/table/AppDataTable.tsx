@@ -130,6 +130,8 @@ type BaseProps<TData> = {
   hoverable?: boolean;
   stickyHeader?: boolean;
   maxHeight?: number | string;
+  fullHeight?: boolean;
+  className?: string;
   showToolbar?: boolean;
   showColumnToggle?: boolean;
   showPagination?: boolean;
@@ -194,6 +196,8 @@ function AppDataTable<TData>({
   hoverable = true,
   stickyHeader = false,
   maxHeight,
+  fullHeight = false,
+  className,
   showToolbar = true,
   showColumnToggle = false,
   showPagination = true,
@@ -410,11 +414,13 @@ function AppDataTable<TData>({
   return (
     <div
       className={cn(
-        "bg-card shadow-sm border flex flex-col flex-1 min-h-0 h-full w-full",
+        "bg-card shadow-sm border flex flex-col w-full",
+        fullHeight || isFullscreen ? "flex-1 min-h-0 h-full" : "h-auto",
         bordered ? "border-border" : "border-transparent",
         isFullscreen
           ? "fixed inset-0 z-50 m-0 rounded-none w-screen h-screen overflow-hidden"
           : "rounded-xl overflow-hidden",
+        className,
       )}
     >
       {/* Toolbar */}
@@ -490,7 +496,7 @@ function AppDataTable<TData>({
 
       {/* Table Views */}
       {showTable && (
-        <div className="relative flex flex-col flex-1 min-h-0">
+        <div className={cn("relative flex flex-col", (fullHeight || isFullscreen) && "flex-1 min-h-0")}>
           {/* Overlay loading khi đang sort/filter với data sẵn có (server-side) */}
           {loading && (
             <div className="absolute inset-0 z-10 bg-background/50 flex items-center justify-center">
@@ -499,7 +505,7 @@ function AppDataTable<TData>({
           )}
 
           <Table
-            containerClassName="flex-1 min-h-0"
+            containerClassName={cn("w-full overflow-x-auto", (fullHeight || isFullscreen) && "flex-1 min-h-0")}
             containerStyle={{
               maxHeight: isFullscreen ? undefined : maxHeight,
             }}

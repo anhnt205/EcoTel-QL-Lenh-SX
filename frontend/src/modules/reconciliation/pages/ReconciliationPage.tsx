@@ -144,34 +144,7 @@ export const ReconciliationPage: React.FC = () => {
             <h1 className="text-xl font-bold text-[#1e293b] dark:text-gray-100 tracking-tight">
               ĐỐI CHIẾU & TỔNG HỢP DỮ LIỆU BÁO CHUYẾN
             </h1>
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              Đối chiếu dữ liệu báo chuyến giữa bên vận tải và bên khai thác,
-              tổng hợp số liệu chuẩn
-            </p>
           </div>
-        </div>
-
-        {/* Top Right Action Buttons */}
-        <div className="flex items-center gap-2.5">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => toast.success("Đã lưu dữ liệu đối chiếu chuẩn!")}
-            className="h-9 px-6 text-xs font-semibold border-emerald-600 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-500 dark:text-emerald-400 shadow-2xs"
-          >
-            Lưu
-          </Button>
-
-          <Button
-            onClick={() => {
-              loadData();
-              toast.success("Đã thực hiện đối chiếu lại toàn bộ dữ liệu!");
-            }}
-            className="h-9 px-5 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white gap-2 shadow-xs"
-          >
-            <RotateCw className="w-4 h-4" />
-            Đối chiếu
-          </Button>
         </div>
       </div>
 
@@ -244,6 +217,20 @@ export const ReconciliationPage: React.FC = () => {
             </Select>
           </div>
 
+          {/* Nút Đối chiếu cạnh Số xe */}
+          <div className="flex flex-col gap-1 justify-end">
+            <Button
+              onClick={() => {
+                loadData();
+                toast.success("Đã thực hiện đối chiếu lại toàn bộ dữ liệu!");
+              }}
+              className="h-9 px-4 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white gap-2 shadow-xs shrink-0"
+            >
+              <RotateCw className="w-4 h-4" />
+              Đối chiếu
+            </Button>
+          </div>
+
           {/* Right Side: Search Box & Action Buttons */}
           <div className="ml-auto flex items-end gap-3">
             <div className="flex flex-col gap-1 w-64">
@@ -309,13 +296,7 @@ export const ReconciliationPage: React.FC = () => {
         {/* Card 2: Tổng số chuyến (Khai thác) */}
         <div className="bg-white dark:bg-gray-900 p-4 rounded-xl border border-gray-200 dark:border-gray-800 shadow-xs flex items-center gap-3.5">
           <div className="w-12 h-12 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 flex items-center justify-center shrink-0">
-            {/* Excavator / Pump icon representation */}
-            <svg
-              className="w-6 h-6 fill-none stroke-current stroke-2"
-              viewBox="0 0 24 24"
-            >
-              <path d="M12 2v6m0 0l-3-3m3 3l3-3M4 14a8 8 0 1016 0 8 8 0 00-16 0z" />
-            </svg>
+            <Truck className="w-6 h-6" />
           </div>
           <div>
             <div className="text-[11px] font-bold uppercase tracking-wider text-emerald-900 dark:text-emerald-300">
@@ -373,22 +354,34 @@ export const ReconciliationPage: React.FC = () => {
         </div>
       </div>
 
-      {/* ══ 4. RECONCILIATION TABLE & ACTION BAR ═════════════════════════ */}
-      <div className="space-y-2">
-        {/* Action Row above Table */}
-        <div className="flex items-center justify-end">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleExportExcel}
-            className="h-8 text-xs gap-1.5 border-emerald-600 text-emerald-700 hover:bg-emerald-50 font-medium"
-          >
-            <Download className="w-3.5 h-3.5 text-emerald-600" />
-            Xuất Excel
-          </Button>
+      {/* ══ 4. RECONCILIATION TABLE ═══════════════════════════════════════ */}
+      <div className="space-y-3">
+        {/* Table Top Bar: Header & Action Buttons */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <span className="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
+            Bảng danh sách kết quả đối chiếu
+          </span>
+
+          <div className="flex items-center gap-2.5 ml-auto">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => toast.success("Đã lưu dữ liệu đối chiếu chuẩn!")}
+              className="h-9 px-6 text-xs font-semibold border-emerald-600 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-500 dark:text-emerald-400 shadow-2xs"
+            >
+              Lưu
+            </Button>
+
+            <Button
+              onClick={handleExportExcel}
+              className="h-9 px-5 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white gap-2 shadow-xs"
+            >
+              <Download className="w-4 h-4" />
+              Tải xuống (Excel)
+            </Button>
+          </div>
         </div>
 
-        {/* Reconciliation Multi-level Table */}
         <ReconciliationComparisonTables
           items={filteredItems}
           onDeleteItem={handleDeleteItem}

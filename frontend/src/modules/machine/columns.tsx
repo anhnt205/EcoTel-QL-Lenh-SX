@@ -46,8 +46,8 @@ export const getMachineColumns = ({
       header: "Loại máy",
       meta: { align: "left" },
       cell: ({ row }) => {
-        const cat = row.original.category as any;
-        return typeof cat === "object" ? cat?.name || "—" : cat || "—";
+        const dev = row.original as any;
+        return dev.categoryName || (typeof dev.category === "object" ? dev.category?.name : dev.category) || "—";
       },
     },
     {
@@ -55,8 +55,8 @@ export const getMachineColumns = ({
       header: "Chủng loại",
       meta: { align: "left" },
       cell: ({ row }) => {
-        const mat = row.original.material as any;
-        return typeof mat === "object" ? mat?.name || "—" : mat || "—";
+        const dev = row.original as any;
+        return dev.materialName || (typeof dev.material === "object" ? dev.material?.name : dev.material) || "—";
       },
     },
     {
@@ -70,6 +70,10 @@ export const getMachineColumns = ({
       header: "Vị trí",
       meta: { align: "center" },
       cell: ({ row }) => {
+        const dev = row.original as any;
+        if (dev.longitude !== undefined && dev.latitude !== undefined) {
+          return `${dev.longitude}, ${dev.latitude}`;
+        }
         const coordsData = row.original.coordinates as any;
         const coords = coordsData?.coordinates;
         if (Array.isArray(coords) && coords.length === 2) {
@@ -83,8 +87,8 @@ export const getMachineColumns = ({
       header: "Đơn vị",
       meta: { align: "left" },
       cell: ({ row }) => {
-        const dept = row.original.department as any;
-        return typeof dept === "object" ? dept?.name || "Chưa có" : dept || "Chưa có";
+        const dev = row.original as any;
+        return dev.departmentName || (typeof dev.department === "object" ? dev.department?.name : dev.department) || "Chưa có";
       },
     },
     {

@@ -91,11 +91,7 @@ api.interceptors.response.use(
       return api(originalRequest);
     } catch (refreshError) {
       processPendingQueue(refreshError, null);
-
-      useAuthStore.getState().clearAuth();
-
-      // Redirect về login
-      window.location.href = '/auth/sign-in';
+      console.warn('[Mock Mode] Refresh token failed - Bypassing redirect to sign-in');
       return Promise.reject(refreshError);
     } finally {
       isRefreshing = false;

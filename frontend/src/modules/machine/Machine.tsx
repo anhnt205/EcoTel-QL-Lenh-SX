@@ -1,23 +1,14 @@
 import { useState, useMemo } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
+import { useQuery } from "@tanstack/react-query";
 
 import type { Device } from "@/types";
-import { RoleEnum, StatusDeviceEnum } from "@/enums";
-import { useAuthStore } from "@/modules/auth/stores/auth.store";
-import api from "@/config/api.config";
-import DepartmentService from "@/modules/departments/services/departmentService";
+import { StatusDeviceEnum } from "@/enums";
 
 import MachineService from "./services/machineService";
 import { getMachineColumns } from "./columns";
-import {
-  MachineFormDialog,
-  type MachineFormValues,
-} from "./components/MachineFormDialog";
 
 import AssetEbook from "@/components/common/AssetEbook";
 import AppDataTable from "@/components/table/AppDataTable";
-import ConfirmDialog from "@/components/ui/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import {
   Breadcrumb,
@@ -27,26 +18,12 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
-import { parseAxiosError } from "@/utils/handleApiError";
 
 const Machines = () => {
-  const user = useAuthStore((state) => state.user);
-  const isAdmin = user?.role === RoleEnum.ADMIN;
-  const queryClient = useQueryClient();
-
   const [searchValue, setSearchValue] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [departmentFilter] = useState("");
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
   const [viewingDevice, setViewingDevice] = useState<Device | null>(null);
-
-  // Xóa theo ID
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
-
-  // Excel import loading
-  const [isImporting, setIsImporting] = useState(false);
 
   // 1. Fetch data
   const {
@@ -72,140 +49,19 @@ const Machines = () => {
       }),
   });
 
-  const { data: deviceTypes = [] } = useQuery({
-    queryKey: ["DeviceTypes"],
-    queryFn: () => api.get("/DeviceTypes").then((res) => res.data.data),
-  });
-
-  const { data: departments = [] } = useQuery({
-    queryKey: ["departments"],
-    queryFn: () => DepartmentService.getAll(),
-  });
-
-  const { data: deviceModels = [] } = useQuery({
-    queryKey: ["devicemodels"],
-    queryFn: () => api.get("/devicemodels").then((res) => res.data.data),
-  });
-
-  // 2. Mutations
-  const createMutation = useMutation({
-    mutationFn: MachineService.create,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["machines"] });
-      queryClient.invalidateQueries({ queryKey: ["allMachines"] });
-      toast.success("Thêm thông tin máy thành công!");
-      setDialogOpen(false);
-    },
-    onError: async (error: any) => {
-      const message = await parseAxiosError(error);
-      toast.error(message || "Lỗi khi thêm thông tin máy");
-    },
-  });
-
-  const updateMutation = useMutation({
-    mutationFn: MachineService.update,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["machines"] });
-      queryClient.invalidateQueries({ queryKey: ["allMachines"] });
-      toast.success("Cập nhật thông tin máy thành công!");
-      setDialogOpen(false);
-    },
-    onError: async (error: any) => {
-      const message = await parseAxiosError(error);
-      toast.error(message || "Lỗi khi cập nhật thông tin máy");
-    },
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: MachineService.delete,
-    onSuccess: (message) => {
-      queryClient.invalidateQueries({ queryKey: ["machines"] });
-      queryClient.invalidateQueries({ queryKey: ["allMachines"] });
-      setSelectedIds([]);
-      setConfirmDeleteOpen(false);
-      toast.success(message || "Xóa thành công!");
-    },
-    onError: async (error: any) => {
-      const message = await parseAxiosError(error);
-      toast.error(message || "Lỗi khi xóa bản ghi");
-    },
-  });
-
-  const importFileMutation = useMutation({
-    mutationFn: (formData: FormData) => MachineService.importFile(formData),
-    onMutate: () => setIsImporting(true),
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["machines"] });
-      queryClient.invalidateQueries({ queryKey: ["allMachines"] });
-      setIsImporting(false);
-      let combinedMessage = `Import dữ liệu hoàn tất. Đã xử lý ${data.summary?.totalProcessed || 0} bản ghi.`;
-      combinedMessage += ` Đã thêm mới: ${data.summary?.insertedCount || 0}, Đã cập nhật: ${data.summary?.updatedCount || 0}`;
-      toast.success(combinedMessage);
-    },
-    onError: async (error: any) => {
-      setIsImporting(false);
-      const message = await parseAxiosError(error);
-      toast.error(message || "Lỗi khi import file Excel");
-    },
-  });
-
-  const exportExcelMutation = useMutation({
-    mutationFn: () => MachineService.exportFile(machines),
-    onSuccess: () => {
-      toast.success("Xuất file Excel thành công!");
-    },
-    onError: async (error: any) => {
-      const message = await parseAxiosError(error);
-      toast.error(message || "Lỗi khi xuất file Excel");
-    },
-  });
-
-  // Handlers
-  const handleOpenAdd = () => {
-    setSelectedDevice(null);
-    setDialogOpen(true);
-  };
-
-  const handleOpenEdit = (device: Device) => {
-    setSelectedDevice(device);
-    setDialogOpen(true);
-  };
-
   const handleOpenView = (device: Device) => {
-    setViewingDevice((prev) => (prev?._id === device._id ? null : device));
-  };
-
-  const handleFormSubmit = async (values: MachineFormValues) => {
-    if (selectedDevice) {
-      await updateMutation.mutateAsync({
-        ...values,
-        _id: selectedDevice._id,
-      });
-    } else {
-      await createMutation.mutateAsync(values);
-    }
-  };
-
-  const handleConfirmDelete = () => {
-    if (selectedIds.length === 0) return;
-    deleteMutation.mutate(selectedIds);
-  };
-
-  const handleImportExcel = (file: File) => {
-    const formData = new FormData();
-    formData.append("file", file);
-    importFileMutation.mutate(formData);
+    setViewingDevice((prev) => (prev?._id === device._id || (prev as any)?.id === (device as any).id ? null : device));
   };
 
   // Table Columns
   const columns = useMemo(
     () =>
       getMachineColumns({
-        onEdit: handleOpenEdit,
+        onEdit: () => {},
         onView: handleOpenView,
-        isAdmin,
+        isAdmin: false,
       }),
-    [isAdmin],
+    [],
   );
 
   return (
@@ -234,11 +90,15 @@ const Machines = () => {
         </Button>
         <Button
           size="sm"
-          variant={statusFilter === StatusDeviceEnum.AVAILABLE ? "default" : "outline"}
+          variant={
+            statusFilter === StatusDeviceEnum.AVAILABLE ? "default" : "outline"
+          }
           className="text-green-600 border-green-600 hover:bg-green-50 dark:hover:bg-green-950"
           onClick={() =>
             setStatusFilter((prev) =>
-              prev === StatusDeviceEnum.AVAILABLE ? "" : StatusDeviceEnum.AVAILABLE,
+              prev === StatusDeviceEnum.AVAILABLE
+                ? ""
+                : StatusDeviceEnum.AVAILABLE,
             )
           }
         >
@@ -251,7 +111,9 @@ const Machines = () => {
         </Button>
         <Button
           size="sm"
-          variant={statusFilter === StatusDeviceEnum.IN_USE ? "default" : "outline"}
+          variant={
+            statusFilter === StatusDeviceEnum.IN_USE ? "default" : "outline"
+          }
           className="text-red-600 border-red-600 hover:bg-red-50 dark:hover:bg-red-950"
           onClick={() =>
             setStatusFilter((prev) =>
@@ -260,12 +122,19 @@ const Machines = () => {
           }
         >
           Đang hoạt động (
-          {allMachines.filter((o) => o.status === StatusDeviceEnum.IN_USE).length}
+          {
+            allMachines.filter((o) => o.status === StatusDeviceEnum.IN_USE)
+              .length
+          }
           )
         </Button>
         <Button
           size="sm"
-          variant={statusFilter === StatusDeviceEnum.MAINTENANCE ? "default" : "outline"}
+          variant={
+            statusFilter === StatusDeviceEnum.MAINTENANCE
+              ? "default"
+              : "outline"
+          }
           className="text-amber-600 border-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950"
           onClick={() =>
             setStatusFilter((prev) =>
@@ -295,11 +164,6 @@ const Machines = () => {
             searchValue={searchValue}
             onSearch={(val) => setSearchValue(val)}
             onRefresh={refetch}
-            onAdd={isAdmin ? handleOpenAdd : undefined}
-            showExport={isAdmin}
-            onExportCsv={() => exportExcelMutation.mutate()}
-            onImportExcel={isAdmin ? handleImportExcel : undefined}
-            isImporting={isImporting}
             showColumnToggle
             stickyHeader
           />
@@ -315,30 +179,6 @@ const Machines = () => {
           </div>
         )}
       </div>
-
-      {/* Form Dialog (Add/Edit) */}
-      <MachineFormDialog
-        open={dialogOpen}
-        onOpenChange={setDialogOpen}
-        device={selectedDevice}
-        deviceTypes={deviceTypes}
-        deviceModels={deviceModels}
-        departments={departments}
-        userRole={user?.role}
-        userDepartmentId={(user as any)?.department?._id || (user as any)?.department}
-        onSubmit={handleFormSubmit}
-        isLoading={createMutation.isPending || updateMutation.isPending}
-      />
-
-      {/* Confirm Delete Dialog */}
-      <ConfirmDialog
-        open={confirmDeleteOpen}
-        onOpenChange={setConfirmDeleteOpen}
-        title="Xác nhận xóa thông tin máy"
-        description={`Bạn có chắc chắn muốn xóa ${selectedIds.length} bản ghi máy đã chọn? Hành động này không thể hoàn tác.`}
-        onConfirm={handleConfirmDelete}
-        loading={deleteMutation.isPending}
-      />
     </div>
   );
 };

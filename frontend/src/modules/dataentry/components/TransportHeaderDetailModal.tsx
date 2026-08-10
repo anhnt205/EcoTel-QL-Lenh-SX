@@ -20,8 +20,6 @@ import { ComboboxInput } from "../../../components/ui/combobox-input.tsx";
 import {
   Plus,
   Trash2,
-  Upload,
-  Download,
   Save,
   XCircle,
   Truck,
@@ -31,20 +29,9 @@ import { toast } from "sonner";
 import { useConfirmDialog } from "../../../components/ui/confirm-dialog.tsx";
 import type { TransportRecord } from "@/modules/dataentry/types/thong-ke.ts";
 import { saveTransportRecords } from "@/modules/dataentry/services/thongKeStorage.ts";
-import { excelService } from "@/modules/report/utils/excel-exporter.ts";
-import {
-  lookupVehicleInfo,
-  lookupOperatorInfo,
-  calculateBenchGroup,
-  getExcavatorsForArea,
-  getCargoGroup,
-  EXCAVATION_AREAS,
-  PICKUP_LOCATIONS,
-  UNLOAD_LOCATIONS,
-  CARGO_TYPES,
-  VEHICLE_NUMBERS,
-  OPERATOR_BADGES,
-} from "@/modules/dataentry/utils/lookup.ts";
+import { calculateBenchGroup } from "@/modules/dataentry/utils/lookup.ts";
+import { useMasterData } from "@/modules/dataentry/hooks/useMasterData.ts";
+import { validateTransportSession } from "@/modules/dataentry/schemas/thong-ke.schema.ts";
 
 // ─── Tải trọng options – radio buttons trong bảng chuyến ─────────────────
 const LOAD_STATUS_OPTIONS = [
@@ -115,83 +102,6 @@ const computeFuelUsed = (s: TransportSessionDraft): number =>
       (Number(s.finalFuel) || 0),
   );
 
-const newTripRow = (area: string = "Khe Chàm"): TransportTripRow => {
-  const availableExcavators = getExcavatorsForArea(area);
-  const bench = "-40";
-  const benchGroup = calculateBenchGroup(area, bench);
-  const cargoType = "Than";
-  const cargoGroup = getCargoGroup(cargoType);
-  const vehicleNo = "505 HD 465-7R";
-  const vInfo = lookupVehicleInfo(vehicleNo);
-
-  return {
-    _tempId: `trip_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-    excavationArea: area,
-    excavatorEquipment: availableExcavators[0] || "KC-MX01",
-    pickupLocation: "11.ĐCS",
-    pickupBench: bench,
-    pickupBenchGroup: benchGroup ? `Nhóm ${benchGroup}` : "",
-    unloadBench: "+10",
-    fullRouteDistance: 5.5,
-    fullRouteElevate: 100,
-    localSlopeDist: 1.2,
-    localSlopeDegree: 8,
-    unloadLocationName: "Bãi sàng",
-    cargoType,
-    cargoGroup,
-    vehicleNo,
-    tripCount: 8,
-    loadStatus: "Đủ tải",
-    loadStatusNote: "",
-    isRainyDay: true,
-    isTraineeVehicle: true,
-    equipmentUnit: vInfo.vehicleManagementUnit || "PXVT9",
-    vehicleType: vInfo.vehicleType || "HD 465-7R",
-  };
-};
-
-const newSession = (): TransportSessionDraft => {
-  const badgeNo = "5251";
-  const opInfo = lookupOperatorInfo(badgeNo);
-
-  return {
-    _tempId: `sess_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-    workingDate: todayStr(),
-    shift: "1",
-    trips: [
-      newTripRow("Khe Chàm"),
-      {
-        ...newTripRow("Khe Chàm"),
-        pickupBench: "-25",
-        pickupBenchGroup: `Nhóm ${calculateBenchGroup("Khe Chàm", "-25")}`,
-        tripCount: 6,
-        loadStatus: "Roda (2/3)",
-        loadStatusNote: "2/3",
-        isRainyDay: false,
-        isTraineeVehicle: false,
-      },
-      {
-        ...newTripRow("Khe Chàm"),
-        pickupBench: "-10",
-        pickupBenchGroup: `Nhóm ${calculateBenchGroup("Khe Chàm", "-10")}`,
-        cargoType: "Đất",
-        cargoGroup: getCargoGroup("Đất"),
-        tripCount: 5,
-        loadStatus: "Khác",
-        loadStatusNote: "1/2",
-        isRainyDay: true,
-        isTraineeVehicle: false,
-      },
-    ],
-    initialFuel: 330,
-    receivedFuel: 400,
-    finalFuel: 340,
-    operatorBadgeNo: badgeNo,
-    operatorName: opInfo.operatorName || "Trần Hồng Sơn",
-    operatorUnit: opInfo.operatorUnit || "PXVT9",
-  };
-};
-
 // ─── Props ────────────────────────────────────────────────────────────────
 interface TransportHeaderDetailModalProps {
   isOpen: boolean;
@@ -203,21 +113,110 @@ interface TransportHeaderDetailModalProps {
 export const TransportHeaderDetailModal: React.FC<
   TransportHeaderDetailModalProps
 > = ({ isOpen, onClose, onSuccess }) => {
+  const {
+    shiftOptions,
+    locationValues,
+    excavatorValues,
+    vehicleValues,
+    cargoTypeValues,
+    operatorOptions,
+    getVehicleDetails,
+    getOperatorDetails,
+    getCargoGroupDetails,
+  } = useMasterData();
+
+  // Dùng primitive (string) để tránh tạo callback mới mỗi render
+  const firstLocation = locationValues[0] || "Khe Chàm";
+  const firstExcavator = excavatorValues[0] || "KC-MX01";
+  const firstCargoType = cargoTypeValues[0] || "Than";
+  const firstVehicle = vehicleValues[0] || "505 HD 465-7R";
+  const secondLocation = locationValues[1] || locationValues[0] || "Bãi sàng";
+
+  const createDefaultTripRow = useCallback(
+    (area?: string): TransportTripRow => {
+      const selectedArea = area || firstLocation;
+      const bench = "-40";
+      const benchGroup = calculateBenchGroup(selectedArea, bench);
+      const cargoType = firstCargoType;
+      const cargoGroup = getCargoGroupDetails(cargoType);
+      const vehicleNo = firstVehicle;
+      const vInfo = getVehicleDetails(vehicleNo);
+
+      return {
+        _tempId: `trip_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+        excavationArea: selectedArea,
+        excavatorEquipment: firstExcavator,
+        pickupLocation: firstLocation,
+        pickupBench: bench,
+        pickupBenchGroup: benchGroup ? `Nhóm ${benchGroup}` : "",
+        unloadBench: "+10",
+        fullRouteDistance: 5.5,
+        fullRouteElevate: 100,
+        localSlopeDist: 1.2,
+        localSlopeDegree: 8,
+        unloadLocationName: secondLocation,
+        cargoType,
+        cargoGroup,
+        vehicleNo,
+        tripCount: 8,
+        loadStatus: "Đủ tải",
+        loadStatusNote: "",
+        isRainyDay: true,
+        isTraineeVehicle: true,
+        equipmentUnit: vInfo.vehicleManagementUnit || "PXVT9",
+        vehicleType: vInfo.vehicleType || "HD 465-7R",
+      };
+    },
+    [firstLocation, firstExcavator, firstCargoType, firstVehicle, secondLocation, getVehicleDetails, getCargoGroupDetails],
+  );
+
+  const firstShift = shiftOptions[0]?.value || "1";
+  const firstOperator = operatorOptions[0]?.value || "5251";
+
+  const createDefaultSession = useCallback((): TransportSessionDraft => {
+    const opInfo = getOperatorDetails(firstOperator);
+
+    return {
+      _tempId: `sess_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      workingDate: todayStr(),
+      shift: firstShift,
+      trips: [
+        createDefaultTripRow("Khe Chàm"),
+        {
+          ...createDefaultTripRow("Khe Chàm"),
+          pickupBench: "-25",
+          pickupBenchGroup: `Nhóm ${calculateBenchGroup("Khe Chàm", "-25")}`,
+          tripCount: 6,
+          loadStatus: "Roda (2/3)",
+          loadStatusNote: "2/3",
+          isRainyDay: false,
+          isTraineeVehicle: false,
+        },
+      ],
+      initialFuel: 330,
+      receivedFuel: 400,
+      finalFuel: 340,
+      operatorBadgeNo: firstOperator,
+      operatorName: opInfo.operatorName || "Trần Hồng Sơn",
+      operatorUnit: opInfo.operatorUnit || "PXVT9",
+    };
+  }, [firstShift, firstOperator, getOperatorDetails, createDefaultTripRow]);
+
   const [sessions, setSessions] = useState<TransportSessionDraft[]>([
-    newSession(),
+    createDefaultSession(),
   ]);
   const [activeIdx, setActiveIdx] = useState(0);
-  const [isImporting, setIsImporting] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const tableBottomRef = useRef<HTMLDivElement>(null);
 
-  // Reset khi mở modal
+  // Reset khi mở modal – chỉ chạy khi isOpen chuyển từ false → true
+  const prevIsOpenRef = useRef(false);
   useEffect(() => {
-    if (isOpen) {
-      setSessions([newSession()]);
+    if (isOpen && !prevIsOpenRef.current) {
+      setSessions([createDefaultSession()]);
       setActiveIdx(0);
     }
-  }, [isOpen]);
+    prevIsOpenRef.current = isOpen;
+  }, [isOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Cập nhật session header ─────────────────────────────────────────────
   const updateSession = useCallback(
@@ -226,9 +225,9 @@ export const TransportHeaderDetailModal: React.FC<
         const next = [...prev];
         if (!next[sIdx]) return prev;
         const updated = { ...next[sIdx], ...patch };
-        // Auto-fill tên + đơn vị theo thẻ lương
+        // Auto-fill tên + đơn vị theo thẻ lương từ API cache
         if ("operatorBadgeNo" in patch) {
-          const info = lookupOperatorInfo(patch.operatorBadgeNo!);
+          const info = getOperatorDetails(patch.operatorBadgeNo!);
           updated.operatorName = info.operatorName;
           updated.operatorUnit = info.operatorUnit;
         }
@@ -236,7 +235,7 @@ export const TransportHeaderDetailModal: React.FC<
         return next;
       });
     },
-    [],
+    [getOperatorDetails],
   );
 
   // ── Cập nhật 1 dòng chuyến ──────────────────────────────────────────────
@@ -259,22 +258,14 @@ export const TransportHeaderDetailModal: React.FC<
           updatedTrip.pickupBenchGroup = bg !== "" ? `Nhóm ${bg}` : "";
         }
 
-        // Auto calculate nhóm hàng
+        // Auto calculate nhóm hàng từ API cache
         if ("cargoType" in patch) {
-          updatedTrip.cargoGroup = getCargoGroup(patch.cargoType!);
+          updatedTrip.cargoGroup = getCargoGroupDetails(patch.cargoType!);
         }
 
-        // Auto update danh sách máy xúc khi đổi khu vực xúc
-        if ("excavationArea" in patch) {
-          const available = getExcavatorsForArea(patch.excavationArea!);
-          if (!available.includes(updatedTrip.excavatorEquipment)) {
-            updatedTrip.excavatorEquipment = available[0] || "";
-          }
-        }
-
-        // Auto-fill đơn vị QL + chủng loại xe theo số xe
+        // Auto-fill đơn vị QL + chủng loại xe theo số xe từ API cache
         if ("vehicleNo" in patch) {
-          const info = lookupVehicleInfo(patch.vehicleNo!);
+          const info = getVehicleDetails(patch.vehicleNo!);
           updatedTrip.equipmentUnit = info.vehicleManagementUnit;
           updatedTrip.vehicleType = info.vehicleType;
         }
@@ -284,27 +275,30 @@ export const TransportHeaderDetailModal: React.FC<
         return next;
       });
     },
-    [],
+    [getVehicleDetails, getCargoGroupDetails],
   );
 
   // ── Thêm / xóa dòng chuyến ─────────────────────────────────────────────
-  const handleAddTrip = useCallback((sIdx: number) => {
-    setSessions((prev) => {
-      const next = [...prev];
-      if (!next[sIdx]) return prev;
-      const lastTrip = next[sIdx].trips[next[sIdx].trips.length - 1];
-      const area = lastTrip ? lastTrip.excavationArea : "Khe Chàm";
-      next[sIdx] = {
-        ...next[sIdx],
-        trips: [...next[sIdx].trips, newTripRow(area)],
-      };
-      return next;
-    });
-    setTimeout(
-      () => tableBottomRef.current?.scrollIntoView({ behavior: "smooth" }),
-      60,
-    );
-  }, []);
+  const handleAddTrip = useCallback(
+    (sIdx: number) => {
+      setSessions((prev) => {
+        const next = [...prev];
+        if (!next[sIdx]) return prev;
+        const lastTrip = next[sIdx].trips[next[sIdx].trips.length - 1];
+        const area = lastTrip ? lastTrip.excavationArea : locationValues[0] || "Khe Chàm";
+        next[sIdx] = {
+          ...next[sIdx],
+          trips: [...next[sIdx].trips, createDefaultTripRow(area)],
+        };
+        return next;
+      });
+      setTimeout(
+        () => tableBottomRef.current?.scrollIntoView({ behavior: "smooth" }),
+        60,
+      );
+    },
+    [createDefaultTripRow, locationValues],
+  );
 
   const handleRemoveTrip = (sIdx: number, tIdx: number) => {
     setSessions((prev) => {
@@ -324,7 +318,7 @@ export const TransportHeaderDetailModal: React.FC<
 
   // ── Thêm / xóa tab bản ghi ─────────────────────────────────────────────
   const handleAddSession = () => {
-    setSessions((prev) => [...prev, newSession()]);
+    setSessions((prev) => [...prev, createDefaultSession()]);
     setActiveIdx(sessions.length);
   };
 
@@ -337,35 +331,18 @@ export const TransportHeaderDetailModal: React.FC<
     setActiveIdx((prev) => Math.min(prev, sessions.length - 2));
   };
 
-  // ── Import Excel ────────────────────────────────────────────────────────
-  const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (!file.name.endsWith(".xlsx") && !file.name.endsWith(".xls")) {
-      toast.error("Vui lòng chọn file Excel (.xlsx hoặc .xls)");
-      e.target.value = "";
-      return;
-    }
-    setIsImporting(true);
-    try {
-      const rawRows = await excelService.parseExcelFile(file);
-      if (!rawRows || rawRows.length === 0) {
-        toast.error("File Excel không chứa bản ghi nào!");
-        return;
-      }
-      toast.success(`Đã nạp ${rawRows.length} dòng từ Excel!`);
-    } catch (err: any) {
-      toast.error(
-        `Lỗi đọc file Excel: ${err.message || "Không thể xử lý file"}`,
-      );
-    } finally {
-      setIsImporting(false);
-      e.target.value = "";
-    }
-  };
-
   // ── Lưu tất cả ─────────────────────────────────────────────────────────
   const handleSave = (andAddNew: boolean) => {
+    // Validate tất cả các sessions qua Zod Schema trước khi lưu
+    for (let i = 0; i < sessions.length; i++) {
+      const validation = validateTransportSession(sessions[i], i);
+      if (!validation.success) {
+        toast.error(validation.errorMsg);
+        setActiveIdx(i);
+        return;
+      }
+    }
+
     const validRecords: TransportRecord[] = [];
 
     sessions.forEach((sess) => {
@@ -434,7 +411,7 @@ export const TransportHeaderDetailModal: React.FC<
     onSuccess();
 
     if (andAddNew) {
-      setSessions([newSession()]);
+      setSessions([createDefaultSession()]);
       setActiveIdx(0);
     } else {
       onClose();
@@ -489,7 +466,7 @@ export const TransportHeaderDetailModal: React.FC<
 
   // ════════════════════════════════════════════════════════════════════════
   return (
-    <Dialog open={isOpen} onOpenChange={handleCancel}>
+    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) handleCancel(); }}>
       <DialogContent
         className="w-[99vw] max-w-[99vw] sm:max-w-[99vw] h-[96vh] max-h-[96vh] flex flex-col p-0
                    bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800
@@ -503,7 +480,7 @@ export const TransportHeaderDetailModal: React.FC<
               <Truck className="w-5 h-5" />
             </div>
             <DialogTitle className="text-base font-bold text-gray-900 dark:text-gray-100 tracking-wide">
-              THÊM MỚI BẢN GHI – BÁO CHUYẾN PHÂN XƯỞNG VẬN TẢI
+              Thêm mới bản ghi – Báo chuyến Phân xưởng Vận tải
             </DialogTitle>
           </div>
           <button
@@ -578,9 +555,11 @@ export const TransportHeaderDetailModal: React.FC<
                   <SelectValue placeholder="Chọn ca" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="1">Ca 1</SelectItem>
-                  <SelectItem value="2">Ca 2</SelectItem>
-                  <SelectItem value="3">Ca 3</SelectItem>
+                  {shiftOptions.map((s) => (
+                    <SelectItem key={s.value} value={s.value}>
+                      {s.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -594,35 +573,6 @@ export const TransportHeaderDetailModal: React.FC<
                 Danh sách chuyến
               </span>
               <div className="flex items-center gap-2">
-                {/* Import Excel */}
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  accept=".xlsx,.xls"
-                  onChange={handleImportExcel}
-                  className="hidden"
-                />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={isImporting}
-                  className="h-8 text-xs gap-1.5 border-gray-300 text-gray-600 hover:bg-gray-50"
-                >
-                  <Upload className="w-3.5 h-3.5" />
-                  Import (Excel)
-                </Button>
-
-                {/* Export Excel */}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-8 text-xs gap-1.5 border-gray-300 text-gray-600 hover:bg-gray-50"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  Export (Excel)
-                </Button>
-
                 {/* Thêm chuyến */}
                 <Button
                   variant="outline"
@@ -710,10 +660,6 @@ export const TransportHeaderDetailModal: React.FC<
 
                 <tbody>
                   {sess.trips.map((trip, tIdx) => {
-                    const availableExcavators = getExcavatorsForArea(
-                      trip.excavationArea,
-                    );
-
                     return (
                       <tr
                         key={trip._tempId}
@@ -740,7 +686,7 @@ export const TransportHeaderDetailModal: React.FC<
                               <SelectValue placeholder="Khu vực" />
                             </SelectTrigger>
                             <SelectContent>
-                              {EXCAVATION_AREAS.map((a) => (
+                              {locationValues.map((a) => (
                                 <SelectItem key={a} value={a}>
                                   {a}
                                 </SelectItem>
@@ -763,7 +709,7 @@ export const TransportHeaderDetailModal: React.FC<
                               <SelectValue placeholder="Máy xúc" />
                             </SelectTrigger>
                             <SelectContent>
-                              {availableExcavators.map((e) => (
+                              {excavatorValues.map((e) => (
                                 <SelectItem key={e} value={e}>
                                   {e}
                                 </SelectItem>
@@ -779,7 +725,7 @@ export const TransportHeaderDetailModal: React.FC<
                             onChange={(v) =>
                               updateTrip(activeIdx, tIdx, { pickupLocation: v })
                             }
-                            options={PICKUP_LOCATIONS}
+                            options={locationValues}
                             placeholder="Nơi nhận tải"
                           />
                         </td>
@@ -913,7 +859,7 @@ export const TransportHeaderDetailModal: React.FC<
                               <SelectValue placeholder="Nơi dỡ" />
                             </SelectTrigger>
                             <SelectContent>
-                              {UNLOAD_LOCATIONS.map((u) => (
+                              {locationValues.map((u) => (
                                 <SelectItem key={u} value={u}>
                                   {u}
                                 </SelectItem>
@@ -934,7 +880,7 @@ export const TransportHeaderDetailModal: React.FC<
                               <SelectValue placeholder="Loại hàng" />
                             </SelectTrigger>
                             <SelectContent>
-                              {CARGO_TYPES.map((c) => (
+                              {cargoTypeValues.map((c) => (
                                 <SelectItem key={c} value={c}>
                                   {c}
                                 </SelectItem>
@@ -961,7 +907,7 @@ export const TransportHeaderDetailModal: React.FC<
                             onChange={(v) =>
                               updateTrip(activeIdx, tIdx, { vehicleNo: v })
                             }
-                            options={VEHICLE_NUMBERS}
+                            options={vehicleValues}
                             placeholder="Số xe"
                           />
                         </td>
@@ -1023,19 +969,18 @@ export const TransportHeaderDetailModal: React.FC<
                                     </span>
                                   </div>
 
-                                  {isNoteOption && (
+                                  {isNoteOption && active && (
                                     <Input
                                       type="text"
-                                      value={active ? trip.loadStatusNote : ""}
-                                      disabled={!active}
+                                      value={trip.loadStatusNote}
                                       onChange={(e) =>
                                         updateTrip(activeIdx, tIdx, {
                                           loadStatusNote: e.target.value,
                                         })
                                       }
                                       onClick={(e) => e.stopPropagation()}
-                                      className="h-5 w-9 text-[10px] px-1 text-center bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 disabled:opacity-40"
-                                      placeholder=""
+                                      className="h-6 w-24 text-[11px] px-1.5 text-center bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700"
+                                      placeholder="1/2…"
                                     />
                                   )}
                                 </label>
@@ -1100,7 +1045,7 @@ export const TransportHeaderDetailModal: React.FC<
                           <button
                             onClick={() => handleRemoveTrip(activeIdx, tIdx)}
                             title="Xóa chuyến"
-                            className="text-gray-300 hover:text-red-500 transition-colors p-1 rounded hover:bg-red-50"
+                            className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 transition-colors p-1 rounded hover:bg-red-50 dark:hover:bg-red-950/30"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
@@ -1225,9 +1170,9 @@ export const TransportHeaderDetailModal: React.FC<
                   <SelectValue placeholder="Chọn số thẻ" />
                 </SelectTrigger>
                 <SelectContent>
-                  {OPERATOR_BADGES.map((b) => (
-                    <SelectItem key={b} value={b}>
-                      {b}
+                  {operatorOptions.map((b) => (
+                    <SelectItem key={b.value} value={b.value}>
+                      {b.label}
                     </SelectItem>
                   ))}
                 </SelectContent>

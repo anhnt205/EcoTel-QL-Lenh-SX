@@ -6,28 +6,32 @@ import { RoleGuard as ModuleRoleGuard } from "@/modules/auth/components/RoleGuar
 import { MainLayout } from "@/layouts/main-layout";
 
 import { statisticsRoutes } from "@/modules/dataentry/router";
-import { reconciliationRoutes } from "@/modules/reconciliation/router";
-import { reportsRoutes } from "@/modules/report/router";
 
 const TransportEntryPage = lazy(() =>
-  import("@/modules/dataentry/pages/TransportEntryPage").then((m) => ({ default: m.TransportEntryPage }))
+  import("@/modules/dataentry/pages/TransportEntryPage").then((m) => ({
+    default: m.TransportEntryPage,
+  }))
 );
 const MiningEntryPage = lazy(() =>
-  import("@/modules/dataentry/pages/MiningEntryPage").then((m) => ({ default: m.MiningEntryPage }))
+  import("@/modules/dataentry/pages/MiningEntryPage").then((m) => ({
+    default: m.MiningEntryPage,
+  }))
 );
 const ReconciliationPage = lazy(() =>
-  import("@/modules/reconciliation/pages/ReconciliationPage").then((m) => ({ default: m.ReconciliationPage }))
+  import("@/modules/reconciliation/pages/ReconciliationPage").then((m) => ({
+    default: m.ReconciliationPage,
+  }))
 );
 
 const DepartmentsPage = lazy(() => import("@/modules/departments/Departments"));
-const DeviceTypesPage = lazy(() => import("@/modules/deviceTypes/DeviceTypes"));
-const DeviceModelsPage = lazy(() => import("@/modules/deviceModels/DeviceModels"));
 const VehiclesPage = lazy(() => import("@/modules/vehicles/Vehicles"));
 const MachinePage = lazy(() => import("@/modules/machine/Machine"));
-const TravelLogPage = lazy(() => import("@/modules/TravelLog/TravelLog"));
-const ModelPage = lazy(() => import("@/modules/model/Model"));
 const MaterialsPage = lazy(() => import("@/modules/materials/Materials"));
 const LocationsPage = lazy(() => import("@/modules/locations/Locations"));
+const CargoGroupsPage = lazy(() => import("@/modules/cargoGroups/CargoGroups"));
+const CargoTypesPage = lazy(() => import("@/modules/cargoTypes/CargoTypes"));
+const ShiftsPage = lazy(() => import("@/modules/shifts/Shifts"));
+const UsersPage = lazy(() => import("@/modules/users/Users"));
 
 const PageLoader = () => (
   <div className="flex h-screen w-full items-center justify-center bg-background/50 backdrop-blur-xs">
@@ -37,9 +41,8 @@ const PageLoader = () => (
 
 export const mainRoutes = (
   <Route element={<ProtectedRoute />}>
-    {/* Các module dùng MainLayout */}
     <Route element={<MainLayout />}>
-      {/* Module Thống Kê (Đối chiếu Vận tải - Khai thác) */}
+      {/* Module Thống Kê (Vận tải - Khai thác - Đối chiếu) */}
       <Route
         path={ROUTES.DATA_ENTRY.TRANSPORT}
         element={
@@ -74,34 +77,12 @@ export const mainRoutes = (
       {/* Statistics */}
       {statisticsRoutes}
 
-      {/* Reconciliation */}
-      {reconciliationRoutes}
-
-      {/* Reports */}
-      {reportsRoutes}
-
-      {/* Danh mục routes */}
+      {/* 8 Danh mục chuẩn hóa theo Backend */}
       <Route
         path={ROUTES.DANH_MUC.DON_VI}
         element={
           <Suspense fallback={<PageLoader />}>
             <DepartmentsPage />
-          </Suspense>
-        }
-      />
-      <Route
-        path={ROUTES.DANH_MUC.PHAN_LOAI_THIET_BI}
-        element={
-          <Suspense fallback={<PageLoader />}>
-            <DeviceTypesPage />
-          </Suspense>
-        }
-      />
-      <Route
-        path={ROUTES.DANH_MUC.CHUNG_LOAI_THIET_BI}
-        element={
-          <Suspense fallback={<PageLoader />}>
-            <DeviceModelsPage />
           </Suspense>
         }
       />
@@ -122,22 +103,6 @@ export const mainRoutes = (
         }
       />
       <Route
-        path={ROUTES.DANH_MUC.CUNG_DO}
-        element={
-          <Suspense fallback={<PageLoader />}>
-            <TravelLogPage />
-          </Suspense>
-        }
-      />
-      <Route
-        path={ROUTES.DANH_MUC.MO_HINH_XE}
-        element={
-          <Suspense fallback={<PageLoader />}>
-            <ModelPage />
-          </Suspense>
-        }
-      />
-      <Route
         path={ROUTES.DANH_MUC.VAT_LIEU}
         element={
           <Suspense fallback={<PageLoader />}>
@@ -153,7 +118,38 @@ export const mainRoutes = (
           </Suspense>
         }
       />
+      <Route
+        path={ROUTES.DANH_MUC.NHOM_HANG}
+        element={
+          <Suspense fallback={<PageLoader />}>
+            <CargoGroupsPage />
+          </Suspense>
+        }
+      />
+      <Route
+        path={ROUTES.DANH_MUC.LOAI_HANG}
+        element={
+          <Suspense fallback={<PageLoader />}>
+            <CargoTypesPage />
+          </Suspense>
+        }
+      />
+      <Route
+        path={ROUTES.DANH_MUC.CA_LAM_VIEC}
+        element={
+          <Suspense fallback={<PageLoader />}>
+            <ShiftsPage />
+          </Suspense>
+        }
+      />
+      <Route
+        path={ROUTES.DANH_MUC.NGUOI_DUNG}
+        element={
+          <Suspense fallback={<PageLoader />}>
+            <UsersPage />
+          </Suspense>
+        }
+      />
     </Route>
   </Route>
 );
-

@@ -109,7 +109,7 @@ export const MiningDetailPanel: React.FC<MiningDetailPanelProps> = ({
       <div className="rounded-md border border-border/60 bg-muted/20 px-3 py-1 divide-y divide-border/40">
         <Field label="Số xe nhận tải" value={vehicleNo} />
         <Field label="Chủng loại xe" value={record.vehicleType} />
-        <Field label="Đơn vị quản lý xe" value={record.vehicleManagementUnit} />
+        <Field label="Đơn vị quản lý thiết bị" value={record.vehicleManagementUnit} />
         <Field label="Số chuyến" value={record.tripCount} />
         <Field label="Nơi nhận tải" value={record.pickupLocation} />
         <Field label="Vị trí đổ" value={record.dumpLocation} />

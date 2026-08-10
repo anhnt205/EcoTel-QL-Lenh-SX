@@ -8,16 +8,21 @@ import type {
 
 export interface User {
   _id: string;
+  id?: number;
   username: string;
   password?: string;
   fullName: string;
-  gender: string;
+  gender?: string;
   email?: string;
   phone?: string;
   avatar?: string;
   signature?: string;
   salaryCode?: string;
+  departmentId?: number;
+  departmentName?: string;
   department?: string;
+  positionId?: number;
+  positionName?: string;
   position?: string;
   role?: string;
   active: boolean;
@@ -44,6 +49,28 @@ export interface DeviceType {
   _id: string;
   name: string;
   group: DeviceTypeEnum;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CargoGroup {
+  _id: string;
+  id?: number;
+  name: string;
+  code?: string;
+  description?: string;
+  cargoTypeId?: number;
+  cargoTypeName?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CargoType {
+  _id: string;
+  id?: number;
+  name: string;
+  code?: string;
+  description?: string;
   createdAt?: string;
   updatedAt?: string;
 }

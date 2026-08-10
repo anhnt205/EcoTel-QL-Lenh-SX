@@ -1,7 +1,17 @@
-import React, { useState } from "react";
-import MaterialType from "./Tab/MaterialType";
-import MaterialDensity from "./Tab/MaterialDensity";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { useState, useEffect, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
+import dayjs from "dayjs";
+
+import MaterialService from "./services/materialService";
+import { getMaterialColumns } from "./columns";
+import AppDataTable from "@/components/table/AppDataTable";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -11,8 +21,70 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 
-const Materials: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<string>("material");
+interface HistoryTimeSlot {
+  id: string;
+  startTime: Date | null;
+  endTime: Date | null;
+}
+
+const Materials = () => {
+  const [searchValue, setSearchValue] = useState("");
+  const [selectedTimeSlot, setSelectedTimeSlot] = useState<HistoryTimeSlot | null>(null);
+  const [timeSlots, setTimeSlots] = useState<HistoryTimeSlot[]>([]);
+
+  // 1. Fetch data
+  const {
+    data: materials = [],
+    isLoading,
+    refetch,
+  } = useQuery({
+    queryKey: ["materials", searchValue],
+    queryFn: () => MaterialService.getAll({ keyword: searchValue }),
+  });
+
+  useEffect(() => {
+    if (materials.length > 0) {
+      const allHistory: HistoryTimeSlot[] = [];
+      const seen = new Set();
+
+      materials.forEach((m: any) => {
+        m.valueHistory?.forEach((h: any) => {
+          const key = `${h.startTime}-${h.endTime}`;
+          if (!seen.has(key)) {
+            seen.add(key);
+            allHistory.push({
+              id: key,
+              startTime: h.startTime ? new Date(h.startTime) : null,
+              endTime: h.endTime ? new Date(h.endTime) : null,
+            });
+          }
+        });
+      });
+
+      setTimeSlots(allHistory);
+    }
+  }, [materials]);
+
+  // Filter materials locally by selected time slot if specified
+  const filteredMaterials = useMemo(() => {
+    if (!selectedTimeSlot) return materials;
+    return materials.map((m: any) => {
+      const matchingHistory = m.valueHistory?.filter((h: any) => {
+        const sTime = h.startTime ? new Date(h.startTime).getTime() : 0;
+        const eTime = h.endTime ? new Date(h.endTime).getTime() : 0;
+        const selSTime = selectedTimeSlot.startTime ? selectedTimeSlot.startTime.getTime() : 0;
+        const selETime = selectedTimeSlot.endTime ? selectedTimeSlot.endTime.getTime() : 0;
+        return sTime === selSTime && eTime === selETime;
+      });
+      return {
+        ...m,
+        valueHistory: matchingHistory && matchingHistory.length > 0 ? matchingHistory : m.valueHistory,
+      };
+    });
+  }, [materials, selectedTimeSlot]);
+
+  // Table Columns
+  const columns = useMemo(() => getMaterialColumns(), []);
 
   return (
     <div className="flex flex-col h-full gap-4 p-4 md:p-6">
@@ -29,29 +101,50 @@ const Materials: React.FC = () => {
         </BreadcrumbList>
       </Breadcrumb>
 
-      <div className="flex flex-col gap-2">
-        <h1 className="text-2xl font-bold tracking-tight text-primary">
-          Vật liệu
-        </h1>
+      {/* Time Slot Filter Selector */}
+      {timeSlots.length > 0 && (
+        <div className="flex items-center gap-3 p-3 bg-card rounded-lg border w-fit shadow-xs">
+          <span className="text-sm font-medium">Lọc theo khoảng thời gian:</span>
+          <Select
+            value={selectedTimeSlot?.id || "all"}
+            onValueChange={(val) => {
+              if (val === "all") {
+                setSelectedTimeSlot(null);
+              } else {
+                const slot = timeSlots.find((s) => s.id === val);
+                setSelectedTimeSlot(slot || null);
+              }
+            }}
+          >
+            <SelectTrigger className="w-[300px] h-9">
+              <SelectValue placeholder="Tất cả khoảng thời gian" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Tất cả khoảng thời gian</SelectItem>
+              {timeSlots.map((slot) => (
+                <SelectItem key={slot.id} value={slot.id}>
+                  Từ {dayjs(slot.startTime).format("DD/MM/YYYY")} - Đến{" "}
+                  {dayjs(slot.endTime).format("DD/MM/YYYY")}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-2 md:w-[400px]">
-            <TabsTrigger value="material" className="font-semibold">
-              Loại vật liệu
-            </TabsTrigger>
-            <TabsTrigger value="density" className="font-semibold">
-              Tỷ trọng vật liệu
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="material" className="mt-4">
-            <MaterialType />
-          </TabsContent>
-
-          <TabsContent value="density" className="mt-4">
-            <MaterialDensity />
-          </TabsContent>
-        </Tabs>
+      {/* Main Table */}
+      <div className="flex-1 min-h-0">
+        <AppDataTable
+          title="Danh sách Vật liệu"
+          data={filteredMaterials}
+          columns={columns}
+          loading={isLoading}
+          searchValue={searchValue}
+          onSearch={(val) => setSearchValue(val)}
+          onRefresh={refetch}
+          showColumnToggle
+          stickyHeader
+        />
       </div>
     </div>
   );

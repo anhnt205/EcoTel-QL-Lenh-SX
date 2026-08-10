@@ -104,7 +104,7 @@ export const miningColumns: ColumnDef[] = [
   },
   {
     key: "vehicleManagementUnit",
-    label: "Đơn vị quản lý xe",
+    label: "Đơn vị quản lý thiết bị",
     type: "text",
     width: "w-36",
   },

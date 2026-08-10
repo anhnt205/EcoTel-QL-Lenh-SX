@@ -1,4 +1,10 @@
-import React, { useState, useMemo } from "react";
+import React, {
+  useState,
+  useMemo,
+  useRef,
+  useCallback,
+  useEffect,
+} from "react";
 import type { ReconciliationItem } from "@/modules/dataentry/types/thong-ke";
 import {
   flexRender,
@@ -38,6 +44,406 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
+// ─── Width constants ────────────────────────────────────────────────────────
+/** Tổng chiều rộng hiển thị của ô "Thông tin chung" trên bảng TanStack */
+const COMMON_INFO_COL_WIDTH = 500;
+
+/** Chiều rộng từng sub-field bên trong khối cuộn ẩn */
+const SUB_FIELD_WIDTHS: Record<string, number> = {
+  select: 40,
+  stt: 45,
+  date: 95,
+  shift: 60,
+  vehicleNo: 90,
+  badgeNo: 80,
+  excavationArea: 95,
+  excavatorEquipment: 80,
+  pickupLocation: 95,
+  unloadBench: 75,
+  pickupBenchGroup: 85,
+  fullRouteDistance: 80,
+  fullRouteElevate: 95,
+  localSlopeDist: 80,
+  localSlopeDegree: 70,
+  unloadLocationName: 95,
+  isRainyDay: 65,
+  isTraineeVehicle: 65,
+};
+
+// ─── Sub-field definitions for THÔNG TIN CHUNG ──────────────────────────────
+interface SubField {
+  id: string;
+  label: string;
+  render: (item: ReconciliationItem, checked?: boolean) => React.ReactNode;
+}
+
+const COMMON_SUB_FIELDS: SubField[] = [
+  {
+    id: "select",
+    label: "",
+    render: () => null, // handled separately via checkbox in row
+  },
+  {
+    id: "stt",
+    label: "STT",
+    render: (_item, _checked) => null, // row index, handled per row
+  },
+  {
+    id: "date",
+    label: "Thời gian",
+    render: (item) => {
+      const day = item.commonKey.day
+        ? String(item.commonKey.day).padStart(2, "0")
+        : "05";
+      const month = item.commonKey.month
+        ? String(item.commonKey.month).padStart(2, "0")
+        : "08";
+      return `${day}/${month}/2026`;
+    },
+  },
+  {
+    id: "shift",
+    label: "Ca",
+    render: (item) => (
+      <span className="font-semibold">{item.commonKey.shift || "Ca 1"}</span>
+    ),
+  },
+  {
+    id: "vehicleNo",
+    label: "Số xe",
+    render: (item) => (
+      <span className="font-bold text-gray-900 dark:text-gray-100">
+        {item.commonKey.vehicleNo || "14C-12345"}
+      </span>
+    ),
+  },
+  {
+    id: "badgeNo",
+    label: "Thẻ lương",
+    render: (item) =>
+      item.transportRecord?.operatorBadgeNo ||
+      item.miningRecord?.operatorBadgeNo ||
+      "8753",
+  },
+  {
+    id: "excavationArea",
+    label: "Khu vực xúc",
+    render: (item) => item.transportRecord?.excavationArea || "Khe Chàm",
+  },
+  {
+    id: "excavatorEquipment",
+    label: "Máy xúc",
+    render: (item) => (
+      <span className="font-semibold">
+        {item.transportRecord?.excavatorEquipment ||
+          item.miningRecord?.mineCode ||
+          "EX05"}
+      </span>
+    ),
+  },
+  {
+    id: "pickupLocation",
+    label: "Nơi nhận tải",
+    render: (item) =>
+      item.transportRecord?.pickupLocation ||
+      item.miningRecord?.pickupLocation ||
+      "Bãi sàng",
+  },
+  {
+    id: "unloadBench",
+    label: "Tầng dỡ tải",
+    render: (item) => item.transportRecord?.unloadBench || "-145",
+  },
+  {
+    id: "pickupBenchGroup",
+    label: "Tầng nhận tải",
+    render: (item) => (
+      <span className="text-gray-500">
+        {item.transportRecord?.pickupBenchGroup ||
+          item.transportRecord?.pickupBench ||
+          "-25"}
+      </span>
+    ),
+  },
+  {
+    id: "fullRouteDistance",
+    label: "CĐ toàn tuyến (km)",
+    render: (item) => item.transportRecord?.fullRouteDistance ?? 5.5,
+  },
+  {
+    id: "fullRouteElevate",
+    label: "Nâng tải TT (m)",
+    render: (item) => item.transportRecord?.fullRouteElevate ?? 100,
+  },
+  {
+    id: "localSlopeDist",
+    label: "CĐ dốc cục bộ (km)",
+    render: (item) => item.transportRecord?.localSlopeDist ?? 1.2,
+  },
+  {
+    id: "localSlopeDegree",
+    label: "Dốc cục bộ (m)",
+    render: (item) => item.transportRecord?.localSlopeDegree ?? 8,
+  },
+  {
+    id: "unloadLocationName",
+    label: "Nơi dỡ tải",
+    render: (item) =>
+      item.transportRecord?.unloadLocationName ||
+      item.miningRecord?.dumpLocation ||
+      "Kho than 5",
+  },
+  {
+    id: "isRainyDay",
+    label: "Mưa",
+    render: (item) => (
+      <div className="flex items-center justify-center">
+        <Checkbox checked={item.transportRecord?.isRainyDay ?? false} />
+      </div>
+    ),
+  },
+  {
+    id: "isTraineeVehicle",
+    label: "Xe bổ túc",
+    render: (item) => (
+      <div className="flex items-center justify-center">
+        <Checkbox checked={item.transportRecord?.isTraineeVehicle ?? false} />
+      </div>
+    ),
+  },
+];
+
+// ─── Scrollable sub-header row for THÔNG TIN CHUNG ──────────────────────────
+interface CommonInfoSubHeaderProps {
+  scrollRef: React.RefObject<HTMLDivElement | null>;
+}
+const CommonInfoSubHeader: React.FC<CommonInfoSubHeaderProps> = ({
+  scrollRef,
+}) => (
+  <div
+    ref={scrollRef}
+    className="flex overflow-x-auto [&::-webkit-scrollbar]:hidden h-full items-center"
+    style={{ scrollbarWidth: "none" }}
+  >
+    {COMMON_SUB_FIELDS.map((f) => (
+      <div
+        key={f.id}
+        className="shrink-0 px-1.5 py-1.5 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 border-r border-gray-200 dark:border-gray-700 last:border-r-0 flex items-center justify-center h-full min-h-[32px]"
+        style={{ width: SUB_FIELD_WIDTHS[f.id] }}
+      >
+        {f.label}
+      </div>
+    ))}
+  </div>
+);
+
+// ─── Scrollable sub-cell row for THÔNG TIN CHUNG ────────────────────────────
+interface CommonInfoCellProps {
+  item: ReconciliationItem;
+  rowIndex: number;
+  isSelected: boolean;
+  onSelectToggle: () => void;
+  scrollRef: React.RefObject<HTMLDivElement | null>;
+}
+const CommonInfoCell: React.FC<CommonInfoCellProps> = ({
+  item,
+  rowIndex,
+  isSelected,
+  onSelectToggle,
+  scrollRef,
+}) => (
+  <div
+    ref={scrollRef}
+    className="flex overflow-x-auto [&::-webkit-scrollbar]:hidden"
+    style={{ scrollbarWidth: "none" }}
+  >
+    {COMMON_SUB_FIELDS.map((f) => {
+      let content: React.ReactNode;
+      if (f.id === "select") {
+        content = (
+          <div className="flex items-center justify-center h-full">
+            <Checkbox checked={isSelected} onCheckedChange={onSelectToggle} />
+          </div>
+        );
+      } else if (f.id === "stt") {
+        content = (
+          <span className="text-gray-500 font-semibold">{rowIndex + 1}</span>
+        );
+      } else {
+        content = f.render(item);
+      }
+
+      return (
+        <div
+          key={f.id}
+          className="shrink-0 flex items-center justify-center px-1.5 py-2 text-xs border-r border-gray-100 dark:border-gray-800/60 last:border-r-0 whitespace-nowrap"
+          style={{ width: SUB_FIELD_WIDTHS[f.id] }}
+        >
+          {content}
+        </div>
+      );
+    })}
+  </div>
+);
+
+// ─── Memoized Final Choice Cell ──────────────────────────────────────────────
+interface FinalChoiceCellProps {
+  item: ReconciliationItem;
+  initialChoice: "VT" | "KT" | "OTHER";
+  initialCustom: { cargo: string; trips: number; loadStatus: string };
+  isMatched: boolean;
+  onChoiceChange: (
+    id: string,
+    choice: "VT" | "KT" | "OTHER",
+    custom: { cargo: string; trips: number; loadStatus: string },
+  ) => void;
+}
+
+const FinalChoiceCell = React.memo<FinalChoiceCellProps>(
+  ({ item, initialChoice, initialCustom, onChoiceChange }) => {
+    const [choice, setChoice] = useState<"VT" | "KT" | "OTHER">(initialChoice);
+    const [custom, setCustom] = useState(initialCustom);
+
+    useEffect(() => {
+      setChoice(initialChoice);
+    }, [initialChoice]);
+
+    useEffect(() => {
+      setCustom(initialCustom);
+    }, [initialCustom.cargo, initialCustom.trips, initialCustom.loadStatus]);
+
+    const handleRadioChange = useCallback(
+      (newChoice: "VT" | "KT" | "OTHER") => {
+        setChoice(newChoice);
+        onChoiceChange(item.id, newChoice, custom);
+      },
+      [item.id, custom, onChoiceChange],
+    );
+
+    const handleCustomChange = useCallback(
+      (field: "cargo" | "trips" | "loadStatus", val: any) => {
+        setCustom((prev) => {
+          const next = { ...prev, [field]: val };
+          onChoiceChange(item.id, choice, next);
+          return next;
+        });
+      },
+      [item.id, choice, onChoiceChange],
+    );
+
+    return (
+      <div className="flex flex-col gap-1.5 p-1 w-full text-xs">
+        {/* Radio options: neatly distributed across column width */}
+        <div className="flex items-center justify-between px-1 py-0.5 gap-2 border-b border-gray-100 dark:border-gray-800/50">
+          <label className="inline-flex items-center gap-1 text-xs cursor-pointer select-none">
+            <input
+              type="radio"
+              name={`choice_${item.id}`}
+              checked={choice === "VT"}
+              onChange={() => handleRadioChange("VT")}
+              className="accent-emerald-600 w-3.5 h-3.5 cursor-pointer"
+            />
+            <span className="font-medium text-gray-700 dark:text-gray-300">
+              Vận tải
+            </span>
+          </label>
+
+          <label className="inline-flex items-center gap-1 text-xs cursor-pointer select-none">
+            <input
+              type="radio"
+              name={`choice_${item.id}`}
+              checked={choice === "KT"}
+              onChange={() => handleRadioChange("KT")}
+              className="accent-emerald-600 w-3.5 h-3.5 cursor-pointer"
+            />
+            <span className="font-medium text-gray-700 dark:text-gray-300">
+              Khai thác
+            </span>
+          </label>
+
+          <label className="inline-flex items-center gap-1 text-xs cursor-pointer select-none">
+            <input
+              type="radio"
+              name={`choice_${item.id}`}
+              checked={choice === "OTHER"}
+              onChange={() => handleRadioChange("OTHER")}
+              className="accent-emerald-600 w-3.5 h-3.5 cursor-pointer"
+            />
+            <span className="font-medium text-gray-700 dark:text-gray-300">
+              Khác
+            </span>
+          </label>
+        </div>
+
+        {/* Custom fields: 3-column grid filling 100% width cleanly */}
+        {choice === "OTHER" && (
+          <div className="grid grid-cols-3 gap-1.5 w-full pt-1 animate-in fade-in-50 duration-150">
+            <div className="flex flex-col gap-0.5 min-w-0">
+              <span className="text-[10px] text-gray-500 font-semibold text-center truncate">
+                Loại hàng
+              </span>
+              <Select
+                value={custom.cargo}
+                onValueChange={(v) => handleCustomChange("cargo", v)}
+              >
+                <SelectTrigger className="h-7 text-xs w-full px-1.5 py-0 bg-white dark:bg-gray-900 border-gray-300 shadow-2xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Than">Than</SelectItem>
+                  <SelectItem value="Đá">Đá</SelectItem>
+                  <SelectItem value="Đất">Đất</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex flex-col gap-0.5 min-w-0">
+              <span className="text-[10px] text-gray-500 font-semibold text-center truncate">
+                Số chuyến
+              </span>
+              <Input
+                type="number"
+                value={custom.trips}
+                onChange={(e) =>
+                  handleCustomChange("trips", Number(e.target.value))
+                }
+                className="h-7 text-xs w-full px-1 py-0 text-center font-bold border-gray-300 shadow-2xs"
+              />
+            </div>
+
+            <div className="flex flex-col gap-0.5 min-w-0">
+              <span className="text-[10px] text-gray-500 font-semibold text-center truncate">
+                Tải trọng
+              </span>
+              <Select
+                value={custom.loadStatus}
+                onValueChange={(v) => handleCustomChange("loadStatus", v)}
+              >
+                <SelectTrigger className="h-7 text-xs w-full px-1 py-0 bg-white dark:bg-gray-900 border-gray-300 shadow-2xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Đủ tải">Đủ tải</SelectItem>
+                  <SelectItem value="Roda (2/3)">Roda (2/3)</SelectItem>
+                  <SelectItem value="Khác (1/2)">Khác (1/2)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  },
+  (prev, next) =>
+    prev.item.id === next.item.id &&
+    prev.initialChoice === next.initialChoice &&
+    prev.initialCustom.cargo === next.initialCustom.cargo &&
+    prev.initialCustom.trips === next.initialCustom.trips &&
+    prev.initialCustom.loadStatus === next.initialCustom.loadStatus &&
+    prev.isMatched === next.isMatched,
+);
+
+// ─── Main component ──────────────────────────────────────────────────────────
 interface ReconciliationComparisonTablesProps {
   items: ReconciliationItem[];
   onDeleteItem?: (id: string) => void;
@@ -91,25 +497,21 @@ export const ReconciliationComparisonTables: React.FC<
     return initial;
   });
 
-  const handleChoiceChange = (id: string, val: "VT" | "KT" | "OTHER") => {
-    setChoices((prev) => ({ ...prev, [id]: val }));
-  };
+  const handleChoiceUpdate = useCallback(
+    (
+      id: string,
+      choice: "VT" | "KT" | "OTHER",
+      custom: { cargo: string; trips: number; loadStatus: string },
+    ) => {
+      setChoices((prev) =>
+        prev[id] === choice ? prev : { ...prev, [id]: choice },
+      );
+      setCustomFields((prev) => ({ ...prev, [id]: custom }));
+    },
+    [],
+  );
 
-  const handleCustomFieldChange = (
-    id: string,
-    field: "cargo" | "trips" | "loadStatus",
-    val: any,
-  ) => {
-    setCustomFields((prev) => ({
-      ...prev,
-      [id]: {
-        ...(prev[id] || { cargo: "Than", trips: 0, loadStatus: "Đủ tải" }),
-        [field]: val,
-      },
-    }));
-  };
-
-  const isMatched = (item: ReconciliationItem) => {
+  const isMatched = useCallback((item: ReconciliationItem) => {
     const t = item.transportRecord;
     const m = item.miningRecord;
     if (!t || !m) return false;
@@ -118,222 +520,146 @@ export const ReconciliationComparisonTables: React.FC<
       (t.cargoType || "").trim().toLowerCase() ===
       (m.material || m.loadStatus || "").trim().toLowerCase();
     return sameTrips && sameCargo;
-  };
+  }, []);
 
-  // TanStack Table Column Definitions (2-level grouped headers)
+  // ─── Sync scroll between sub-header and sub-cells per column ─────────────
+  const headerScrollRef = useRef<HTMLDivElement | null>(null);
+  const cellScrollRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+
+  const choicesRef = useRef(choices);
+  const customFieldsRef = useRef(customFields);
+
+  useEffect(() => {
+    choicesRef.current = choices;
+  }, [choices]);
+
+  useEffect(() => {
+    customFieldsRef.current = customFields;
+  }, [customFields]);
+
+  const syncScroll = useCallback((source: HTMLDivElement) => {
+    const left = source.scrollLeft;
+    if (headerScrollRef.current && headerScrollRef.current !== source) {
+      headerScrollRef.current.scrollLeft = left;
+    }
+    cellScrollRefs.current.forEach((el) => {
+      if (el && el !== source) el.scrollLeft = left;
+    });
+  }, []);
+
+  const onHeaderScroll = (e: React.UIEvent<HTMLDivElement>) =>
+    syncScroll(e.currentTarget);
+
+  const onCellScroll = (e: React.UIEvent<HTMLDivElement>) =>
+    syncScroll(e.currentTarget);
+
+  // ─── Drag-to-scroll (click-hold + drag) ───────────────────────────────────
+  const dragState = useRef<{
+    el: HTMLDivElement;
+    startX: number;
+    startScrollLeft: number;
+  } | null>(null);
+
+  const onMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const el = e.currentTarget;
+    dragState.current = {
+      el,
+      startX: e.clientX,
+      startScrollLeft: el.scrollLeft,
+    };
+    el.style.cursor = "grabbing";
+    el.style.userSelect = "none";
+  }, []);
+
+  const onMouseMove = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      if (!dragState.current) return;
+      const dx = e.clientX - dragState.current.startX;
+      const newLeft = dragState.current.startScrollLeft - dx;
+      dragState.current.el.scrollLeft = newLeft;
+      syncScroll(dragState.current.el);
+    },
+    [syncScroll],
+  );
+
+  const onMouseUp = useCallback(() => {
+    if (!dragState.current) return;
+    dragState.current.el.style.cursor = "grab";
+    dragState.current.el.style.userSelect = "";
+    dragState.current = null;
+  }, []);
+
+  const onMouseLeave = useCallback(() => {
+    if (!dragState.current) return;
+    dragState.current.el.style.cursor = "grab";
+    dragState.current.el.style.userSelect = "";
+    dragState.current = null;
+  }, []);
+
+  /** Tập hợp drag event props dùng chung cho header và mỗi cell */
+  const dragProps = {
+    onMouseDown,
+    onMouseMove,
+    onMouseUp,
+    onMouseLeave,
+  } as const;
+
+  // ─── TanStack Table Column Definitions ────────────────────────────────────
   const columns = useMemo<ColumnDef<ReconciliationItem>[]>(
     () => [
-      // 1. THÔNG TIN CHUNG (19 cols)
+      // 1. THÔNG TIN CHUNG – single parent column, internal sub-fields rendered via flex
       {
         id: "group_common_info",
-        header: "THÔNG TIN CHUNG",
+        header: () => (
+          <div className="text-center font-bold text-gray-800 dark:text-gray-200 text-xs">
+            THÔNG TIN CHUNG
+          </div>
+        ),
+        // Single leaf column – renders sub-header row on depth=1
         columns: [
           {
-            id: "select",
-            header: ({ table }) => (
-              <div className="flex justify-center">
-                <Checkbox
-                  checked={
-                    table.getIsAllPageRowsSelected() ||
-                    (table.getIsSomePageRowsSelected() && "indeterminate")
-                  }
-                  onCheckedChange={(value) =>
-                    table.toggleAllPageRowsSelected(!!value)
-                  }
-                  aria-label="Select all"
-                />
-              </div>
+            id: "common_info_panel",
+            header: () => (
+              <CommonInfoSubHeader
+                scrollRef={
+                  headerScrollRef as React.RefObject<HTMLDivElement | null>
+                }
+              />
             ),
-            cell: ({ row }) => (
-              <div className="flex justify-center">
-                <Checkbox
-                  checked={row.getIsSelected()}
-                  onCheckedChange={(value) => row.toggleSelected(!!value)}
-                  aria-label="Select row"
-                />
-              </div>
-            ),
-            size: 30,
-          },
-          {
-            id: "stt",
-            header: "STT",
-            cell: ({ row }) => (
-              <span className="text-gray-500 font-semibold">
-                {row.index + 1}
-              </span>
-            ),
-            size: 35,
-          },
-          {
-            id: "date",
-            header: "Thời gian",
             cell: ({ row }) => {
               const item = row.original;
-              const day = item.commonKey.day
-                ? String(item.commonKey.day).padStart(2, "0")
-                : "05";
-              const month = item.commonKey.month
-                ? String(item.commonKey.month).padStart(2, "0")
-                : "08";
-              return `${day}/${month}/2026`;
-            },
-            size: 75,
-          },
-          {
-            id: "shift",
-            header: "Ca",
-            cell: ({ row }) => (
-              <span className="font-semibold">
-                {row.original.commonKey.shift || "Ca 1"}
-              </span>
-            ),
-            size: 45,
-          },
-          {
-            id: "vehicleNo",
-            header: "Số xe",
-            cell: ({ row }) => (
-              <span className="font-bold text-gray-900 dark:text-gray-100">
-                {row.original.commonKey.vehicleNo || "14C-12345"}
-              </span>
-            ),
-            size: 75,
-          },
-          {
-            id: "badgeNo",
-            header: "Số thẻ lương",
-            cell: ({ row }) =>
-              row.original.transportRecord?.operatorBadgeNo ||
-              row.original.miningRecord?.operatorBadgeNo ||
-              "8753",
-            size: 65,
-          },
-          {
-            id: "excavationArea",
-            header: "Khu vực xúc",
-            cell: ({ row }) =>
-              row.original.transportRecord?.excavationArea || "Khe Chàm",
-            size: 70,
-          },
-          {
-            id: "excavatorEquipment",
-            header: "Máy xúc",
-            cell: ({ row }) => (
-              <span className="font-semibold">
-                {row.original.transportRecord?.excavatorEquipment ||
-                  row.original.miningRecord?.mineCode ||
-                  "EX05"}
-              </span>
-            ),
-            size: 55,
-          },
-          {
-            id: "pickupLocation",
-            header: "Nơi nhận tải",
-            cell: ({ row }) =>
-              row.original.transportRecord?.pickupLocation ||
-              row.original.miningRecord?.pickupLocation ||
-              "Bãi sàng",
-            size: 65,
-          },
-          {
-            id: "unloadBench",
-            header: "Tầng dỡ tải",
-            cell: ({ row }) =>
-              row.original.transportRecord?.unloadBench || "-145",
-            size: 55,
-          },
-          {
-            id: "pickupBenchGroup",
-            header: "Tầng/nhóm tầng",
-            cell: ({ row }) => (
-              <span className="text-gray-500">
-                {row.original.transportRecord?.pickupBenchGroup || "-25"}
-              </span>
-            ),
-            size: 65,
-          },
-          {
-            id: "fullRouteDistance",
-            header: "CĐ toàn tuyến (km)",
-            cell: ({ row }) =>
-              row.original.transportRecord?.fullRouteDistance ?? 5.5,
-            size: 65,
-          },
-          {
-            id: "fullRouteElevate",
-            header: "Nâng tải (m)",
-            cell: ({ row }) =>
-              row.original.transportRecord?.fullRouteElevate ?? 100,
-            size: 60,
-          },
-          {
-            id: "localSlopeDist",
-            header: "CĐ dốc (km)",
-            cell: ({ row }) =>
-              row.original.transportRecord?.localSlopeDist ?? 1.2,
-            size: 60,
-          },
-          {
-            id: "localSlopeDegree",
-            header: "Dốc (m)",
-            cell: ({ row }) =>
-              row.original.transportRecord?.localSlopeDegree ?? 8,
-            size: 50,
-          },
-          {
-            id: "unloadLocationName",
-            header: "Nơi dỡ tải",
-            cell: ({ row }) =>
-              row.original.transportRecord?.unloadLocationName ||
-              row.original.miningRecord?.dumpLocation ||
-              "Kho than 5",
-            size: 70,
-          },
-          {
-            id: "isRainyDay",
-            header: "Ngày mưa",
-            cell: ({ row }) => (
-              <div className="flex items-center justify-center">
-                <Checkbox
-                  checked={row.original.transportRecord?.isRainyDay ?? false}
-                />
-              </div>
-            ),
-            size: 55,
-          },
-          {
-            id: "isTraineeVehicle",
-            header: "Xe bổ túc",
-            cell: ({ row }) => (
-              <div className="flex items-center justify-center">
-                <Checkbox
-                  checked={
-                    row.original.transportRecord?.isTraineeVehicle ?? false
+              const isSelected = row.getIsSelected();
+              return (
+                <CommonInfoCell
+                  item={item}
+                  rowIndex={row.index}
+                  isSelected={isSelected}
+                  onSelectToggle={() => row.toggleSelected(!isSelected)}
+                  scrollRef={
+                    {
+                      current: null,
+                    } as React.RefObject<HTMLDivElement | null>
                   }
                 />
-              </div>
-            ),
-            size: 55,
-          },
-          {
-            id: "cargoType",
-            header: "Loại hàng",
-            cell: ({ row }) =>
-              row.original.transportRecord?.cargoType ||
-              row.original.miningRecord?.material ||
-              "Than",
-            size: 60,
+              );
+            },
+            size: COMMON_INFO_COL_WIDTH,
           },
         ],
       },
 
-      // 2. SỐ LIỆU BÁO CHUYẾN (VẬN TẢI) (3 cols)
+      // 2. SỐ LIỆU BÁO CHUYẾN (VẬN TẢI) (4 cols)
       {
         id: "group_transport_data",
         header: "SỐ LIỆU BÁO CHUYẾN (VẬN TẢI)",
         columns: [
+          {
+            id: "transCargo",
+            header: "Loại hàng",
+            cell: ({ row }) =>
+              row.original.transportRecord?.cargoType || "Than",
+            size: 75,
+          },
           {
             id: "transTrips",
             header: "Số chuyến",
@@ -342,7 +668,7 @@ export const ReconciliationComparisonTables: React.FC<
                 {row.original.transportRecord?.tripCount ?? 0}
               </span>
             ),
-            size: 50,
+            size: 65,
           },
           {
             id: "transLoadStatus",
@@ -350,21 +676,21 @@ export const ReconciliationComparisonTables: React.FC<
             cell: ({ row }) => {
               const status = row.original.transportRecord?.loadStatus;
               return status ? (
-                <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300">
+                <span className="inline-block px-1.5 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300">
                   {status}
                 </span>
               ) : (
                 "-"
               );
             },
-            size: 65,
+            size: 75,
           },
           {
             id: "transBadgeNo",
             header: "Số thẻ lương",
             cell: ({ row }) =>
               row.original.transportRecord?.operatorBadgeNo || "8753",
-            size: 65,
+            size: 75,
           },
         ],
       },
@@ -381,7 +707,7 @@ export const ReconciliationComparisonTables: React.FC<
               row.original.miningRecord?.material ||
               row.original.miningRecord?.loadStatus ||
               "Than",
-            size: 60,
+            size: 75,
           },
           {
             id: "miningTrips",
@@ -391,7 +717,7 @@ export const ReconciliationComparisonTables: React.FC<
                 {row.original.miningRecord?.tripCount ?? 0}
               </span>
             ),
-            size: 50,
+            size: 65,
           },
           {
             id: "miningLoadStatus",
@@ -399,21 +725,21 @@ export const ReconciliationComparisonTables: React.FC<
             cell: ({ row }) => {
               const status = row.original.miningRecord?.loadStatus;
               return status ? (
-                <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                <span className="inline-block px-1.5 py-0.5 rounded text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
                   {status}
                 </span>
               ) : (
                 "-"
               );
             },
-            size: 65,
+            size: 75,
           },
           {
             id: "miningBadgeNo",
             header: "Số thẻ lương",
             cell: ({ row }) =>
               row.original.miningRecord?.operatorBadgeNo || "8753",
-            size: 65,
+            size: 75,
           },
         ],
       },
@@ -434,7 +760,7 @@ export const ReconciliationComparisonTables: React.FC<
               ) : (
                 <span className="text-gray-400 font-bold">-</span>
               ),
-            size: 40,
+            size: 50,
           },
           {
             id: "mismatched",
@@ -447,7 +773,7 @@ export const ReconciliationComparisonTables: React.FC<
               ) : (
                 <span className="text-gray-400 font-bold">-</span>
               ),
-            size: 45,
+            size: 60,
           },
         ],
       },
@@ -462,130 +788,35 @@ export const ReconciliationComparisonTables: React.FC<
             header: "Phương án chốt chuẩn",
             cell: ({ row }) => {
               const item = row.original;
-              const t = item.transportRecord;
-              const m = item.miningRecord;
               const matched = isMatched(item);
-
-              const currentChoice =
-                choices[item.id] || (matched ? "VT" : "OTHER");
-              const currentCustom = customFields[item.id] || {
-                cargo: m?.material || t?.cargoType || "Than",
-                trips: m?.tripCount ?? t?.tripCount ?? 0,
-                loadStatus: m?.loadStatus || t?.loadStatus || "Đủ tải",
+              const initialChoice =
+                choicesRef.current[item.id] || (matched ? "VT" : "OTHER");
+              const initialCustom = customFieldsRef.current[item.id] || {
+                cargo:
+                  item.miningRecord?.material ||
+                  item.transportRecord?.cargoType ||
+                  "Than",
+                trips:
+                  item.miningRecord?.tripCount ??
+                  item.transportRecord?.tripCount ??
+                  0,
+                loadStatus:
+                  item.miningRecord?.loadStatus ||
+                  item.transportRecord?.loadStatus ||
+                  "Đủ tải",
               };
 
               return (
-                <div className="flex flex-wrap items-center gap-3">
-                  <label className="inline-flex items-center gap-1 text-xs cursor-pointer">
-                    <input
-                      type="radio"
-                      name={`choice_${item.id}`}
-                      checked={currentChoice === "VT"}
-                      onChange={() => handleChoiceChange(item.id, "VT")}
-                      className="accent-emerald-600 w-3.5 h-3.5"
-                    />
-                    <span className="font-medium text-gray-700 dark:text-gray-300">
-                      Vận tải
-                    </span>
-                  </label>
-
-                  <label className="inline-flex items-center gap-1 text-xs cursor-pointer">
-                    <input
-                      type="radio"
-                      name={`choice_${item.id}`}
-                      checked={currentChoice === "KT"}
-                      onChange={() => handleChoiceChange(item.id, "KT")}
-                      className="accent-emerald-600 w-3.5 h-3.5"
-                    />
-                    <span className="font-medium text-gray-700 dark:text-gray-300">
-                      Khai thác
-                    </span>
-                  </label>
-
-                  <label className="inline-flex items-center gap-1 text-xs cursor-pointer">
-                    <input
-                      type="radio"
-                      name={`choice_${item.id}`}
-                      checked={currentChoice === "OTHER"}
-                      onChange={() => handleChoiceChange(item.id, "OTHER")}
-                      className="accent-emerald-600 w-3.5 h-3.5"
-                    />
-                    <span className="font-medium text-gray-700 dark:text-gray-300">
-                      Khác
-                    </span>
-                  </label>
-
-                  {currentChoice === "OTHER" && (
-                    <div className="flex items-end gap-2 ml-1 animate-in fade-in-50 duration-150">
-                      <div className="flex flex-col gap-1">
-                        <span className="text-[10px] text-gray-500 font-semibold leading-none">
-                          Loại hàng
-                        </span>
-                        <Select
-                          value={currentCustom.cargo}
-                          onValueChange={(v) =>
-                            handleCustomFieldChange(item.id, "cargo", v)
-                          }
-                        >
-                          <SelectTrigger className="h-7 text-xs w-20 px-2 py-0 bg-white dark:bg-gray-900 border-gray-300 shadow-2xs">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="Than">Than</SelectItem>
-                            <SelectItem value="Đá">Đá</SelectItem>
-                            <SelectItem value="Đất">Đất</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div className="flex flex-col gap-1">
-                        <span className="text-[10px] text-gray-500 font-semibold leading-none">
-                          Số chuyến
-                        </span>
-                        <Input
-                          type="number"
-                          value={currentCustom.trips}
-                          onChange={(e) =>
-                            handleCustomFieldChange(
-                              item.id,
-                              "trips",
-                              Number(e.target.value),
-                            )
-                          }
-                          className="h-7 text-xs w-14 px-1 py-0 text-center font-bold border-gray-300 shadow-2xs"
-                        />
-                      </div>
-
-                      <div className="flex flex-col gap-1">
-                        <span className="text-[10px] text-gray-500 font-semibold leading-none">
-                          Tải trọng
-                        </span>
-                        <Select
-                          value={currentCustom.loadStatus}
-                          onValueChange={(v) =>
-                            handleCustomFieldChange(item.id, "loadStatus", v)
-                          }
-                        >
-                          <SelectTrigger className="h-7 text-xs w-24 px-2 py-0 bg-white dark:bg-gray-900 border-gray-300 shadow-2xs">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="Đủ tải">Đủ tải</SelectItem>
-                            <SelectItem value="Roda (2/3)">
-                              Roda (2/3)
-                            </SelectItem>
-                            <SelectItem value="Khác (1/2)">
-                              Khác (1/2)
-                            </SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                  )}
-                </div>
+                <FinalChoiceCell
+                  item={item}
+                  initialChoice={initialChoice}
+                  initialCustom={initialCustom}
+                  isMatched={matched}
+                  onChoiceChange={handleChoiceUpdate}
+                />
               );
             },
-            size: 250,
+            size: 290,
           },
         ],
       },
@@ -593,7 +824,7 @@ export const ReconciliationComparisonTables: React.FC<
       // 6. Action Delete
       {
         id: "actions",
-        header: () => <span>🗑</span>,
+        header: () => {},
         cell: ({ row }) => (
           <div className="flex justify-center">
             <Button
@@ -609,13 +840,13 @@ export const ReconciliationComparisonTables: React.FC<
             </Button>
           </div>
         ),
-        size: 30,
+        size: 50,
       },
     ],
-    [choices, customFields, onDeleteItem],
+    [handleChoiceUpdate, isMatched, onDeleteItem],
   );
 
-  // TanStack Table Instance
+  // ─── TanStack Table Instance ───────────────────────────────────────────────
   const table = useReactTable({
     data: items,
     columns,
@@ -635,41 +866,82 @@ export const ReconciliationComparisonTables: React.FC<
     },
   });
 
+  // ─── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-3">
-      {/* TanStack Table Container using shadcn UI components */}
+      {/* TanStack Table Container */}
       <div className="border border-gray-200 dark:border-gray-800 rounded-lg overflow-x-auto bg-white dark:bg-gray-900 shadow-sm">
-        <Table className="w-full text-xs border-collapse min-w-[1700px]">
+        <Table
+          className="text-xs border-collapse w-full"
+          style={{ tableLayout: "fixed" }}
+        >
+          <colgroup>
+            {table.getVisibleLeafColumns().map((column) => (
+              <col
+                key={column.id}
+                style={{
+                  width: `${(column.getSize() / table.getTotalSize()) * 100}%`,
+                }}
+              />
+            ))}
+          </colgroup>
+
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow
                 key={headerGroup.id}
                 className={
                   headerGroup.depth === 0
-                    ? "bg-gray-100/90 dark:bg-gray-800/90 text-gray-800 dark:text-gray-200 text-[10px] font-bold border-b border-gray-200 dark:border-gray-800"
-                    : "bg-gray-50 dark:bg-gray-900 text-gray-700 dark:text-gray-300 text-[10px] font-semibold border-b border-gray-200 dark:border-gray-800"
+                    ? "bg-gray-100/90 dark:bg-gray-800/90 text-gray-800 dark:text-gray-200 text-xs font-bold border-b border-gray-200 dark:border-gray-800"
+                    : "bg-gray-50 dark:bg-gray-900 text-gray-700 dark:text-gray-300 text-xs font-semibold border-b border-gray-200 dark:border-gray-800"
                 }
               >
                 {headerGroup.headers.map((header) => {
                   const isTopLevelGroup = header.depth === 0;
                   const isActionCol = header.column.id === "actions";
+                  const isCommonInfoPanel =
+                    header.column.id === "common_info_panel";
 
                   return (
                     <TableHead
                       key={header.id}
                       colSpan={header.colSpan}
-                      className={`px-1 py-1.5 text-center border-r border-gray-200 dark:border-gray-800 ${
+                      style={{
+                        // Clip the inner scrollable sub-header
+                        overflow: isCommonInfoPanel ? "hidden" : undefined,
+                        padding: isCommonInfoPanel ? 0 : undefined,
+                      }}
+                      className={`px-1.5 py-2 text-center text-xs border-r border-gray-200 dark:border-gray-800 whitespace-normal break-words leading-tight ${
                         isTopLevelGroup
                           ? "border-r border-gray-300 dark:border-gray-700"
                           : ""
-                      } ${isActionCol ? "w-8 text-red-600" : ""}`}
+                      } ${isActionCol ? "text-red-600" : ""}`}
                     >
-                      {header.isPlaceholder
-                        ? null
-                        : flexRender(
-                            header.column.columnDef.header,
-                            header.getContext(),
-                          )}
+                      {header.isPlaceholder ? null : isCommonInfoPanel ? (
+                        // Render scrollable sub-header with sync
+                        <div
+                          ref={headerScrollRef}
+                          onScroll={onHeaderScroll}
+                          {...dragProps}
+                          className="flex overflow-x-auto [&::-webkit-scrollbar]:hidden cursor-grab select-none h-full items-center"
+                          style={{ scrollbarWidth: "none" }}
+                        >
+                          {COMMON_SUB_FIELDS.map((f) => (
+                            <div
+                              key={f.id}
+                              className="shrink-0 px-1.5 py-1.5 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 border-r border-gray-200 dark:border-gray-700 last:border-r-0 flex items-center justify-center h-full min-h-[32px]"
+                              style={{ width: SUB_FIELD_WIDTHS[f.id] }}
+                            >
+                              {f.label}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        flexRender(
+                          header.column.columnDef.header,
+                          header.getContext(),
+                        )
+                      )}
                     </TableHead>
                   );
                 })}
@@ -694,17 +966,81 @@ export const ReconciliationComparisonTables: React.FC<
                           : "bg-slate-50/40 dark:bg-gray-900/50"
                     } hover:bg-emerald-50/30 dark:hover:bg-emerald-950/20`}
                   >
-                    {row.getVisibleCells().map((cell) => (
-                      <TableCell
-                        key={cell.id}
-                        className="px-1 py-1.5 text-center border-r border-gray-100 dark:border-gray-800/60"
-                      >
-                        {flexRender(
-                          cell.column.columnDef.cell,
-                          cell.getContext(),
-                        )}
-                      </TableCell>
-                    ))}
+                    {row.getVisibleCells().map((cell) => {
+                      const isCommonInfoCell =
+                        cell.column.id === "common_info_panel";
+
+                      if (isCommonInfoCell) {
+                        // Render scrollable sub-cell row with sync
+                        return (
+                          <TableCell
+                            key={cell.id}
+                            style={{
+                              padding: 0,
+                              overflow: "hidden",
+                            }}
+                            className="border-r border-gray-200 dark:border-gray-700 text-xs"
+                          >
+                            <div
+                              ref={(el) => {
+                                if (el) cellScrollRefs.current.set(row.id, el);
+                                else cellScrollRefs.current.delete(row.id);
+                              }}
+                              onScroll={onCellScroll}
+                              {...dragProps}
+                              className="flex overflow-x-auto [&::-webkit-scrollbar]:hidden cursor-grab select-none"
+                              style={{ scrollbarWidth: "none" }}
+                            >
+                              {COMMON_SUB_FIELDS.map((f) => {
+                                let content: React.ReactNode;
+                                if (f.id === "select") {
+                                  content = (
+                                    <div className="flex items-center justify-center h-full">
+                                      <Checkbox
+                                        checked={isSelected}
+                                        onCheckedChange={() =>
+                                          row.toggleSelected(!isSelected)
+                                        }
+                                      />
+                                    </div>
+                                  );
+                                } else if (f.id === "stt") {
+                                  content = (
+                                    <span className="text-gray-500 font-semibold">
+                                      {row.index + 1}
+                                    </span>
+                                  );
+                                } else {
+                                  content = f.render(row.original);
+                                }
+
+                                return (
+                                  <div
+                                    key={f.id}
+                                    className="shrink-0 flex items-center justify-center px-1.5 py-2 text-xs border-r border-gray-100 dark:border-gray-800/60 last:border-r-0 whitespace-nowrap"
+                                    style={{ width: SUB_FIELD_WIDTHS[f.id] }}
+                                  >
+                                    {content}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </TableCell>
+                        );
+                      }
+
+                      return (
+                        <TableCell
+                          key={cell.id}
+                          className="px-2 py-2 text-center text-xs border-r border-gray-100 dark:border-gray-800/60 whitespace-nowrap"
+                        >
+                          {flexRender(
+                            cell.column.columnDef.cell,
+                            cell.getContext(),
+                          )}
+                        </TableCell>
+                      );
+                    })}
                   </TableRow>
                 );
               })
