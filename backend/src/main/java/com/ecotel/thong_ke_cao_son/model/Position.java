@@ -26,6 +26,9 @@ public class Position {
     @SequenceGenerator(name = "position_seq", sequenceName = "position_seq", allocationSize = 50)
     private Long id;
 
+    @Column(name = "mongo_id", unique = true)
+    private String mongoId;
+
     @NotBlank(message = "Position name is required")
     @Column(name = "name", nullable = false)
     private String name;

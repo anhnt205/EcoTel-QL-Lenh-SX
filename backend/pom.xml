@@ -60,6 +60,12 @@
 			<scope>test</scope>
 		</dependency>
 
+		<!-- Mongo drive -->
+		<dependency>
+			<groupId>org.mongodb</groupId>
+			<artifactId>mongodb-driver-sync</artifactId>
+		</dependency>
+
 		<!-- OAuth2 -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>

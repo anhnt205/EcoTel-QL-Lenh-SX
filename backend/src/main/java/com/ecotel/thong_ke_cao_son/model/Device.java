@@ -35,6 +35,9 @@ public class Device {
     @SequenceGenerator(name = "device_seq", sequenceName = "device_seq", allocationSize = 50)
     private Long id;
 
+    @Column(name = "mongo_id", unique = true)
+    private String mongoId;
+
     @NotBlank(message = "Device code is required")
     @Column(name = "code", nullable = false)
     private String code;

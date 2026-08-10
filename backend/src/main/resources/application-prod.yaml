@@ -27,6 +27,11 @@ spring:
 server:
   port: ${THONG_KE_PORT}
 
+mongo:
+  sync:
+    uri: ${MONGO_SYNC_URI}
+    database: Lenh_sx
+
 springdoc:
   swagger-ui:
     enabled: true

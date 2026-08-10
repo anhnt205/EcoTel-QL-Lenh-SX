@@ -8,8 +8,8 @@ services:
     environment:
       - TZ=Asia/Ho_Chi_Minh
     networks:
-      - frontnet
-      - backnet
+      - staging_frontnet
+      - staging_backnet
     depends_on:
       - frontend-service
       - backend-service
@@ -23,7 +23,7 @@ services:
     environment:
       - TZ=Asia/Ho_Chi_Minh
     networks:
-      - frontnet
+      - staging_frontnet
     restart: "no"
 
   backend-service:
@@ -38,7 +38,7 @@ services:
     ports:
       - "1402:8088"
     networks:
-      - backnet
+      - staging_backnet
     restart: "no"
 
   postgres:
@@ -46,7 +46,10 @@ services:
     env_file:
       - .env_backend
     environment:
-      - TZ=Asia/Ho_Chi_Minh
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+      POSTGRES_DB: ${POSTGRES_DB:-thong_ke}
+      TZ: Asia/Ho_Chi_Minh
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
@@ -57,7 +60,7 @@ services:
       retries: 5
     restart: "no"
     networks:
-      - backnet
+      - staging_backnet
 
   pgadmin:
     image: dpage/pgadmin4:latest
@@ -74,7 +77,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     networks:
-      - backnet
+      - staging_backnet
 
 volumes:
   postgres_data:
@@ -91,5 +94,7 @@ volumes:
       o: bind
 
 networks:
-  frontnet:
-  backnet:
+  staging_frontnet:
+    external: true
+  staging_backnet:
+    external: true

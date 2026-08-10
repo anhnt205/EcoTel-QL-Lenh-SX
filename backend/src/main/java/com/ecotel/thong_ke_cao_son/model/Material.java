@@ -28,6 +28,9 @@ public class Material {
     @SequenceGenerator(name = "material_seq", sequenceName = "material_seq", allocationSize = 50)
     private Long id;
 
+    @Column(name = "mongo_id", unique = true)
+    private String mongoId;
+
     @NotBlank(message = "Material name is required")
     @Column(name = "name", nullable = false)
     private String name;

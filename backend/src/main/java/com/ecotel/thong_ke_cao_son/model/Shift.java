@@ -25,6 +25,9 @@ public class Shift {
     @SequenceGenerator(name = "shift_seq", sequenceName = "shift_seq", allocationSize = 50)
     Long id;
 
+    @Column(name = "mongo_id", unique = true)
+    String mongoId;
+
     @NotNull(message = "Shift name is required")
     @Column(name = "name", nullable = false)
     Integer name;

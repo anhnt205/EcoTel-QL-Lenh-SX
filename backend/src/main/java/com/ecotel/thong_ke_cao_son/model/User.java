@@ -30,6 +30,9 @@ public class User {
     @SequenceGenerator(name = "user_seq", sequenceName = "user_seq", allocationSize = 50)
     private Long id;
 
+    @Column(name = "mongo_id", unique = true)
+    private String mongoId;
+
     @NotBlank(message = "Username is required")
     @Column(name = "username", nullable = false, unique = true)
     private String username;

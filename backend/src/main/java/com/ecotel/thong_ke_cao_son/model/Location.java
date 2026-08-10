@@ -26,6 +26,9 @@ public class Location {
     @SequenceGenerator(name = "location_seq", sequenceName = "location_seq", allocationSize = 50)
     private Long id;
 
+    @Column(name = "mongo_id", unique = true)
+    private String mongoId;
+
     @NotBlank(message = "Location name is required")
     @Column(name = "name", nullable = false)
     private String name;

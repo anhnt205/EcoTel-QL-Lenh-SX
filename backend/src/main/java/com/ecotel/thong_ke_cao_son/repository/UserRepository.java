@@ -8,8 +8,12 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Optional;
+
 @Repository
 public interface UserRepository extends JpaRepository<User, Long> {
+
+    Optional<User> findByMongoId(String mongoId);
 
     @Query("""
         SELECT u FROM User u
@@ -25,4 +29,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
            OR LOWER(pos.name) LIKE LOWER(CONCAT('%', :keyword, '%'))
         """)
     Page<User> search(@Param("keyword") String keyword, Pageable pageable);
+
+    Optional<User> findBySalaryCode(String salaryCode);
 }

@@ -26,6 +26,9 @@ public class DeviceModel {
     @SequenceGenerator(name = "device_model_seq", sequenceName = "device_model_seq", allocationSize = 50)
     private Long id;
 
+    @Column(name = "mongo_id", unique = true)
+    private String mongoId;
+
     @NotBlank(message = "Model name is required")
     @Column(name = "name", nullable = false)
     private String name;

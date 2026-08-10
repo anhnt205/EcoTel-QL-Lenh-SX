@@ -8,8 +8,12 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Optional;
+
 @Repository
 public interface ShiftRepository extends JpaRepository<Shift, Long> {
+
+    Optional<Shift> findByMongoId(String mongoId);
     @Query("""
         SELECT s FROM Shift s
         WHERE :keyword IS NULL OR :keyword = ''

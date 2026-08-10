@@ -25,6 +25,9 @@ public class Department {
     @SequenceGenerator(name = "department_seq", sequenceName = "department_seq", allocationSize = 50)
     Long id;
 
+    @Column(name = "mongo_id", unique = true)
+    String mongoId;
+
     @NotBlank(message = "Department name is required")
     @Column(name = "name", nullable = false, unique = true)
     String name;
