@@ -1,15 +1,27 @@
 package com.ecotel.thong_ke_cao_son.controller;
 
+import com.ecotel.thong_ke_cao_son.dto.request.BulkDeleteRequest;
+import com.ecotel.thong_ke_cao_son.dto.request.TransportReportBulkUpdateItem;
 import com.ecotel.thong_ke_cao_son.dto.request.TransportReportRequest;
-import com.ecotel.thong_ke_cao_son.dto.response.ApiResponse;
-import com.ecotel.thong_ke_cao_son.dto.response.PageResponse;
-import com.ecotel.thong_ke_cao_son.dto.response.TransportReportResponse;
+import com.ecotel.thong_ke_cao_son.dto.response.*;
+import com.ecotel.thong_ke_cao_son.excel.TransportReportExcelExporter;
+import com.ecotel.thong_ke_cao_son.excel.TransportReportExcelImporter;
+import com.ecotel.thong_ke_cao_son.model.TransportReport;
+import com.ecotel.thong_ke_cao_son.model.TransportReportTrip;
+import com.ecotel.thong_ke_cao_son.repository.TransportReportRepository;
+import com.ecotel.thong_ke_cao_son.repository.TransportReportTripRepository;
 import com.ecotel.thong_ke_cao_son.service.TransportReportService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -19,6 +31,9 @@ import java.util.List;
 public class TransportReportController {
 
     private final TransportReportService transportReportService;
+    private final TransportReportRepository transportReportRepository;
+    private final TransportReportExcelExporter transportReportExcelExporter;
+    private final TransportReportExcelImporter transportReportExcelImporter;
 
     @PostMapping
     public ApiResponse<TransportReportResponse> create(@Valid @RequestBody TransportReportRequest request) {
@@ -51,5 +66,50 @@ public class TransportReportController {
     public ApiResponse<Void> delete(@PathVariable Long id) {
         transportReportService.delete(id);
         return ApiResponse.success(null);
+    }
+
+    @PostMapping("/bulk")
+    public ApiResponse<List<TransportReportResponse>> bulkCreate(
+            @Valid @RequestBody List<@Valid TransportReportRequest> requests) {
+        return ApiResponse.created(transportReportService.bulkCreate(requests));
+    }
+
+    @PutMapping("/bulk")
+    public ApiResponse<List<TransportReportResponse>> bulkUpdate(
+            @Valid @RequestBody List<@Valid TransportReportBulkUpdateItem> items) {
+        return ApiResponse.success(transportReportService.bulkUpdate(items));
+    }
+
+    @DeleteMapping("/bulk")
+    public ApiResponse<BulkDeleteResponse> bulkDelete(@Valid @RequestBody BulkDeleteRequest request) {
+        return ApiResponse.success(transportReportService.bulkDelete(request.getIds()));
+    }
+
+    @GetMapping("/export")
+    public ResponseEntity<byte[]> export(
+            @RequestParam LocalDate fromDate,
+            @RequestParam LocalDate toDate,
+            @RequestParam(required = false) List<Long> shiftIds,
+            @RequestParam(required = false) List<Long> deviceIds) {
+
+        List<TransportReport> reports = transportReportRepository
+                .search(fromDate, toDate, shiftIds, deviceIds, Pageable.unpaged())
+                .getContent();
+
+        byte[] excelBytes = transportReportExcelExporter.export(reports);
+
+        String filename = "bao-cao-van-tai_" + fromDate + "_" + toDate + ".xlsx";
+        String encodedFilename = URLEncoder.encode(filename, StandardCharsets.UTF_8).replace("+", "%20");
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"" + filename + "\"; filename*=UTF-8''" + encodedFilename)
+                .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(excelBytes);
+    }
+
+    @PostMapping("/import")
+    public ApiResponse<ExcelImportResultResponse> importExcel(@RequestParam("file") MultipartFile file) {
+        return ApiResponse.success(transportReportExcelImporter.importFile(file));
     }
 }

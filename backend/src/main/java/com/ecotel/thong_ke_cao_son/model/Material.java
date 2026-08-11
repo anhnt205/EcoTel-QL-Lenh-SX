@@ -35,6 +35,12 @@ public class Material {
     @Column(name = "name", nullable = false)
     private String name;
 
+    @Column(name = "code")
+    private String code;
+
+    @Column(name = "description")
+    private String description;
+
     // sản phẩm nghiệm thu
     @Column(name = "accepted_product")
     private String acceptedProduct;

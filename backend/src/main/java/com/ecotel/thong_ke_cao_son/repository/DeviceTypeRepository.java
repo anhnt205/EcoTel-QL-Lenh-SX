@@ -19,6 +19,7 @@ public interface DeviceTypeRepository extends JpaRepository<DeviceType, Long> {
         SELECT dt FROM DeviceType dt
         WHERE :keyword IS NULL OR :keyword = ''
            OR LOWER(dt.name) LIKE LOWER(CONCAT('%', :keyword, '%'))
+           OR LOWER(dt.code) LIKE LOWER(CONCAT('%', :keyword, '%'))
         """)
     Page<DeviceType> search(@Param("keyword") String keyword, Pageable pageable);
 }

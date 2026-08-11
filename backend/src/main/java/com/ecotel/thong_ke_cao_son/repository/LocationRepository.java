@@ -15,11 +15,13 @@ public interface LocationRepository extends JpaRepository<Location, Long> {
 
     Optional<Location> findByMongoId(String mongoId);
 
+    Optional<Location> findByName(String name);
+
     @Query("""
         SELECT l FROM Location l
         WHERE :keyword IS NULL OR :keyword = ''
            OR LOWER(l.name) LIKE LOWER(CONCAT('%', :keyword, '%'))
-           OR CAST(l.distance AS string) LIKE CONCAT('%', :keyword, '%')
+           OR LOWER(l.code) LIKE LOWER(CONCAT('%', :keyword, '%'))
         """)
     Page<Location> search(@Param("keyword") String keyword, Pageable pageable);
 }

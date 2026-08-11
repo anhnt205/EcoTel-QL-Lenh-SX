@@ -13,6 +13,8 @@ import java.time.LocalDateTime;
 public class CargoGroupResponse {
     Long id;
     String name;
+    String code;
+    String description;
     LocalDateTime createdAt;
     LocalDateTime updatedAt;
 }

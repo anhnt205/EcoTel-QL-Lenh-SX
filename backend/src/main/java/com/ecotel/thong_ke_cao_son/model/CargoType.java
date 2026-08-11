@@ -35,6 +35,12 @@ public class CargoType {
     @Column(name = "name", nullable = false)
     private String name;
 
+    @Column(name = "code")
+    private String code;
+
+    @Column(name = "description")
+    private String description;
+
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "cargo_group_id", nullable = false)
     private CargoGroup cargoGroup;

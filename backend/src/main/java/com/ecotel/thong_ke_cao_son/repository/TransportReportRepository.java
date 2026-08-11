@@ -9,6 +9,7 @@ import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 public interface TransportReportRepository extends JpaRepository<TransportReport, Long> {
 
@@ -25,4 +26,7 @@ public interface TransportReportRepository extends JpaRepository<TransportReport
             @Param("shiftIds") List<Long> shiftIds,
             @Param("deviceIds") List<Long> deviceIds,
             Pageable pageable);
+
+    Optional<TransportReport> findByReportDateAndShiftIdAndDeviceIdAndEmployeeId(
+            LocalDate reportDate, Long shiftId, Long deviceId, Long employeeId);
 }

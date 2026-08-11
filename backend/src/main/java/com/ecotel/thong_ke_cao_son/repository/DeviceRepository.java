@@ -16,6 +16,8 @@ public interface DeviceRepository extends JpaRepository<Device, Long> {
 
     Optional<Device> findByMongoId(String mongoId);
 
+    Optional<Device> findByCode(String code);
+
     @Query("""
         SELECT d FROM Device d
         LEFT JOIN d.department dep

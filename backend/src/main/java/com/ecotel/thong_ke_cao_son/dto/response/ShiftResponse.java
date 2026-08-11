@@ -11,6 +11,8 @@ import java.time.LocalDateTime;
 public class ShiftResponse {
     Long id;
     Integer name;
+    String code;
+    String description;
     String startTime;
     String endTime;
     LocalDateTime createdAt;

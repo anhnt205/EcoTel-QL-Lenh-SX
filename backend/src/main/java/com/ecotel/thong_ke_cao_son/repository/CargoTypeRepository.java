@@ -9,6 +9,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface CargoTypeRepository extends JpaRepository<CargoType, Long> {
@@ -17,9 +18,12 @@ public interface CargoTypeRepository extends JpaRepository<CargoType, Long> {
         SELECT ct FROM CargoType ct
         WHERE :keyword IS NULL OR :keyword = ''
            OR LOWER(ct.name) LIKE LOWER(CONCAT('%', :keyword, '%'))
+           OR LOWER(ct.code) LIKE LOWER(CONCAT('%', :keyword, '%'))
         """)
     Page<CargoType> search(@Param("keyword") String keyword, Pageable pageable);
 
     List<CargoType> findByCargoGroupId(Long cargoGroupId);
+
+    Optional<CargoType> findByName(String name);
 
 }

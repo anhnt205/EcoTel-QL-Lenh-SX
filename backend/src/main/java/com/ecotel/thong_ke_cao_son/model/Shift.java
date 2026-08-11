@@ -32,6 +32,12 @@ public class Shift {
     @Column(name = "name", nullable = false)
     Integer name;
 
+    @Column(name = "code")
+    String code;
+
+    @Column(name = "description")
+    String description;
+
     @Column(name = "start_time")
     String startTime;
 

@@ -14,10 +14,14 @@ import java.util.Optional;
 public interface ShiftRepository extends JpaRepository<Shift, Long> {
 
     Optional<Shift> findByMongoId(String mongoId);
+
+    Optional<Shift> findByName(Integer name);
+
     @Query("""
         SELECT s FROM Shift s
         WHERE :keyword IS NULL OR :keyword = ''
            OR CAST(s.name AS string) LIKE CONCAT('%', :keyword, '%')
+           OR LOWER(s.code) LIKE LOWER(CONCAT('%', :keyword, '%'))
            OR LOWER(s.startTime) LIKE LOWER(CONCAT('%', :keyword, '%'))
            OR LOWER(s.endTime) LIKE LOWER(CONCAT('%', :keyword, '%'))
         """)

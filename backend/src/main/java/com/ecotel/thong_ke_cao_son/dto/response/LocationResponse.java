@@ -13,6 +13,8 @@ import java.time.LocalDateTime;
 public class LocationResponse {
     Long id;
     String name;
+    String code;
+    String description;
     Double distance;
     Double longitude;
     Double latitude;

@@ -14,6 +14,8 @@ import java.util.List;
 public class MaterialResponse {
     Long id;
     String name;
+    String code;
+    String description;
     String acceptedProduct;
     List<MaterialValueHistoryResponse> valueHistory;
     LocalDateTime createdAt;

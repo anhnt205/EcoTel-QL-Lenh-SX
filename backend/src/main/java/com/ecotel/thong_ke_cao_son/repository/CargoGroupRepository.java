@@ -15,6 +15,7 @@ public interface CargoGroupRepository extends JpaRepository<CargoGroup, Long> {
         SELECT cg FROM CargoGroup cg
         WHERE :keyword IS NULL OR :keyword = ''
            OR LOWER(cg.name) LIKE LOWER(CONCAT('%', :keyword, '%'))
+           OR LOWER(cg.code) LIKE LOWER(CONCAT('%', :keyword, '%'))
         """)
     Page<CargoGroup> search(@Param("keyword") String keyword, Pageable pageable);
 }

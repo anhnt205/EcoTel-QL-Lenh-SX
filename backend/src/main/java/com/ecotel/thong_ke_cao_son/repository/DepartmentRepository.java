@@ -20,7 +20,6 @@ public interface DepartmentRepository extends JpaRepository<Department, Long> {
         WHERE :keyword IS NULL OR :keyword = ''
            OR LOWER(d.name) LIKE LOWER(CONCAT('%', :keyword, '%'))
            OR LOWER(d.code) LIKE LOWER(CONCAT('%', :keyword, '%'))
-           OR LOWER(d.description) LIKE LOWER(CONCAT('%', :keyword, '%'))
         """)
     Page<Department> search(@Param("keyword") String keyword, Pageable pageable);
 }

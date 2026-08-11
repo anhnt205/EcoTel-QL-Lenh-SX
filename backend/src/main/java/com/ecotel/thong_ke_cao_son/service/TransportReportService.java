@@ -1,7 +1,9 @@
 package com.ecotel.thong_ke_cao_son.service;
 
+import com.ecotel.thong_ke_cao_son.dto.request.TransportReportBulkUpdateItem;
 import com.ecotel.thong_ke_cao_son.dto.request.TransportReportRequest;
 import com.ecotel.thong_ke_cao_son.dto.request.TransportReportTripRequest;
+import com.ecotel.thong_ke_cao_son.dto.response.BulkDeleteResponse;
 import com.ecotel.thong_ke_cao_son.dto.response.TransportReportResponse;
 import com.ecotel.thong_ke_cao_son.exception.ResourceNotFoundException;
 import com.ecotel.thong_ke_cao_son.model.*;
@@ -16,7 +18,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -127,5 +132,38 @@ public class TransportReportService {
     private <T, ID> T getOrThrow(JpaRepository<T, ID> repo, ID id, String label) {
         return repo.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException(label + " không tồn tại: " + id));
+    }
+
+    @Transactional
+    public List<TransportReportResponse> bulkCreate(List<TransportReportRequest> requests) {
+        List<TransportReportResponse> results = new ArrayList<>();
+        for (TransportReportRequest request : requests) {
+            results.add(create(request));
+        }
+        return results;
+    }
+
+    @Transactional
+    public List<TransportReportResponse> bulkUpdate(List<TransportReportBulkUpdateItem> items) {
+        List<TransportReportResponse> results = new ArrayList<>();
+        for (TransportReportBulkUpdateItem item : items) {
+            results.add(update(item.getId(), item.getData()));
+        }
+        return results;
+    }
+
+    @Transactional
+    public BulkDeleteResponse bulkDelete(List<Long> ids) {
+        List<TransportReport> reports = transportReportRepository.findAllById(ids);
+        if (reports.size() != ids.size()) {
+            Set<Long> foundIds = reports.stream().map(TransportReport::getId).collect(Collectors.toSet());
+            List<Long> missingIds = ids.stream().filter(id -> !foundIds.contains(id)).toList();
+            throw new ResourceNotFoundException("Không tìm thấy báo cáo với ID: " + missingIds);
+        }
+        transportReportRepository.deleteAll(reports);
+        return BulkDeleteResponse.builder()
+                .requestedCount(ids.size())
+                .deletedCount(reports.size())
+                .build();
     }
 }

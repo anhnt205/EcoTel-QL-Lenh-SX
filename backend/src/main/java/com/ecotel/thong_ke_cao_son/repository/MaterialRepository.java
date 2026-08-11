@@ -19,7 +19,7 @@ public interface MaterialRepository extends JpaRepository<Material, Long> {
         SELECT m FROM Material m
         WHERE :keyword IS NULL OR :keyword = ''
            OR LOWER(m.name) LIKE LOWER(CONCAT('%', :keyword, '%'))
-           OR LOWER(m.acceptedProduct) LIKE LOWER(CONCAT('%', :keyword, '%'))
+           OR LOWER(m.code) LIKE LOWER(CONCAT('%', :keyword, '%'))
         """)
     Page<Material> search(@Param("keyword") String keyword, Pageable pageable);
 }

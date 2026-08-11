@@ -19,6 +19,7 @@ public interface PositionRepository extends JpaRepository<Position, Long> {
         SELECT p FROM Position p
         WHERE :keyword IS NULL OR :keyword = ''
            OR LOWER(p.name) LIKE LOWER(CONCAT('%', :keyword, '%'))
+           OR LOWER(p.code) LIKE LOWER(CONCAT('%', :keyword, '%'))
         """)
     Page<Position> search(@Param("keyword") String keyword, Pageable pageable);
 }

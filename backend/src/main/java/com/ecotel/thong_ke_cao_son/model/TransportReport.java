@@ -17,7 +17,13 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(name = "transport_reports")
+@Table(
+        name = "transport_reports",
+        uniqueConstraints = {
+                @UniqueConstraint(name = "uk_transport_report_key",
+                        columnNames = {"report_date", "shift_id", "device_id", "employee_id"})
+        }
+)
 @Getter
 @Setter
 @NoArgsConstructor
