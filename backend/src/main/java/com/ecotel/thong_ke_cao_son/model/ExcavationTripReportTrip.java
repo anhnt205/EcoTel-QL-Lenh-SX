@@ -1,0 +1,64 @@
+package com.ecotel.thong_ke_cao_son.model;
+
+import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.Setter;
+import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+
+import java.time.LocalDateTime;
+
+@Entity
+@Table(name = "excavation_trip_report_trips")
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@EntityListeners(AuditingEntityListener.class)
+public class ExcavationTripReportTrip {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "excavation_trip_report_trip_seq")
+    @SequenceGenerator(name = "excavation_trip_report_trip_seq", sequenceName = "excavation_trip_report_trip_seq", allocationSize = 50)
+    private Long id;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "excavation_trip_report_id", nullable = false)
+    private ExcavationTripReport excavationTripReport;
+
+    // "Số xe" — Đơn vị quản lý thiết bị / Chủng loại xe derive từ đây ở tầng response
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "vehicle_device_id", nullable = false)
+    private Device vehicle;
+
+    @Column(name = "trip_count")
+    private Integer tripCount;
+
+    // "Vị trí đổ"
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "drop_off_location_id", nullable = false)
+    private Location dropOffLocation;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "cargo_type_id", nullable = false)
+    private CargoType cargoType;
+
+    // Nhóm hàng — tự động lấy theo cargoType.cargoGroup, không nhận từ request
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "cargo_group_id", nullable = false)
+    private CargoGroup cargoGroup;
+
+    @Embedded
+    private LoadLevel loadLevel = new LoadLevel();
+
+    @CreatedDate
+    @Column(name = "created_at", updatable = false)
+    private LocalDateTime createdAt;
+
+    @LastModifiedDate
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
+}

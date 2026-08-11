@@ -16,6 +16,7 @@ public interface DeviceMapper {
     @Mapping(target = "departmentName", source = "department.name")
     @Mapping(target = "categoryId", source = "category.id")
     @Mapping(target = "categoryName", source = "category.name")
+    @Mapping(target = "categoryGroup", source = "category.group")
     @Mapping(target = "materialId", source = "material.id")
     @Mapping(target = "materialName", source = "material.name")
     @Mapping(target = "createdById", source = "createdBy.id")

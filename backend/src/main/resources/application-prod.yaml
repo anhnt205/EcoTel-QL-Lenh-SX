@@ -32,6 +32,10 @@ mongo:
     uri: ${MONGO_SYNC_URI}
     database: Lenh_sx
 
+sync:
+  mongo:
+    enabled: true
+
 springdoc:
   swagger-ui:
     enabled: true

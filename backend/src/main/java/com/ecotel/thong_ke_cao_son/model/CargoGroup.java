@@ -13,12 +13,7 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(
-        name = "cargo_groups",
-        indexes = {
-                @Index(name = "idx_cargo_group_cargo_type", columnList = "cargo_type_id")
-        }
-)
+@Table(name = "cargo_groups")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -34,10 +29,6 @@ public class CargoGroup {
     @NotBlank(message = "Tên nhóm hàng là bắt buộc")
     @Column(name = "name", nullable = false)
     private String name;
-
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "cargo_type_id", nullable = false)
-    private CargoType cargoType;
 
     @CreatedDate
     @Column(name = "created_at", updatable = false)

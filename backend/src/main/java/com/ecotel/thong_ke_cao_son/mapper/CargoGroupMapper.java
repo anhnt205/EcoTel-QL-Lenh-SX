@@ -7,8 +7,5 @@ import org.mapstruct.Mapping;
 
 @Mapper(componentModel = "spring")
 public interface CargoGroupMapper {
-
-    @Mapping(target = "cargoTypeId", source = "cargoType.id")
-    @Mapping(target = "cargoTypeName", source = "cargoType.name")
     CargoGroupResponse toResponse(CargoGroup cargoGroup);
 }

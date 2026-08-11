@@ -1,5 +1,6 @@
 package com.ecotel.thong_ke_cao_son.repository;
 
+import com.ecotel.thong_ke_cao_son.enums.DeviceGroup;
 import com.ecotel.thong_ke_cao_son.model.Device;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -20,7 +21,9 @@ public interface DeviceRepository extends JpaRepository<Device, Long> {
         LEFT JOIN d.department dep
         LEFT JOIN d.category ct
         LEFT JOIN d.material mat
-        WHERE :keyword IS NULL OR :keyword = ''
+        WHERE (:categoryName IS NULL OR :categoryName = '' OR LOWER(ct.name) = LOWER(:categoryName))
+          AND (:categoryGroup IS NULL OR ct.group = :categoryGroup)
+          AND (:keyword IS NULL OR :keyword = ''
            OR LOWER(d.code) LIKE LOWER(CONCAT('%', :keyword, '%'))
            OR LOWER(d.name) LIKE LOWER(CONCAT('%', :keyword, '%'))
            OR LOWER(d.vehicleNumber) LIKE LOWER(CONCAT('%', :keyword, '%'))
@@ -28,7 +31,7 @@ public interface DeviceRepository extends JpaRepository<Device, Long> {
            OR LOWER(d.note) LIKE LOWER(CONCAT('%', :keyword, '%'))
            OR LOWER(dep.name) LIKE LOWER(CONCAT('%', :keyword, '%'))
            OR LOWER(ct.name) LIKE LOWER(CONCAT('%', :keyword, '%'))
-           OR LOWER(mat.name) LIKE LOWER(CONCAT('%', :keyword, '%'))
+           OR LOWER(mat.name) LIKE LOWER(CONCAT('%', :keyword, '%')))
         """)
-    Page<Device> search(@Param("keyword") String keyword, Pageable pageable);
+    Page<Device> search(@Param("keyword") String keyword, @Param("categoryName") String categoryName, @Param("categoryGroup") DeviceGroup categoryGroup, Pageable pageable);
 }

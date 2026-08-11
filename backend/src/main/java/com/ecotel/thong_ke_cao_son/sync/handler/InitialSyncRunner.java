@@ -8,6 +8,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.bson.Document;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.core.annotation.Order;
 import org.springframework.core.annotation.AnnotationAwareOrderComparator;
 import org.springframework.stereotype.Component;
@@ -17,6 +18,7 @@ import java.util.List;
 @Component
 @Order(0) // chạy trước ChangeStreamRunner (không có @Order = mặc định thấp nhất ưu tiên)
 @RequiredArgsConstructor
+@ConditionalOnProperty(name = "sync.mongo.enabled", havingValue = "true", matchIfMissing = true)
 @Slf4j
 public class InitialSyncRunner implements ApplicationRunner {
 

@@ -12,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.bson.BsonDocument;
 import org.bson.Document;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,6 +24,7 @@ import java.util.concurrent.Executors;
 @Component
 @Slf4j
 @RequiredArgsConstructor
+@ConditionalOnProperty(name = "sync.mongo.enabled", havingValue = "true", matchIfMissing = true)
 public class ChangeStreamRunner {
 
     private final MongoDatabase mongoSyncDatabase;
@@ -44,16 +46,25 @@ public class ChangeStreamRunner {
         while (!Thread.currentThread().isInterrupted()) {
             try {
                 var collection = mongoSyncDatabase.getCollection(collectionName);
-                var changeStream = collection.watch().fullDocument(FullDocument.UPDATE_LOOKUP);
+                var changeStreamIterable = collection.watch().fullDocument(FullDocument.UPDATE_LOOKUP);
 
                 BsonDocument resumeToken = loadResumeToken(collectionName);
                 if (resumeToken != null) {
-                    changeStream = changeStream.resumeAfter(resumeToken);
+                    changeStreamIterable = changeStreamIterable.resumeAfter(resumeToken);
                 }
 
-                for (ChangeStreamDocument<Document> event : changeStream) {
-                    processEvent(handler, event);
-                    saveResumeToken(collectionName, event.getResumeToken());
+                try (var cursor = changeStreamIterable.cursor()) {
+                    // Lưu checkpoint NGAY sau khi mở cursor thành công, dù chưa có event nào,
+                    // để lần restart sau không phải full sync lại (đã xác nhận đây là điểm hiện tại của stream).
+                    if (cursor.getResumeToken() != null) {
+                        saveResumeToken(collectionName, cursor.getResumeToken());
+                    }
+
+                    while (cursor.hasNext() && !Thread.currentThread().isInterrupted()) {
+                        ChangeStreamDocument<Document> event = cursor.next();
+                        processEvent(handler, event);
+                        saveResumeToken(collectionName, event.getResumeToken());
+                    }
                 }
             } catch (Exception e) {
                 log.error("Lỗi Change Stream cho collection {}, thử lại sau 5s", collectionName, e);

@@ -13,10 +13,8 @@ public interface CargoGroupRepository extends JpaRepository<CargoGroup, Long> {
 
     @Query("""
         SELECT cg FROM CargoGroup cg
-        LEFT JOIN cg.cargoType ct
         WHERE :keyword IS NULL OR :keyword = ''
            OR LOWER(cg.name) LIKE LOWER(CONCAT('%', :keyword, '%'))
-           OR LOWER(ct.name) LIKE LOWER(CONCAT('%', :keyword, '%'))
         """)
     Page<CargoGroup> search(@Param("keyword") String keyword, Pageable pageable);
 }

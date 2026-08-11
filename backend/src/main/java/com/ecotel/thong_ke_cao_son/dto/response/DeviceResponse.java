@@ -1,5 +1,6 @@
 package com.ecotel.thong_ke_cao_son.dto.response;
 
+import com.ecotel.thong_ke_cao_son.enums.DeviceGroup;
 import com.ecotel.thong_ke_cao_son.enums.DeviceStatus;
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -21,6 +22,7 @@ public class DeviceResponse {
     String vehicleNumber;
     Long categoryId;
     String categoryName;
+    DeviceGroup categoryGroup;
     Long materialId;
     String materialName;
     String fuelType;

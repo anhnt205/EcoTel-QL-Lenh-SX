@@ -1,6 +1,7 @@
 package com.ecotel.thong_ke_cao_son.service;
 
 import com.ecotel.thong_ke_cao_son.dto.response.DeviceResponse;
+import com.ecotel.thong_ke_cao_son.enums.DeviceGroup;
 import com.ecotel.thong_ke_cao_son.exception.ResourceNotFoundException;
 import com.ecotel.thong_ke_cao_son.mapper.DeviceMapper;
 import com.ecotel.thong_ke_cao_son.model.Device;
@@ -18,8 +19,8 @@ public class DeviceService {
     private final DeviceRepository deviceRepository;
     private final DeviceMapper deviceMapper;
 
-    public PageResponse<DeviceResponse> getAll(String keyword, Pageable pageable) {
-        Page<DeviceResponse> page = deviceRepository.search(keyword, pageable)
+    public PageResponse<DeviceResponse> getAll(String keyword, String categoryName, DeviceGroup categoryGroup, Pageable pageable) {
+        Page<DeviceResponse> page = deviceRepository.search(keyword, categoryName, categoryGroup, pageable)
                 .map(deviceMapper::toResponse);
         return PageResponse.from(page);
     }
