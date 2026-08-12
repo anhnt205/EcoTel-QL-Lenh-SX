@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
 
 import { RoleEnum } from "@/enums";
 import UserService from "./services/userService";
@@ -21,15 +21,28 @@ const Users = () => {
   const isAdmin = user?.role === RoleEnum.ADMIN;
 
   const [searchValue, setSearchValue] = useState("");
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(10);
 
   const {
-    data: users = [],
+    data: pageData,
     isLoading,
     refetch,
   } = useQuery({
-    queryKey: ["users", searchValue],
-    queryFn: () => UserService.getAll({ keyword: searchValue }),
+    queryKey: ["users", page, pageSize, searchValue],
+    queryFn: () =>
+      UserService.getAll({
+        page,
+        size: pageSize,
+        sort: "id,DESC",
+        keyword: searchValue,
+      }),
+    placeholderData: keepPreviousData,
   });
+
+  const users = pageData?.content ?? [];
+  const totalElements = pageData?.totalElements ?? 0;
+  const totalPages = pageData?.totalPages ?? 0;
 
   const columns = useMemo(
     () => getUserColumns({ isAdmin }),
@@ -57,10 +70,23 @@ const Users = () => {
           columns={columns}
           loading={isLoading}
           searchValue={searchValue}
-          onSearch={(val) => setSearchValue(val)}
+          onSearch={(val) => {
+            setSearchValue(val);
+            setPage(0);
+          }}
           onRefresh={refetch}
           showColumnToggle
           stickyHeader
+          manualPagination
+          page={page}
+          rowsPerPage={pageSize}
+          pageCount={totalPages}
+          totalCount={totalElements}
+          onPageChange={(newPage) => setPage(newPage)}
+          onRowsPerPageChange={(newSize) => {
+            setPageSize(newSize);
+            setPage(0);
+          }}
         />
       </div>
     </div>

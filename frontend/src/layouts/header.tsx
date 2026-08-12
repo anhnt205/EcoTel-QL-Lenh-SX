@@ -2,8 +2,6 @@ import { NavLink, useLocation } from "react-router-dom";
 import { useAuthStore } from "@/modules/auth/stores/auth.store";
 import logo from "@/assets/logo.png";
 import {
-  Eye,
-  BarChart3,
   ChevronDown,
   User,
   LogOut,
@@ -51,9 +49,15 @@ export function Header() {
     }`;
 
   return (
-    <header className="sticky top-0 z-40 flex flex-col w-full select-none shadow-md font-sans">
-      {/* 1. Top Section Header (Green background, Company Info & Software Title) */}
-      <div className="bg-[#137947] text-white py-4 px-4 flex items-center justify-center border-b border-emerald-600/40">
+    <header
+      className="sticky top-0 z-50 flex flex-col w-full select-none shadow-md"
+      style={{
+        background:
+          "linear-gradient(to right, #0b109aff, #0284c7ff, #1e40afff, #0b109aff)",
+      }}
+    >
+      {/* 1. Top Section Header (Company Info & Software Title) */}
+      <div className="bg-transparent text-white py-4 px-4 flex items-center justify-center border-b border-white/20">
         {/* Logo + Content side by side, centered as a group */}
         <div className="flex items-center gap-4 max-w-7xl w-full justify-center">
           <img
@@ -67,13 +71,13 @@ export function Header() {
               CÔNG TY CỔ PHẦN THAN CAO SƠN - TKV
             </h1>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-x-3 gap-y-0.5 mt-1">
-              <span className="flex items-center gap-1 text-xs sm:text-[13px] text-emerald-100 font-medium">
+              <span className="flex items-center gap-1 text-xs sm:text-[13px] text-blue-100 font-medium">
                 Tổ 1, Khu Cao Sơn 2, P. Cửa Ông, Tỉnh Quảng Ninh
               </span>
-              <span className="hidden sm:inline text-emerald-300 opacity-60">
+              <span className="hidden sm:inline text-blue-200 opacity-60">
                 |
               </span>
-              <span className="flex items-center gap-1 text-xs sm:text-[13px] text-emerald-100 font-medium">
+              <span className="flex items-center gap-1 text-xs sm:text-[13px] text-blue-100 font-medium">
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   className="h-3.5 w-3.5 shrink-0 opacity-80"
@@ -97,7 +101,7 @@ export function Header() {
       </div>
 
       {/* 2. Bottom Navigation Menu Bar */}
-      <div className="bg-[#137947] text-white px-4 py-1 flex items-center justify-between border-t border-emerald-600/30">
+      <div className="bg-black/10 backdrop-blur-xs text-white px-4 py-1 flex items-center justify-between border-t border-white/10">
         {/* Left Side: Navigation Links */}
         <nav className="hidden md:flex items-center gap-1">
           {/* Nhập liệu Khai thác & Nhập liệu Vận tải (Admin & Nhập liệu) */}
@@ -147,15 +151,15 @@ export function Header() {
 
               {/* Thiết bị (Sub Menu) */}
               <DropdownMenuSub>
-                <DropdownMenuSubTrigger className="flex items-center gap-2 px-2.5 py-2 text-sm rounded hover:bg-emerald-50 cursor-pointer">
-                  <Cog className="h-4 w-4 text-emerald-600" />
+                <DropdownMenuSubTrigger className="flex items-center gap-2 px-2.5 py-2 text-sm rounded hover:bg-blue-50 cursor-pointer">
+                  <Cog className="h-4 w-4 text-blue-600" />
                   <span>Thiết bị</span>
                 </DropdownMenuSubTrigger>
                 <DropdownMenuSubContent className="w-48 p-1 bg-white text-gray-800 shadow-xl border border-gray-200 rounded-lg ml-1">
                   <DropdownMenuItem asChild>
                     <NavLink
                       to={ROUTES.DANH_MUC.THONG_TIN_XE}
-                      className="flex items-center gap-2 px-2.5 py-2 text-sm rounded hover:bg-emerald-50 cursor-pointer"
+                      className="flex items-center gap-2 px-2.5 py-2 text-sm rounded hover:bg-blue-50 cursor-pointer"
                     >
                       Thông tin xe
                     </NavLink>
@@ -163,7 +167,7 @@ export function Header() {
                   <DropdownMenuItem asChild>
                     <NavLink
                       to={ROUTES.DANH_MUC.THONG_TIN_MAY}
-                      className="flex items-center gap-2 px-2.5 py-2 text-sm rounded hover:bg-emerald-50 cursor-pointer"
+                      className="flex items-center gap-2 px-2.5 py-2 text-sm rounded hover:bg-blue-50 cursor-pointer"
                     >
                       Thông tin máy
                     </NavLink>
@@ -175,9 +179,9 @@ export function Header() {
               <DropdownMenuItem asChild>
                 <NavLink
                   to={ROUTES.DANH_MUC.NHOM_HANG}
-                  className="flex items-center gap-2 px-2.5 py-2 text-sm rounded hover:bg-emerald-50 cursor-pointer"
+                  className="flex items-center gap-2 px-2.5 py-2 text-sm rounded hover:bg-blue-50 cursor-pointer"
                 >
-                  <FolderTree className="h-4 w-4 text-emerald-600" />
+                  <FolderTree className="h-4 w-4 text-blue-600" />
                   Nhóm hàng
                 </NavLink>
               </DropdownMenuItem>
@@ -186,9 +190,9 @@ export function Header() {
               <DropdownMenuItem asChild>
                 <NavLink
                   to={ROUTES.DANH_MUC.LOAI_HANG}
-                  className="flex items-center gap-2 px-2.5 py-2 text-sm rounded hover:bg-emerald-50 cursor-pointer"
+                  className="flex items-center gap-2 px-2.5 py-2 text-sm rounded hover:bg-blue-50 cursor-pointer"
                 >
-                  <Layers className="h-4 w-4 text-emerald-600" />
+                  <Layers className="h-4 w-4 text-blue-600" />
                   Loại hàng
                 </NavLink>
               </DropdownMenuItem>
@@ -197,9 +201,9 @@ export function Header() {
               <DropdownMenuItem asChild>
                 <NavLink
                   to={ROUTES.DANH_MUC.VAT_LIEU}
-                  className="flex items-center gap-2 px-2.5 py-2 text-sm rounded hover:bg-emerald-50 cursor-pointer"
+                  className="flex items-center gap-2 px-2.5 py-2 text-sm rounded hover:bg-blue-50 cursor-pointer"
                 >
-                  <Layers className="h-4 w-4 text-emerald-600" />
+                  <Layers className="h-4 w-4 text-blue-600" />
                   Vật liệu
                 </NavLink>
               </DropdownMenuItem>
@@ -208,9 +212,9 @@ export function Header() {
               <DropdownMenuItem asChild>
                 <NavLink
                   to={ROUTES.DANH_MUC.DIEM_DO_TAI}
-                  className="flex items-center gap-2 px-2.5 py-2 text-sm rounded hover:bg-emerald-50 cursor-pointer"
+                  className="flex items-center gap-2 px-2.5 py-2 text-sm rounded hover:bg-blue-50 cursor-pointer"
                 >
-                  <MapPin className="h-4 w-4 text-emerald-600" />
+                  <MapPin className="h-4 w-4 text-blue-600" />
                   Điểm đổ tải
                 </NavLink>
               </DropdownMenuItem>
@@ -219,9 +223,9 @@ export function Header() {
               <DropdownMenuItem asChild>
                 <NavLink
                   to={ROUTES.DANH_MUC.DON_VI}
-                  className="flex items-center gap-2 px-2.5 py-2 text-sm rounded hover:bg-emerald-50 cursor-pointer"
+                  className="flex items-center gap-2 px-2.5 py-2 text-sm rounded hover:bg-blue-50 cursor-pointer"
                 >
-                  <Building2 className="h-4 w-4 text-emerald-600" />
+                  <Building2 className="h-4 w-4 text-blue-600" />
                   Đơn vị
                 </NavLink>
               </DropdownMenuItem>
@@ -230,9 +234,9 @@ export function Header() {
               <DropdownMenuItem asChild>
                 <NavLink
                   to={ROUTES.DANH_MUC.CA_LAM_VIEC}
-                  className="flex items-center gap-2 px-2.5 py-2 text-sm rounded hover:bg-emerald-50 cursor-pointer"
+                  className="flex items-center gap-2 px-2.5 py-2 text-sm rounded hover:bg-blue-50 cursor-pointer"
                 >
-                  <Clock className="h-4 w-4 text-emerald-600" />
+                  <Clock className="h-4 w-4 text-blue-600" />
                   Ca làm việc
                 </NavLink>
               </DropdownMenuItem>
@@ -241,69 +245,16 @@ export function Header() {
               <DropdownMenuItem asChild>
                 <NavLink
                   to={ROUTES.DANH_MUC.NGUOI_DUNG}
-                  className="flex items-center gap-2 px-2.5 py-2 text-sm rounded hover:bg-emerald-50 cursor-pointer"
+                  className="flex items-center gap-2 px-2.5 py-2 text-sm rounded hover:bg-blue-50 cursor-pointer"
                 >
-                  <User className="h-4 w-4 text-emerald-600" />
+                  <User className="h-4 w-4 text-blue-600" />
                   Người dùng & Lái xe
                 </NavLink>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
 
-          {/* Xem báo cáo ∨ */}
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              className={dropdownTriggerClass(pathname.startsWith("/reports"))}
-            >
-              <Eye className="h-4 w-4 mr-0.5" />
-              Báo cáo
-              <ChevronDown className="h-3.5 w-3.5 opacity-80" />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent
-              align="start"
-              className="w-56 p-1 bg-white text-gray-800 shadow-xl border border-gray-200 rounded-lg"
-            >
-              <DropdownMenuLabel className="text-[11px] font-bold uppercase text-gray-400 px-2 py-1">
-                Danh sách báo cáo
-              </DropdownMenuLabel>
-              <DropdownMenuItem asChild>
-                <NavLink
-                  to={ROUTES.REPORTS.INTERNAL_TRUCKS}
-                  className="flex items-center gap-2 px-2.5 py-2 text-sm rounded hover:bg-emerald-50 cursor-pointer"
-                >
-                  <BarChart3 className="h-4 w-4 text-emerald-600" />
-                  Báo cáo Xe trong mỏ
-                </NavLink>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <NavLink
-                  to={ROUTES.REPORTS.EXTERNAL_TRUCKS}
-                  className="flex items-center gap-2 px-2.5 py-2 text-sm rounded hover:bg-emerald-50 cursor-pointer"
-                >
-                  <BarChart3 className="h-4 w-4 text-emerald-600" />
-                  Báo cáo Xe thuê ngoài
-                </NavLink>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <NavLink
-                  to={ROUTES.REPORTS.PRODUCTION_ANALYSIS}
-                  className="flex items-center gap-2 px-2.5 py-2 text-sm rounded hover:bg-emerald-50 cursor-pointer"
-                >
-                  <BarChart3 className="h-4 w-4 text-emerald-600" />
-                  Phân tích sản lượng
-                </NavLink>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <NavLink
-                  to={ROUTES.REPORTS.SUMMARY}
-                  className="flex items-center gap-2 px-2.5 py-2 text-sm rounded hover:bg-emerald-50 cursor-pointer"
-                >
-                  <BarChart3 className="h-4 w-4 text-emerald-600" />
-                  Báo cáo tổng hợp
-                </NavLink>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+
 
           {/* Đối chiếu */}
           <NavLink
@@ -351,7 +302,7 @@ export function Header() {
                       to="/nhap-lieu/van-tai"
                       className="flex items-center gap-2 px-2 py-2 text-sm font-medium"
                     >
-                      <Truck className="h-4 w-4 text-emerald-600" /> Nhập liệu
+                      <Truck className="h-4 w-4 text-blue-600" /> Nhập liệu
                       Vận tải
                     </NavLink>
                   </DropdownMenuItem>
@@ -373,14 +324,14 @@ export function Header() {
               </DropdownMenuLabel>
 
               <DropdownMenuSub>
-                <DropdownMenuSubTrigger className="flex items-center gap-2 px-2 py-2 text-sm font-medium rounded hover:bg-emerald-50 cursor-pointer">
-                  <Cog className="h-4 w-4 text-emerald-600" /> Thiết bị
+                <DropdownMenuSubTrigger className="flex items-center gap-2 px-2 py-2 text-sm font-medium rounded hover:bg-blue-50 cursor-pointer">
+                  <Cog className="h-4 w-4 text-blue-600" /> Thiết bị
                 </DropdownMenuSubTrigger>
                 <DropdownMenuSubContent className="w-56 p-1 bg-white text-zinc-800 shadow-xl border border-zinc-200 rounded-lg ml-1">
                   <DropdownMenuItem asChild>
                     <NavLink
                       to={ROUTES.DANH_MUC.THONG_TIN_XE}
-                      className="flex items-center gap-2 px-2.5 py-2 text-sm rounded hover:bg-emerald-50 cursor-pointer"
+                      className="flex items-center gap-2 px-2.5 py-2 text-sm rounded hover:bg-blue-50 cursor-pointer"
                     >
                       Thông tin xe
                     </NavLink>
@@ -388,7 +339,7 @@ export function Header() {
                   <DropdownMenuItem asChild>
                     <NavLink
                       to={ROUTES.DANH_MUC.THONG_TIN_MAY}
-                      className="flex items-center gap-2 px-2.5 py-2 text-sm rounded hover:bg-emerald-50 cursor-pointer"
+                      className="flex items-center gap-2 px-2.5 py-2 text-sm rounded hover:bg-blue-50 cursor-pointer"
                     >
                       Thông tin máy
                     </NavLink>
@@ -401,7 +352,7 @@ export function Header() {
                   to={ROUTES.DANH_MUC.NHOM_HANG}
                   className="flex items-center gap-2 px-2 py-2 text-sm font-medium"
                 >
-                  <FolderTree className="h-4 w-4 text-emerald-600" /> Nhóm hàng
+                  <FolderTree className="h-4 w-4 text-blue-600" /> Nhóm hàng
                 </NavLink>
               </DropdownMenuItem>
 
@@ -410,7 +361,7 @@ export function Header() {
                   to={ROUTES.DANH_MUC.LOAI_HANG}
                   className="flex items-center gap-2 px-2 py-2 text-sm font-medium"
                 >
-                  <Layers className="h-4 w-4 text-emerald-600" /> Loại hàng
+                  <Layers className="h-4 w-4 text-blue-600" /> Loại hàng
                 </NavLink>
               </DropdownMenuItem>
 
@@ -419,7 +370,7 @@ export function Header() {
                   to={ROUTES.DANH_MUC.VAT_LIEU}
                   className="flex items-center gap-2 px-2 py-2 text-sm font-medium"
                 >
-                  <Layers className="h-4 w-4 text-emerald-600" /> Vật liệu
+                  <Layers className="h-4 w-4 text-blue-600" /> Vật liệu
                 </NavLink>
               </DropdownMenuItem>
 
@@ -428,7 +379,7 @@ export function Header() {
                   to={ROUTES.DANH_MUC.DIEM_DO_TAI}
                   className="flex items-center gap-2 px-2 py-2 text-sm font-medium"
                 >
-                  <MapPin className="h-4 w-4 text-emerald-600" /> Điểm đổ tải
+                  <MapPin className="h-4 w-4 text-blue-600" /> Điểm đổ tải
                 </NavLink>
               </DropdownMenuItem>
 
@@ -437,7 +388,7 @@ export function Header() {
                   to={ROUTES.DANH_MUC.DON_VI}
                   className="flex items-center gap-2 px-2 py-2 text-sm font-medium"
                 >
-                  <Building2 className="h-4 w-4 text-emerald-600" /> Đơn vị
+                  <Building2 className="h-4 w-4 text-blue-600" /> Đơn vị
                 </NavLink>
               </DropdownMenuItem>
 
@@ -446,7 +397,7 @@ export function Header() {
                   to={ROUTES.DANH_MUC.CA_LAM_VIEC}
                   className="flex items-center gap-2 px-2 py-2 text-sm font-medium"
                 >
-                  <Clock className="h-4 w-4 text-emerald-600" /> Ca làm việc
+                  <Clock className="h-4 w-4 text-blue-600" /> Ca làm việc
                 </NavLink>
               </DropdownMenuItem>
 
@@ -455,7 +406,7 @@ export function Header() {
                   to={ROUTES.DANH_MUC.NGUOI_DUNG}
                   className="flex items-center gap-2 px-2 py-2 text-sm font-medium"
                 >
-                  <User className="h-4 w-4 text-emerald-600" /> Người dùng & Lái
+                  <User className="h-4 w-4 text-blue-600" /> Người dùng & Lái
                   xe
                 </NavLink>
               </DropdownMenuItem>
@@ -485,7 +436,7 @@ export function Header() {
               <p className="text-sm font-bold text-gray-900">
                 {user?.hoTen || "System Admin"}
               </p>
-              <p className="text-xs text-emerald-700 font-medium mt-0.5">
+              <p className="text-xs text-blue-700 font-medium mt-0.5">
                 {user ? ROLE_LABELS[user.role] : "Quản trị hệ thống"}
               </p>
             </DropdownMenuLabel>

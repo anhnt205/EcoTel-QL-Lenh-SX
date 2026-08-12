@@ -8,8 +8,8 @@ export const getCargoGroupColumns = (): ColumnDef<CargoGroup>[] => [
     accessorKey: "name",
     header: "Tên Nhóm hàng",
     cell: ({ row }) => (
-      <div className="font-medium text-emerald-800 dark:text-emerald-300 flex items-center gap-1.5">
-        <Layers className="w-3.5 h-3.5 text-emerald-600" />
+      <div className="font-medium text-blue-800 dark:text-blue-300 flex items-center gap-1.5">
+        <Layers className="w-3.5 h-3.5 text-blue-600" />
         {row.original.name}
       </div>
     ),
@@ -23,11 +23,6 @@ export const getCargoGroupColumns = (): ColumnDef<CargoGroup>[] => [
       ) : (
         "—"
       ),
-  },
-  {
-    accessorKey: "cargoTypeName",
-    header: "Thuộc Loại hàng",
-    cell: ({ row }) => row.original.cargoTypeName || "—",
   },
   {
     accessorKey: "description",

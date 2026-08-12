@@ -13,9 +13,9 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 
 function EcotelLogo({ className = "h-11 w-11" }: { className?: string }) {
   return (
-    <div className={`rounded-full bg-white p-1 shadow-md flex items-center justify-center shrink-0 border border-emerald-100/20 ${className}`}>
+    <div className={`rounded-full bg-white p-1 shadow-md flex items-center justify-center shrink-0 border border-blue-100/20 ${className}`}>
       <svg viewBox="0 0 100 100" className="w-full h-full" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="50" cy="50" r="46" fill="#ffffff" stroke="#137947" strokeWidth="4" />
+        <circle cx="50" cy="50" r="46" fill="#ffffff" stroke="#0f4c81" strokeWidth="4" />
         <circle cx="50" cy="50" r="38" fill="none" stroke="#d97706" strokeWidth="2.5" strokeDasharray="6 3" />
         <path d="M 50 16 L 75 68 L 25 68 Z" fill="#dc2626" opacity="0.95" />
         <path d="M 50 25 L 68 64 L 32 64 Z" fill="#ffffff" />
@@ -60,10 +60,10 @@ export function SignInForm() {
   return (
     <div className="flex min-h-screen w-full bg-gray-50/50">
       {/* Left Panel: Branding & Company Info (Hidden on mobile) */}
-      <div className="relative hidden w-1/2 flex-col justify-between overflow-hidden bg-[#137947] p-12 lg:flex">
+      <div className="relative hidden w-1/2 flex-col justify-between overflow-hidden bg-[#0f4c81] p-12 lg:flex">
         {/* Background decorative elements */}
-        <div className="absolute -left-20 -top-20 h-64 w-64 rounded-full bg-emerald-600/20 blur-3xl"></div>
-        <div className="absolute -bottom-32 -right-32 h-96 w-96 rounded-full bg-emerald-800/40 blur-3xl"></div>
+        <div className="absolute -left-20 -top-20 h-64 w-64 rounded-full bg-blue-600/20 blur-3xl"></div>
+        <div className="absolute -bottom-32 -right-32 h-96 w-96 rounded-full bg-blue-900/40 blur-3xl"></div>
         
         <div className="relative z-10 flex flex-col">
           <EcotelLogo className="mb-8 h-20 w-20 shadow-xl" />
@@ -71,47 +71,44 @@ export function SignInForm() {
             Công ty Cổ phần<br />
             Than Cao Sơn - TKV
           </h1>
-          <p className="mt-5 max-w-md text-lg text-emerald-50 leading-relaxed font-medium">
+          <p className="mt-5 max-w-md text-lg text-blue-50 leading-relaxed font-medium">
             Phần mềm thống kê Cao Sơn. Hỗ trợ tổng hợp, giám sát, phân tích và báo cáo số liệu chuyên sâu.
           </p>
           
           <div className="mt-10 space-y-4">
-            <div className="flex items-center gap-3 text-emerald-100">
+            <div className="flex items-center gap-3 text-blue-100">
               <CheckCircle2 className="h-5 w-5 text-amber-400" />
               <span>Thống kê số liệu chính xác 100%</span>
             </div>
-            <div className="flex items-center gap-3 text-emerald-100">
+            <div className="flex items-center gap-3 text-blue-100">
               <CheckCircle2 className="h-5 w-5 text-amber-400" />
               <span>Hệ thống báo cáo đa chiều, trực quan</span>
             </div>
-            <div className="flex items-center gap-3 text-emerald-100">
+            <div className="flex items-center gap-3 text-blue-100">
               <CheckCircle2 className="h-5 w-5 text-amber-400" />
               <span>Phân quyền bảo mật đa lớp</span>
             </div>
           </div>
         </div>
         
-        <div className="relative z-10 font-medium text-emerald-200/60 text-sm">
+        <div className="relative z-10 font-medium text-blue-200/60 text-sm">
           &copy; {new Date().getFullYear()} TKV - Vinacomin. All rights reserved.
         </div>
       </div>
 
       {/* Right Panel: Login Form */}
       <div className="flex w-full flex-col justify-center px-4 py-12 sm:px-6 lg:w-1/2 lg:px-20 xl:px-32">
-        <div className="mx-auto w-full max-w-[420px]">
-          
-          {/* Mobile Logo */}
-          <div className="mb-8 flex justify-center lg:hidden">
-            <EcotelLogo className="h-20 w-20 shadow-lg" />
+        <div className="mx-auto w-full max-w-md">
+          {/* Mobile Header Logo */}
+          <div className="mb-8 flex flex-col items-center lg:hidden text-center">
+            <EcotelLogo className="mb-4 h-16 w-16 shadow-lg" />
+            <h2 className="text-xl font-bold text-gray-900 uppercase">Than Cao Sơn - TKV</h2>
+            <p className="text-xs text-gray-500 font-medium mt-1">Phần mềm thống kê Cao Sơn</p>
           </div>
 
-          <div className="mb-10 text-center lg:text-left">
-            <h2 className="text-3xl font-bold tracking-tight text-gray-900">
-              Chào mừng trở lại
-            </h2>
-            <p className="mt-2 text-sm text-gray-600">
-              Đăng nhập để truy cập phần mềm thống kê Cao Sơn
-            </p>
+          <div className="mb-8">
+            <h2 className="text-2xl font-extrabold text-gray-900 tracking-tight">Đăng nhập hệ thống</h2>
+            <p className="mt-2 text-sm text-gray-500 font-medium">Vui lòng nhập tài khoản và mật khẩu của bạn để tiếp tục</p>
           </div>
 
           <div className="rounded-2xl bg-white p-8 shadow-xl shadow-gray-200/50 border border-gray-100">
@@ -129,7 +126,7 @@ export function SignInForm() {
                         <Input
                           {...field}
                           placeholder="Nhập tên đăng nhập"
-                          className="h-12 rounded-xl bg-gray-50/50 px-4 text-sm border-gray-200 focus-visible:ring-1 focus-visible:ring-emerald-600 focus-visible:border-emerald-600 transition-colors"
+                          className="h-12 rounded-xl bg-gray-50/50 px-4 text-sm border-gray-200 focus-visible:ring-1 focus-visible:ring-blue-600 focus-visible:border-blue-600 transition-colors"
                         />
                       </FormControl>
                       <FormMessage className="text-xs text-red-500" />
@@ -151,14 +148,14 @@ export function SignInForm() {
                             {...field}
                             type={showPassword ? 'text' : 'password'}
                             placeholder="Nhập mật khẩu"
-                            className="h-12 rounded-xl bg-gray-50/50 px-4 pr-12 text-sm border-gray-200 focus-visible:ring-1 focus-visible:ring-emerald-600 focus-visible:border-emerald-600 transition-colors"
+                            className="h-12 rounded-xl bg-gray-50/50 px-4 pr-12 text-sm border-gray-200 focus-visible:ring-1 focus-visible:ring-blue-600 focus-visible:border-blue-600 transition-colors"
                           />
                           <Button
                             type="button"
                             variant="ghost"
                             size="icon"
                             onClick={() => setShowPassword(!showPassword)}
-                            className="absolute right-1.5 top-1/2 h-9 w-9 -translate-y-1/2 text-gray-400 hover:text-emerald-600 cursor-pointer rounded-lg"
+                            className="absolute right-1.5 top-1/2 h-9 w-9 -translate-y-1/2 text-gray-400 hover:text-blue-600 cursor-pointer rounded-lg"
                           >
                             {showPassword ? (
                               <EyeOff className="h-4 w-4" />
@@ -182,7 +179,7 @@ export function SignInForm() {
                 <Button
                   type="submit"
                   disabled={loading}
-                  className="mt-2 h-12 w-full rounded-xl bg-[#137947] text-sm font-bold text-white hover:bg-emerald-800 transition-all shadow-md shadow-emerald-700/20 disabled:opacity-70 cursor-pointer"
+                  className="mt-2 h-12 w-full rounded-xl bg-[#0f4c81] text-sm font-bold text-white hover:bg-blue-800 transition-all shadow-md shadow-blue-700/20 disabled:opacity-70 cursor-pointer"
                 >
                   {loading ? (
                     <Loader2 className="h-5 w-5 animate-spin" />
@@ -207,7 +204,7 @@ export function SignInForm() {
                     form.setValue('password', '123456');
                     form.handleSubmit(onSubmit)();
                   }}
-                  className="h-10 rounded-lg border-gray-200 bg-white px-2 text-xs font-semibold text-gray-700 hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700 cursor-pointer transition-colors"
+                  className="h-10 rounded-lg border-gray-200 bg-white px-2 text-xs font-semibold text-gray-700 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 cursor-pointer transition-colors"
                 >
                   <span className="mr-1.5">👑</span> Admin
                 </Button>

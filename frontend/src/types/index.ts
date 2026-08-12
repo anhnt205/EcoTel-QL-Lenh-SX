@@ -59,8 +59,6 @@ export interface CargoGroup {
   name: string;
   code?: string;
   description?: string;
-  cargoTypeId?: number;
-  cargoTypeName?: string;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -71,6 +69,8 @@ export interface CargoType {
   name: string;
   code?: string;
   description?: string;
+  cargoGroupId?: number;
+  cargoGroupName?: string;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -277,6 +277,47 @@ export interface ApiResponse<T> {
   error?: string;
   message?: string;
 }
+
+export interface PaginatedResponse<T> {
+  content: T[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+  last: boolean;
+}
+
+export const parsePaginatedResponse = <T>(res: any): PaginatedResponse<T> => {
+  const data = res.data?.data || res.data?.result || res.data;
+  if (data && Array.isArray(data.content)) {
+    return {
+      content: data.content,
+      page: data.page ?? 0,
+      size: data.size ?? data.content.length,
+      totalElements: data.totalElements ?? data.content.length,
+      totalPages: data.totalPages ?? 1,
+      last: data.last ?? true,
+    };
+  }
+  if (Array.isArray(data)) {
+    return {
+      content: data,
+      page: 0,
+      size: data.length,
+      totalElements: data.length,
+      totalPages: 1,
+      last: true,
+    };
+  }
+  return {
+    content: [],
+    page: 0,
+    size: 10,
+    totalElements: 0,
+    totalPages: 0,
+    last: true,
+  };
+};
 
 export interface SystemInfo {
   cpu: number[]; // CPU usage history

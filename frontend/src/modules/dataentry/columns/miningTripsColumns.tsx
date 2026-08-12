@@ -67,6 +67,7 @@ export const getMiningTripsColumns = (
       return "05/08/2026";
     },
     id: "date",
+    meta: { headerTitle: "Thời gian" },
     header: ({ column }) => (
       <Button
         variant="ghost"
@@ -85,6 +86,7 @@ export const getMiningTripsColumns = (
   {
     accessorKey: "shift",
     id: "shift",
+    meta: { headerTitle: "Ca" },
     header: ({ column }) => (
       <Button
         variant="ghost"
@@ -103,7 +105,7 @@ export const getMiningTripsColumns = (
   {
     accessorKey: "pickupLocation",
     id: "pickupLocation",
-    header: "Nơi nhận tải",
+    header: "Nơi chất tải",
     cell: ({ row }) => (
       <span className="font-medium">
         {row.original.pickupLocation || "KX1"}
@@ -114,18 +116,19 @@ export const getMiningTripsColumns = (
   {
     accessorKey: "mineCode",
     id: "mineCode",
+    meta: { headerTitle: "Máy xúc" },
     header: ({ column }) => (
       <Button
         variant="ghost"
         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        className="h-7 px-1 text-xs font-semibold hover:bg-transparent text-emerald-700 dark:text-emerald-400"
+        className="h-7 px-1 text-xs font-semibold hover:bg-transparent text-blue-700 dark:text-blue-400"
       >
         Máy xúc
         <ArrowUpDown className="ml-1 h-3 w-3" />
       </Button>
     ),
     cell: ({ row }) => (
-      <span className="font-semibold text-emerald-700 dark:text-emerald-400">
+      <span className="font-semibold text-blue-700 dark:text-blue-400">
         {row.original.mineCode || "P15"}
       </span>
     ),
@@ -141,6 +144,7 @@ export const getMiningTripsColumns = (
   {
     accessorKey: "transportVehicleNo",
     id: "transportVehicleNo",
+    meta: { headerTitle: "Số xe" },
     header: ({ column }) => (
       <Button
         variant="ghost"
@@ -161,18 +165,19 @@ export const getMiningTripsColumns = (
   {
     accessorKey: "tripCount",
     id: "tripCount",
+    meta: { headerTitle: "Số chuyến" },
     header: ({ column }) => (
       <Button
         variant="ghost"
         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        className="h-7 px-1 text-xs font-semibold hover:bg-transparent text-emerald-700 dark:text-emerald-300"
+        className="h-7 px-1 text-xs font-semibold hover:bg-transparent text-blue-700 dark:text-blue-300"
       >
         Số chuyến
         <ArrowUpDown className="ml-1 h-3 w-3" />
       </Button>
     ),
     cell: ({ row }) => (
-      <span className="font-bold text-emerald-700 dark:text-emerald-300">
+      <span className="font-bold text-blue-700 dark:text-blue-300">
         {row.original.tripCount ?? 6}
       </span>
     ),
@@ -192,7 +197,7 @@ export const getMiningTripsColumns = (
     id: "loadStatus",
     header: "Tải trọng",
     cell: ({ row }) => (
-      <span className="inline-block px-2 py-0.5 rounded text-[11px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800">
+      <span className="inline-block px-2 py-0.5 rounded text-[11px] font-medium bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800">
         {row.original.loadStatus || "Đủ tải"}
       </span>
     ),

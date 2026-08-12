@@ -67,6 +67,7 @@ export const getMiningFuelColumns = (
       return "05/08/2026";
     },
     id: "date",
+    meta: { headerTitle: "Thời gian" },
     header: ({ column }) => (
       <Button
         variant="ghost"
@@ -94,7 +95,7 @@ export const getMiningFuelColumns = (
   {
     accessorKey: "pickupLocation",
     id: "pickupLocation",
-    header: "Nơi nhận tải",
+    header: "Nơi chất tải",
     cell: ({ row }) => (
       <span className="font-medium">
         {row.original.pickupLocation || "KX1"}
@@ -105,18 +106,19 @@ export const getMiningFuelColumns = (
   {
     accessorKey: "mineCode",
     id: "mineCode",
+    meta: { headerTitle: "Máy xúc" },
     header: ({ column }) => (
       <Button
         variant="ghost"
         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        className="h-7 px-1 text-xs font-semibold hover:bg-transparent text-emerald-700 dark:text-emerald-400"
+        className="h-7 px-1 text-xs font-semibold hover:bg-transparent text-blue-700 dark:text-blue-400"
       >
         Máy xúc
         <ArrowUpDown className="ml-1 h-3 w-3" />
       </Button>
     ),
     cell: ({ row }) => (
-      <span className="font-semibold text-emerald-700 dark:text-emerald-400">
+      <span className="font-semibold text-blue-700 dark:text-blue-400">
         {row.original.mineCode || "P15"}
       </span>
     ),
@@ -201,7 +203,7 @@ export const getMiningFuelColumns = (
             (Number(row.original.finalFuel) || 120),
         );
       return (
-        <span className="font-bold text-emerald-700 dark:text-emerald-400">
+        <span className="font-bold text-blue-700 dark:text-blue-400">
           {fuelUsed}
         </span>
       );

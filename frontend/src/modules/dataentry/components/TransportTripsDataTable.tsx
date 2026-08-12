@@ -180,11 +180,11 @@ export const TransportTripsDataTable: React.FC<
                     key={row.id}
                     className={`border-b border-gray-100 dark:border-gray-800/60 transition-colors ${
                       isSelected
-                        ? "bg-emerald-50/60 dark:bg-emerald-950/30"
+                        ? "bg-blue-50/60 dark:bg-blue-950/30"
                         : idx % 2 === 0
                           ? "bg-white dark:bg-gray-900"
                           : "bg-slate-50/40 dark:bg-gray-900/50"
-                    } hover:bg-emerald-50/30 dark:hover:bg-emerald-950/20`}
+                    } hover:bg-blue-50/30 dark:hover:bg-blue-950/20`}
                   >
                     {row.getVisibleCells().map((cell) => (
                       <TableCell

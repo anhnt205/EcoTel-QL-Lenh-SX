@@ -37,6 +37,7 @@ declare module "@tanstack/react-table" {
     align?: "left" | "center" | "right";
     className?: string;
     headerClassName?: string;
+    headerTitle?: string;
   }
 }
 import { ChevronRight, ChevronDown } from "lucide-react";
@@ -468,9 +469,10 @@ function AppDataTable<TData>({
             .map((column) => ({
               id: column.id,
               label:
-                typeof column.columnDef.header === "string"
+                column.columnDef.meta?.headerTitle ??
+                (typeof column.columnDef.header === "string"
                   ? column.columnDef.header
-                  : column.id,
+                  : column.id),
               isVisible: column.getIsVisible(),
               onToggle: (val) => column.toggleVisibility(!!val),
             }))}

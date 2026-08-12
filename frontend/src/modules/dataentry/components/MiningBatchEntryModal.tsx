@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useRef, useEffect, useCallback } from "react";
+import { DatePickerString } from "@/components/common/DatePickerString";
 import {
   Dialog,
   DialogContent,
@@ -16,20 +17,22 @@ import {
   SelectValue,
 } from "../../../components/ui/select.tsx";
 import { ComboboxInput } from "../../../components/ui/combobox-input.tsx";
-import {
-  Plus,
-  Trash2,
-  Save,
-  XCircle,
-  Pickaxe,
-  X,
-} from "lucide-react";
+import { Progress } from "../../../components/ui/progress.tsx";
+import { Plus, Trash2, Save, XCircle, Pickaxe, X } from "lucide-react";
+
 import { toast } from "sonner";
-import { useConfirmDialog } from "../../../components/ui/confirm-dialog.tsx";
+
 import type { MiningRecord } from "@/modules/dataentry/types/thong-ke.ts";
 import { saveMiningRecords } from "@/modules/dataentry/services/thongKeStorage.ts";
 import { useMasterData } from "@/modules/dataentry/hooks/useMasterData.ts";
-import { validateMiningSession } from "@/modules/dataentry/schemas/thong-ke.schema.ts";
+import { useFormTabNavigation } from "@/hooks/useFormTabNavigation.ts";
+import { useMiningDraftStore } from "@/modules/dataentry/store/useMiningDraftStore.ts";
+import {
+  buildExcavationReportRequest,
+  useCreateExcavationTripReportMutation,
+  useUpdateExcavationTripReportMutation,
+  type ExcavationTripReportRequest,
+} from "@/modules/dataentry/services/excavationTripReportService.ts";
 
 // ─── Tải trọng options – radio buttons trong bảng chuyến ─────────────────
 const LOAD_STATUS_OPTIONS = [
@@ -53,12 +56,12 @@ export interface TripRow {
 // ─── 1 bản ghi = 1 ca + 1 máy xúc ──────────────────────────────────────
 export interface MiningSessionDraft {
   _tempId: string;
+  reportId?: number; // ID bản ghi trên Backend (nếu đang ở chế độ Chỉnh sửa)
 
   // === Header (nhập 1 lần / ca / máy xúc) ===
   workingDate: string; // Thời gian (YYYY-MM-DD)
   shift: string; // Ca: "1" | "2" | "3"
-  miningUnit: string; // Đơn vị khai thác
-  pickupLocation: string; // Nơi nhận tải
+  pickupLocation: string; // Nơi chất tải
   excavator: string; // Máy xúc
   totalScoops: number | ""; // Tổng xúc
 
@@ -78,11 +81,6 @@ export interface MiningSessionDraft {
 }
 
 // ─── Utilities ───────────────────────────────────────────────────────────
-const todayStr = (): string => {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-};
-
 const computeFuelUsed = (s: MiningSessionDraft): number =>
   Math.max(
     0,
@@ -90,17 +88,6 @@ const computeFuelUsed = (s: MiningSessionDraft): number =>
       (Number(s.receivedFuel) || 0) -
       (Number(s.finalFuel) || 0),
   );
-
-const newTripRow = (defaultMaterial = "Đất đá"): TripRow => ({
-  _tempId: `trip_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-  vehicleNo: "",
-  tripCount: "",
-  material: defaultMaterial,
-  loadStatus: "Đủ tải",
-  loadStatusNote: "",
-  vehicleManagementUnit: "",
-  vehicleType: "",
-});
 
 // ─── Props ────────────────────────────────────────────────────────────────
 interface MiningBatchEntryModalProps {
@@ -117,179 +104,163 @@ export const MiningBatchEntryModal: React.FC<MiningBatchEntryModalProps> = ({
 }) => {
   const {
     shiftOptions,
-    departmentValues,
     locationValues,
     excavatorValues,
     vehicleValues,
-    materialValues,
+    cargoTypeValues,
     operatorOptions,
     getVehicleDetails,
     getOperatorDetails,
-  } = useMasterData();
+    rawShifts,
+    rawLocations,
+    rawExcavators,
+    rawVehicles,
+    rawUsers,
+    rawCargoTypes,
+  } = useMasterData({ enabled: isOpen });
 
-  // Dùng primitive (string) thay vì array để tránh tạo createDefaultSession mới mỗi render
-  const firstShift = shiftOptions[0]?.value || "1";
-  const firstDept = departmentValues[0] || "";
-  const firstLoc = locationValues[0] || "";
-  const firstExcavator = excavatorValues[0] || "";
-  const firstMaterial = materialValues[0] || "Đất đá";
+  const createReportMutation = useCreateExcavationTripReportMutation();
+  const updateReportMutation = useUpdateExcavationTripReportMutation();
 
-  const createDefaultSession = useCallback((): MiningSessionDraft => ({
-    _tempId: `sess_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-    workingDate: todayStr(),
-    shift: firstShift,
-    miningUnit: firstDept,
-    pickupLocation: firstLoc,
-    excavator: firstExcavator,
-    totalScoops: "",
-    trips: [newTripRow(firstMaterial)],
-    initialFuel: "",
-    receivedFuel: "",
-    finalFuel: "",
-    operatorBadgeNo: "",
-    operatorName: "",
-    operatorUnit: "",
-  }), [firstShift, firstDept, firstLoc, firstExcavator, firstMaterial]);
+  const {
+    sessions,
+    activeIdx,
+    initDrafts,
+    addSession,
+    removeSession,
+    setActiveIdx,
+    updateActiveSession,
+    updateTripRow,
+    addTripRow,
+    removeTripRow,
+    validateAllSessions,
+    isSessionValid,
+    getSessionProgress,
+    getBatchProgress,
+  } = useMiningDraftStore();
 
-  const [sessions, setSessions] = useState<MiningSessionDraft[]>([
-    createDefaultSession(),
-  ]);
-  const [activeIdx, setActiveIdx] = useState(0);
+  const batchProgress = getBatchProgress();
   const tableBottomRef = useRef<HTMLDivElement>(null);
 
   // Reset khi mở modal – chỉ chạy khi isOpen chuyển từ false → true
   const prevIsOpenRef = useRef(false);
   useEffect(() => {
     if (isOpen && !prevIsOpenRef.current) {
-      setSessions([createDefaultSession()]);
-      setActiveIdx(0);
+      initDrafts();
     }
     prevIsOpenRef.current = isOpen;
-  }, [isOpen]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isOpen, initDrafts]);
 
   // ── Cập nhật session header ─────────────────────────────────────────────
-  const updateSession = useCallback(
-    (sIdx: number, patch: Partial<MiningSessionDraft>) => {
-      setSessions((prev) => {
-        const next = [...prev];
-        if (!next[sIdx]) return prev;
-        const updated = { ...next[sIdx], ...patch };
-        // Auto-fill tên + đơn vị theo thẻ lương từ API cache
-        if ("operatorBadgeNo" in patch) {
-          const info = getOperatorDetails(patch.operatorBadgeNo!);
-          updated.operatorName = info.operatorName;
-          updated.operatorUnit = info.operatorUnit;
-        }
-        next[sIdx] = updated;
-        return next;
-      });
+  const handleUpdateSession = useCallback(
+    (patch: Partial<MiningSessionDraft>) => {
+      updateActiveSession(patch, getOperatorDetails);
     },
-    [getOperatorDetails],
+    [updateActiveSession, getOperatorDetails],
   );
 
   // ── Cập nhật 1 dòng chuyến ──────────────────────────────────────────────
-  const updateTrip = useCallback(
-    (sIdx: number, tIdx: number, patch: Partial<TripRow>) => {
-      setSessions((prev) => {
-        const next = [...prev];
-        if (!next[sIdx]) return prev;
-        const trips = [...next[sIdx].trips];
-        if (!trips[tIdx]) return prev;
-        const updatedTrip = { ...trips[tIdx], ...patch };
-        // Auto-fill đơn vị QL + chủng loại xe theo số xe từ API cache
-        if ("vehicleNo" in patch) {
-          const info = getVehicleDetails(patch.vehicleNo!);
-          updatedTrip.vehicleManagementUnit = info.vehicleManagementUnit;
-          updatedTrip.vehicleType = info.vehicleType;
-        }
-        trips[tIdx] = updatedTrip;
-        next[sIdx] = { ...next[sIdx], trips };
-        return next;
-      });
+  const handleUpdateTrip = useCallback(
+    (tIdx: number, patch: Partial<TripRow>) => {
+      updateTripRow(tIdx, patch, getVehicleDetails);
     },
-    [getVehicleDetails],
+    [updateTripRow, getVehicleDetails],
   );
 
   // ── Thêm / xóa dòng chuyến ─────────────────────────────────────────────
-  const handleAddTrip = useCallback(
-    (sIdx: number) => {
-      setSessions((prev) => {
-        const next = [...prev];
-        if (!next[sIdx]) return prev;
-        next[sIdx] = {
-          ...next[sIdx],
-          trips: [...next[sIdx].trips, newTripRow(materialValues[0] || "Đất đá")],
-        };
-        return next;
-      });
-      setTimeout(
-        () => tableBottomRef.current?.scrollIntoView({ behavior: "smooth" }),
-        60,
-      );
-    },
-    [materialValues],
-  );
+  const handleAddTripAction = useCallback(() => {
+    addTripRow();
+    setTimeout(
+      () => tableBottomRef.current?.scrollIntoView({ behavior: "smooth" }),
+      60,
+    );
+  }, [addTripRow]);
 
-  const handleRemoveTrip = (sIdx: number, tIdx: number) => {
-    setSessions((prev) => {
-      const next = [...prev];
-      if (!next[sIdx]) return prev;
-      if (next[sIdx].trips.length <= 1) {
-        toast.error("Phải giữ ít nhất 1 chuyến xe!");
-        return prev;
-      }
-      next[sIdx] = {
-        ...next[sIdx],
-        trips: next[sIdx].trips.filter((_, i) => i !== tIdx),
-      };
-      return next;
-    });
-  };
-
-  // ── Thêm / xóa tab bản ghi ─────────────────────────────────────────────
-  const handleAddSession = () => {
-    setSessions((prev) => [...prev, createDefaultSession()]);
-    setActiveIdx(sessions.length);
-  };
-
-  const handleRemoveSession = (sIdx: number) => {
-    if (sessions.length <= 1) {
-      toast.error("Cần giữ ít nhất 1 bản ghi!");
-      return;
+  const handleRemoveTripAction = (tIdx: number) => {
+    const success = removeTripRow(tIdx);
+    if (!success) {
+      toast.error("Phải giữ ít nhất 1 chuyến xe!");
     }
-    setSessions((prev) => prev.filter((_, i) => i !== sIdx));
-    setActiveIdx((prev) => Math.min(prev, sessions.length - 2));
   };
+
+  // ── Keyboard Navigation (Tab / Enter) giữa các ô nhập liệu ────────────
+  const { handleKeyDown } = useFormTabNavigation({
+    onAddNewRow: handleAddTripAction,
+  });
 
   // ── Lưu tất cả ─────────────────────────────────────────────────────────
-  const handleSave = (andAddNew: boolean) => {
-    // Validate tất cả các sessions qua Zod Schema trước khi lưu
+  const handleSave = async (andAddNew: boolean) => {
+    const validation = validateAllSessions();
+    if (!validation.isValid) {
+      toast.error(validation.firstErrorMsg || "Thông tin bản ghi chưa đầy đủ!");
+      if (typeof validation.firstErrorIdx === "number") {
+        setActiveIdx(validation.firstErrorIdx);
+      }
+      return;
+    }
+
+    // Map dữ liệu & kiểm tra khớp Master Data cho từng session trong try/catch RIÊNG
+    const payloads: ExcavationTripReportRequest[] = [];
     for (let i = 0; i < sessions.length; i++) {
-      const validation = validateMiningSession(sessions[i], i);
-      if (!validation.success) {
-        toast.error(validation.errorMsg);
+      const sess = sessions[i];
+      try {
+        const payload = buildExcavationReportRequest(sess, {
+          rawShifts,
+          rawLocations,
+          rawExcavators,
+          rawVehicles,
+          rawUsers,
+          rawCargoTypes,
+        });
+        payloads.push(payload);
+      } catch (err: any) {
+        console.error(`[Mapping Data Error] Lỗi bản ghi ca ${i + 1}:`, err);
+        toast.error(`Bản ghi #${i + 1}: ${err.message || "Lỗi dữ liệu không hợp lệ"}`);
         setActiveIdx(i);
-        return;
+        return; // Dừng ngay lập tức, không gửi API và không lưu nháp local
       }
     }
 
-    const validRecords: MiningRecord[] = [];
+    let apiSuccessCount = 0;
+    const apiErrors: string[] = [];
 
+    // Gọi API POST / PUT /api/excavation-reports sử dụng React Query Mutation
+    for (let i = 0; i < payloads.length; i++) {
+      const sess = sessions[i];
+      try {
+        if (sess.reportId) {
+          await updateReportMutation.mutateAsync({
+            id: sess.reportId,
+            payload: payloads[i],
+          });
+        } else {
+          await createReportMutation.mutateAsync(payloads[i]);
+        }
+        apiSuccessCount++;
+      } catch (err: any) {
+        console.error(`[API Error] Lỗi khi gửi báo cáo ca ${i + 1}:`, err);
+        const msg =
+          err.response?.data?.message ||
+          err.message ||
+          "Lỗi kết nối máy chủ API";
+        apiErrors.push(`Ca ${i + 1}: ${msg}`);
+      }
+    }
+
+    // Lưu vào bộ nhớ local nháp để bảo toàn dữ liệu UI
+    const validRecords: MiningRecord[] = [];
     sessions.forEach((sess) => {
       const dateObj = new Date(sess.workingDate);
       sess.trips.forEach((trip) => {
         const record: MiningRecord = {
-          // Thông tin chung
           month: dateObj.getMonth() + 1,
           day: dateObj.getDate(),
           shift: sess.shift,
-          miningUnit: sess.miningUnit, // Đơn vị khai thác
-          mineCode: sess.excavator, // Máy xúc
-          excavationBench: "", // Tầng xúc (không có trong form này)
-          pickupLocation: sess.pickupLocation, // Nơi nhận tải
+          mineCode: sess.excavator,
+          excavationBench: "",
+          pickupLocation: sess.pickupLocation,
           dumpLocation: "",
 
-          // Thông tin chuyến
           transportVehicleNo: trip.vehicleNo,
           vehicleType: trip.vehicleType,
           vehicleManagementUnit: trip.vehicleManagementUnit,
@@ -302,7 +273,6 @@ export const MiningBatchEntryModal: React.FC<MiningBatchEntryModalProps> = ({
           tempVolume: 0,
           tempWeight: 0,
 
-          // Nhiên liệu
           initialFuel: Number(sess.initialFuel) || 0,
           receivedFuel: Number(sess.receivedFuel) || 0,
           finalFuel: Number(sess.finalFuel) || 0,
@@ -310,7 +280,6 @@ export const MiningBatchEntryModal: React.FC<MiningBatchEntryModalProps> = ({
           fuelNorm: 0,
           fuelDiff: 0,
 
-          // Người vận hành
           operatorBadgeNo: sess.operatorBadgeNo,
           operatorName: sess.operatorName,
           operatorUnit: sess.operatorUnit,
@@ -320,37 +289,32 @@ export const MiningBatchEntryModal: React.FC<MiningBatchEntryModalProps> = ({
       });
     });
 
-    if (validRecords.length === 0) {
-      toast.error("Không có dữ liệu nào để lưu!");
-      return;
+    saveMiningRecords(validRecords);
+
+    if (apiSuccessCount > 0) {
+      toast.success(
+        `Đã gửi thành công ${apiSuccessCount} bản ghi!`,
+      );
+    } else if (apiErrors.length > 0) {
+      toast.warning(
+        `Đã lưu tạm (${validRecords.length} chuyến), nhưng lỗi kết nối API: ${apiErrors[0]}`,
+      );
+    } else {
+      toast.success(
+        `Đã lưu thành công ${sessions.length} bản ghi (${validRecords.length} chuyến khai thác)!`,
+      );
     }
 
-    saveMiningRecords(validRecords);
-    toast.success(`Đã lưu ${validRecords.length} chuyến khai thác!`);
     onSuccess();
 
     if (andAddNew) {
-      setSessions([createDefaultSession()]);
-      setActiveIdx(0);
+      initDrafts();
     } else {
       onClose();
     }
   };
 
-  const { confirm, ConfirmDialogComponent } = useConfirmDialog();
-
-  const handleCancel = async () => {
-    const confirmed = await confirm({
-      title: "Xác nhận thoát",
-      description:
-        "Dữ liệu đang nhập dở sẽ bị đóng. Bạn có chắc chắn muốn thoát?",
-      confirmText: "Đóng & Hủy nhập",
-      cancelText: "Tiếp tục nhập",
-      variant: "primary",
-      icon: "warning",
-    });
-    if (confirmed) onClose();
-  };
+  const handleCancel = () => onClose();
 
   // ── Phím tắt: F3 = thêm chuyến, F2 = lưu & thêm mới, F5 = lưu ────────
   useEffect(() => {
@@ -358,7 +322,7 @@ export const MiningBatchEntryModal: React.FC<MiningBatchEntryModalProps> = ({
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "F3") {
         e.preventDefault();
-        handleAddTrip(activeIdx);
+        handleAddTripAction();
       }
       if (e.key === "F2") {
         e.preventDefault();
@@ -381,7 +345,12 @@ export const MiningBatchEntryModal: React.FC<MiningBatchEntryModalProps> = ({
 
   // ════════════════════════════════════════════════════════════════════════
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) handleCancel(); }}>
+    <Dialog
+      open={isOpen}
+      onOpenChange={(open) => {
+        if (!open) handleCancel();
+      }}
+    >
       <DialogContent
         className="w-[99vw] max-w-[99vw] sm:max-w-[99vw] h-[96vh] max-h-[96vh] flex flex-col p-0
                    bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800
@@ -391,7 +360,7 @@ export const MiningBatchEntryModal: React.FC<MiningBatchEntryModalProps> = ({
         {/* ══ HEADER ══════════════════════════════════════════════════════ */}
         <DialogHeader className="flex flex-row items-center justify-between px-5 py-3 border-b border-gray-200 dark:border-gray-800 shrink-0">
           <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-lg bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300">
+            <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300">
               <Pickaxe className="w-5 h-5" />
             </div>
             <DialogTitle className="text-base font-bold text-gray-900 dark:text-gray-100 tracking-wide">
@@ -406,55 +375,113 @@ export const MiningBatchEntryModal: React.FC<MiningBatchEntryModalProps> = ({
           </button>
         </DialogHeader>
 
-        {/* ══ TABS (khi có nhiều bản ghi) ════════════════════════════════ */}
-        {sessions.length > 1 && (
-          <div className="flex items-center gap-1 px-5 pt-2 border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 shrink-0 overflow-x-auto">
-            {sessions.map((s, i) => (
-              <div key={s._tempId} className="flex items-center">
-                <button
-                  onClick={() => setActiveIdx(i)}
-                  className={`px-4 py-1.5 text-xs font-medium rounded-t-md border-b-2 transition-colors whitespace-nowrap ${
-                    i === activeIdx
-                      ? "border-emerald-500 text-emerald-700 bg-white dark:bg-gray-950"
-                      : "border-transparent text-gray-500 hover:text-gray-700 hover:bg-white dark:hover:bg-gray-900"
-                  }`}
+        {/* ══ TABS & BATCH PROGRESS HEADER ════════════════════════════════ */}
+        <div className="border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 shrink-0 px-5 pb-1 space-y-1">
+          {/* Thanh tổng quan tiến độ lô dữ liệu */}
+          <div className="flex items-center justify-between text-xs gap-3 px-0.5">
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-gray-700 dark:text-gray-200 text-[11px]">
+                Tiến độ nhập:
+              </span>
+              <span className="font-medium text-gray-500 dark:text-gray-400 text-[11px]">
+                <strong className="text-blue-700 dark:text-blue-400 font-bold">
+                  {batchProgress.validCount}
+                </strong>
+                /{batchProgress.totalCount} bản ghi đã hợp lệ
+              </span>
+            </div>
+          </div>
+
+          {/* Dải danh sách Tab pill */}
+          <div className="flex items-center gap-5 overflow-x-auto pb-1 pt-0.5 scrollbar-thin">
+            {sessions.map((s, i) => {
+              const isValid = isSessionValid(i);
+              const isActive = i === activeIdx;
+              const progress = getSessionProgress(i);
+
+              return (
+                <div
+                  key={s._tempId}
+                  className="flex items-center group shrink-0"
                 >
-                  Bản ghi {i + 1}
-                  {s.excavator ? ` – ${s.excavator}` : ""}
-                </button>
-                <button
-                  onClick={() => handleRemoveSession(i)}
-                  className="ml-0.5 p-0.5 rounded text-gray-300 hover:text-red-500 transition-colors"
-                >
-                  <X className="w-3 h-3" />
-                </button>
-              </div>
-            ))}
+                  <button
+                    onClick={() => setActiveIdx(i)}
+                    className={`flex flex-col gap-1.5 px-4 py-2.5 text-xs font-semibold rounded-xl border transition-all whitespace-nowrap min-w-[140px] ${
+                      isActive
+                        ? "border-blue-500 text-blue-900 dark:text-blue-200 bg-white dark:bg-gray-950 shadow-md ring-2 ring-blue-400/20"
+                        : "border-gray-200 dark:border-gray-800 text-gray-600 dark:text-gray-400 bg-white/70 dark:bg-gray-900/70 hover:bg-white dark:hover:bg-gray-800 hover:border-gray-300"
+                    }`}
+                  >
+                    {/* Hàng trên: Chấm trạng thái + Tên bản ghi */}
+                    <div className="flex items-center gap-2 w-full">
+                      <span
+                        className={`w-2 h-2 rounded-full shrink-0 ${
+                          isValid
+                            ? "bg-blue-500 shadow-xs shadow-blue-500"
+                            : "bg-amber-400 animate-pulse"
+                        }`}
+                        title={
+                          isValid ? "Đã hợp lệ" : "Chưa hoàn thành thông tin"
+                        }
+                      />
+                      <span>
+                        Bản ghi {i + 1}
+                        {s.excavator ? ` – ${s.excavator}` : ""}
+                      </span>
+                    </div>
+
+                    {/* Hàng dưới: Thanh Progress bar ngay bên dưới chữ */}
+                    <Progress
+                      value={progress}
+                      className={`h-1.5 w-full rounded-full bg-gray-100 dark:bg-gray-800 ${
+                        isValid
+                          ? "[&>div]:bg-blue-500"
+                          : "[&>div]:bg-amber-500"
+                      }`}
+                    />
+                  </button>
+
+                  {/* Nút xóa Tab (tăng khoảng cách lề hai bên rộng rãi) */}
+                  {sessions.length > 1 && (
+                    <button
+                      onClick={() => removeSession(i)}
+                      title="Xóa bản ghi này"
+                      className="ml-3.5 mr-2 p-1.5 rounded-full text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 border border-transparent hover:border-red-200 dark:hover:border-red-800 transition-all opacity-80 group-hover:opacity-100"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+
             <button
-              onClick={handleAddSession}
-              className="ml-2 px-3 py-1.5 text-xs font-medium text-emerald-600 hover:bg-emerald-50 rounded-md transition-colors flex items-center gap-1"
+              onClick={addSession}
+              className="px-4 py-2.5 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/50 rounded-xl transition-all flex items-center gap-1.5 border border-dashed border-blue-400 dark:border-blue-700 shrink-0 shadow-2xs"
             >
-              <Plus className="w-3.5 h-3.5" /> Thêm bản ghi
+              <Plus className="w-4 h-4" /> Thêm bản ghi
             </button>
           </div>
-        )}
+        </div>
 
         {/* ══ BODY (cuộn) ════════════════════════════════════════════════ */}
-        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
+        <div
+          className="flex-1 overflow-y-auto px-5 py-4 space-y-5"
+          onKeyDown={handleKeyDown}
+        >
           {/* ── HÀNG 1: Thời gian · Ca ───────────────────────────── */}
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-4">
+
             {/* Thời gian */}
             <div className="flex flex-col gap-1">
               <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">
                 Thời gian <span className="text-red-500">*</span>
               </label>
-              <Input
-                type="date"
+              <DatePickerString
                 value={sess.workingDate}
-                onChange={(e) =>
-                  updateSession(activeIdx, { workingDate: e.target.value })
-                }
-                className="h-9 text-sm"
+                onChange={(val) => handleUpdateSession({ workingDate: val })}
+                className="w-full"
+                popoverClassName="z-[110]"
               />
             </div>
 
@@ -464,13 +491,17 @@ export const MiningBatchEntryModal: React.FC<MiningBatchEntryModalProps> = ({
                 Ca <span className="text-red-500">*</span>
               </label>
               <Select
-                value={sess.shift}
-                onValueChange={(v) => updateSession(activeIdx, { shift: v })}
+                value={
+                  sess.shift
+                    ? String(sess.shift).replace(/^ca\s+/i, "").trim()
+                    : undefined
+                }
+                onValueChange={(v) => handleUpdateSession({ shift: v })}
               >
                 <SelectTrigger className="h-9 text-sm w-full">
                   <SelectValue placeholder="Chọn ca" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="z-[110]">
                   {shiftOptions.map((s) => (
                     <SelectItem key={s.value} value={s.value}>
                       {s.label}
@@ -481,44 +512,18 @@ export const MiningBatchEntryModal: React.FC<MiningBatchEntryModalProps> = ({
             </div>
           </div>
 
-          {/* ── HÀNG 2: Đơn vị KT · Nơi nhận tải · Máy xúc · Tổng xúc ── */}
-          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {/* Đơn vị khai thác */}
+          {/* ── HÀNG 2: Nơi chất tải · Máy xúc · Tổng xúc ── */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {/* Nơi chất tải */}
             <div className="flex flex-col gap-1">
               <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">
-                Đơn vị khai thác <span className="text-red-500">*</span>
-              </label>
-              <Select
-                value={sess.miningUnit}
-                onValueChange={(v) =>
-                  updateSession(activeIdx, { miningUnit: v })
-                }
-              >
-                <SelectTrigger className="h-9 text-sm w-full">
-                  <SelectValue placeholder="Chọn đơn vị" />
-                </SelectTrigger>
-                <SelectContent>
-                  {departmentValues.map((u) => (
-                    <SelectItem key={u} value={u}>
-                      {u}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Nơi nhận tải */}
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">
-                Nơi nhận tải <span className="text-red-500">*</span>
+                Nơi chất tải <span className="text-red-500">*</span>
               </label>
               <ComboboxInput
-                value={sess.pickupLocation}
-                onChange={(v) =>
-                  updateSession(activeIdx, { pickupLocation: v })
-                }
                 options={locationValues}
-                placeholder="Chọn/nhập Nơi nhận tải"
+                value={sess.pickupLocation}
+                onChange={(v) => handleUpdateSession({ pickupLocation: v })}
+                placeholder="Chọn/nhập Nơi chất tải"
               />
             </div>
 
@@ -528,9 +533,9 @@ export const MiningBatchEntryModal: React.FC<MiningBatchEntryModalProps> = ({
                 Máy xúc <span className="text-red-500">*</span>
               </label>
               <ComboboxInput
-                value={sess.excavator}
-                onChange={(v) => updateSession(activeIdx, { excavator: v })}
                 options={excavatorValues}
+                value={sess.excavator}
+                onChange={(v) => handleUpdateSession({ excavator: v })}
                 placeholder="Chọn/nhập máy xúc"
               />
             </div>
@@ -545,7 +550,7 @@ export const MiningBatchEntryModal: React.FC<MiningBatchEntryModalProps> = ({
                 min={0}
                 value={sess.totalScoops}
                 onChange={(e) =>
-                  updateSession(activeIdx, {
+                  handleUpdateSession({
                     totalScoops:
                       e.target.value === "" ? "" : Number(e.target.value),
                   })
@@ -560,7 +565,7 @@ export const MiningBatchEntryModal: React.FC<MiningBatchEntryModalProps> = ({
           <div>
             {/* Tiêu đề + nút */}
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400 tracking-widest uppercase">
+              <span className="text-xs font-bold text-blue-700 dark:text-blue-400 tracking-widest uppercase">
                 Danh sách chuyến
               </span>
               <div className="flex items-center gap-2">
@@ -568,8 +573,8 @@ export const MiningBatchEntryModal: React.FC<MiningBatchEntryModalProps> = ({
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => handleAddTrip(activeIdx)}
-                  className="h-8 text-xs gap-1.5 border-emerald-500 text-emerald-700 hover:bg-emerald-50 font-semibold"
+                  onClick={handleAddTripAction}
+                  className="h-8 text-xs gap-1.5 border-blue-500 text-blue-700 hover:bg-blue-50 font-semibold"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   Thêm chuyến (F3)
@@ -598,7 +603,9 @@ export const MiningBatchEntryModal: React.FC<MiningBatchEntryModalProps> = ({
                       Tải trọng <span className="text-red-500">*</span>
                     </th>
                     <th className="px-3 py-2.5 border-r border-b border-gray-200 dark:border-gray-700 text-center min-w-[150px]">
-                      Đơn vị quản lý thiết bị
+                      Đơn vị quản lý
+                      <br />
+                      thiết bị
                     </th>
                     <th className="px-3 py-2.5 border-r border-b border-gray-200 dark:border-gray-700 text-center min-w-[120px]">
                       Chủng loại xe
@@ -615,32 +622,23 @@ export const MiningBatchEntryModal: React.FC<MiningBatchEntryModalProps> = ({
                         tIdx % 2 === 0
                           ? "bg-white dark:bg-gray-950"
                           : "bg-gray-50/50 dark:bg-gray-900/40"
-                      } hover:bg-emerald-50/30 dark:hover:bg-emerald-950/20 transition-colors`}
+                      } hover:bg-blue-50/30 dark:hover:bg-blue-950/20 transition-colors`}
                     >
                       {/* STT */}
                       <td className="px-3 py-2 border-r border-b border-gray-200 dark:border-gray-700 text-center text-gray-500 font-semibold">
                         {tIdx + 1}
                       </td>
 
-                      {/* Số xe — Select */}
+                      {/* Số xe — ComboboxInput */}
                       <td className="px-2 py-1.5 border-r border-b border-gray-200 dark:border-gray-700">
-                        <Select
+                        <ComboboxInput
+                          options={vehicleValues}
                           value={trip.vehicleNo}
-                          onValueChange={(v) =>
-                            updateTrip(activeIdx, tIdx, { vehicleNo: v })
+                          onChange={(v) =>
+                            handleUpdateTrip(tIdx, { vehicleNo: v })
                           }
-                        >
-                          <SelectTrigger className="h-8 text-xs bg-white dark:bg-gray-900 w-full">
-                            <SelectValue placeholder="Chọn" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {vehicleValues.map((v) => (
-                              <SelectItem key={v} value={v}>
-                                {v}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                          placeholder="Số xe"
+                        />
                       </td>
 
                       {/* Số chuyến */}
@@ -650,7 +648,7 @@ export const MiningBatchEntryModal: React.FC<MiningBatchEntryModalProps> = ({
                           min={1}
                           value={trip.tripCount}
                           onChange={(e) =>
-                            updateTrip(activeIdx, tIdx, {
+                            handleUpdateTrip(tIdx, {
                               tripCount:
                                 e.target.value === ""
                                   ? ""
@@ -664,23 +662,14 @@ export const MiningBatchEntryModal: React.FC<MiningBatchEntryModalProps> = ({
 
                       {/* Loại hàng */}
                       <td className="px-2 py-1.5 border-r border-b border-gray-200 dark:border-gray-700">
-                        <Select
+                        <ComboboxInput
+                          options={cargoTypeValues}
                           value={trip.material}
-                          onValueChange={(v) =>
-                            updateTrip(activeIdx, tIdx, { material: v })
+                          onChange={(v) =>
+                            handleUpdateTrip(tIdx, { material: v })
                           }
-                        >
-                          <SelectTrigger className="h-8 text-xs bg-white dark:bg-gray-900 w-full">
-                            <SelectValue placeholder="Loại hàng" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {materialValues.map((m) => (
-                              <SelectItem key={m} value={m}>
-                                {m}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                          placeholder="Loại hàng"
+                        />
                       </td>
 
                       {/* Tải trọng — 3 radio ngang */}
@@ -696,14 +685,14 @@ export const MiningBatchEntryModal: React.FC<MiningBatchEntryModalProps> = ({
                                 {/* Radio dot */}
                                 <div
                                   onClick={() =>
-                                    updateTrip(activeIdx, tIdx, {
+                                    handleUpdateTrip(tIdx, {
                                       loadStatus: opt.value,
                                       loadStatusNote: "",
                                     })
                                   }
                                   className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${
                                     active
-                                      ? "border-emerald-600 bg-emerald-600"
+                                      ? "border-blue-600 bg-blue-600"
                                       : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900"
                                   }`}
                                 >
@@ -720,13 +709,14 @@ export const MiningBatchEntryModal: React.FC<MiningBatchEntryModalProps> = ({
                                     type="text"
                                     value={trip.loadStatusNote}
                                     onChange={(e) =>
-                                      updateTrip(activeIdx, tIdx, {
+                                      handleUpdateTrip(tIdx, {
                                         loadStatusNote: e.target.value,
                                       })
                                     }
                                     onClick={(e) => e.stopPropagation()}
                                     className="h-6 w-20 text-[11px] ml-1 px-1.5"
                                     placeholder="1/2…"
+                                    title="Chỉ chấp nhận kiểu phân số (ví dụ: 1/2, 2/3)"
                                   />
                                 )}
                               </label>
@@ -736,13 +726,14 @@ export const MiningBatchEntryModal: React.FC<MiningBatchEntryModalProps> = ({
                       </td>
 
                       {/* Đơn vị QL thiết bị (auto-fill, readonly) */}
-                      <td className="px-2 py-1.5 border-r border-b border-gray-200 dark:border-gray-700">
+                      <td className="px-2 py-1.5 border-r border-b border-gray-200 dark:border-gray-700 min-w-[150px]">
                         <Input
                           type="text"
                           value={trip.vehicleManagementUnit}
                           readOnly
                           disabled
-                          className="h-8 text-xs bg-gray-100 dark:bg-gray-800 text-center cursor-not-allowed border-gray-200 dark:border-gray-700"
+                          title={trip.vehicleManagementUnit}
+                          className="h-auto min-h-[32px] text-xs bg-gray-100 dark:bg-gray-800 text-center cursor-not-allowed border-gray-200 dark:border-gray-700 py-1 px-1.5 whitespace-normal break-words leading-tight"
                         />
                       </td>
 
@@ -760,7 +751,7 @@ export const MiningBatchEntryModal: React.FC<MiningBatchEntryModalProps> = ({
                       {/* Nút xóa dòng */}
                       <td className="px-2 py-1.5 border-b border-gray-200 dark:border-gray-700 text-center">
                         <button
-                          onClick={() => handleRemoveTrip(activeIdx, tIdx)}
+                          onClick={() => handleRemoveTripAction(tIdx)}
                           title="Xóa chuyến"
                           className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 transition-colors p-1 rounded hover:bg-red-50 dark:hover:bg-red-950/30"
                         >
@@ -799,7 +790,7 @@ export const MiningBatchEntryModal: React.FC<MiningBatchEntryModalProps> = ({
                 min={0}
                 value={sess.initialFuel}
                 onChange={(e) =>
-                  updateSession(activeIdx, {
+                  handleUpdateSession({
                     initialFuel:
                       e.target.value === "" ? "" : Number(e.target.value),
                   })
@@ -819,7 +810,7 @@ export const MiningBatchEntryModal: React.FC<MiningBatchEntryModalProps> = ({
                 min={0}
                 value={sess.receivedFuel}
                 onChange={(e) =>
-                  updateSession(activeIdx, {
+                  handleUpdateSession({
                     receivedFuel:
                       e.target.value === "" ? "" : Number(e.target.value),
                   })
@@ -840,7 +831,7 @@ export const MiningBatchEntryModal: React.FC<MiningBatchEntryModalProps> = ({
                 min={0}
                 value={sess.finalFuel}
                 onChange={(e) =>
-                  updateSession(activeIdx, {
+                  handleUpdateSession({
                     finalFuel:
                       e.target.value === "" ? "" : Number(e.target.value),
                   })
@@ -872,23 +863,12 @@ export const MiningBatchEntryModal: React.FC<MiningBatchEntryModalProps> = ({
               <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">
                 Số thẻ lương <span className="text-red-500">*</span>
               </label>
-              <Select
+              <ComboboxInput
+                options={operatorOptions}
                 value={sess.operatorBadgeNo}
-                onValueChange={(v) =>
-                  updateSession(activeIdx, { operatorBadgeNo: v })
-                }
-              >
-                <SelectTrigger className="h-9 text-sm w-full">
-                  <SelectValue placeholder="Chọn số thẻ" />
-                </SelectTrigger>
-                <SelectContent>
-                  {operatorOptions.map((b) => (
-                    <SelectItem key={b.value} value={b.value}>
-                      {b.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                onChange={(v) => handleUpdateSession({ operatorBadgeNo: v })}
+                placeholder="Chọn/nhập số thẻ"
+              />
             </div>
 
             {/* Họ và tên (auto-fill, readonly) */}
@@ -939,24 +919,31 @@ export const MiningBatchEntryModal: React.FC<MiningBatchEntryModalProps> = ({
           {/* Lưu & Thêm mới (F2) */}
           <Button
             variant="outline"
+            disabled={createReportMutation.isPending}
             onClick={() => handleSave(true)}
-            className="h-9 text-sm px-4 gap-1.5 border-emerald-500 text-emerald-700 hover:bg-emerald-50 font-semibold"
+            className="h-9 text-sm px-4 gap-1.5 border-blue-500 text-blue-700 hover:bg-blue-50 font-semibold"
           >
             <Plus className="w-4 h-4" />
-            Lưu &amp; Thêm mới (F2)
+            {createReportMutation.isPending
+              ? "Đang lưu..."
+              : sessions.length > 1
+                ? `Lưu & Thêm mới (${sessions.length} bản ghi) (F2)`
+                : "Lưu & Thêm mới (F2)"}
           </Button>
 
-          {/* Lưu (F5) */}
           <Button
+            disabled={createReportMutation.isPending}
             onClick={() => handleSave(false)}
-            className="h-9 text-sm px-6 gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-md"
+            className="h-9 text-sm px-6 gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-md transition-all"
           >
             <Save className="w-4 h-4" />
-            Lưu (F5)
+            {createReportMutation.isPending
+              ? "Đang lưu..."
+              : sessions.length > 1
+                ? `Lưu (${sessions.length} bản ghi) (F5)`
+                : "Lưu bản ghi (F5)"}
           </Button>
         </DialogFooter>
-
-        {ConfirmDialogComponent}
       </DialogContent>
     </Dialog>
   );

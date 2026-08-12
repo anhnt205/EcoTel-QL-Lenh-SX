@@ -30,6 +30,7 @@ export interface DeviceApiItem {
   vehicleNumber?: string;
   categoryId?: number;
   categoryName?: string;
+  categoryGroup?: string;
   departmentId?: number;
   departmentName?: string;
   materialId?: number;
@@ -58,13 +59,13 @@ export interface UserApiItem {
 export interface CargoTypeApiItem {
   id: number;
   name: string;
+  cargoGroupId?: number;
+  cargoGroupName?: string;
 }
 
 export interface CargoGroupApiItem {
   id: number;
   name: string;
-  cargoTypeId?: number;
-  cargoTypeName?: string;
 }
 
 const extractData = <T>(res: any): T[] => {
@@ -84,41 +85,55 @@ const extractData = <T>(res: any): T[] => {
 };
 
 export const fetchShifts = async (): Promise<ShiftApiItem[]> => {
-  const res = await api.get(API.MASTER_DATA.SHIFTS);
+  const res = await api.get(API.MASTER_DATA.SHIFTS, { params: { size: 1000 } });
   return extractData<ShiftApiItem>(res);
 };
 
 export const fetchDepartments = async (): Promise<DepartmentApiItem[]> => {
-  const res = await api.get(API.MASTER_DATA.DEPARTMENTS);
+  const res = await api.get(API.MASTER_DATA.DEPARTMENTS, { params: { size: 1000 } });
   return extractData<DepartmentApiItem>(res);
 };
 
 export const fetchLocations = async (): Promise<LocationApiItem[]> => {
-  const res = await api.get(API.MASTER_DATA.LOCATIONS);
+  const res = await api.get(API.MASTER_DATA.LOCATIONS, { params: { size: 1000 } });
   return extractData<LocationApiItem>(res);
 };
 
 export const fetchDevices = async (): Promise<DeviceApiItem[]> => {
-  const res = await api.get(API.MASTER_DATA.DEVICES);
+  const res = await api.get(API.MASTER_DATA.DEVICES, { params: { size: 1000 } });
+  return extractData<DeviceApiItem>(res);
+};
+
+export const fetchExcavators = async (): Promise<DeviceApiItem[]> => {
+  const res = await api.get(API.MASTER_DATA.DEVICES, {
+    params: { categoryGroup: "MAY", categoryName: "Máy xúc", size: 1000 },
+  });
+  return extractData<DeviceApiItem>(res);
+};
+
+export const fetchTransportVehicles = async (): Promise<DeviceApiItem[]> => {
+  const res = await api.get(API.MASTER_DATA.DEVICES, {
+    params: { categoryGroup: "XE", size: 1000 },
+  });
   return extractData<DeviceApiItem>(res);
 };
 
 export const fetchMaterials = async (): Promise<MaterialApiItem[]> => {
-  const res = await api.get(API.MASTER_DATA.MATERIALS);
+  const res = await api.get(API.MASTER_DATA.MATERIALS, { params: { size: 1000 } });
   return extractData<MaterialApiItem>(res);
 };
 
 export const fetchUsers = async (): Promise<UserApiItem[]> => {
-  const res = await api.get(API.MASTER_DATA.USERS);
+  const res = await api.get(API.MASTER_DATA.USERS, { params: { size: 1000 } });
   return extractData<UserApiItem>(res);
 };
 
 export const fetchCargoTypes = async (): Promise<CargoTypeApiItem[]> => {
-  const res = await api.get(API.MASTER_DATA.CARGO_TYPES);
+  const res = await api.get(API.MASTER_DATA.CARGO_TYPES, { params: { size: 1000 } });
   return extractData<CargoTypeApiItem>(res);
 };
 
 export const fetchCargoGroups = async (): Promise<CargoGroupApiItem[]> => {
-  const res = await api.get(API.MASTER_DATA.CARGO_GROUPS);
+  const res = await api.get(API.MASTER_DATA.CARGO_GROUPS, { params: { size: 1000 } });
   return extractData<CargoGroupApiItem>(res);
 };

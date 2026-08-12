@@ -17,7 +17,7 @@ export const getUserColumns = ({
     accessorKey: "username",
     header: "Tên tài khoản",
     cell: ({ row }) => (
-      <div className="font-semibold text-emerald-700 dark:text-emerald-400">
+      <div className="font-semibold text-blue-700 dark:text-blue-400">
         {row.original.username}
       </div>
     ),
@@ -62,7 +62,7 @@ export const getUserColumns = ({
     header: "Vai trò",
     cell: ({ row }) => (
       <Badge variant="outline" className="gap-1 bg-slate-50 font-normal">
-        <Shield className="w-3 h-3 text-emerald-600" />
+        <Shield className="w-3 h-3 text-blue-600" />
         {row.original.role || "USER"}
       </Badge>
     ),
@@ -72,7 +72,7 @@ export const getUserColumns = ({
     header: "Trạng thái",
     cell: ({ row }) =>
       row.original.active !== false ? (
-        <Badge className="bg-emerald-100 text-emerald-800 border-emerald-300 gap-1">
+        <Badge className="bg-blue-100 text-blue-800 border-blue-300 gap-1">
           <CheckCircle className="w-3 h-3" /> Hoạt động
         </Badge>
       ) : (
@@ -94,7 +94,7 @@ export const getUserColumns = ({
                 onClick={() => onEdit?.(row.original)}
                 title="Chỉnh sửa"
               >
-                <Edit2 className="w-4 h-4 text-emerald-600" />
+                <Edit2 className="w-4 h-4 text-blue-600" />
               </Button>
             </div>
           ),

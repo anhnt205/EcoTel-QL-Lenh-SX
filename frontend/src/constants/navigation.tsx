@@ -1,6 +1,5 @@
 import { ROUTES } from '@/constants/routes';
 import {
-  BarChart3,
   FileText,
   GitCompareArrows,
   LayoutDashboard,
@@ -49,29 +48,5 @@ export const MENU_ITEMS: MenuItem[] = [
     path: ROUTES.RECONCILIATION.DASHBOARD,
     icon: <GitCompareArrows className="h-4 w-4" />,
     section: 'ĐỐI CHIẾU',
-  },
-  {
-    label: 'Xe trong mỏ',
-    path: ROUTES.REPORTS.INTERNAL_TRUCKS,
-    icon: <BarChart3 className="h-4 w-4" />,
-    section: 'BÁO CÁO',
-  },
-  {
-    label: 'Xe thuê ngoài',
-    path: ROUTES.REPORTS.EXTERNAL_TRUCKS,
-    icon: <BarChart3 className="h-4 w-4" />,
-    section: 'BÁO CÁO',
-  },
-  {
-    label: 'Phân tích sản lượng',
-    path: ROUTES.REPORTS.PRODUCTION_ANALYSIS,
-    icon: <BarChart3 className="h-4 w-4" />,
-    section: 'BÁO CÁO',
-  },
-  {
-    label: 'Tổng hợp',
-    path: ROUTES.REPORTS.SUMMARY,
-    icon: <BarChart3 className="h-4 w-4" />,
-    section: 'BÁO CÁO',
   },
 ];

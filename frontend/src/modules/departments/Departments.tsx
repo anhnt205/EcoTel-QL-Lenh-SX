@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
 
 import DepartmentService from "./services/departmentService";
 import { columns } from "./columns";
@@ -15,16 +15,29 @@ import {
 
 const Departments = () => {
   const [searchValue, setSearchValue] = useState("");
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(10);
 
   // 1. Fetch data
   const {
-    data: departments = [],
+    data: pageData,
     isLoading,
     refetch,
   } = useQuery({
-    queryKey: ["departments", searchValue],
-    queryFn: () => DepartmentService.getAll({ keyword: searchValue }),
+    queryKey: ["departments", page, pageSize, searchValue],
+    queryFn: () =>
+      DepartmentService.getAll({
+        page,
+        size: pageSize,
+        sort: "id,DESC",
+        keyword: searchValue,
+      }),
+    placeholderData: keepPreviousData,
   });
+
+  const departments = pageData?.content ?? [];
+  const totalElements = pageData?.totalElements ?? 0;
+  const totalPages = pageData?.totalPages ?? 0;
 
   return (
     <div className="flex flex-col h-full gap-4 p-4 md:p-6">
@@ -49,10 +62,23 @@ const Departments = () => {
           columns={columns}
           loading={isLoading}
           searchValue={searchValue}
-          onSearch={(val) => setSearchValue(val)}
+          onSearch={(val) => {
+            setSearchValue(val);
+            setPage(0);
+          }}
           onRefresh={refetch}
           showColumnToggle
           stickyHeader
+          manualPagination
+          page={page}
+          rowsPerPage={pageSize}
+          pageCount={totalPages}
+          totalCount={totalElements}
+          onPageChange={(newPage) => setPage(newPage)}
+          onRowsPerPageChange={(newSize) => {
+            setPageSize(newSize);
+            setPage(0);
+          }}
         />
       </div>
     </div>

@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
 
 import ShiftService from "./services/shiftService";
 import { getShiftColumns } from "./columns";
@@ -16,15 +16,28 @@ import {
 
 const Shifts = () => {
   const [searchValue, setSearchValue] = useState("");
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(10);
 
   const {
-    data: shifts = [],
+    data: pageData,
     isLoading,
     refetch,
   } = useQuery({
-    queryKey: ["shifts", searchValue],
-    queryFn: () => ShiftService.getAll({ keyword: searchValue }),
+    queryKey: ["shifts", page, pageSize, searchValue],
+    queryFn: () =>
+      ShiftService.getAll({
+        page,
+        size: pageSize,
+        sort: "id,DESC",
+        keyword: searchValue,
+      }),
+    placeholderData: keepPreviousData,
   });
+
+  const shifts = pageData?.content ?? [];
+  const totalElements = pageData?.totalElements ?? 0;
+  const totalPages = pageData?.totalPages ?? 0;
 
   const columns = useMemo(() => getShiftColumns(), []);
 
@@ -49,10 +62,23 @@ const Shifts = () => {
           columns={columns}
           loading={isLoading}
           searchValue={searchValue}
-          onSearch={(val) => setSearchValue(val)}
+          onSearch={(val) => {
+            setSearchValue(val);
+            setPage(0);
+          }}
           onRefresh={refetch}
           showColumnToggle
           stickyHeader
+          manualPagination
+          page={page}
+          rowsPerPage={pageSize}
+          pageCount={totalPages}
+          totalCount={totalElements}
+          onPageChange={(newPage) => setPage(newPage)}
+          onRowsPerPageChange={(newSize) => {
+            setPageSize(newSize);
+            setPage(0);
+          }}
         />
       </div>
     </div>

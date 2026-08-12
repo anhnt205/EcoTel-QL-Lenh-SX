@@ -29,7 +29,10 @@ function AppRoutes() {
   return (
     <Routes>
       {/* Root redirect to Module Thống Kê */}
-      <Route path="/" element={<Navigate to={ROUTES.DATA_ENTRY.TRANSPORT} replace />} />
+      <Route
+        path="/"
+        element={<Navigate to={ROUTES.DATA_ENTRY.TRANSPORT} replace />}
+      />
       <Route
         path="/nhap-lieu"
         element={<Navigate to={ROUTES.DATA_ENTRY.TRANSPORT} replace />}

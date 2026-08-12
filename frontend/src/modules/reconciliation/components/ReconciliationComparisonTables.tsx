@@ -55,7 +55,6 @@ const SUB_FIELD_WIDTHS: Record<string, number> = {
   date: 95,
   shift: 60,
   vehicleNo: 90,
-  badgeNo: 80,
   excavationArea: 95,
   excavatorEquipment: 80,
   pickupLocation: 95,
@@ -94,10 +93,10 @@ const COMMON_SUB_FIELDS: SubField[] = [
     render: (item) => {
       const day = item.commonKey.day
         ? String(item.commonKey.day).padStart(2, "0")
-        : "05";
+        : "--";
       const month = item.commonKey.month
         ? String(item.commonKey.month).padStart(2, "0")
-        : "08";
+        : "--";
       return `${day}/${month}/2026`;
     },
   },
@@ -105,7 +104,7 @@ const COMMON_SUB_FIELDS: SubField[] = [
     id: "shift",
     label: "Ca",
     render: (item) => (
-      <span className="font-semibold">{item.commonKey.shift || "Ca 1"}</span>
+      <span className="font-semibold">{item.commonKey.shift || "-"}</span>
     ),
   },
   {
@@ -113,22 +112,14 @@ const COMMON_SUB_FIELDS: SubField[] = [
     label: "Số xe",
     render: (item) => (
       <span className="font-bold text-gray-900 dark:text-gray-100">
-        {item.commonKey.vehicleNo || "14C-12345"}
+        {item.commonKey.vehicleNo || "-"}
       </span>
     ),
   },
   {
-    id: "badgeNo",
-    label: "Thẻ lương",
-    render: (item) =>
-      item.transportRecord?.operatorBadgeNo ||
-      item.miningRecord?.operatorBadgeNo ||
-      "8753",
-  },
-  {
     id: "excavationArea",
     label: "Khu vực xúc",
-    render: (item) => item.transportRecord?.excavationArea || "Khe Chàm",
+    render: (item) => item.transportRecord?.excavationArea || "-",
   },
   {
     id: "excavatorEquipment",
@@ -137,7 +128,7 @@ const COMMON_SUB_FIELDS: SubField[] = [
       <span className="font-semibold">
         {item.transportRecord?.excavatorEquipment ||
           item.miningRecord?.mineCode ||
-          "EX05"}
+          "-"}
       </span>
     ),
   },
@@ -147,12 +138,12 @@ const COMMON_SUB_FIELDS: SubField[] = [
     render: (item) =>
       item.transportRecord?.pickupLocation ||
       item.miningRecord?.pickupLocation ||
-      "Bãi sàng",
+      "-",
   },
   {
     id: "unloadBench",
     label: "Tầng dỡ tải",
-    render: (item) => item.transportRecord?.unloadBench || "-145",
+    render: (item) => item.transportRecord?.unloadBench || "-",
   },
   {
     id: "pickupBenchGroup",
@@ -161,29 +152,29 @@ const COMMON_SUB_FIELDS: SubField[] = [
       <span className="text-gray-500">
         {item.transportRecord?.pickupBenchGroup ||
           item.transportRecord?.pickupBench ||
-          "-25"}
+          "-"}
       </span>
     ),
   },
   {
     id: "fullRouteDistance",
     label: "CĐ toàn tuyến (km)",
-    render: (item) => item.transportRecord?.fullRouteDistance ?? 5.5,
+    render: (item) => item.transportRecord?.fullRouteDistance ?? "-",
   },
   {
     id: "fullRouteElevate",
     label: "Nâng tải TT (m)",
-    render: (item) => item.transportRecord?.fullRouteElevate ?? 100,
+    render: (item) => item.transportRecord?.fullRouteElevate ?? "-",
   },
   {
     id: "localSlopeDist",
     label: "CĐ dốc cục bộ (km)",
-    render: (item) => item.transportRecord?.localSlopeDist ?? 1.2,
+    render: (item) => item.transportRecord?.localSlopeDist ?? "-",
   },
   {
     id: "localSlopeDegree",
     label: "Dốc cục bộ (m)",
-    render: (item) => item.transportRecord?.localSlopeDegree ?? 8,
+    render: (item) => item.transportRecord?.localSlopeDegree ?? "-",
   },
   {
     id: "unloadLocationName",
@@ -191,7 +182,7 @@ const COMMON_SUB_FIELDS: SubField[] = [
     render: (item) =>
       item.transportRecord?.unloadLocationName ||
       item.miningRecord?.dumpLocation ||
-      "Kho than 5",
+      "-",
   },
   {
     id: "isRainyDay",
@@ -333,45 +324,57 @@ const FinalChoiceCell = React.memo<FinalChoiceCellProps>(
 
     return (
       <div className="flex flex-col gap-1.5 p-1 w-full text-xs">
-        {/* Radio options: neatly distributed across column width */}
-        <div className="flex items-center justify-between px-1 py-0.5 gap-2 border-b border-gray-100 dark:border-gray-800/50">
-          <label className="inline-flex items-center gap-1 text-xs cursor-pointer select-none">
+        {/* Radio options: styled pills with distinctive option colors */}
+        <div className="flex items-center justify-between px-0.5 py-1 gap-1 border-b border-gray-200/60 dark:border-gray-800/60">
+          <label
+            className={`inline-flex items-center gap-1 px-1.5 py-1 rounded-md text-xs font-semibold cursor-pointer select-none transition-all border ${
+              choice === "VT"
+                ? "bg-blue-100/90 text-blue-900 border-blue-400 dark:bg-blue-950/80 dark:text-blue-200 dark:border-blue-700 shadow-2xs"
+                : "border-transparent text-gray-600 hover:bg-blue-50/60 dark:hover:bg-blue-950/30"
+            }`}
+          >
             <input
               type="radio"
               name={`choice_${item.id}`}
               checked={choice === "VT"}
               onChange={() => handleRadioChange("VT")}
-              className="accent-emerald-600 w-3.5 h-3.5 cursor-pointer"
+              className="accent-blue-600 w-3.5 h-3.5 cursor-pointer"
             />
-            <span className="font-medium text-gray-700 dark:text-gray-300">
-              Vận tải
-            </span>
+            <span>Vận tải</span>
           </label>
 
-          <label className="inline-flex items-center gap-1 text-xs cursor-pointer select-none">
+          <label
+            className={`inline-flex items-center gap-1 px-1.5 py-1 rounded-md text-xs font-semibold cursor-pointer select-none transition-all border ${
+              choice === "KT"
+                ? "bg-blue-100/90 text-blue-900 border-blue-400 dark:bg-blue-950/80 dark:text-blue-200 dark:border-blue-700 shadow-2xs"
+                : "border-transparent text-gray-600 hover:bg-blue-50/60 dark:hover:bg-blue-950/30"
+            }`}
+          >
             <input
               type="radio"
               name={`choice_${item.id}`}
               checked={choice === "KT"}
               onChange={() => handleRadioChange("KT")}
-              className="accent-emerald-600 w-3.5 h-3.5 cursor-pointer"
+              className="accent-blue-600 w-3.5 h-3.5 cursor-pointer"
             />
-            <span className="font-medium text-gray-700 dark:text-gray-300">
-              Khai thác
-            </span>
+            <span>Khai thác</span>
           </label>
 
-          <label className="inline-flex items-center gap-1 text-xs cursor-pointer select-none">
+          <label
+            className={`inline-flex items-center gap-1 px-1.5 py-1 rounded-md text-xs font-semibold cursor-pointer select-none transition-all border ${
+              choice === "OTHER"
+                ? "bg-amber-100/90 text-amber-900 border-amber-400 dark:bg-amber-950/80 dark:text-amber-200 dark:border-amber-700 shadow-2xs"
+                : "border-transparent text-gray-600 hover:bg-amber-50/60 dark:hover:bg-amber-950/30"
+            }`}
+          >
             <input
               type="radio"
               name={`choice_${item.id}`}
               checked={choice === "OTHER"}
               onChange={() => handleRadioChange("OTHER")}
-              className="accent-emerald-600 w-3.5 h-3.5 cursor-pointer"
+              className="accent-amber-600 w-3.5 h-3.5 cursor-pointer"
             />
-            <span className="font-medium text-gray-700 dark:text-gray-300">
-              Khác
-            </span>
+            <span>Khác</span>
           </label>
         </div>
 
@@ -657,7 +660,7 @@ export const ReconciliationComparisonTables: React.FC<
             id: "transCargo",
             header: "Loại hàng",
             cell: ({ row }) =>
-              row.original.transportRecord?.cargoType || "Than",
+              row.original.transportRecord?.cargoType || "-",
             size: 75,
           },
           {
@@ -665,7 +668,7 @@ export const ReconciliationComparisonTables: React.FC<
             header: "Số chuyến",
             cell: ({ row }) => (
               <span className="font-bold text-gray-900 dark:text-gray-100">
-                {row.original.transportRecord?.tripCount ?? 0}
+                {row.original.transportRecord?.tripCount ?? "-"}
               </span>
             ),
             size: 65,
@@ -689,7 +692,7 @@ export const ReconciliationComparisonTables: React.FC<
             id: "transBadgeNo",
             header: "Số thẻ lương",
             cell: ({ row }) =>
-              row.original.transportRecord?.operatorBadgeNo || "8753",
+              row.original.transportRecord?.operatorBadgeNo || "-",
             size: 75,
           },
         ],
@@ -706,7 +709,7 @@ export const ReconciliationComparisonTables: React.FC<
             cell: ({ row }) =>
               row.original.miningRecord?.material ||
               row.original.miningRecord?.loadStatus ||
-              "Than",
+              "-",
             size: 75,
           },
           {
@@ -714,7 +717,7 @@ export const ReconciliationComparisonTables: React.FC<
             header: "Số chuyến",
             cell: ({ row }) => (
               <span className="font-bold text-gray-900 dark:text-gray-100">
-                {row.original.miningRecord?.tripCount ?? 0}
+                {row.original.miningRecord?.tripCount ?? "-"}
               </span>
             ),
             size: 65,
@@ -725,7 +728,7 @@ export const ReconciliationComparisonTables: React.FC<
             cell: ({ row }) => {
               const status = row.original.miningRecord?.loadStatus;
               return status ? (
-                <span className="inline-block px-1.5 py-0.5 rounded text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                <span className="inline-block px-1.5 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300">
                   {status}
                 </span>
               ) : (
@@ -738,7 +741,7 @@ export const ReconciliationComparisonTables: React.FC<
             id: "miningBadgeNo",
             header: "Số thẻ lương",
             cell: ({ row }) =>
-              row.original.miningRecord?.operatorBadgeNo || "8753",
+              row.original.miningRecord?.operatorBadgeNo || "-",
             size: 75,
           },
         ],
@@ -754,7 +757,7 @@ export const ReconciliationComparisonTables: React.FC<
             header: "Khớp",
             cell: ({ row }) =>
               isMatched(row.original) ? (
-                <div className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400 flex items-center justify-center mx-auto font-bold">
+                <div className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-400 flex items-center justify-center mx-auto font-bold">
                   <Check className="w-3.5 h-3.5 stroke-[3]" />
                 </div>
               ) : (
@@ -952,19 +955,36 @@ export const ReconciliationComparisonTables: React.FC<
           <TableBody>
             {table.getRowModel().rows?.length ? (
               table.getRowModel().rows.map((row) => {
+                const item = row.original;
                 const isSelected = row.getIsSelected();
+                const matched = isMatched(item);
+                const choice = choices[item.id] || (matched ? "VT" : "OTHER");
+
+                let rowHighlightClass = "";
+                if (isSelected) {
+                  rowHighlightClass =
+                    "bg-blue-100/80 dark:bg-blue-950/60 border-l-4 border-l-blue-600 font-medium";
+                } else if (choice === "VT") {
+                  rowHighlightClass =
+                    "bg-sky-50/75 dark:bg-sky-950/30 hover:bg-sky-100/60 dark:hover:bg-sky-900/40 border-l-4 border-l-sky-500";
+                } else if (choice === "KT") {
+                  rowHighlightClass =
+                    "bg-blue-50/75 dark:bg-blue-950/30 hover:bg-blue-100/60 dark:hover:bg-blue-900/40 border-l-4 border-l-blue-500";
+                } else if (choice === "OTHER") {
+                  rowHighlightClass =
+                    "bg-amber-50/75 dark:bg-amber-950/30 hover:bg-amber-100/60 dark:hover:bg-amber-900/40 border-l-4 border-l-amber-500";
+                } else {
+                  rowHighlightClass =
+                    row.index % 2 === 0
+                      ? "bg-white dark:bg-gray-900"
+                      : "bg-slate-50/40 dark:bg-gray-900/50";
+                }
 
                 return (
                   <TableRow
                     key={row.id}
                     data-state={isSelected && "selected"}
-                    className={`border-b border-gray-100 dark:border-gray-800/60 transition-colors ${
-                      isSelected
-                        ? "bg-emerald-50/60 dark:bg-emerald-950/30"
-                        : row.index % 2 === 0
-                          ? "bg-white dark:bg-gray-900"
-                          : "bg-slate-50/40 dark:bg-gray-900/50"
-                    } hover:bg-emerald-50/30 dark:hover:bg-emerald-950/20`}
+                    className={`border-b border-gray-200/80 dark:border-gray-800/80 transition-all ${rowHighlightClass}`}
                   >
                     {row.getVisibleCells().map((cell) => {
                       const isCommonInfoCell =
@@ -1137,7 +1157,7 @@ export const ReconciliationComparisonTables: React.FC<
                 onClick={() => table.setPageIndex(page - 1)}
                 className={`h-7 w-7 p-0 text-xs font-semibold ${
                   page === table.getState().pagination.pageIndex + 1
-                    ? "bg-emerald-600 text-white hover:bg-emerald-700"
+                    ? "bg-blue-600 text-white hover:bg-blue-700"
                     : ""
                 }`}
               >

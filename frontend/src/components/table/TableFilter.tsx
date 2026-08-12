@@ -1,4 +1,4 @@
-import React from "react";
+import { DatePickerString } from "@/components/common/DatePickerString";
 import { RotateCcw, X } from "lucide-react";
 import {
   Select,
@@ -86,11 +86,10 @@ const TableFilter: React.FC<TableFilterProps> = ({
             <span className="text-xs font-medium text-muted-foreground">
               {field.label}
             </span>
-            <Input
-              type="date"
-              className="h-9 w-full rounded-lg"
+            <DatePickerString
               value={values[field.key] || ""}
-              onChange={(e) => handleFieldChange(field.key, e.target.value)}
+              onChange={(val) => handleFieldChange(field.key, val)}
+              placeholder={`Chọn ${field.label.toLowerCase()}`}
             />
           </div>
         );

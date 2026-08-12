@@ -169,18 +169,18 @@ export const MiningTripsDataTable: React.FC<MiningTripsDataTableProps> = ({
           </TableHeader>
           <TableBody>
             {table.getRowModel().rows?.length ? (
-              table.getRowModel().rows.map((row, idx) => {
+              table.getRowModel().rows.map((row) => {
                 const isSelected = selectedIds.has(row.original.id || "");
                 return (
                   <TableRow
                     key={row.id}
                     className={`border-b border-gray-100 dark:border-gray-800/60 transition-colors ${
                       isSelected
-                        ? "bg-emerald-50/60 dark:bg-emerald-950/30"
-                        : idx % 2 === 0
-                          ? "bg-white dark:bg-gray-900"
-                          : "bg-slate-50/40 dark:bg-gray-900/50"
-                    } hover:bg-emerald-50/30 dark:hover:bg-emerald-950/20`}
+                        ? "bg-blue-50/60 dark:bg-blue-950/30"
+                        : row.index % 2 === 0
+                          ? "bg-white dark:bg-gray-950"
+                          : "bg-gray-50/50 dark:bg-gray-900/40"
+                    } hover:bg-blue-50/30 dark:hover:bg-blue-950/20`}
                   >
                     {row.getVisibleCells().map((cell) => (
                       <TableCell

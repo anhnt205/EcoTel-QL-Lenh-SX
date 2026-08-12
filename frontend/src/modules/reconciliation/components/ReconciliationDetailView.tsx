@@ -312,17 +312,17 @@ const buildComparedFields = (item: ReconciliationItem): ComparedField[] =>
 const getGroupIcon = (group: string) => {
   switch (group) {
     case "Thông tin chung":
-      return <Info className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />;
+      return <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />;
     case "Sản lượng":
-      return <Scale className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />;
+      return <Scale className="h-4 w-4 text-blue-600 dark:text-blue-400" />;
     case "Vị trí - thiết bị":
-      return <MapPin className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />;
+      return <MapPin className="h-4 w-4 text-blue-600 dark:text-blue-400" />;
     case "Nhiên liệu":
-      return <Fuel className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />;
+      return <Fuel className="h-4 w-4 text-blue-600 dark:text-blue-400" />;
     case "Khai thác":
-      return <Pickaxe className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />;
+      return <Pickaxe className="h-4 w-4 text-blue-600 dark:text-blue-400" />;
     default:
-      return <Layers className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />;
+      return <Layers className="h-4 w-4 text-blue-600 dark:text-blue-400" />;
   }
 };
 
@@ -423,7 +423,7 @@ export const ReconciliationDetailView: React.FC<Props> = ({
                   onClick={() => setSelectedVehicleIdx(idx)}
                   className={`flex-1 py-1.5 px-2 rounded-md text-[11px] font-medium transition-all flex items-center justify-center gap-1.5 ${
                     isActive
-                      ? "bg-white dark:bg-gray-900 text-emerald-700 dark:text-emerald-300 shadow-xs font-semibold"
+                      ? "bg-white dark:bg-gray-900 text-blue-700 dark:text-blue-300 shadow-xs font-semibold"
                       : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
                   }`}
                 >
@@ -431,7 +431,7 @@ export const ReconciliationDetailView: React.FC<Props> = ({
                   <span>{v.commonKey.vehicleNo}</span>
                   <span
                     className={`w-2 h-2 rounded-full ${
-                      vMismatched ? "bg-red-500" : "bg-emerald-500"
+                      vMismatched ? "bg-red-500" : "bg-blue-500"
                     }`}
                   />
                 </button>
@@ -449,9 +449,9 @@ export const ReconciliationDetailView: React.FC<Props> = ({
               </AlertDescription>
             </Alert>
           ) : (
-            <Alert className="rounded-lg bg-emerald-50 border-emerald-200 text-emerald-800 dark:bg-emerald-950/40 dark:border-emerald-900 dark:text-emerald-200">
-              <Check className="h-4 w-4 text-emerald-600" />
-              <AlertTitle className="font-semibold text-xs text-emerald-700 dark:text-emerald-300">Dữ liệu khớp 100%</AlertTitle>
+            <Alert className="rounded-lg bg-blue-50 border-blue-200 text-blue-800 dark:bg-blue-950/40 dark:border-blue-900 dark:text-blue-200">
+              <Check className="h-4 w-4 text-blue-600" />
+              <AlertTitle className="font-semibold text-xs text-blue-700 dark:text-blue-300">Dữ liệu khớp 100%</AlertTitle>
               <AlertDescription className="text-[11px]">
                 Hai nguồn dữ liệu đã trùng khớp hoàn toàn.
               </AlertDescription>
@@ -462,7 +462,7 @@ export const ReconciliationDetailView: React.FC<Props> = ({
           <div className="grid grid-cols-2 gap-2 rounded-lg border border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/50 p-3">
             <div>
               <span className="block text-[10px] font-medium text-gray-500 dark:text-gray-400">Biển số xe</span>
-              <span className="text-sm font-bold text-emerald-700 dark:text-emerald-400">{activeItem.commonKey.vehicleNo}</span>
+              <span className="text-sm font-bold text-blue-700 dark:text-blue-400">{activeItem.commonKey.vehicleNo}</span>
             </div>
             <div>
               <span className="block text-[10px] font-medium text-gray-500 dark:text-gray-400">Phiên làm việc</span>
@@ -539,7 +539,7 @@ export const ReconciliationDetailView: React.FC<Props> = ({
             <Button
               onClick={handleSave}
               disabled={isSaved}
-              className="w-full gap-2 text-xs h-8 bg-emerald-600 hover:bg-emerald-700 text-white font-medium"
+              className="w-full gap-2 text-xs h-8 bg-blue-600 hover:bg-blue-700 text-white font-medium"
             >
               {isSaved ? (
                 <Check className="h-3.5 w-3.5" />
@@ -598,17 +598,17 @@ export const ReconciliationDetailView: React.FC<Props> = ({
                     onClick={() => setSelectedVehicleIdx(idx)}
                     className={`px-3 py-1 rounded-md text-xs font-medium transition-all flex items-center gap-2 ${
                       isActive
-                        ? "bg-white dark:bg-gray-950 text-emerald-700 dark:text-emerald-300 shadow-xs font-semibold"
+                        ? "bg-white dark:bg-gray-950 text-blue-700 dark:text-blue-300 shadow-xs font-semibold"
                         : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
                     }`}
                   >
-                    <Truck className="w-3.5 h-3.5 text-emerald-600" />
+                    <Truck className="w-3.5 h-3.5 text-blue-600" />
                     <span>Xe #{idx + 1}: {v.commonKey.vehicleNo}</span>
                     <span
                       className={`px-1.5 py-0.2 rounded-full text-[10px] ${
                         vMismatched
                           ? "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300"
-                          : "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
+                          : "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300"
                       }`}
                     >
                       {vMismatched ? "Lệch" : "Khớp"}
@@ -629,7 +629,7 @@ export const ReconciliationDetailView: React.FC<Props> = ({
                 embedded ? "px-2.5 py-1" : "px-3 py-1.5"
               }`}
             >
-              <Clock className="h-3.5 w-3.5 text-emerald-600" />
+              <Clock className="h-3.5 w-3.5 text-blue-600" />
               <div>
                 <span className="block text-[9px] font-medium uppercase tracking-wider text-gray-500">
                   Phiên làm việc
@@ -645,13 +645,13 @@ export const ReconciliationDetailView: React.FC<Props> = ({
               className={`flex items-center gap-1.5 font-medium ${
                 hasMismatch
                   ? "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-300 dark:border-red-900"
-                  : "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900"
+                  : "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-900"
               } ${embedded ? "px-2.5 py-1 text-xs" : "px-3 py-1.5 text-xs"}`}
             >
               {hasMismatch ? (
                 <AlertTriangle className="h-3.5 w-3.5 text-red-600" />
               ) : (
-                <Check className="h-3.5 w-3.5 text-emerald-600" />
+                <Check className="h-3.5 w-3.5 text-blue-600" />
               )}
               {hasMismatch
                 ? `${mismatchedFields.length} trường có sai lệch`
@@ -662,7 +662,7 @@ export const ReconciliationDetailView: React.FC<Props> = ({
               onClick={handleSave}
               disabled={isSaved}
               size="sm"
-              className="gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs h-8"
+              className="gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs h-8"
             >
               {isSaved ? (
                 <Check className="h-3.5 w-3.5" />
@@ -684,7 +684,7 @@ export const ReconciliationDetailView: React.FC<Props> = ({
               }`}
             >
               <div className="flex items-center gap-2">
-                <Layers className="h-4 w-4 text-emerald-600" />
+                <Layers className="h-4 w-4 text-blue-600" />
                 <CardTitle
                   className={
                     embedded
@@ -698,9 +698,9 @@ export const ReconciliationDetailView: React.FC<Props> = ({
               <div className="flex gap-2">
                 <Badge
                   variant="outline"
-                  className="gap-1 rounded font-medium text-[11px] bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800"
+                  className="gap-1 rounded font-medium text-[11px] bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800"
                 >
-                  <Check className="h-3 w-3 text-emerald-600" /> Khớp
+                  <Check className="h-3 w-3 text-blue-600" /> Khớp
                 </Badge>
                 {hasMismatch && (
                   <Badge
@@ -734,13 +734,13 @@ export const ReconciliationDetailView: React.FC<Props> = ({
               }`}
             >
               <div className="flex items-center justify-center gap-1.5 rounded bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 px-2 py-1 font-medium text-gray-700 dark:text-gray-300">
-                <Truck className="h-3.5 w-3.5 text-emerald-600" /> Bên Vận tải
+                <Truck className="h-3.5 w-3.5 text-blue-600" /> Bên Vận tải
               </div>
               <div className="flex items-center justify-center gap-1.5 rounded bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 px-2 py-1 font-medium text-gray-700 dark:text-gray-300">
-                <Pickaxe className="h-3.5 w-3.5 text-emerald-600" /> Bên Khai thác
+                <Pickaxe className="h-3.5 w-3.5 text-blue-600" /> Bên Khai thác
               </div>
               <div className="flex items-center justify-center gap-1.5 rounded bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 px-2 py-1 font-medium text-gray-700 dark:text-gray-300">
-                <Sparkles className="h-3.5 w-3.5 text-emerald-600" /> Dữ liệu chuẩn
+                <Sparkles className="h-3.5 w-3.5 text-blue-600" /> Dữ liệu chuẩn
               </div>
             </div>
 
@@ -873,14 +873,14 @@ export const ReconciliationDetailView: React.FC<Props> = ({
                                     )
                                   }
                                   placeholder={`Nhập ${field.label.toLowerCase()} chuẩn...`}
-                                  className="h-8 text-xs border-red-300 focus-visible:ring-emerald-500 bg-white dark:bg-gray-900 font-medium"
+                                  className="h-8 text-xs border-red-300 focus-visible:ring-blue-500 bg-white dark:bg-gray-900 font-medium"
                                 />
                               </div>
                             ) : (
-                              <div className="rounded border border-emerald-200 dark:border-emerald-900/60 bg-emerald-50/50 dark:bg-emerald-950/30 p-2">
+                              <div className="rounded border border-blue-200 dark:border-blue-900/60 bg-blue-50/50 dark:bg-blue-950/30 p-2">
                                 <div className="mb-0.5 flex items-center gap-1.5">
-                                  <Check className="h-3.5 w-3.5 text-emerald-600" />
-                                  <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">
+                                  <Check className="h-3.5 w-3.5 text-blue-600" />
+                                  <span className="text-xs font-semibold text-blue-700 dark:text-blue-400">
                                     {field.label}
                                   </span>
                                 </div>
@@ -912,7 +912,7 @@ export const ReconciliationDetailView: React.FC<Props> = ({
               }`}
             >
               <div className="flex items-center gap-2">
-                <ShieldCheck className="h-4 w-4 text-emerald-600" />
+                <ShieldCheck className="h-4 w-4 text-blue-600" />
                 <CardTitle
                   className={
                     embedded
@@ -931,12 +931,12 @@ export const ReconciliationDetailView: React.FC<Props> = ({
             <ScrollArea className="flex-1 min-h-0">
               <CardContent className="space-y-4 p-4">
                 {/* Vehicle & Session Summary Card */}
-                <div className="grid grid-cols-2 gap-3 rounded-lg border border-emerald-200 dark:border-emerald-900/60 bg-emerald-50/40 dark:bg-emerald-950/20 p-3">
+                <div className="grid grid-cols-2 gap-3 rounded-lg border border-blue-200 dark:border-blue-900/60 bg-blue-50/40 dark:bg-blue-950/20 p-3">
                   <div>
                     <span className="block text-[10px] font-medium text-gray-500 dark:text-gray-400">
                       Biển số xe
                     </span>
-                    <span className="text-sm font-bold text-emerald-700 dark:text-emerald-400">
+                    <span className="text-sm font-bold text-blue-700 dark:text-blue-400">
                       {activeItem.commonKey.vehicleNo}
                     </span>
                   </div>
@@ -975,7 +975,7 @@ export const ReconciliationDetailView: React.FC<Props> = ({
                               className={`rounded font-semibold text-xs ${
                                 field.needsStandardInput
                                   ? "bg-red-50 text-red-700 border-red-200 dark:bg-red-950 dark:text-red-300"
-                                  : "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300"
+                                  : "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-300"
                               }`}
                             >
                               {formatValue(field.finalValue, field.unit)}
@@ -998,7 +998,7 @@ export const ReconciliationDetailView: React.FC<Props> = ({
                 onClick={handleSave}
                 disabled={isSaved}
                 size="sm"
-                className="gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs h-8"
+                className="gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs h-8"
               >
                 {isSaved ? (
                   <Check className="h-3.5 w-3.5" />

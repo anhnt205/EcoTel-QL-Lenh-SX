@@ -1,9 +1,16 @@
 import React, { useEffect, useState, useMemo, useRef } from "react";
 import type { TransportRecord } from "@/modules/dataentry/types/thong-ke";
 import {
-  getTransportRecords,
   saveTransportRecords,
 } from "@/modules/dataentry/services/thongKeStorage";
+import {
+  useTransportReportsQuery,
+  fetchTransportReportById,
+  mapReportResponseToDraft,
+  useDeleteTransportReportMutation,
+  type TransportReportResponse,
+} from "@/modules/dataentry/services/transportTripReportService";
+import { useTransportDraftStore } from "@/modules/dataentry/store/useTransportDraftStore";
 import { validateImportRows } from "@/modules/dataentry/utils/importValidator";
 import { excelService } from "@/modules/report/utils/excel-exporter";
 import { BatchEntryModal } from "@/modules/dataentry/components/BatchEntryModal.tsx";
@@ -12,12 +19,18 @@ import { TransportFuelDataTable } from "@/modules/dataentry/components/Transport
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  Combobox,
+  ComboboxChip,
+  ComboboxChips,
+  ComboboxChipsInput,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxItem,
+  ComboboxList,
+  ComboboxValue,
+  useComboboxAnchor,
+} from "@/components/ui/combobox";
+import { DatePickerString } from "@/components/common/DatePickerString";
 import {
   Upload,
   Download,
@@ -26,7 +39,6 @@ import {
   Search,
   RefreshCw,
   Trash2,
-  Filter,
   FileSpreadsheet,
   Truck,
   Fuel,
@@ -36,7 +48,9 @@ import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 
 export const TransportEntryPage: React.FC = () => {
   const role = "ROLE_TRANSPORT";
-  const [records, setRecords] = useState<TransportRecord[]>([]);
+  const shiftAnchorRef = useComboboxAnchor();
+  const vehicleAnchorRef = useComboboxAnchor();
+
   const [isEntryModalOpen, setIsEntryModalOpen] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -44,8 +58,8 @@ export const TransportEntryPage: React.FC = () => {
   // ── Main Top Filters ─────────────────────────────────────────────────────
   const [startDate, setStartDate] = useState("2026-08-01");
   const [endDate, setEndDate] = useState("2026-08-31");
-  const [filterShift, setFilterShift] = useState("ALL");
-  const [filterVehicle, setFilterVehicle] = useState("ALL");
+  const [selectedShifts, setSelectedShifts] = useState<string[]>([]);
+  const [selectedVehicles, setSelectedVehicles] = useState<string[]>([]);
   const [searchKeyword, setSearchKeyword] = useState("");
 
   // ── Table 1 Inline Header Filters ─────────────────────────────────────────
@@ -69,14 +83,91 @@ export const TransportEntryPage: React.FC = () => {
     new Set(),
   );
 
-  const loadData = () => {
-    const list = getTransportRecords();
-    setRecords(list);
-  };
+  // ── Query Backend API ───────────────────────────────────────────────────
+  const {
+    data: apiResponse,
+    refetch,
+  } = useTransportReportsQuery({
+    fromDate: startDate,
+    toDate: endDate,
+  });
 
-  useEffect(() => {
-    loadData();
-  }, []);
+  const deleteReportMutation = useDeleteTransportReportMutation();
+  const { loadSessionForEdit } = useTransportDraftStore();
+
+  const reportsList = useMemo<TransportReportResponse[]>(() => {
+    const raw = apiResponse?.data;
+    if (!raw) return [];
+    if (Array.isArray(raw)) return raw;
+    return raw.content || [];
+  }, [apiResponse]);
+
+  // Convert TransportReportResponse items to TransportRecord format for table display
+  const records = useMemo<TransportRecord[]>(() => {
+    if (!reportsList || reportsList.length === 0) return [];
+    const list: TransportRecord[] = [];
+
+    reportsList.forEach((report) => {
+      const d = new Date(report.reportDate);
+      const month = d.getMonth() + 1;
+      const day = d.getDate();
+      const rawShift = String(report.shiftName || report.shiftId || "");
+      const shiftStr = rawShift.replace(/^ca\s+/i, "").trim();
+
+      (report.trips || []).forEach((t) => {
+        const record: TransportRecord = {
+          id: String(report.id),
+          month,
+          day,
+          shift: shiftStr,
+          vehicleNo: t.vehicleCode || t.vehicleName || "",
+          vehicleType: t.vehicleCategoryName || "",
+          equipmentUnit: t.vehicleDepartmentName || "",
+          operatorBadgeNo: report.employeeSalaryCode || "",
+          operatorName: report.employeeFullName || "",
+          operatorUnit: report.employeeDepartmentName || "",
+          isRainyDay: Boolean(t.rainyDay),
+          isTraineeVehicle: Boolean(t.supplementaryVehicle),
+          initialFuel: report.fuelBeginning ?? 0,
+          receivedFuel: report.fuelReceived ?? 0,
+          finalFuel: report.fuelEnding ?? 0,
+          fuelConsumption:
+            report.fuelUsed ??
+            Math.max(
+              0,
+              (report.fuelBeginning || 0) +
+                (report.fuelReceived || 0) -
+                (report.fuelEnding || 0),
+            ),
+          excavationArea: t.excavationAreaName || "",
+          excavatorEquipment: t.excavatorDeviceName || "",
+          pickupLocation: t.loadingPointName || "",
+          pickupBench: t.receivingFloor != null ? String(t.receivingFloor) : "",
+          pickupBenchGroup:
+            t.receivingFloorGroup != null ? t.receivingFloorGroup : "",
+          unloadLocationName: t.unloadingPointName || "",
+          unloadBench: t.unloadingFloor || "",
+          fullRouteDistance: t.totalRouteDistanceKm ?? 0,
+          fullRouteElevate: t.totalRouteLiftM ?? 0,
+          localSlopeDist: t.localSlopeDistanceKm ?? 0,
+          localSlopeDegree: t.localSlopeM ?? 0,
+          cargoType: t.cargoTypeName || "",
+          cargoGroup: t.cargoGroupName || "",
+          tripCount: t.tripCount || 1,
+          loadStatus:
+            t.loadLevelType === "OTHER"
+              ? `Khác${t.loadLevelCustomValue ? ` (${t.loadLevelCustomValue})` : ""}`
+              : t.loadLevelType === "RODA_2_3"
+              ? "Roda (2/3)"
+              : "Đủ tải",
+          createdBy: report.employeeFullName || report.employeeSalaryCode || "",
+        };
+        list.push(record);
+      });
+    });
+
+    return list;
+  }, [reportsList]);
 
   // F3 shortcut to open Add Trip modal
   useEffect(() => {
@@ -101,16 +192,16 @@ export const TransportEntryPage: React.FC = () => {
         if (endDate && rDateStr > endDate) return false;
       }
 
-      // Shift filter
-      if (filterShift !== "ALL") {
-        const s = (r.shift || "").toLowerCase();
-        const f = filterShift.toLowerCase();
-        if (!s.includes(f) && s !== f) return false;
+      // Shift filter (Multi-select)
+      if (selectedShifts.length > 0) {
+        const s = r.shift || "";
+        if (!selectedShifts.includes(s)) return false;
       }
 
-      // Vehicle filter
-      if (filterVehicle !== "ALL") {
-        if (r.vehicleNo !== filterVehicle) return false;
+      // Vehicle filter (Multi-select)
+      if (selectedVehicles.length > 0) {
+        const v = r.vehicleNo || "";
+        if (!selectedVehicles.includes(v)) return false;
       }
 
       // Inline column filters
@@ -155,8 +246,8 @@ export const TransportEntryPage: React.FC = () => {
     records,
     startDate,
     endDate,
-    filterShift,
-    filterVehicle,
+    selectedShifts,
+    selectedVehicles,
     colArea,
     colExcavator,
     colPickup,
@@ -172,16 +263,21 @@ export const TransportEntryPage: React.FC = () => {
   ]);
 
   // Unique values for filter dropdowns
+  const uniqueShifts = useMemo(() => {
+    const set = new Set(records.map((r) => r.shift).filter(Boolean));
+    return Array.from(set).map(String);
+  }, [records]);
+
   const uniqueVehicles = useMemo(() => {
     const set = new Set(records.map((r) => r.vehicleNo).filter(Boolean));
-    return Array.from(set);
+    return Array.from(set).map(String);
   }, [records]);
 
   const handleResetFilters = () => {
     setStartDate("2026-08-01");
     setEndDate("2026-08-31");
-    setFilterShift("ALL");
-    setFilterVehicle("ALL");
+    setSelectedShifts([]);
+    setSelectedVehicles([]);
     setColArea("ALL");
     setColExcavator("ALL");
     setColPickup("ALL");
@@ -194,6 +290,7 @@ export const TransportEntryPage: React.FC = () => {
     setColOperatorUnit("ALL");
     setColCreatedBy("ALL");
     setSearchKeyword("");
+    refetch();
     toast.info("Đã làm mới các bộ lọc!");
   };
 
@@ -254,35 +351,86 @@ export const TransportEntryPage: React.FC = () => {
     });
   };
 
+  // ── Edit Selected Record ───────────────────────────────────────────────
+  const handleEditSelected = async () => {
+    const selectedIdsArray = Array.from(
+      new Set([...selectedTripIds, ...selectedFuelIds]),
+    );
+
+    if (selectedIdsArray.length === 0) {
+      setIsEntryModalOpen(true);
+      return;
+    }
+
+    const firstId = Number(selectedIdsArray[0]);
+    if (isNaN(firstId)) {
+      setIsEntryModalOpen(true);
+      return;
+    }
+
+    try {
+      toast.info("Đang tải dữ liệu báo cáo từ máy chủ...");
+      const res = await fetchTransportReportById(firstId);
+      if (res.success && res.data) {
+        const draft = mapReportResponseToDraft(res.data);
+        loadSessionForEdit(draft);
+        setIsEntryModalOpen(true);
+        toast.success(`Đã mở báo cáo ID #${firstId} để chỉnh sửa`);
+      } else {
+        toast.error("Không tìm thấy dữ liệu báo cáo trên hệ thống!");
+      }
+    } catch (err: any) {
+      console.error("[Fetch Edit Error]", err);
+      toast.error(
+        `Lỗi khi tải dữ liệu báo cáo: ${err.message || "Không thể truy vấn API"}`,
+      );
+    }
+  };
+
   // ── Delete Selected Records ──────────────────────────────────────────────
   const { confirm, ConfirmDialogComponent } = useConfirmDialog();
 
   const handleDeleteSelected = async () => {
-    const selectedCount = selectedTripIds.size + selectedFuelIds.size;
-    if (selectedCount === 0) {
+    const selectedIdsArray = Array.from(
+      new Set([...selectedTripIds, ...selectedFuelIds]),
+    );
+
+    if (selectedIdsArray.length === 0) {
       toast.error("Vui lòng chọn ít nhất 1 dòng để xóa!");
       return;
     }
 
+    const numericIds = Array.from(
+      new Set(selectedIdsArray.map((id) => Number(id)).filter((n) => !isNaN(n))),
+    );
+
     const isConfirmed = await confirm({
-      title: "Xác nhận xóa bản ghi",
-      description: `Bạn có chắc chắn muốn xóa ${selectedCount} bản ghi đã chọn? Hành động này không thể hoàn tác.`,
-      confirmText: "Xóa bản ghi",
+      title: "Xác nhận xóa báo cáo Vận tải",
+      description: `Bạn có chắc chắn muốn xóa ${numericIds.length > 0 ? numericIds.length : selectedIdsArray.length} báo cáo đã chọn? Hành động này không thể hoàn tác trên CSDL.`,
+      confirmText: "Xóa báo cáo",
       cancelText: "Hủy bỏ",
       variant: "destructive",
     });
 
     if (isConfirmed) {
-      const idsToDelete = new Set([...selectedTripIds, ...selectedFuelIds]);
-      const updated = records.filter((r) => !idsToDelete.has(r.id!));
-      localStorage.setItem(
-        "thongke_transport_records_v3",
-        JSON.stringify(updated),
-      );
-      setRecords(updated);
-      setSelectedTripIds(new Set());
-      setSelectedFuelIds(new Set());
-      toast.success(`Đã xóa thành công ${selectedCount} bản ghi!`);
+      try {
+        if (numericIds.length > 0) {
+          for (const id of numericIds) {
+            await deleteReportMutation.mutateAsync(id);
+          }
+          toast.success(`Đã xóa thành công ${numericIds.length} báo cáo từ CSDL!`);
+        } else {
+          toast.success(`Đã xóa các bản ghi tạm khỏi giao diện!`);
+        }
+        setSelectedTripIds(new Set());
+        setSelectedFuelIds(new Set());
+        refetch();
+      } catch (err: any) {
+        console.error("[Delete Report Error]", err);
+        const msg =
+          err.response?.data?.message || err.message || "Lỗi khi xóa báo cáo";
+        toast.error(`Xóa thất bại: ${msg}`);
+      }
     }
   };
 
@@ -321,7 +469,7 @@ export const TransportEntryPage: React.FC = () => {
       }
 
       saveTransportRecords(validRows as TransportRecord[]);
-      loadData();
+      refetch();
       toast.success(
         `Đã nạp thành công ${validRows.length}/${results.length} bản ghi từ file "${file.name}"!`,
       );
@@ -351,7 +499,7 @@ export const TransportEntryPage: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 ">
         {/* Title */}
         <div className="flex items-center gap-3">
-          <div className="p-2.5 rounded-xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400">
+          <div className="p-2.5 rounded-xl bg-blue-100 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400">
             <FileSpreadsheet className="w-7 h-7" />
           </div>
           <div>
@@ -396,7 +544,7 @@ export const TransportEntryPage: React.FC = () => {
           {/* Add Trip Modal Trigger */}
           <Button
             onClick={() => setIsEntryModalOpen(true)}
-            className="h-9 text-xs gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-sm"
+            className="h-9 text-xs gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-sm"
           >
             <Plus className="w-4 h-4" />
             Thêm chuyến (F3)
@@ -404,12 +552,7 @@ export const TransportEntryPage: React.FC = () => {
 
           {/* Edit Trip Button */}
           <Button
-            onClick={() => {
-              if (selectedTripIds.size === 0 && selectedFuelIds.size === 0) {
-                toast.info("Vui lòng chọn bản ghi cần chỉnh sửa hoặc mở cửa sổ nhập liệu");
-              }
-              setIsEntryModalOpen(true);
-            }}
+            onClick={handleEditSelected}
             className="h-9 text-xs gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-sm"
           >
             <Pencil className="w-3.5 h-3.5" />
@@ -437,11 +580,10 @@ export const TransportEntryPage: React.FC = () => {
             <span className="font-medium text-gray-600 dark:text-gray-400">
               Thời gian bắt đầu
             </span>
-            <Input
-              type="date"
+            <DatePickerString
               value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              className="h-9 text-xs w-36"
+              onChange={(v) => setStartDate(v)}
+              className="w-36"
             />
           </div>
 
@@ -452,55 +594,100 @@ export const TransportEntryPage: React.FC = () => {
             <span className="font-medium text-gray-600 dark:text-gray-400">
               Thời gian kết thúc
             </span>
-            <Input
-              type="date"
+            <DatePickerString
               value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              className="h-9 text-xs w-36"
+              onChange={(v) => setEndDate(v)}
+              className="w-36"
             />
           </div>
 
-          {/* Ca */}
-          <div className="flex flex-col gap-1 min-w-[100px]">
+          {/* Ca (Combobox Chọn nhiều) */}
+          <div className="flex flex-col gap-1 min-w-[170px] max-w-[280px]">
             <span className="font-medium text-gray-600 dark:text-gray-400">
               Ca
             </span>
-            <Select value={filterShift} onValueChange={setFilterShift}>
-              <SelectTrigger className="h-9 text-xs w-full bg-white dark:bg-gray-900">
-                <SelectValue placeholder="Tất cả" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">Tất cả</SelectItem>
-                <SelectItem value="Ca 1">Ca 1</SelectItem>
-                <SelectItem value="Ca 2">Ca 2</SelectItem>
-                <SelectItem value="Ca 3">Ca 3</SelectItem>
-              </SelectContent>
-            </Select>
+            <Combobox
+              items={uniqueShifts}
+              multiple
+              value={selectedShifts}
+              onValueChange={setSelectedShifts}
+            >
+              <ComboboxChips
+                ref={shiftAnchorRef}
+                className="min-h-9 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800 text-xs py-1"
+              >
+                <ComboboxValue placeholder="Tất cả ca">
+                  {selectedShifts.map((item) => (
+                    <ComboboxChip key={item} className="text-xs py-0.5">
+                      {item}
+                    </ComboboxChip>
+                  ))}
+                </ComboboxValue>
+                <ComboboxChipsInput
+                  placeholder={selectedShifts.length === 0 ? "Chọn ca..." : ""}
+                  className="text-xs"
+                />
+              </ComboboxChips>
+              <ComboboxContent anchor={shiftAnchorRef} sideOffset={4} align="start">
+                <ComboboxEmpty className="text-xs py-2 text-gray-400">
+                  Không tìm thấy ca
+                </ComboboxEmpty>
+                <ComboboxList>
+                  {(item) => (
+                    <ComboboxItem key={item} value={item} className="text-xs py-1.5">
+                      {item}
+                    </ComboboxItem>
+                  )}
+                </ComboboxList>
+              </ComboboxContent>
+            </Combobox>
           </div>
 
-          {/* Số xe */}
-          <div className="flex flex-col gap-1 min-w-[120px]">
+          {/* Số xe (Combobox Chọn nhiều) */}
+          <div className="flex flex-col gap-1 min-w-[210px] max-w-[340px]">
             <span className="font-medium text-gray-600 dark:text-gray-400">
               Số xe
             </span>
-            <Select value={filterVehicle} onValueChange={setFilterVehicle}>
-              <SelectTrigger className="h-9 text-xs w-full bg-white dark:bg-gray-900">
-                <SelectValue placeholder="Tất cả" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">Tất cả</SelectItem>
-                {uniqueVehicles.map((v) => (
-                  <SelectItem key={v} value={v!}>
-                    {v}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Combobox
+              items={uniqueVehicles}
+              multiple
+              value={selectedVehicles}
+              onValueChange={setSelectedVehicles}
+            >
+              <ComboboxChips
+                ref={vehicleAnchorRef}
+                className="min-h-9 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800 text-xs py-1"
+              >
+                <ComboboxValue placeholder="Tất cả xe">
+                  {selectedVehicles.map((item) => (
+                    <ComboboxChip key={item} className="text-xs py-0.5">
+                      {item}
+                    </ComboboxChip>
+                  ))}
+                </ComboboxValue>
+                <ComboboxChipsInput
+                  placeholder={selectedVehicles.length === 0 ? "Chọn số xe..." : ""}
+                  className="text-xs"
+                />
+              </ComboboxChips>
+              <ComboboxContent anchor={vehicleAnchorRef} sideOffset={4} align="start">
+                <ComboboxEmpty className="text-xs py-2 text-gray-400">
+                  Không tìm thấy xe nào
+                </ComboboxEmpty>
+                <ComboboxList>
+                  {(item) => (
+                    <ComboboxItem key={item} value={item} className="text-xs py-1.5">
+                      {item}
+                    </ComboboxItem>
+                  )}
+                </ComboboxList>
+              </ComboboxContent>
+            </Combobox>
           </div>
 
           {/* Search Box */}
           <div className="flex-1 min-w-[220px] flex flex-col gap-1">
-            <span className="font-medium text-transparent">Search</span>
+            <span className="font-medium text-transparent">Tìm kiếm</span>
             <div className="relative">
               <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-gray-400" />
               <Input
@@ -513,17 +700,8 @@ export const TransportEntryPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Filter & Reset buttons */}
+          {/* Reset button */}
           <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-9 text-xs gap-1 border-gray-300 dark:border-gray-700"
-            >
-              <Filter className="w-3.5 h-3.5" />
-              Bộ lọc
-            </Button>
-
             <Button
               variant="outline"
               size="sm"
@@ -541,7 +719,7 @@ export const TransportEntryPage: React.FC = () => {
       <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm overflow-hidden space-y-3 p-4">
         {/* Table Title */}
         <div className="flex items-center gap-2 text-sm font-bold text-gray-900 dark:text-gray-100">
-          <Truck className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+          <Truck className="w-4 h-4 text-blue-600 dark:text-blue-400" />
           <span>1. BẢNG BÁO CHUYẾN</span>
         </div>
 
@@ -558,7 +736,7 @@ export const TransportEntryPage: React.FC = () => {
       <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm overflow-hidden space-y-3 p-4">
         {/* Table Title */}
         <div className="flex items-center gap-2 text-sm font-bold text-gray-900 dark:text-gray-100">
-          <Fuel className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+          <Fuel className="w-4 h-4 text-blue-600 dark:text-blue-400" />
           <span>2. BẢNG BÁO NHIÊN LIỆU</span>
         </div>
 
@@ -577,7 +755,7 @@ export const TransportEntryPage: React.FC = () => {
         isOpen={isEntryModalOpen}
         onClose={() => setIsEntryModalOpen(false)}
         onSuccess={() => {
-          loadData();
+          refetch();
           setIsEntryModalOpen(false);
         }}
       />

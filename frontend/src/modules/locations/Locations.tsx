@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
 
 import LocationService from "./services/locationService";
 import { getLocationColumns } from "./columns";
@@ -15,16 +15,29 @@ import {
 
 const Locations = () => {
   const [searchValue, setSearchValue] = useState("");
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(10);
 
   // 1. Fetch data
   const {
-    data: locations = [],
+    data: pageData,
     isLoading,
     refetch,
   } = useQuery({
-    queryKey: ["locations", searchValue],
-    queryFn: () => LocationService.getAll({ keyword: searchValue }),
+    queryKey: ["locations", page, pageSize, searchValue],
+    queryFn: () =>
+      LocationService.getAll({
+        page,
+        size: pageSize,
+        sort: "id,DESC",
+        keyword: searchValue,
+      }),
+    placeholderData: keepPreviousData,
   });
+
+  const locations = pageData?.content ?? [];
+  const totalElements = pageData?.totalElements ?? 0;
+  const totalPages = pageData?.totalPages ?? 0;
 
   // Table Columns
   const columns = useMemo(
@@ -54,10 +67,23 @@ const Locations = () => {
           columns={columns}
           loading={isLoading}
           searchValue={searchValue}
-          onSearch={(val) => setSearchValue(val)}
+          onSearch={(val) => {
+            setSearchValue(val);
+            setPage(0);
+          }}
           onRefresh={refetch}
           showColumnToggle
           stickyHeader
+          manualPagination
+          page={page}
+          rowsPerPage={pageSize}
+          pageCount={totalPages}
+          totalCount={totalElements}
+          onPageChange={(newPage) => setPage(newPage)}
+          onRowsPerPageChange={(newSize) => {
+            setPageSize(newSize);
+            setPage(0);
+          }}
         />
       </div>
     </div>

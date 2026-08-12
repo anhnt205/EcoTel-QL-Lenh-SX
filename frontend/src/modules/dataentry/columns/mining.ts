@@ -1,6 +1,5 @@
 import { type ColumnDef } from "./types";
 import {
-  MINING_UNITS,
   EXCAVATORS,
   BENCHES,
   PICKUP_LOCATIONS,
@@ -22,13 +21,6 @@ export const miningColumns: ColumnDef[] = [
     type: "select",
     options: ["1", "2", "3"],
     width: "w-20",
-  },
-  {
-    key: "miningUnit",
-    label: "Đơn vị khai thác",
-    type: "select",
-    options: MINING_UNITS,
-    width: "w-36",
   },
   {
     key: "mineCode",
@@ -64,7 +56,7 @@ export const miningColumns: ColumnDef[] = [
   },
   {
     key: "pickupLocation",
-    label: "Nơi nhận tải",
+    label: "Nơi chất tải",
     type: "text",
     options: PICKUP_LOCATIONS,
     width: "w-36",

@@ -67,6 +67,7 @@ export const getTransportFuelColumns = (
       return "05/08/2026 06:00";
     },
     id: "date",
+    meta: { headerTitle: "Thời gian" },
     header: ({ column }) => (
       <Button
         variant="ghost"
@@ -94,6 +95,7 @@ export const getTransportFuelColumns = (
   {
     accessorKey: "vehicleNo",
     id: "vehicleNo",
+    meta: { headerTitle: "Số xe" },
     header: ({ column }) => (
       <Button
         variant="ghost"
@@ -163,7 +165,7 @@ export const getTransportFuelColumns = (
             (Number(row.original.finalFuel) || 831),
         );
       return (
-        <span className="font-bold text-emerald-700 dark:text-emerald-300">
+        <span className="font-bold text-blue-700 dark:text-blue-300">
           {Number(fuelUsed).toLocaleString("vi-VN")}
         </span>
       );

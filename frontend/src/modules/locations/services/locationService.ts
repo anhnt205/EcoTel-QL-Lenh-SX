@@ -1,5 +1,6 @@
 import api from "@/config/api.config";
 import type { Location } from "@/types";
+import { parsePaginatedResponse, type PaginatedResponse } from "@/types";
 
 const cleanParams = (params?: Record<string, any>) => {
   if (!params) return undefined;
@@ -14,10 +15,9 @@ const cleanParams = (params?: Record<string, any>) => {
 };
 
 const LocationService = {
-  getAll: async (params?: Record<string, any>): Promise<Location[]> => {
+  getAll: async (params?: Record<string, any>): Promise<PaginatedResponse<Location>> => {
     const res = await api.get("/locations", { params: cleanParams(params) });
-    const data = res.data?.data?.content || res.data?.data || res.data?.result?.data || res.data;
-    return Array.isArray(data) ? data : [];
+    return parsePaginatedResponse<Location>(res);
   },
 };
 

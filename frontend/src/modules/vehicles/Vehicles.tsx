@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import VehicleService from "./services/vehicleService";
 import { columns } from "./columns";
 
@@ -15,23 +15,34 @@ import {
 
 const Vehicles = () => {
   const [searchValue, setSearchValue] = useState("");
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(10);
   const [statusFilter] = useState("");
   const [departmentFilter] = useState("");
 
   // 1. Fetch data
   const {
-    data: vehicles = [],
+    data: vehiclesPage,
     isLoading,
     refetch,
   } = useQuery({
-    queryKey: ["vehicles", searchValue, departmentFilter, statusFilter],
+    queryKey: ["vehicles", page, pageSize, searchValue, departmentFilter, statusFilter],
     queryFn: () =>
       VehicleService.getVehicles({
+        page,
+        size: pageSize,
+        sort: "id,DESC",
         q: searchValue,
         department: departmentFilter,
         status: statusFilter,
       }),
+    placeholderData: keepPreviousData,
   });
+
+  const vehicles = vehiclesPage?.content ?? [];
+  const totalElements = vehiclesPage?.totalElements ?? 0;
+  const totalPages = vehiclesPage?.totalPages ?? 0;
+
   // Table Column
   return (
     <div className="flex flex-col h-full gap-4 p-4 md:p-6">
@@ -55,10 +66,23 @@ const Vehicles = () => {
             columns={columns}
             loading={isLoading}
             searchValue={searchValue}
-            onSearch={(val) => setSearchValue(val)}
+            onSearch={(val) => {
+              setSearchValue(val);
+              setPage(0);
+            }}
             onRefresh={refetch}
             showColumnToggle
             stickyHeader
+            manualPagination
+            page={page}
+            rowsPerPage={pageSize}
+            pageCount={totalPages}
+            totalCount={totalElements}
+            onPageChange={(newPage) => setPage(newPage)}
+            onRowsPerPageChange={(newSize) => {
+              setPageSize(newSize);
+              setPage(0);
+            }}
           />
         </div>
       </div>

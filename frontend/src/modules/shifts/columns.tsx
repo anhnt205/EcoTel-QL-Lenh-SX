@@ -8,7 +8,7 @@ export const getShiftColumns = (): ColumnDef<Shift>[] => [
     accessorKey: "name",
     header: "Tên Ca làm việc",
     cell: ({ row }) => (
-      <Badge className="bg-emerald-600 text-white gap-1 text-xs">
+      <Badge className="bg-blue-600 text-white gap-1 text-xs">
         <Clock className="w-3 h-3" /> Ca {row.original.name}
       </Badge>
     ),

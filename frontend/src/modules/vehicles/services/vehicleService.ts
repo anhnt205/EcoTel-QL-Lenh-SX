@@ -1,10 +1,16 @@
 import api from "@/config/api.config";
 import type { Device } from "@/types";
-import { DeviceTypeEnum } from "@/enums";
+import { parsePaginatedResponse, type PaginatedResponse } from "@/types";
 
 const cleanParams = (params?: Record<string, any>) => {
   if (!params) return undefined;
   const cleaned: Record<string, any> = {};
+  Object.keys(params).forEach((key) => {
+    const val = params[key];
+    if (val !== undefined && val !== null && val !== "") {
+      cleaned[key] = val;
+    }
+  });
   const kw = params.keyword || params.q || params.name;
   if (kw !== undefined && kw !== null && kw !== "") {
     cleaned.keyword = kw;
@@ -12,47 +18,15 @@ const cleanParams = (params?: Record<string, any>) => {
   return Object.keys(cleaned).length > 0 ? cleaned : undefined;
 };
 
-const extractDevices = (res: any): Device[] => {
-  const data =
-    res.data?.data?.content ||
-    res.data?.data ||
-    res.data?.result?.data ||
-    res.data;
-  return Array.isArray(data) ? data : [];
-};
-
 const VehicleService = {
-  getVehicles: async (params?: Record<string, any>): Promise<Device[]> => {
-    const res = await api.get("/devices", { params: cleanParams(params) });
-    const list = extractDevices(res);
-    return list.filter((item: any) => {
-      const groupStr =
-        item?.categoryName || item?.category?.group || item?.category || "";
-      if (!groupStr) return true;
-      return (
-        groupStr
-          .toString()
-          .toLowerCase()
-          .includes(DeviceTypeEnum.VEHICLE.toLowerCase()) ||
-        groupStr.toString().toLowerCase().includes("xe")
-      );
-    });
+  getVehicles: async (params?: Record<string, any>): Promise<PaginatedResponse<Device>> => {
+    const res = await api.get("/devices", { params: cleanParams({ categoryGroup: "XE", ...params }) });
+    return parsePaginatedResponse<Device>(res);
   },
   getAllVehicles: async (params?: Record<string, any>): Promise<Device[]> => {
-    const res = await api.get("/devices", { params: cleanParams(params) });
-    const list = extractDevices(res);
-    return list.filter((item: any) => {
-      const groupStr =
-        item?.categoryName || item?.category?.group || item?.category || "";
-      if (!groupStr) return true;
-      return (
-        groupStr
-          .toString()
-          .toLowerCase()
-          .includes(DeviceTypeEnum.VEHICLE.toLowerCase()) ||
-        groupStr.toString().toLowerCase().includes("xe")
-      );
-    });
+    const res = await api.get("/devices", { params: cleanParams({ categoryGroup: "XE", ...params, size: 1000 }) });
+    const parsed = parsePaginatedResponse<Device>(res);
+    return parsed.content;
   },
 };
 

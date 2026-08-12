@@ -1,5 +1,6 @@
 import api from "@/config/api.config";
 import type { Shift } from "@/types";
+import { parsePaginatedResponse, type PaginatedResponse } from "@/types";
 
 const cleanParams = (params?: Record<string, any>) => {
   if (!params) return undefined;
@@ -14,10 +15,9 @@ const cleanParams = (params?: Record<string, any>) => {
 };
 
 const ShiftService = {
-  getAll: async (params?: Record<string, any>): Promise<Shift[]> => {
+  getAll: async (params?: Record<string, any>): Promise<PaginatedResponse<Shift>> => {
     const res = await api.get("/shifts", { params: cleanParams(params) });
-    const data = res.data?.data?.content || res.data?.data || res.data?.result?.data || res.data;
-    return Array.isArray(data) ? data : [];
+    return parsePaginatedResponse<Shift>(res);
   },
   getById: async (id: string | number): Promise<Shift> => {
     const res = await api.get(`/shifts/${id}`);

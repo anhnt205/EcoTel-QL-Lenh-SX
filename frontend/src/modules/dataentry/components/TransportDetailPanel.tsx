@@ -68,7 +68,7 @@ export const TransportDetailPanel: React.FC<TransportDetailPanelProps> = ({
       <div className="flex flex-wrap gap-1.5">
         <Badge
           variant="outline"
-          className="text-xs bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-400"
+          className="text-xs bg-blue-50 text-blue-700 border-blue-300 dark:bg-blue-950/40 dark:text-blue-400"
         >
           {record.cargoType || "N/A"}
         </Badge>

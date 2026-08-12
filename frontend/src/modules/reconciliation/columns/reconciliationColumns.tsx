@@ -42,7 +42,7 @@ export const getReconciliationColumns = (
     id: "vehicleNo",
     header: "Số xe",
     cell: (info) => (
-      <div className="font-bold text-emerald-700 dark:text-emerald-400">
+      <div className="font-bold text-blue-700 dark:text-blue-400">
         {info.getValue<string>()}
       </div>
     ),
@@ -59,7 +59,7 @@ export const getReconciliationColumns = (
           <div className="flex justify-center">
             <Badge
               variant="outline"
-              className="min-w-24 justify-center rounded-md border-emerald-300 bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/60 dark:text-emerald-300"
+              className="min-w-24 justify-center rounded-md border-blue-300 bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700 dark:border-blue-900/60 dark:bg-blue-950/60 dark:text-blue-300"
             >
               Khớp
             </Badge>

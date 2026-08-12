@@ -80,12 +80,12 @@ export function DashboardPage() {
 
       {/* Hero Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-        <Card className="rounded-xl border border-border bg-card p-5 shadow-xs hover:border-emerald-500/40 transition-all flex flex-col justify-between">
+        <Card className="rounded-xl border border-border bg-card p-5 shadow-xs hover:border-blue-500/40 transition-all flex flex-col justify-between">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               Tổng sản lượng hôm nay
             </span>
-            <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+            <div className="p-2 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400">
               <BarChart3 className="size-4" />
             </div>
           </div>
@@ -94,9 +94,9 @@ export function DashboardPage() {
               <NumberTicker value={1240} variant="gradient" className="text-3xl font-extrabold" />
               <span className="text-xs font-medium text-muted-foreground">Chuyến</span>
             </div>
-            <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400 flex items-center mt-2">
+            <p className="text-xs font-medium text-blue-600 dark:text-blue-400 flex items-center mt-2">
               <ArrowUpRight className="h-3.5 w-3.5 mr-0.5 shrink-0" />
-              <NumberTicker value={37200} variant="emerald" className="font-bold text-xs" />
+              <NumberTicker value={37200} variant="blue" className="font-bold text-xs" />
               <span className="ml-1">Tấn quy đổi</span>
             </p>
           </div>
@@ -143,18 +143,18 @@ export function DashboardPage() {
           </div>
         </Card>
 
-        <Card className="rounded-xl border border-border bg-card p-5 shadow-xs hover:border-emerald-500/40 transition-all flex flex-col justify-between">
+        <Card className="rounded-xl border border-border bg-card p-5 shadow-xs hover:border-blue-500/40 transition-all flex flex-col justify-between">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               Tỷ lệ đối chiếu khớp
             </span>
-            <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+            <div className="p-2 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400">
               <ShieldCheck className="h-4 w-4" />
             </div>
           </div>
           <div className="mt-4">
             <div className="flex items-baseline gap-1.5">
-              <NumberTicker value={98.2} decimalPlaces={1} suffix="%" variant="emerald" className="text-3xl font-extrabold" />
+              <NumberTicker value={98.2} decimalPlaces={1} suffix="%" variant="blue" className="text-3xl font-extrabold" />
             </div>
             <p className="text-xs font-medium text-muted-foreground mt-2">
               Chỉ 2 phiếu có sai lệch nhẹ
@@ -236,7 +236,7 @@ export function DashboardPage() {
                   variant="outline"
                   className={`rounded-md px-2.5 py-0.5 text-xs font-semibold border ${
                     item.isApproved
-                      ? "bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 border-emerald-200/80 dark:border-emerald-800/50"
+                      ? "bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-400 border-blue-200/80 dark:border-blue-800/50"
                       : "bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 border-amber-200/80 dark:border-amber-800/50"
                   }`}
                 >
@@ -267,10 +267,6 @@ export function DashboardPage() {
               {
                 label: "Đối chiếu Nhiên liệu Gas",
                 route: ROUTES.RECONCILIATION.FUEL,
-              },
-              {
-                label: "Báo cáo 65 Cột Xe mỏ",
-                route: ROUTES.REPORTS.INTERNAL_TRUCKS,
               },
             ].map((shortcut, idx) => (
               <Button

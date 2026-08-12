@@ -14,12 +14,6 @@ export const ROUTES = {
     FUEL: '/nhap-lieu/doi-chieu',
     DASHBOARD: '/nhap-lieu/doi-chieu',
   },
-  REPORTS: {
-    INTERNAL_TRUCKS: '/nhap-lieu/van-tai',
-    EXTERNAL_TRUCKS: '/nhap-lieu/van-tai',
-    PRODUCTION_ANALYSIS: '/nhap-lieu/van-tai',
-    SUMMARY: '/nhap-lieu/van-tai',
-  },
   DATA_ENTRY: {
     TRANSPORT: '/nhap-lieu/van-tai',
     MINING: '/nhap-lieu/khai-thac',

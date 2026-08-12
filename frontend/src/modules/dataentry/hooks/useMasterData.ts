@@ -1,8 +1,6 @@
 import { useQueries } from "@tanstack/react-query";
 import * as masterDataService from "../services/masterDataService";
 
-const STALE_TIME = 5 * 60 * 1000; // 5 phút cache cho master data
-
 export interface MasterOption<T = any> {
   value: string;
   label: string;
@@ -32,48 +30,68 @@ const toOptions = <T>(
   return deduplicateOptions(options);
 };
 
-export function useMasterData() {
+export interface UseMasterDataOptions {
+  enabled?: boolean;
+}
+
+export function useMasterData(options: UseMasterDataOptions = {}) {
+  const { enabled = true } = options;
+
   const results = useQueries({
     queries: [
       {
         queryKey: ["masterData", "shifts"],
         queryFn: masterDataService.fetchShifts,
-        staleTime: STALE_TIME,
+        enabled,
+        staleTime: 0,
       },
       {
         queryKey: ["masterData", "departments"],
         queryFn: masterDataService.fetchDepartments,
-        staleTime: STALE_TIME,
+        enabled,
+        staleTime: 0,
       },
       {
         queryKey: ["masterData", "locations"],
         queryFn: masterDataService.fetchLocations,
-        staleTime: STALE_TIME,
+        enabled,
+        staleTime: 0,
       },
       {
-        queryKey: ["masterData", "devices"],
-        queryFn: masterDataService.fetchDevices,
-        staleTime: STALE_TIME,
+        queryKey: ["masterData", "excavators"],
+        queryFn: masterDataService.fetchExcavators,
+        enabled,
+        staleTime: 0,
+      },
+      {
+        queryKey: ["masterData", "transportVehicles"],
+        queryFn: masterDataService.fetchTransportVehicles,
+        enabled,
+        staleTime: 0,
       },
       {
         queryKey: ["masterData", "materials"],
         queryFn: masterDataService.fetchMaterials,
-        staleTime: STALE_TIME,
+        enabled,
+        staleTime: 0,
       },
       {
         queryKey: ["masterData", "users"],
         queryFn: masterDataService.fetchUsers,
-        staleTime: STALE_TIME,
+        enabled,
+        staleTime: 0,
       },
       {
         queryKey: ["masterData", "cargoTypes"],
         queryFn: masterDataService.fetchCargoTypes,
-        staleTime: STALE_TIME,
+        enabled,
+        staleTime: 0,
       },
       {
         queryKey: ["masterData", "cargoGroups"],
         queryFn: masterDataService.fetchCargoGroups,
-        staleTime: STALE_TIME,
+        enabled,
+        staleTime: 0,
       },
     ],
   });
@@ -82,7 +100,8 @@ export function useMasterData() {
     shiftsQ,
     deptQ,
     locQ,
-    devicesQ,
+    excavatorsQ,
+    transportVehiclesQ,
     materialsQ,
     usersQ,
     cargoTypesQ,
@@ -92,30 +111,13 @@ export function useMasterData() {
   const rawShifts = shiftsQ.data ?? [];
   const rawDepartments = deptQ.data ?? [];
   const rawLocations = locQ.data ?? [];
-  const rawDevices = devicesQ.data ?? [];
+  const rawExcavators = excavatorsQ.data ?? [];
+  const rawVehicles = transportVehiclesQ.data ?? [];
+  const rawDevices = [...rawExcavators, ...rawVehicles];
   const rawMaterials = materialsQ.data ?? [];
   const rawUsers = usersQ.data ?? [];
   const rawCargoTypes = cargoTypesQ.data ?? [];
   const rawCargoGroups = cargoGroupsQ.data ?? [];
-
-  // Lọc thiết bị: Máy xúc vs Xe vận tải
-  const rawExcavators = rawDevices.filter((d) => {
-    const cat = (d.categoryName || d.code || "").toUpperCase();
-    return (
-      cat.includes("MÁY XÚC") || cat.includes("MX") || d.code.startsWith("MX")
-    );
-  });
-
-  const rawVehicles = rawDevices.filter((d) => {
-    const cat = (d.categoryName || d.code || "").toUpperCase();
-    return (
-      !cat.includes("MÁY XÚC") &&
-      (cat.includes("XE") ||
-        cat.includes("Ô TÔ") ||
-        d.vehicleNumber ||
-        !d.code.startsWith("MX"))
-    );
-  });
 
   // Chuyển đổi thành mảng Option chuẩn
   const rawShiftOptions = rawShifts.map((s) => {
@@ -141,29 +143,36 @@ export function useMasterData() {
 
   const excavatorOptions = deduplicateOptions(
     rawExcavators.map((d) => ({
-      value: d.name || d.code,
-      label: d.name || d.code,
+      value: d.code || d.name,
+      label: d.code || d.name,
       rawData: d,
     })),
   );
 
   const vehicleOptions = deduplicateOptions(
     rawVehicles.map((d) => ({
-      value: d.vehicleNumber || d.name || d.code,
-      label: d.name || d.vehicleNumber || d.code,
+      value: d.code || d.vehicleNumber || d.name,
+      label: d.code || d.vehicleNumber || d.name,
       rawData: d,
     })),
   );
 
   const materialOptions = toOptions(rawMaterials, "name", "name");
 
-  const operatorOptions = deduplicateOptions(
-    rawUsers.map((u) => ({
-      value: u.salaryCode,
-      label: `${u.salaryCode} - ${u.fullName}`,
-      rawData: u,
-    })),
-  );
+  const rawOperatorOptions = rawUsers
+    .filter((u) => u && (u.salaryCode || u.username || u.fullName))
+    .map((u) => {
+      const code = String(u.salaryCode || u.username || "").trim();
+      const name = String(u.fullName || "").trim();
+      return {
+        value: code,
+        label: code && name ? `${code} - ${name}` : code || name,
+        rawData: u,
+      };
+    })
+    .filter((o) => o.value !== "");
+
+  const operatorOptions = deduplicateOptions(rawOperatorOptions);
 
   const cargoTypeOptions = toOptions(rawCargoTypes, "name", "name");
   const cargoGroupOptions = toOptions(rawCargoGroups, "name", "name");
@@ -195,8 +204,8 @@ export function useMasterData() {
 
     if (found) {
       return {
-        vehicleManagementUnit: found.departmentName || "PXVT",
-        vehicleType: found.materialName || found.categoryName || "Xe Vận Tải",
+        vehicleManagementUnit: found.departmentName || "",
+        vehicleType: found.materialName || "",
       };
     }
     return { vehicleManagementUnit: "", vehicleType: "" };
@@ -207,37 +216,71 @@ export function useMasterData() {
   ): { operatorName: string; operatorUnit: string } => {
     if (!badgeNo) return { operatorName: "", operatorUnit: "" };
     const trimmed = badgeNo.trim().toLowerCase();
-    const found = rawUsers.find(
-      (u) =>
-        u.salaryCode.toLowerCase() === trimmed ||
-        u.username.toLowerCase() === trimmed,
-    );
+
+    // Tìm trong danh sách rawUsers trả về từ API Backend (xử lý null-safe)
+    const found = rawUsers.find((u) => {
+      const code = String(u.salaryCode || "")
+        .trim()
+        .toLowerCase();
+      const uname = String(u.username || "")
+        .trim()
+        .toLowerCase();
+      const fname = String(u.fullName || "")
+        .trim()
+        .toLowerCase();
+      const fullLabel = `${code} - ${fname}`.toLowerCase();
+
+      return (
+        (code && code === trimmed) ||
+        (uname && uname === trimmed) ||
+        (fname && fname === trimmed) ||
+        (fullLabel && fullLabel === trimmed) ||
+        (code && trimmed.startsWith(code))
+      );
+    });
 
     if (found) {
       return {
-        operatorName: found.fullName,
-        operatorUnit: found.departmentName || "Phân Xưởng Khai Thác",
+        operatorName: found.fullName || "",
+        operatorUnit: found.departmentName || "",
       };
     }
-    return { operatorName: "", operatorUnit: "" };
+
+    return {
+      operatorName: "",
+      operatorUnit: "",
+    };
   };
 
   const getCargoGroupDetails = (cargoType: string): string => {
-    if (!cargoType) return "Nhóm Hàng";
+    if (!cargoType) return "";
     const trimmed = cargoType.trim().toLowerCase();
-    const foundGroup = rawCargoGroups.find(
-      (g) =>
-        g.cargoTypeName?.toLowerCase() === trimmed ||
-        g.name.toLowerCase().includes(trimmed),
+
+    // 1. Tra cứu trực tiếp từ danh mục Loại hàng (Loại hàng thuộc về Nhóm hàng cha)
+    const foundType = rawCargoTypes.find(
+      (t) => t.name.trim().toLowerCase() === trimmed,
+    );
+    if (foundType?.cargoGroupName) return foundType.cargoGroupName;
+
+    // 2. Tra cứu qua danh mục Nhóm hàng nếu có khớp tên
+    const foundGroup = rawCargoGroups.find((g) =>
+      g.name.toLowerCase().includes(trimmed),
     );
     if (foundGroup) return foundGroup.name;
+    return "";
+  };
 
-    // Quy đổi nhóm hàng theo loại hàng
-    if (trimmed.includes("than")) return "Nhóm Than Nguyên Khai";
-    if (trimmed.includes("đất")) return "Nhóm Đất Phủ Bóc";
-    if (trimmed.includes("nomin") || trimmed.includes("nổ")) return "Nhóm Nổ Minh";
-    if (trimmed.includes("đá") || trimmed.includes("dthai")) return "Nhóm Đá Thải";
-    return "Nhóm Hàng";
+  const getCargoTypesByGroup = (cargoGroup: string): string[] => {
+    if (!cargoGroup || !cargoGroup.trim()) {
+      return cargoTypeValues;
+    }
+    const trimmedGroup = cargoGroup.trim().toLowerCase();
+    const filtered = rawCargoTypes.filter((t) => {
+      const gName = String(t.cargoGroupName || "").trim().toLowerCase();
+      return gName === trimmedGroup || gName.includes(trimmedGroup);
+    });
+    if (filtered.length === 0) return cargoTypeValues;
+    return Array.from(new Set(filtered.map((t) => t.name)));
   };
 
   return {
@@ -245,6 +288,8 @@ export function useMasterData() {
     rawShifts,
     rawDepartments,
     rawLocations,
+    rawExcavators,
+    rawVehicles,
     rawDevices,
     rawMaterials,
     rawUsers,
@@ -277,6 +322,7 @@ export function useMasterData() {
     getVehicleDetails,
     getOperatorDetails,
     getCargoGroupDetails,
+    getCargoTypesByGroup,
 
     // Status flags
     isLoading: results.some((r) => r.isLoading),
@@ -284,4 +330,3 @@ export function useMasterData() {
     errors: results.filter((r) => r.isError).map((r) => r.error),
   };
 }
-

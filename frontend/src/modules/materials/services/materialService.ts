@@ -1,5 +1,6 @@
 import api from "@/config/api.config";
 import type { Material } from "@/types";
+import { parsePaginatedResponse, type PaginatedResponse } from "@/types";
 
 const cleanParams = (params?: Record<string, any>) => {
   if (!params) return undefined;
@@ -14,10 +15,9 @@ const cleanParams = (params?: Record<string, any>) => {
 };
 
 const MaterialService = {
-  getAll: async (params?: Record<string, any>): Promise<Material[]> => {
+  getAll: async (params?: Record<string, any>): Promise<PaginatedResponse<Material>> => {
     const res = await api.get("/materials", { params: cleanParams(params) });
-    const data = res.data?.data?.content || res.data?.data || res.data?.result?.data || res.data;
-    return Array.isArray(data) ? data : [];
+    return parsePaginatedResponse<Material>(res);
   },
 };
 

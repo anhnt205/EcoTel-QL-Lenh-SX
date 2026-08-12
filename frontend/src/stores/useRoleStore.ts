@@ -12,7 +12,7 @@ export const ROLE_DETAILS: Record<RoleType, { label: string; description: string
   ROLE_TRANSPORT: {
     label: 'Vai trò Vận tải',
     description: 'Nhập liệu & Quản lý chuyến xe đơn vị Vận tải',
-    badgeColor: 'bg-emerald-600 text-white',
+    badgeColor: 'bg-blue-600 text-white',
     defaultPath: '/nhap-lieu/van-tai',
   },
   ROLE_MINING: {

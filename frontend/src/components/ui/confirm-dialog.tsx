@@ -74,7 +74,7 @@ export function useConfirmDialog() {
       case "info":
         return <Info className="h-6 w-6 text-blue-500 shrink-0" />;
       case "success":
-        return <CheckCircle2 className="h-6 w-6 text-emerald-500 shrink-0" />;
+        return <CheckCircle2 className="h-6 w-6 text-blue-600 shrink-0" />;
       case "warning":
       default:
         return (

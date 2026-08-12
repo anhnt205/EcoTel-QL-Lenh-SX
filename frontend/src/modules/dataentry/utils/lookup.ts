@@ -53,37 +53,10 @@ export const lookupOperatorInfo = (badgeNo: string): OperatorInfo => {
   if (!badgeNo) return { operatorName: "", operatorUnit: "" };
   const trimmed = badgeNo.trim();
   if (OPERATOR_LOOKUP[trimmed]) return OPERATOR_LOOKUP[trimmed];
-  return { operatorName: "Cán Bộ Vận Hành", operatorUnit: "Phân Xưởng Khai Thác" };
+  return { operatorName: "", operatorUnit: "" };
 };
 
-// 3. CÔNG THỨC NHÓM TẦNG NHẬN TẢI (TRUNC)
-export const calculateBenchGroup = (
-  excavationArea: string = "",
-  benchValue: string | number = ""
-): number | string => {
-  if (benchValue === undefined || benchValue === null || benchValue === "") return "";
-  const bench = Number(benchValue);
-  if (isNaN(bench)) return "";
 
-  const area = (excavationArea || "").toLowerCase().trim();
-  const isKheCham = area.includes("khe chàm") || area.includes("khe cham");
-
-  if (isKheCham) {
-    if (bench < -195) {
-      return -200;
-    } else if (bench < 0) {
-      return (-1 + Math.trunc((bench + 1) / 15)) * 15;
-    } else {
-      return Math.trunc(bench / 15) * 15;
-    }
-  } else {
-    if (bench < 0) {
-      return (-1 + Math.trunc((bench + 1) / 15)) * 15;
-    } else {
-      return Math.trunc(bench / 15) * 15;
-    }
-  }
-};
 
 // 4. Danh mục & lọc máy xúc theo khu vực cho Vận Tải
 export const EXCAVATION_AREAS = [

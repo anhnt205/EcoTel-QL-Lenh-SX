@@ -13,10 +13,9 @@ export const ROLE_MENU_ACCESS: Record<UserRole, string[]> = {
     '/admin/users',
     '/statistics',
     '/reconciliation',
-    '/reports',
   ],
-  [ROLES.NHAP_LIEU]: ['/statistics', '/reconciliation', '/reports'],
-  [ROLES.BAO_CAO]: ['/reconciliation', '/reports'],
+  [ROLES.NHAP_LIEU]: ['/statistics', '/reconciliation'],
+  [ROLES.BAO_CAO]: ['/reconciliation'],
 };
 
 // Label tiếng Việt cho role

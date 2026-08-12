@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
 
 import CargoTypeService from "./services/cargoTypeService";
 import { getCargoTypeColumns } from "./columns";
@@ -16,15 +16,28 @@ import {
 
 const CargoTypes = () => {
   const [searchValue, setSearchValue] = useState("");
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(10);
 
   const {
-    data: cargoTypes = [],
+    data: pageData,
     isLoading,
     refetch,
   } = useQuery({
-    queryKey: ["cargo-types", searchValue],
-    queryFn: () => CargoTypeService.getAll({ keyword: searchValue }),
+    queryKey: ["cargo-types", page, pageSize, searchValue],
+    queryFn: () =>
+      CargoTypeService.getAll({
+        page,
+        size: pageSize,
+        sort: "id,DESC",
+        keyword: searchValue,
+      }),
+    placeholderData: keepPreviousData,
   });
+
+  const cargoTypes = pageData?.content ?? [];
+  const totalElements = pageData?.totalElements ?? 0;
+  const totalPages = pageData?.totalPages ?? 0;
 
   const columns = useMemo(() => getCargoTypeColumns(), []);
 
@@ -49,10 +62,23 @@ const CargoTypes = () => {
           columns={columns}
           loading={isLoading}
           searchValue={searchValue}
-          onSearch={(val) => setSearchValue(val)}
+          onSearch={(val) => {
+            setSearchValue(val);
+            setPage(0);
+          }}
           onRefresh={refetch}
           showColumnToggle
           stickyHeader
+          manualPagination
+          page={page}
+          rowsPerPage={pageSize}
+          pageCount={totalPages}
+          totalCount={totalElements}
+          onPageChange={(newPage) => setPage(newPage)}
+          onRowsPerPageChange={(newSize) => {
+            setPageSize(newSize);
+            setPage(0);
+          }}
         />
       </div>
     </div>

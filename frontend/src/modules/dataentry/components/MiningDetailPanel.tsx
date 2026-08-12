@@ -6,7 +6,6 @@ import {
   Pickaxe,
   MapPin,
   Layers,
-  Info,
 } from "lucide-react";
 
 interface MiningDetailPanelProps {
@@ -72,7 +71,7 @@ export const MiningDetailPanel: React.FC<MiningDetailPanelProps> = ({
         {record.material && (
           <Badge
             variant="outline"
-            className="text-xs bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-400"
+            className="text-xs bg-blue-50 text-blue-700 border-blue-300 dark:bg-blue-950/40 dark:text-blue-400"
           >
             {record.material}
           </Badge>
@@ -85,19 +84,8 @@ export const MiningDetailPanel: React.FC<MiningDetailPanelProps> = ({
             MX: {record.mineCode}
           </Badge>
         )}
-        {record.miningUnit && (
-          <Badge variant="secondary" className="text-xs">
-            {record.miningUnit}
-          </Badge>
-        )}
-      </div>
-
-      {/* A. Thông tin chung */}
-      <SectionTitle icon={<Info className="h-3.5 w-3.5" />} label="A. Thông tin chung" />
-      <div className="rounded-md border border-border/60 bg-muted/20 px-3 py-1 divide-y divide-border/40">
         <Field label="Tháng / Ngày" value={`Tháng ${record.month ?? "-"} / Ngày ${record.day ?? "-"}`} />
         <Field label="Ca" value={record.shift} />
-        <Field label="Đơn vị khai thác" value={record.miningUnit} />
         <Field label="Máy xúc" value={record.mineCode} />
         <Field label="Tầng xúc" value={record.excavationBench} />
       </div>
@@ -111,7 +99,7 @@ export const MiningDetailPanel: React.FC<MiningDetailPanelProps> = ({
         <Field label="Chủng loại xe" value={record.vehicleType} />
         <Field label="Đơn vị quản lý thiết bị" value={record.vehicleManagementUnit} />
         <Field label="Số chuyến" value={record.tripCount} />
-        <Field label="Nơi nhận tải" value={record.pickupLocation} />
+        <Field label="Nơi chất tải" value={record.pickupLocation} />
         <Field label="Vị trí đổ" value={record.dumpLocation} />
         <Field label="Vật liệu" value={record.material} />
         <Field label="Loại hàng / Mức tải" value={record.loadStatus} />

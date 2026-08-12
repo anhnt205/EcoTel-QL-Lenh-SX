@@ -29,6 +29,8 @@ export const API = {
     CARGO_TYPES: "/cargo-types",
   },
   RECONCILIATION: {
+    SEARCH: "/reconciliation",
+    DECISIONS: "/reconciliation/decisions",
     PRODUCTION: {
       LIST: "/v1/reconciliation/production",
       EXPORT: "/v1/reconciliation/export/production",
