@@ -136,19 +136,19 @@ export const TransportDetailPanel: React.FC<TransportDetailPanelProps> = ({
       <SectionTitle icon={<Fuel className="h-3.5 w-3.5" />} label="Nhiên liệu" />
       <div className="rounded-md border border-border/60 bg-muted/20 px-3 py-1 divide-y divide-border/40">
         <Field
-          label="NL tồn đầu ca"
+          label="Nhiên liệu tồn đầu ca"
           value={record.initialFuel != null ? `${record.initialFuel} L` : undefined}
         />
         <Field
-          label="NL lĩnh"
+          label="Nhiên liệu lĩnh"
           value={record.receivedFuel != null ? `${record.receivedFuel} L` : undefined}
         />
         <Field
-          label="NL tồn cuối ca"
+          label="Nhiên liệu tồn cuối ca"
           value={record.finalFuel != null ? `${record.finalFuel} L` : undefined}
         />
         <Field
-          label="NL tiêu thụ"
+          label="Nhiên liệu tiêu thụ"
           value={calculatedFuelCons != null ? `${calculatedFuelCons} L` : undefined}
         />
       </div>

@@ -2,7 +2,7 @@ import {
   useExcavationReportsQuery,
   fetchExcavationReportById,
   mapReportResponseToDraft,
-  useDeleteExcavationTripReportMutation,
+  useBulkDeleteExcavationTripReportMutation,
   type ExcavationReportResponse,
 } from "@/modules/dataentry/services/excavationTripReportService";
 import { useMiningDraftStore } from "@/modules/dataentry/store/useMiningDraftStore";
@@ -81,8 +81,8 @@ export const MiningEntryPage: React.FC = () => {
     toDate: endDate,
   });
 
-  const deleteReportMutation = useDeleteExcavationTripReportMutation();
-  const { loadSessionForEdit, initDrafts } = useMiningDraftStore();
+  const bulkDeleteReportMutation = useBulkDeleteExcavationTripReportMutation();
+  const { loadSessionsForEdit, initDrafts } = useMiningDraftStore();
 
   const reportsList = useMemo<ExcavationReportResponse[]>(() => {
     const raw = apiResponse?.data;
@@ -316,31 +316,45 @@ export const MiningEntryPage: React.FC = () => {
   const handleEditSelected = async () => {
     const selectedIdsArray = Array.from(
       new Set([...selectedTripIds, ...selectedFuelIds]),
-    );
-    if (selectedIdsArray.length === 0) {
-      initDrafts();
-      setIsEntryModalOpen(true);
-      return;
-    }
+    )
+      .map(Number)
+      .filter((id) => Boolean(id) && !isNaN(id));
 
-    const reportIdNum = Number(selectedIdsArray[0]);
-    if (!reportIdNum || isNaN(reportIdNum)) {
-      initDrafts();
-      setIsEntryModalOpen(true);
+    if (selectedIdsArray.length === 0) {
+      toast.warning("Vui lòng chọn bản ghi để chỉnh sửa!");
       return;
     }
 
     try {
-      toast.loading("Đang tải dữ liệu chi tiết báo cáo...", {
-        id: "fetch-detail",
-      });
-      const res = await fetchExcavationReportById(reportIdNum);
+      toast.loading(
+        selectedIdsArray.length === 1
+          ? "Đang tải dữ liệu chi tiết báo cáo..."
+          : `Đang tải dữ liệu ${selectedIdsArray.length} báo cáo...`,
+        { id: "fetch-detail" },
+      );
+
+      const responses = await Promise.all(
+        selectedIdsArray.map((id) =>
+          fetchExcavationReportById(id).catch((err) => {
+            console.error(`Lỗi tải báo cáo #${id}:`, err);
+            return null;
+          }),
+        ),
+      );
+
       toast.dismiss("fetch-detail");
-      if (res.data) {
-        const draft = mapReportResponseToDraft(res.data);
-        loadSessionForEdit(draft);
-        setIsEntryModalOpen(true);
+
+      const drafts = responses
+        .filter((res) => Boolean(res?.data))
+        .map((res) => mapReportResponseToDraft(res!.data!));
+
+      if (drafts.length === 0) {
+        toast.error("Không tải được thông tin chi tiết của bản ghi nào!");
+        return;
       }
+
+      loadSessionsForEdit(drafts);
+      setIsEntryModalOpen(true);
     } catch (err: any) {
       toast.dismiss("fetch-detail");
       toast.error(
@@ -352,9 +366,12 @@ export const MiningEntryPage: React.FC = () => {
   const handleDeleteSelected = async () => {
     const selectedIdsArray = Array.from(
       new Set([...selectedTripIds, ...selectedFuelIds]),
-    );
+    )
+      .map(Number)
+      .filter((id) => Boolean(id) && !isNaN(id));
+
     if (selectedIdsArray.length === 0) {
-      toast.error("Vui lòng chọn ít nhất 1 dòng để xóa!");
+      toast.warning("Vui lòng chọn ít nhất 1 dòng để xóa!");
       return;
     }
 
@@ -367,22 +384,17 @@ export const MiningEntryPage: React.FC = () => {
     });
 
     if (isConfirmed) {
-      let successCount = 0;
-      for (const idStr of selectedIdsArray) {
-        const idNum = Number(idStr);
-        if (idNum) {
-          try {
-            await deleteReportMutation.mutateAsync(idNum);
-            successCount++;
-          } catch (err: any) {
-            console.error("Lỗi xóa bản ghi:", err);
-          }
-        }
+      try {
+        const res = await bulkDeleteReportMutation.mutateAsync(selectedIdsArray);
+        setSelectedTripIds(new Set());
+        setSelectedFuelIds(new Set());
+        const deletedCount = res.data?.deletedCount ?? selectedIdsArray.length;
+        toast.success(`Đã xóa thành công ${deletedCount} báo cáo!`);
+        refetch();
+      } catch (err: any) {
+        console.error("Lỗi xóa bản ghi bulk:", err);
+        toast.error(`Lỗi khi xóa bản ghi: ${err.response?.data?.message || err.message || "Lỗi máy chủ"}`);
       }
-      setSelectedTripIds(new Set());
-      setSelectedFuelIds(new Set());
-      toast.success(`Đã xóa thành công ${successCount} báo cáo!`);
-      refetch();
     }
   };
 

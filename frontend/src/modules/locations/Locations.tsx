@@ -55,14 +55,14 @@ const Locations = () => {
           </BreadcrumbItem>
           <BreadcrumbSeparator />
           <BreadcrumbItem>
-            <BreadcrumbPage>Điểm đổ tải</BreadcrumbPage>
+            <BreadcrumbPage>Vị trí</BreadcrumbPage>
           </BreadcrumbItem>
         </BreadcrumbList>
       </Breadcrumb>
 
       <div className="flex-1 min-h-0">
         <AppDataTable
-          title="Danh sách điểm đổ tải"
+          title="Danh sách vị trí"
           data={locations}
           columns={columns}
           loading={isLoading}

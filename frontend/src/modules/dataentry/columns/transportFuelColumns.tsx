@@ -72,7 +72,7 @@ export const getTransportFuelColumns = (
       <Button
         variant="ghost"
         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        className="h-7 px-1 text-xs font-semibold hover:bg-transparent"
+        className="h-7 px-1 text-sm font-bold hover:bg-transparent"
       >
         Thời gian
         <ArrowUpDown className="ml-1 h-3 w-3" />
@@ -100,7 +100,7 @@ export const getTransportFuelColumns = (
       <Button
         variant="ghost"
         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        className="h-7 px-1 text-xs font-semibold hover:bg-transparent"
+        className="h-7 px-1 text-sm font-bold hover:bg-transparent"
       >
         Số xe
         <ArrowUpDown className="ml-1 h-3 w-3" />
@@ -116,7 +116,7 @@ export const getTransportFuelColumns = (
   {
     accessorKey: "initialFuel",
     id: "initialFuel",
-    header: "NL tồn đầu (lít)",
+    header: "Nhiên liệu tồn đầu (lít)",
     cell: ({ row }) => (
       <span className="font-semibold">
         {row.original.initialFuel
@@ -124,12 +124,12 @@ export const getTransportFuelColumns = (
           : "1,188"}
       </span>
     ),
-    size: 125,
+    size: 175,
   },
   {
     accessorKey: "receivedFuel",
     id: "receivedFuel",
-    header: "NL lĩnh (lít)",
+    header: "Nhiên liệu lĩnh (lít)",
     cell: ({ row }) => (
       <span className="font-semibold">
         {row.original.receivedFuel
@@ -137,12 +137,12 @@ export const getTransportFuelColumns = (
           : "590"}
       </span>
     ),
-    size: 120,
+    size: 160,
   },
   {
     accessorKey: "finalFuel",
     id: "finalFuel",
-    header: "NL tồn cuối (lít)",
+    header: "Nhiên liệu tồn cuối (lít)",
     cell: ({ row }) => (
       <span className="font-semibold">
         {row.original.finalFuel
@@ -150,11 +150,11 @@ export const getTransportFuelColumns = (
           : "831"}
       </span>
     ),
-    size: 125,
+    size: 175,
   },
   {
     id: "fuelConsumption",
-    header: "NL tiêu thụ (lít)",
+    header: "Nhiên liệu tiêu thụ (lít)",
     cell: ({ row }) => {
       const fuelUsed =
         row.original.fuelConsumption ??
@@ -165,7 +165,7 @@ export const getTransportFuelColumns = (
             (Number(row.original.finalFuel) || 831),
         );
       return (
-        <span className="font-bold text-blue-700 dark:text-blue-300">
+        <span className="font-semibold">
           {Number(fuelUsed).toLocaleString("vi-VN")}
         </span>
       );

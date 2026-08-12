@@ -26,6 +26,7 @@ interface TransportDraftStore {
   addTripRow: (defaultTrip: TransportTripRow) => void;
   removeTripRow: (tIdx: number) => boolean;
   loadSessionForEdit: (draft: TransportSessionDraft) => void;
+  loadSessionsForEdit: (drafts: TransportSessionDraft[]) => void;
   validateAllSessions: () => {
     isValid: boolean;
     firstErrorMsg?: string;
@@ -167,6 +168,13 @@ export const useTransportDraftStore = create<TransportDraftStore>((set, get) => 
     });
   },
 
+  loadSessionsForEdit: (drafts: TransportSessionDraft[]) => {
+    set({
+      sessions: drafts.length > 0 ? drafts : [],
+      activeIdx: 0,
+    });
+  },
+
   validateAllSessions: () => {
     const { sessions } = get();
     for (let i = 0; i < sessions.length; i++) {
@@ -197,14 +205,19 @@ export const useTransportDraftStore = create<TransportDraftStore>((set, get) => 
     let points = 0;
     const total = 3;
 
-    if (sess.workingDate?.trim()) points++;
-    if (sess.shift?.trim()) points++;
-    if (sess.operatorBadgeNo?.trim()) points++;
+    if (String(sess.workingDate ?? "").trim()) points++;
+    if (String(sess.shift ?? "").trim()) points++;
+    if (String(sess.operatorBadgeNo ?? "").trim()) points++;
 
     const tripRatio =
       sess.trips.length > 0
         ? sess.trips.filter(
-            (t) => t.vehicleNo?.trim() && t.cargoType?.trim() && Number(t.tripCount) >= 1 && t.excavationArea?.trim() && t.unloadLocationName?.trim()
+            (t) =>
+              String(t.vehicleNo ?? "").trim() &&
+              String(t.cargoType ?? "").trim() &&
+              Number(t.tripCount) >= 1 &&
+              String(t.excavationArea ?? "").trim() &&
+              String(t.unloadLocationName ?? "").trim()
           ).length / sess.trips.length
         : 0;
 

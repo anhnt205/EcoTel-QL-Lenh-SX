@@ -37,7 +37,11 @@ import { useTransportDraftStore } from "@/modules/dataentry/store/useTransportDr
 import {
   useCreateTransportReportMutation,
   useUpdateTransportReportMutation,
+  useBulkCreateTransportReportMutation,
+  useBulkUpdateTransportReportMutation,
   buildTransportReportRequest,
+  type TransportReportRequest,
+  type TransportReportBulkUpdateItem,
 } from "@/modules/dataentry/services/transportTripReportService";
 
 // ─── Tải trọng options – radio buttons trong bảng chuyến ─────────────────
@@ -144,6 +148,8 @@ export const TransportHeaderDetailModal: React.FC<
 
   const createReportMutation = useCreateTransportReportMutation();
   const updateReportMutation = useUpdateTransportReportMutation();
+  const bulkCreateReportMutation = useBulkCreateTransportReportMutation();
+  const bulkUpdateReportMutation = useBulkUpdateTransportReportMutation();
 
   const {
     sessions,
@@ -214,15 +220,6 @@ export const TransportHeaderDetailModal: React.FC<
 
 
   const tableBottomRef = useRef<HTMLDivElement>(null);
-
-  // Reset khi mở modal – chỉ chạy khi isOpen chuyển từ false → true
-  const prevIsOpenRef = useRef(false);
-  useEffect(() => {
-    if (isOpen && !prevIsOpenRef.current) {
-      initDrafts(createDefaultSession());
-    }
-    prevIsOpenRef.current = isOpen;
-  }, [isOpen, initDrafts, createDefaultSession]);
 
   // ── Cập nhật session header ─────────────────────────────────────────────
   const handleUpdateSession = useCallback(
@@ -307,26 +304,60 @@ export const TransportHeaderDetailModal: React.FC<
     let apiSuccessCount = 0;
     const apiErrors: string[] = [];
 
-    // 2. Gọi API POST / PUT cho từng mẻ
+    // Tách danh sách bản ghi tạo mới và bản ghi cập nhật
+    const createItems: TransportReportRequest[] = [];
+    const updateItems: TransportReportBulkUpdateItem[] = [];
+
     for (let i = 0; i < payloads.length; i++) {
       const sess = sessions[i];
+      if (sess.reportId) {
+        updateItems.push({
+          id: sess.reportId,
+          data: payloads[i],
+        });
+      } else {
+        createItems.push(payloads[i]);
+      }
+    }
+
+    // Gọi API Tạo mới (đơn lẻ hoặc bulk)
+    if (createItems.length > 0) {
       try {
-        if (sess.reportId) {
-          await updateReportMutation.mutateAsync({
-            id: sess.reportId,
-            payload: payloads[i],
-          });
+        if (createItems.length === 1) {
+          await createReportMutation.mutateAsync(createItems[0]);
         } else {
-          await createReportMutation.mutateAsync(payloads[i]);
+          await bulkCreateReportMutation.mutateAsync(createItems);
         }
-        apiSuccessCount++;
+        apiSuccessCount += createItems.length;
       } catch (err: any) {
-        console.error(`[API Error] Lỗi khi gửi báo cáo ca ${i + 1}:`, err);
+        console.error("[API Create Error] Lỗi khi tạo mới báo cáo vận tải:", err);
         const msg =
           err.response?.data?.message ||
           err.message ||
           "Lỗi kết nối máy chủ API";
-        apiErrors.push(`Ca ${i + 1}: ${msg}`);
+        apiErrors.push(`Tạo mới (${createItems.length} bản ghi): ${msg}`);
+      }
+    }
+
+    // Gọi API Cập nhật (đơn lẻ hoặc bulk)
+    if (updateItems.length > 0) {
+      try {
+        if (updateItems.length === 1) {
+          await updateReportMutation.mutateAsync({
+            id: updateItems[0].id,
+            payload: updateItems[0].data,
+          });
+        } else {
+          await bulkUpdateReportMutation.mutateAsync(updateItems);
+        }
+        apiSuccessCount += updateItems.length;
+      } catch (err: any) {
+        console.error("[API Update Error] Lỗi khi cập nhật báo cáo vận tải:", err);
+        const msg =
+          err.response?.data?.message ||
+          err.message ||
+          "Lỗi kết nối máy chủ API";
+        apiErrors.push(`Cập nhật (${updateItems.length} bản ghi): ${msg}`);
       }
     }
 
@@ -573,7 +604,7 @@ export const TransportHeaderDetailModal: React.FC<
                 onValueChange={(v) => handleUpdateSession({ shift: v })}
               >
                 <SelectTrigger className="h-9 text-sm w-full">
-                  <SelectValue placeholder="Chọn ca" />
+                  <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="z-[110]">
                   {shiftOptions.map((s) => (
@@ -609,70 +640,70 @@ export const TransportHeaderDetailModal: React.FC<
 
             {/* Bảng chuyến vận tải */}
             <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-x-auto">
-              <table className="w-full text-xs border-collapse min-w-[1680px]">
+              <table className="w-full text-xs border-collapse min-w-[2180px]">
                 <thead>
-                  <tr className="bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300 text-[11px] font-semibold">
+                  <tr className="bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-100 text-sm font-bold border-b border-gray-200 dark:border-gray-700">
                     <th className="px-2 py-2 border-r border-b border-gray-200 dark:border-gray-700 text-center w-10">
                       STT
                     </th>
-                    <th className="px-2 py-2 border-r border-b border-gray-200 dark:border-gray-700 text-left min-w-[110px]">
+                    <th className="px-2 py-2 border-r border-b border-gray-200 dark:border-gray-700 text-left min-w-[135px]">
                       Khu vực xúc
                     </th>
-                    <th className="px-2 py-2 border-r border-b border-gray-200 dark:border-gray-700 text-left min-w-[100px]">
+                    <th className="px-2 py-2 border-r border-b border-gray-200 dark:border-gray-700 text-left min-w-[125px]">
                       Máy xúc
                     </th>
-                    <th className="px-2 py-2 border-r border-b border-gray-200 dark:border-gray-700 text-left min-w-[100px]">
+                    <th className="px-2 py-2 border-r border-b border-gray-200 dark:border-gray-700 text-left min-w-[130px]">
                       Nơi nhận tải
                     </th>
-                    <th className="px-2 py-2 border-r border-b border-gray-200 dark:border-gray-700 text-center min-w-[65px]">
+                    <th className="px-2 py-2 border-r border-b border-gray-200 dark:border-gray-700 text-center min-w-[100px]">
                       Tầng nhận tải
                     </th>
-                    <th className="px-2 py-2 border-r border-b border-gray-200 dark:border-gray-700 text-center min-w-[95px]">
+                    <th className="px-2 py-2 border-r border-b border-gray-200 dark:border-gray-700 text-center min-w-[140px]">
                       Nhóm tầng nhận tải
                     </th>
-                    <th className="px-2 py-2 border-r border-b border-gray-200 dark:border-gray-700 text-center min-w-[65px]">
+                    <th className="px-2 py-2 border-r border-b border-gray-200 dark:border-gray-700 text-center min-w-[100px]">
                       Tầng dỡ tải
                     </th>
-                    <th className="px-2 py-2 border-r border-b border-gray-200 dark:border-gray-700 text-center min-w-[95px]">
+                    <th className="px-2 py-2 border-r border-b border-gray-200 dark:border-gray-700 text-center min-w-[145px]">
                       Cung độ<br />toàn tuyến (km)
                     </th>
-                    <th className="px-2 py-2 border-r border-b border-gray-200 dark:border-gray-700 text-center min-w-[95px]">
+                    <th className="px-2 py-2 border-r border-b border-gray-200 dark:border-gray-700 text-center min-w-[145px]">
                       Nâng tải<br />toàn tuyến (m)
                     </th>
-                    <th className="px-2 py-2 border-r border-b border-gray-200 dark:border-gray-700 text-center min-w-[95px]">
+                    <th className="px-2 py-2 border-r border-b border-gray-200 dark:border-gray-700 text-center min-w-[145px]">
                       Cung độ dốc<br />cục bộ (km)
                     </th>
-                    <th className="px-2 py-2 border-r border-b border-gray-200 dark:border-gray-700 text-center min-w-[75px]">
+                    <th className="px-2 py-2 border-r border-b border-gray-200 dark:border-gray-700 text-center min-w-[125px]">
                       Dốc cục bộ (m)
                     </th>
-                    <th className="px-2 py-2 border-r border-b border-gray-200 dark:border-gray-700 text-left min-w-[110px]">
+                    <th className="px-2 py-2 border-r border-b border-gray-200 dark:border-gray-700 text-left min-w-[130px]">
                       Nơi dỡ tải
                     </th>
-                    <th className="px-2 py-2 border-r border-b border-gray-200 dark:border-gray-700 text-left min-w-[130px]">
+                    <th className="px-2 py-2 border-r border-b border-gray-200 dark:border-gray-700 text-left min-w-[140px]">
                       Nhóm hàng
                     </th>
-                    <th className="px-2 py-2 border-r border-b border-gray-200 dark:border-gray-700 text-left min-w-[110px]">
+                    <th className="px-2 py-2 border-r border-b border-gray-200 dark:border-gray-700 text-left min-w-[130px]">
                       Loại hàng
                     </th>
-                    <th className="px-2 py-2 border-r border-b border-gray-200 dark:border-gray-700 text-left min-w-[135px]">
+                    <th className="px-2 py-2 border-r border-b border-gray-200 dark:border-gray-700 text-left min-w-[140px]">
                       Số xe
                     </th>
-                    <th className="px-2 py-2 border-r border-b border-gray-200 dark:border-gray-700 text-center min-w-[90px]">
+                    <th className="px-2 py-2 border-r border-b border-gray-200 dark:border-gray-700 text-center min-w-[105px]">
                       Số chuyến
                     </th>
-                    <th className="px-2 py-2 border-r border-b border-gray-200 dark:border-gray-700 text-center min-w-[115px] w-32">
+                    <th className="px-2 py-2 border-r border-b border-gray-200 dark:border-gray-700 text-center min-w-[125px] w-32">
                       Tải trọng
                     </th>
-                    <th className="px-2 py-2 border-r border-b border-gray-200 dark:border-gray-700 text-center min-w-[70px]">
+                    <th className="px-2 py-2 border-r border-b border-gray-200 dark:border-gray-700 text-center min-w-[80px]">
                       Ngày mưa
                     </th>
-                    <th className="px-2 py-2 border-r border-b border-gray-200 dark:border-gray-700 text-center min-w-[70px]">
+                    <th className="px-2 py-2 border-r border-b border-gray-200 dark:border-gray-700 text-center min-w-[80px]">
                       Xe bổ túc
                     </th>
-                    <th className="px-2 py-2 border-r border-b border-gray-200 dark:border-gray-700 text-center min-w-[150px]">
+                    <th className="px-2 py-2 border-r border-b border-gray-200 dark:border-gray-700 text-center min-w-[160px]">
                       Đơn vị quản lý<br />thiết bị
                     </th>
-                    <th className="px-2 py-2 border-r border-b border-gray-200 dark:border-gray-700 text-center min-w-[110px]">
+                    <th className="px-2 py-2 border-r border-b border-gray-200 dark:border-gray-700 text-center min-w-[120px]">
                       Chủng loại
                     </th>
                     <th className="px-2 py-2 border-b border-gray-200 dark:border-gray-700 text-center w-15" />
@@ -703,7 +734,7 @@ export const TransportHeaderDetailModal: React.FC<
                             onChange={(v) =>
                               handleUpdateTrip(tIdx, { excavationArea: v })
                             }
-                            placeholder="Khu vực"
+                            placeholder=""
                           />
                         </td>
 
@@ -717,7 +748,7 @@ export const TransportHeaderDetailModal: React.FC<
                                 excavatorEquipment: v,
                               })
                             }
-                            placeholder="Máy xúc"
+                            placeholder=""
                           />
                         </td>
 
@@ -729,7 +760,7 @@ export const TransportHeaderDetailModal: React.FC<
                             onChange={(v) =>
                               handleUpdateTrip(tIdx, { pickupLocation: v })
                             }
-                            placeholder="Nơi nhận tải"
+                            placeholder=""
                           />
                         </td>
 
@@ -744,7 +775,6 @@ export const TransportHeaderDetailModal: React.FC<
                               })
                             }
                             className="h-8 text-xs text-center px-1"
-                            placeholder="-40"
                           />
                         </td>
 
@@ -770,7 +800,6 @@ export const TransportHeaderDetailModal: React.FC<
                               })
                             }
                             className="h-8 text-xs text-center px-1"
-                            placeholder="+10"
                           />
                         </td>
 
@@ -789,7 +818,6 @@ export const TransportHeaderDetailModal: React.FC<
                               })
                             }
                             className="h-8 text-xs text-center px-1"
-                            placeholder="5.5"
                           />
                         </td>
 
@@ -807,7 +835,6 @@ export const TransportHeaderDetailModal: React.FC<
                               })
                             }
                             className="h-8 text-xs text-center px-1"
-                            placeholder="100"
                           />
                         </td>
 
@@ -826,7 +853,6 @@ export const TransportHeaderDetailModal: React.FC<
                               })
                             }
                             className="h-8 text-xs text-center px-1"
-                            placeholder="1.2"
                           />
                         </td>
 
@@ -844,7 +870,6 @@ export const TransportHeaderDetailModal: React.FC<
                               })
                             }
                             className="h-8 text-xs text-center px-1"
-                            placeholder="8"
                           />
                         </td>
 
@@ -858,7 +883,7 @@ export const TransportHeaderDetailModal: React.FC<
                                 unloadLocationName: v,
                               })
                             }
-                            placeholder="Nơi dỡ"
+                            placeholder=""
                           />
                         </td>
 
@@ -872,7 +897,7 @@ export const TransportHeaderDetailModal: React.FC<
                               const keepType = validTypes.includes(trip.cargoType) ? trip.cargoType : "";
                               handleUpdateTrip(tIdx, { cargoGroup: v, cargoType: keepType });
                             }}
-                            placeholder="Nhóm hàng"
+                            placeholder=""
                           />
                         </td>
 
@@ -884,7 +909,7 @@ export const TransportHeaderDetailModal: React.FC<
                             onChange={(v) =>
                               handleUpdateTrip(tIdx, { cargoType: v })
                             }
-                            placeholder={trip.cargoGroup ? "Loại hàng" : "Chọn Nhóm trước"}
+                            placeholder=""
                           />
                         </td>
 
@@ -896,7 +921,7 @@ export const TransportHeaderDetailModal: React.FC<
                             onChange={(v) =>
                               handleUpdateTrip(tIdx, { vehicleNo: v })
                             }
-                            placeholder="Số xe"
+                            placeholder=""
                           />
                         </td>
 
@@ -916,7 +941,6 @@ export const TransportHeaderDetailModal: React.FC<
                                 })
                               }
                               className="h-8 text-xs text-center font-bold px-1 w-full"
-                              placeholder="0"
                             />
                           </div>
                         </td>
@@ -968,7 +992,6 @@ export const TransportHeaderDetailModal: React.FC<
                                       }
                                       onClick={(e) => e.stopPropagation()}
                                       className="h-6 w-24 text-[11px] px-1.5 text-center bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700"
-                                      placeholder="1/2…"
                                       title="Chỉ chấp nhận kiểu phân số (ví dụ: 1/2, 2/3)"
                                     />
                                   )}
@@ -1083,7 +1106,6 @@ export const TransportHeaderDetailModal: React.FC<
                   })
                 }
                 className="h-9 text-sm"
-                placeholder="0"
               />
             </div>
 
@@ -1103,7 +1125,6 @@ export const TransportHeaderDetailModal: React.FC<
                   })
                 }
                 className="h-9 text-sm"
-                placeholder="0"
               />
             </div>
 
@@ -1123,7 +1144,6 @@ export const TransportHeaderDetailModal: React.FC<
                   })
                 }
                 className="h-9 text-sm"
-                placeholder="0"
               />
             </div>
 
@@ -1153,7 +1173,7 @@ export const TransportHeaderDetailModal: React.FC<
                 options={operatorOptions}
                 value={sess.operatorBadgeNo}
                 onChange={(v) => handleUpdateSession({ operatorBadgeNo: v })}
-                placeholder="Chọn/nhập số thẻ"
+                placeholder=""
               />
             </div>
 
@@ -1168,7 +1188,6 @@ export const TransportHeaderDetailModal: React.FC<
                 readOnly
                 disabled
                 className="h-9 text-sm bg-gray-100 dark:bg-gray-800 cursor-not-allowed border-gray-200 dark:border-gray-700"
-                placeholder="Tự điền theo thẻ lương"
               />
             </div>
 
@@ -1183,7 +1202,6 @@ export const TransportHeaderDetailModal: React.FC<
                 readOnly
                 disabled
                 className="h-9 text-sm bg-gray-100 dark:bg-gray-800 cursor-not-allowed border-gray-200 dark:border-gray-700"
-                placeholder="Tự điền theo thẻ lương"
               />
             </div>
           </div>

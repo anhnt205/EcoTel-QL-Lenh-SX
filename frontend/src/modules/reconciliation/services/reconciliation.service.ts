@@ -104,22 +104,24 @@ export const reconciliationService = {
       queryParams.deviceIds = params.deviceIds.join(',');
     }
 
-    const response = await axiosInstance.get<ApiResponse<PageResponse<ReconciliationRowResponse>>>(
+    const response = await axiosInstance.get(
       API.RECONCILIATION.SEARCH,
       { params: queryParams }
     );
-    return response.data.result;
+    const res = response.data as any;
+    return res?.data || res?.result || res;
   },
 
   // POST /api/reconciliation/decisions
   saveDecision: async (
     payload: ReconciliationDecisionRequest
   ): Promise<ReconciliationDecisionResponse> => {
-    const response = await axiosInstance.post<ApiResponse<ReconciliationDecisionResponse>>(
+    const response = await axiosInstance.post(
       API.RECONCILIATION.DECISIONS,
       payload
     );
-    return response.data.result;
+    const res = response.data as any;
+    return res?.data || res?.result || res;
   },
 
   // === Đối chiếu sản lượng cũ ===

@@ -15,7 +15,7 @@ export const getLocationColumns = ({
   const columns: ColumnDef<Location, unknown>[] = [
     {
       accessorKey: "name",
-      header: "Tên điểm đổ tải",
+      header: "Tên vị trí",
       meta: { align: "left" },
     },
     {
@@ -65,7 +65,7 @@ export const getLocationColumns = ({
             variant="ghost"
             size="icon"
             onClick={() => onEdit(row.original)}
-            title="Sửa điểm đổ tải"
+            title="Sửa vị trí"
             className="h-8 w-8 text-primary hover:text-primary/80"
           >
             <Pencil className="h-4 w-4" />

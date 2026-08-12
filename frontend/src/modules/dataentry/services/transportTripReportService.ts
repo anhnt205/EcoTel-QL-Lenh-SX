@@ -129,6 +129,16 @@ export interface PageResponse<T> {
   number: number;
 }
 
+export interface TransportReportBulkUpdateItem {
+  id: number;
+  data: TransportReportRequest;
+}
+
+export interface BulkDeleteResponse {
+  requestedCount: number;
+  deletedCount: number;
+}
+
 /**
  * Hàm hỗ trợ map dữ liệu từ TransportSessionDraft (UI Form) thành TransportReportRequest (API Backend)
  */
@@ -432,6 +442,43 @@ export async function deleteTransportReport(
 }
 
 /**
+ * Gọi API POST /api/transport-reports/bulk
+ */
+export async function bulkCreateTransportReports(
+  payloads: TransportReportRequest[],
+): Promise<ApiResponse<TransportReportResponse[]>> {
+  const validatedPayloads = z
+    .array(transportReportRequestSchema)
+    .parse(payloads);
+  const res = await api.post("/transport-reports/bulk", validatedPayloads);
+  return res.data;
+}
+
+/**
+ * Gọi API PUT /api/transport-reports/bulk
+ */
+export async function bulkUpdateTransportReports(
+  items: TransportReportBulkUpdateItem[],
+): Promise<ApiResponse<TransportReportResponse[]>> {
+  const validatedItems = items.map((item) => ({
+    id: item.id,
+    data: transportReportRequestSchema.parse(item.data),
+  }));
+  const res = await api.put("/transport-reports/bulk", validatedItems);
+  return res.data;
+}
+
+/**
+ * Gọi API DELETE /api/transport-reports/bulk
+ */
+export async function bulkDeleteTransportReports(
+  ids: number[],
+): Promise<ApiResponse<BulkDeleteResponse>> {
+  const res = await api.delete("/transport-reports/bulk", { data: { ids } });
+  return res.data;
+}
+
+/**
  * React Query Hooks cho Vận tải
  */
 export function useCreateTransportReportMutation() {
@@ -470,6 +517,44 @@ export function useDeleteTransportReportMutation() {
 
   return useMutation({
     mutationFn: (id: number) => deleteTransportReport(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["transportReports"] });
+      queryClient.invalidateQueries({ queryKey: ["statistics"] });
+    },
+  });
+}
+
+export function useBulkCreateTransportReportMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payloads: TransportReportRequest[]) =>
+      bulkCreateTransportReports(payloads),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["transportReports"] });
+      queryClient.invalidateQueries({ queryKey: ["statistics"] });
+    },
+  });
+}
+
+export function useBulkUpdateTransportReportMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (items: TransportReportBulkUpdateItem[]) =>
+      bulkUpdateTransportReports(items),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["transportReports"] });
+      queryClient.invalidateQueries({ queryKey: ["statistics"] });
+    },
+  });
+}
+
+export function useBulkDeleteTransportReportMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (ids: number[]) => bulkDeleteTransportReports(ids),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["transportReports"] });
       queryClient.invalidateQueries({ queryKey: ["statistics"] });

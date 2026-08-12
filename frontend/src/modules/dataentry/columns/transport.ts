@@ -80,9 +80,9 @@ export const transportColumns: ColumnDef[] = [
   },
   { key: "roda", label: "Roda", type: "text", width: "w-24" },
   { key: "earthDeduction", label: "Trừ vơi", type: "number", width: "w-24" },
-  { key: "initialFuel", label: "NL Tồn đầu (xe)", type: "number", width: "w-32" },
-  { key: "receivedFuel", label: "NL Lĩnh", type: "number", width: "w-28" },
-  { key: "finalFuel", label: "NL Tồn cuối", type: "number", width: "w-28" },
+  { key: "initialFuel", label: "Nhiên liệu tồn đầu (xe)", type: "number", width: "w-32" },
+  { key: "receivedFuel", label: "Nhiên liệu lĩnh", type: "number", width: "w-28" },
+  { key: "finalFuel", label: "Nhiên liệu tồn cuối", type: "number", width: "w-28" },
   {
     key: "fleet",
     label: "Ca xe",

@@ -72,7 +72,7 @@ export const getMiningFuelColumns = (
       <Button
         variant="ghost"
         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        className="h-7 px-1 text-xs font-semibold hover:bg-transparent"
+        className="h-7 px-1 text-sm font-bold hover:bg-transparent"
       >
         Thời gian
         <ArrowUpDown className="ml-1 h-3 w-3" />
@@ -111,14 +111,14 @@ export const getMiningFuelColumns = (
       <Button
         variant="ghost"
         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        className="h-7 px-1 text-xs font-semibold hover:bg-transparent text-blue-700 dark:text-blue-400"
+        className="h-7 px-1 text-sm font-bold hover:bg-transparent"
       >
         Máy xúc
         <ArrowUpDown className="ml-1 h-3 w-3" />
       </Button>
     ),
     cell: ({ row }) => (
-      <span className="font-semibold text-blue-700 dark:text-blue-400">
+      <span className="font-medium">
         {row.original.mineCode || "P15"}
       </span>
     ),
@@ -166,33 +166,33 @@ export const getMiningFuelColumns = (
   {
     accessorKey: "initialFuel",
     id: "initialFuel",
-    header: "NL tồn đầu (lít)",
+    header: "Nhiên liệu tồn đầu (lít)",
     cell: ({ row }) => (
       <span className="font-medium">{row.original.initialFuel ?? 150}</span>
     ),
-    size: 145,
+    size: 175,
   },
   {
     accessorKey: "receivedFuel",
     id: "receivedFuel",
-    header: "NL lĩnh (lít)",
+    header: "Nhiên liệu lĩnh (lít)",
     cell: ({ row }) => (
       <span className="font-medium">{row.original.receivedFuel ?? 200}</span>
     ),
-    size: 125,
+    size: 160,
   },
   {
     accessorKey: "finalFuel",
     id: "finalFuel",
-    header: "NL tồn cuối (lít)",
+    header: "Nhiên liệu tồn cuối (lít)",
     cell: ({ row }) => (
       <span className="font-medium">{row.original.finalFuel ?? 120}</span>
     ),
-    size: 125,
+    size: 175,
   },
   {
     id: "fuelConsumption",
-    header: "NL sử dụng (lít)",
+    header: "Nhiên liệu sử dụng (lít)",
     cell: ({ row }) => {
       const fuelUsed =
         row.original.fuelConsumption ??
@@ -203,7 +203,7 @@ export const getMiningFuelColumns = (
             (Number(row.original.finalFuel) || 120),
         );
       return (
-        <span className="font-bold text-blue-700 dark:text-blue-400">
+        <span className="font-semibold">
           {fuelUsed}
         </span>
       );

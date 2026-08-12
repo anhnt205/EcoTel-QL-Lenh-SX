@@ -76,7 +76,7 @@ export const MiningTripsDataTable: React.FC<MiningTripsDataTableProps> = ({
     getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
-    getRowId: (row) => row.id || "",
+    getRowId: (row, relativeIndex) => `${row.id || "trip"}_t_${relativeIndex}`,
     initialState: {
       pagination: {
         pageSize: 20,
@@ -147,7 +147,7 @@ export const MiningTripsDataTable: React.FC<MiningTripsDataTableProps> = ({
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow
                 key={headerGroup.id}
-                className="bg-gray-50 dark:bg-gray-900/80 text-gray-700 dark:text-gray-300 text-[11px] font-semibold border-b border-gray-200 dark:border-gray-800"
+                className="bg-gray-50 dark:bg-gray-900/80 text-gray-800 dark:text-gray-100 text-sm font-bold border-b border-gray-200 dark:border-gray-800"
               >
                 {headerGroup.headers.map((header) => (
                   <TableHead

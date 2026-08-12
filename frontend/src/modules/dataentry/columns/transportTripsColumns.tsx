@@ -72,7 +72,7 @@ export const getTransportTripsColumns = (
       <Button
         variant="ghost"
         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        className="h-7 px-1 text-xs font-semibold hover:bg-transparent"
+        className="h-7 px-1 text-sm font-bold hover:bg-transparent"
       >
         Thời gian
         <ArrowUpDown className="ml-1 h-3 w-3" />
@@ -91,7 +91,7 @@ export const getTransportTripsColumns = (
       <Button
         variant="ghost"
         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        className="h-7 px-1 text-xs font-semibold hover:bg-transparent"
+        className="h-7 px-1 text-sm font-bold hover:bg-transparent"
       >
         Ca
         <ArrowUpDown className="ml-1 h-3 w-3" />
@@ -117,14 +117,14 @@ export const getTransportTripsColumns = (
       <Button
         variant="ghost"
         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        className="h-7 px-1 text-xs font-semibold hover:bg-transparent text-blue-700 dark:text-blue-400"
+        className="h-7 px-1 text-sm font-bold hover:bg-transparent"
       >
         Máy xúc
         <ArrowUpDown className="ml-1 h-3 w-3" />
       </Button>
     ),
     cell: ({ row }) => (
-      <span className="font-semibold text-blue-700 dark:text-blue-400">
+      <span className="font-medium">
         {row.original.excavatorEquipment || "KC-MX01"}
       </span>
     ),
@@ -167,35 +167,35 @@ export const getTransportTripsColumns = (
     id: "fullRouteDistance",
     header: "Cung độ toàn tuyến (km)",
     cell: ({ row }) => row.original.fullRouteDistance ?? 5.5,
-    size: 125,
+    size: 175,
   },
   {
     accessorKey: "fullRouteElevate",
     id: "fullRouteElevate",
     header: "Nâng tải toàn tuyến (m)",
     cell: ({ row }) => row.original.fullRouteElevate ?? 100,
-    size: 125,
+    size: 175,
   },
   {
     accessorKey: "localSlopeDist",
     id: "localSlopeDist",
     header: "Cung độ dốc cục bộ (km)",
     cell: ({ row }) => row.original.localSlopeDist ?? 1.2,
-    size: 125,
+    size: 175,
   },
   {
     accessorKey: "localSlopeDegree",
     id: "localSlopeDegree",
     header: "Dốc cục bộ (m)",
     cell: ({ row }) => row.original.localSlopeDegree ?? 8,
-    size: 100,
+    size: 135,
   },
   {
     accessorKey: "unloadLocationName",
     id: "unloadLocationName",
     header: "Nơi dỡ tải",
     cell: ({ row }) => row.original.unloadLocationName || "Đá",
-    size: 110,
+    size: 135,
   },
   {
     accessorKey: "cargoType",
@@ -221,7 +221,7 @@ export const getTransportTripsColumns = (
       <Button
         variant="ghost"
         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        className="h-7 px-1 text-xs font-semibold hover:bg-transparent"
+        className="h-7 px-1 text-sm font-bold hover:bg-transparent"
       >
         Số xe
         <ArrowUpDown className="ml-1 h-3 w-3" />
@@ -242,14 +242,14 @@ export const getTransportTripsColumns = (
       <Button
         variant="ghost"
         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        className="h-7 px-1 text-xs font-semibold hover:bg-transparent text-blue-700 dark:text-blue-300"
+        className="h-7 px-1 text-sm font-bold hover:bg-transparent"
       >
         Số chuyến
         <ArrowUpDown className="ml-1 h-3 w-3" />
       </Button>
     ),
     cell: ({ row }) => (
-      <span className="font-bold text-blue-700 dark:text-blue-300">
+      <span>
         {row.original.tripCount ?? 8}
       </span>
     ),

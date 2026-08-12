@@ -546,7 +546,7 @@ function AppDataTable<TData>({
                           ).minSize,
                         }}
                         className={cn(
-                          "relative px-4 py-3.5 font-bold text-slate-700 dark:text-slate-200 text-[12px] uppercase tracking-wider whitespace-nowrap border-r border-border/70 last:border-r-0 overflow-hidden text-ellipsis align-middle",
+                          "relative px-4 py-3.5 font-bold text-slate-800 dark:text-slate-100 text-sm uppercase tracking-wider whitespace-nowrap border-r border-border/70 last:border-r-0 overflow-hidden text-ellipsis align-middle",
                           alignClass,
                           meta?.headerClassName || meta?.className
                         )}

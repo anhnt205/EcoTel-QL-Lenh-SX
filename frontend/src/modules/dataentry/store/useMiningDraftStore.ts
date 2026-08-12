@@ -57,6 +57,7 @@ interface MiningDraftStore {
   addTripRow: () => void;
   removeTripRow: (tIdx: number) => boolean;
   loadSessionForEdit: (draft: MiningSessionDraft) => void;
+  loadSessionsForEdit: (drafts: MiningSessionDraft[]) => void;
   validateAllSessions: () => {
     isValid: boolean;
     firstErrorMsg?: string;
@@ -199,6 +200,13 @@ export const useMiningDraftStore = create<MiningDraftStore>((set, get) => ({
     });
   },
 
+  loadSessionsForEdit: (drafts: MiningSessionDraft[]) => {
+    set({
+      sessions: drafts.length > 0 ? drafts : [createDefaultSession()],
+      activeIdx: 0,
+    });
+  },
+
   validateAllSessions: () => {
     const { sessions } = get();
     for (let i = 0; i < sessions.length; i++) {
@@ -229,25 +237,25 @@ export const useMiningDraftStore = create<MiningDraftStore>((set, get) => ({
     let points = 0;
     const total = 9;
 
-    if (sess.workingDate?.trim()) points++;
-    if (sess.shift?.trim()) points++;
-    if (sess.pickupLocation?.trim()) points++;
-    if (sess.excavator?.trim()) points++;
+    if (String(sess.workingDate ?? "").trim()) points++;
+    if (String(sess.shift ?? "").trim()) points++;
+    if (String(sess.pickupLocation ?? "").trim()) points++;
+    if (String(sess.excavator ?? "").trim()) points++;
     if (sess.totalScoops !== "" && Number(sess.totalScoops) > 0) points++;
     if (sess.initialFuel !== "" && Number(sess.initialFuel) >= 0) points++;
     if (sess.receivedFuel !== "" && Number(sess.receivedFuel) >= 0) points++;
     if (sess.finalFuel !== "" && Number(sess.finalFuel) >= 0) points++;
-    if (sess.operatorBadgeNo?.trim()) points++;
+    if (String(sess.operatorBadgeNo ?? "").trim()) points++;
 
     const tripRatio =
       sess.trips.length > 0
         ? sess.trips.filter((t) => {
-            const hasVehicle = Boolean(t.vehicleNo?.trim());
-            const hasMaterial = Boolean(t.material?.trim());
+            const hasVehicle = Boolean(String(t.vehicleNo ?? "").trim());
+            const hasMaterial = Boolean(String(t.material ?? "").trim());
             const hasValidTripCount = Number(t.tripCount) >= 1;
             let hasValidNote = true;
             if (t.loadStatus === "Khác") {
-              const note = t.loadStatusNote?.trim().replace(/\s+/g, "") || "";
+              const note = String(t.loadStatusNote ?? "").trim().replace(/\s+/g, "");
               hasValidNote = Boolean(note) && /^\d+\/[1-9]\d*$/.test(note);
             }
             return hasVehicle && hasMaterial && hasValidTripCount && hasValidNote;

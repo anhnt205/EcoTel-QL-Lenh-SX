@@ -31,7 +31,10 @@ import {
   buildExcavationReportRequest,
   useCreateExcavationTripReportMutation,
   useUpdateExcavationTripReportMutation,
+  useBulkCreateExcavationTripReportMutation,
+  useBulkUpdateExcavationTripReportMutation,
   type ExcavationTripReportRequest,
+  type ExcavationReportBulkUpdateItem,
 } from "@/modules/dataentry/services/excavationTripReportService.ts";
 
 // ─── Tải trọng options – radio buttons trong bảng chuyến ─────────────────
@@ -121,6 +124,8 @@ export const MiningBatchEntryModal: React.FC<MiningBatchEntryModalProps> = ({
 
   const createReportMutation = useCreateExcavationTripReportMutation();
   const updateReportMutation = useUpdateExcavationTripReportMutation();
+  const bulkCreateReportMutation = useBulkCreateExcavationTripReportMutation();
+  const bulkUpdateReportMutation = useBulkUpdateExcavationTripReportMutation();
 
   const {
     sessions,
@@ -141,15 +146,6 @@ export const MiningBatchEntryModal: React.FC<MiningBatchEntryModalProps> = ({
 
   const batchProgress = getBatchProgress();
   const tableBottomRef = useRef<HTMLDivElement>(null);
-
-  // Reset khi mở modal – chỉ chạy khi isOpen chuyển từ false → true
-  const prevIsOpenRef = useRef(false);
-  useEffect(() => {
-    if (isOpen && !prevIsOpenRef.current) {
-      initDrafts();
-    }
-    prevIsOpenRef.current = isOpen;
-  }, [isOpen, initDrafts]);
 
   // ── Cập nhật session header ─────────────────────────────────────────────
   const handleUpdateSession = useCallback(
@@ -224,26 +220,60 @@ export const MiningBatchEntryModal: React.FC<MiningBatchEntryModalProps> = ({
     let apiSuccessCount = 0;
     const apiErrors: string[] = [];
 
-    // Gọi API POST / PUT /api/excavation-reports sử dụng React Query Mutation
+    // Tách danh sách bản ghi tạo mới và bản ghi cập nhật
+    const createItems: ExcavationTripReportRequest[] = [];
+    const updateItems: ExcavationReportBulkUpdateItem[] = [];
+
     for (let i = 0; i < payloads.length; i++) {
       const sess = sessions[i];
+      if (sess.reportId) {
+        updateItems.push({
+          id: sess.reportId,
+          data: payloads[i],
+        });
+      } else {
+        createItems.push(payloads[i]);
+      }
+    }
+
+    // Gọi API Tạo mới (đơn lẻ hoặc bulk)
+    if (createItems.length > 0) {
       try {
-        if (sess.reportId) {
-          await updateReportMutation.mutateAsync({
-            id: sess.reportId,
-            payload: payloads[i],
-          });
+        if (createItems.length === 1) {
+          await createReportMutation.mutateAsync(createItems[0]);
         } else {
-          await createReportMutation.mutateAsync(payloads[i]);
+          await bulkCreateReportMutation.mutateAsync(createItems);
         }
-        apiSuccessCount++;
+        apiSuccessCount += createItems.length;
       } catch (err: any) {
-        console.error(`[API Error] Lỗi khi gửi báo cáo ca ${i + 1}:`, err);
+        console.error("[API Create Error] Lỗi khi tạo mới báo cáo:", err);
         const msg =
           err.response?.data?.message ||
           err.message ||
           "Lỗi kết nối máy chủ API";
-        apiErrors.push(`Ca ${i + 1}: ${msg}`);
+        apiErrors.push(`Tạo mới (${createItems.length} bản ghi): ${msg}`);
+      }
+    }
+
+    // Gọi API Cập nhật (đơn lẻ hoặc bulk)
+    if (updateItems.length > 0) {
+      try {
+        if (updateItems.length === 1) {
+          await updateReportMutation.mutateAsync({
+            id: updateItems[0].id,
+            payload: updateItems[0].data,
+          });
+        } else {
+          await bulkUpdateReportMutation.mutateAsync(updateItems);
+        }
+        apiSuccessCount += updateItems.length;
+      } catch (err: any) {
+        console.error("[API Update Error] Lỗi khi cập nhật báo cáo:", err);
+        const msg =
+          err.response?.data?.message ||
+          err.message ||
+          "Lỗi kết nối máy chủ API";
+        apiErrors.push(`Cập nhật (${updateItems.length} bản ghi): ${msg}`);
       }
     }
 
@@ -499,7 +529,7 @@ export const MiningBatchEntryModal: React.FC<MiningBatchEntryModalProps> = ({
                 onValueChange={(v) => handleUpdateSession({ shift: v })}
               >
                 <SelectTrigger className="h-9 text-sm w-full">
-                  <SelectValue placeholder="Chọn ca" />
+                  <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="z-[110]">
                   {shiftOptions.map((s) => (
@@ -523,7 +553,7 @@ export const MiningBatchEntryModal: React.FC<MiningBatchEntryModalProps> = ({
                 options={locationValues}
                 value={sess.pickupLocation}
                 onChange={(v) => handleUpdateSession({ pickupLocation: v })}
-                placeholder="Chọn/nhập Nơi chất tải"
+                placeholder=""
               />
             </div>
 
@@ -536,7 +566,7 @@ export const MiningBatchEntryModal: React.FC<MiningBatchEntryModalProps> = ({
                 options={excavatorValues}
                 value={sess.excavator}
                 onChange={(v) => handleUpdateSession({ excavator: v })}
-                placeholder="Chọn/nhập máy xúc"
+                placeholder=""
               />
             </div>
 
@@ -556,7 +586,6 @@ export const MiningBatchEntryModal: React.FC<MiningBatchEntryModalProps> = ({
                   })
                 }
                 className="h-9 text-sm"
-                placeholder="0"
               />
             </div>
           </div>
@@ -584,30 +613,30 @@ export const MiningBatchEntryModal: React.FC<MiningBatchEntryModalProps> = ({
 
             {/* Bảng */}
             <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-x-auto">
-              <table className="w-full text-xs border-collapse min-w-[860px]">
+              <table className="w-full text-xs border-collapse min-w-[1020px]">
                 <thead>
-                  <tr className="bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300 text-[11px] font-semibold">
+                  <tr className="bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-100 text-sm font-bold border-b border-gray-200 dark:border-gray-700">
                     <th className="px-3 py-2.5 border-r border-b border-gray-200 dark:border-gray-700 text-center w-10">
                       STT
                     </th>
-                    <th className="px-3 py-2.5 border-r border-b border-gray-200 dark:border-gray-700 text-left min-w-[130px]">
+                    <th className="px-3 py-2.5 border-r border-b border-gray-200 dark:border-gray-700 text-left min-w-[145px]">
                       Số xe <span className="text-red-500">*</span>
                     </th>
-                    <th className="px-3 py-2.5 border-r border-b border-gray-200 dark:border-gray-700 text-center w-24">
+                    <th className="px-3 py-2.5 border-r border-b border-gray-200 dark:border-gray-700 text-center min-w-[110px]">
                       Số chuyến <span className="text-red-500">*</span>
                     </th>
-                    <th className="px-3 py-2.5 border-r border-b border-gray-200 dark:border-gray-700 text-left min-w-[160px]">
+                    <th className="px-3 py-2.5 border-r border-b border-gray-200 dark:border-gray-700 text-left min-w-[170px]">
                       Loại hàng <span className="text-red-500">*</span>
                     </th>
-                    <th className="px-3 py-2.5 border-r border-b border-gray-200 dark:border-gray-700 text-center min-w-[280px]">
+                    <th className="px-3 py-2.5 border-r border-b border-gray-200 dark:border-gray-700 text-center min-w-[300px]">
                       Tải trọng <span className="text-red-500">*</span>
                     </th>
-                    <th className="px-3 py-2.5 border-r border-b border-gray-200 dark:border-gray-700 text-center min-w-[150px]">
+                    <th className="px-3 py-2.5 border-r border-b border-gray-200 dark:border-gray-700 text-center min-w-[170px]">
                       Đơn vị quản lý
                       <br />
                       thiết bị
                     </th>
-                    <th className="px-3 py-2.5 border-r border-b border-gray-200 dark:border-gray-700 text-center min-w-[120px]">
+                    <th className="px-3 py-2.5 border-r border-b border-gray-200 dark:border-gray-700 text-center min-w-[140px]">
                       Chủng loại xe
                     </th>
                     <th className="px-2 py-2.5 border-b border-gray-200 dark:border-gray-700 text-center w-10" />
@@ -637,7 +666,7 @@ export const MiningBatchEntryModal: React.FC<MiningBatchEntryModalProps> = ({
                           onChange={(v) =>
                             handleUpdateTrip(tIdx, { vehicleNo: v })
                           }
-                          placeholder="Số xe"
+                          placeholder=""
                         />
                       </td>
 
@@ -656,7 +685,6 @@ export const MiningBatchEntryModal: React.FC<MiningBatchEntryModalProps> = ({
                             })
                           }
                           className="h-8 text-xs text-center"
-                          placeholder="0"
                         />
                       </td>
 
@@ -668,7 +696,7 @@ export const MiningBatchEntryModal: React.FC<MiningBatchEntryModalProps> = ({
                           onChange={(v) =>
                             handleUpdateTrip(tIdx, { material: v })
                           }
-                          placeholder="Loại hàng"
+                          placeholder=""
                         />
                       </td>
 
@@ -715,7 +743,6 @@ export const MiningBatchEntryModal: React.FC<MiningBatchEntryModalProps> = ({
                                     }
                                     onClick={(e) => e.stopPropagation()}
                                     className="h-6 w-20 text-[11px] ml-1 px-1.5"
-                                    placeholder="1/2…"
                                     title="Chỉ chấp nhận kiểu phân số (ví dụ: 1/2, 2/3)"
                                   />
                                 )}
@@ -796,7 +823,6 @@ export const MiningBatchEntryModal: React.FC<MiningBatchEntryModalProps> = ({
                   })
                 }
                 className="h-9 text-sm"
-                placeholder="0"
               />
             </div>
 
@@ -816,7 +842,6 @@ export const MiningBatchEntryModal: React.FC<MiningBatchEntryModalProps> = ({
                   })
                 }
                 className="h-9 text-sm"
-                placeholder="0"
               />
             </div>
 
@@ -837,7 +862,6 @@ export const MiningBatchEntryModal: React.FC<MiningBatchEntryModalProps> = ({
                   })
                 }
                 className="h-9 text-sm"
-                placeholder="0"
               />
             </div>
 
@@ -867,7 +891,7 @@ export const MiningBatchEntryModal: React.FC<MiningBatchEntryModalProps> = ({
                 options={operatorOptions}
                 value={sess.operatorBadgeNo}
                 onChange={(v) => handleUpdateSession({ operatorBadgeNo: v })}
-                placeholder="Chọn/nhập số thẻ"
+                placeholder=""
               />
             </div>
 
@@ -882,7 +906,6 @@ export const MiningBatchEntryModal: React.FC<MiningBatchEntryModalProps> = ({
                 readOnly
                 disabled
                 className="h-9 text-sm bg-gray-100 dark:bg-gray-800 cursor-not-allowed border-gray-200 dark:border-gray-700"
-                placeholder="Tự điền theo thẻ lương"
               />
             </div>
 
@@ -897,7 +920,6 @@ export const MiningBatchEntryModal: React.FC<MiningBatchEntryModalProps> = ({
                 readOnly
                 disabled
                 className="h-9 text-sm bg-gray-100 dark:bg-gray-800 cursor-not-allowed border-gray-200 dark:border-gray-700"
-                placeholder="Tự điền theo thẻ lương"
               />
             </div>
           </div>

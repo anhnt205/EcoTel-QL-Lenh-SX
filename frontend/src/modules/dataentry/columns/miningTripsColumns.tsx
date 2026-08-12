@@ -72,7 +72,7 @@ export const getMiningTripsColumns = (
       <Button
         variant="ghost"
         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        className="h-7 px-1 text-xs font-semibold hover:bg-transparent"
+        className="h-7 px-1 text-sm font-bold hover:bg-transparent"
       >
         Thời gian
         <ArrowUpDown className="ml-1 h-3 w-3" />
@@ -91,7 +91,7 @@ export const getMiningTripsColumns = (
       <Button
         variant="ghost"
         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        className="h-7 px-1 text-xs font-semibold hover:bg-transparent"
+        className="h-7 px-1 text-sm font-bold hover:bg-transparent"
       >
         Ca
         <ArrowUpDown className="ml-1 h-3 w-3" />
@@ -121,14 +121,14 @@ export const getMiningTripsColumns = (
       <Button
         variant="ghost"
         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        className="h-7 px-1 text-xs font-semibold hover:bg-transparent text-blue-700 dark:text-blue-400"
+        className="h-7 px-1 text-sm font-bold hover:bg-transparent"
       >
         Máy xúc
         <ArrowUpDown className="ml-1 h-3 w-3" />
       </Button>
     ),
     cell: ({ row }) => (
-      <span className="font-semibold text-blue-700 dark:text-blue-400">
+      <span className="font-medium">
         {row.original.mineCode || "P15"}
       </span>
     ),
@@ -149,7 +149,7 @@ export const getMiningTripsColumns = (
       <Button
         variant="ghost"
         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        className="h-7 px-1 text-xs font-semibold hover:bg-transparent"
+        className="h-7 px-1 text-sm font-bold hover:bg-transparent"
       >
         Số xe
         <ArrowUpDown className="ml-1 h-3 w-3" />
@@ -170,14 +170,14 @@ export const getMiningTripsColumns = (
       <Button
         variant="ghost"
         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        className="h-7 px-1 text-xs font-semibold hover:bg-transparent text-blue-700 dark:text-blue-300"
+        className="h-7 px-1 text-sm font-bold hover:bg-transparent"
       >
         Số chuyến
         <ArrowUpDown className="ml-1 h-3 w-3" />
       </Button>
     ),
     cell: ({ row }) => (
-      <span className="font-bold text-blue-700 dark:text-blue-300">
+      <span>
         {row.original.tripCount ?? 6}
       </span>
     ),

@@ -622,3 +622,66 @@ export const getReconciliationItems = (
 
   return Array.from(itemsMap.values());
 };
+
+// ─── Standard Trip Reports (Báo chuyến chốt chuẩn) ───────────────────────────
+const APPROVED_TRIP_KEY = "thongke_approved_trip_reports_v1";
+
+export interface StandardTripReport {
+  id: string;
+  reportDate: string;
+  shift: string;
+  vehicleNo: string;
+  excavationArea?: string;
+  excavatorEquipment: string;
+  pickupLocation: string;
+  pickupBench?: string;
+  unloadLocationName: string;
+  unloadBench?: string;
+  fullRouteDistance?: number;
+  fullRouteElevate?: number;
+  localSlopeDist?: number;
+  localSlopeDegree?: number;
+  operatorBadgeNo?: string;
+  isRainyDay?: boolean;
+  isTraineeVehicle?: boolean;
+  finalOption: "TRANSPORT" | "EXCAVATION" | "OTHER";
+  finalOptionLabel: string;
+  cargoType: string;
+  tripCount: number;
+  loadStatus: string;
+  approvedAt: string;
+  status: "Đã chốt";
+}
+
+
+
+export const getApprovedTripReports = (): StandardTripReport[] => {
+  try {
+    const raw = localStorage.getItem(APPROVED_TRIP_KEY);
+    if (!raw) return [];
+    return JSON.parse(raw);
+  } catch (e) {
+    console.error("Error reading approved trip reports:", e);
+    return [];
+  }
+};
+
+export const saveApprovedTripReports = (reports: StandardTripReport[]): void => {
+  try {
+    localStorage.setItem(APPROVED_TRIP_KEY, JSON.stringify(reports));
+  } catch (e) {
+    console.error("Error saving approved trip reports:", e);
+  }
+};
+
+export const addApprovedTripReport = (report: StandardTripReport): void => {
+  const existing = getApprovedTripReports();
+  const index = existing.findIndex((item) => item.id === report.id);
+  if (index >= 0) {
+    existing[index] = report;
+  } else {
+    existing.unshift(report);
+  }
+  saveApprovedTripReports(existing);
+};
+

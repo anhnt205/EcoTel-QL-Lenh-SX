@@ -51,22 +51,22 @@ const COMMON_INFO_COL_WIDTH = 500;
 /** Chiều rộng từng sub-field bên trong khối cuộn ẩn */
 const SUB_FIELD_WIDTHS: Record<string, number> = {
   select: 40,
-  stt: 45,
-  date: 95,
-  shift: 60,
-  vehicleNo: 90,
-  excavationArea: 95,
-  excavatorEquipment: 80,
-  pickupLocation: 95,
-  unloadBench: 75,
-  pickupBenchGroup: 85,
-  fullRouteDistance: 80,
-  fullRouteElevate: 95,
-  localSlopeDist: 80,
-  localSlopeDegree: 70,
-  unloadLocationName: 95,
-  isRainyDay: 65,
-  isTraineeVehicle: 65,
+  stt: 50,
+  date: 125,
+  shift: 70,
+  vehicleNo: 110,
+  excavationArea: 130,
+  excavatorEquipment: 120,
+  pickupLocation: 130,
+  unloadBench: 100,
+  pickupBenchGroup: 140,
+  fullRouteDistance: 145,
+  fullRouteElevate: 145,
+  localSlopeDist: 145,
+  localSlopeDegree: 130,
+  unloadLocationName: 125,
+  isRainyDay: 85,
+  isTraineeVehicle: 85,
 };
 
 // ─── Sub-field definitions for THÔNG TIN CHUNG ──────────────────────────────
@@ -280,7 +280,7 @@ const CommonInfoCell: React.FC<CommonInfoCellProps> = ({
 // ─── Memoized Final Choice Cell ──────────────────────────────────────────────
 interface FinalChoiceCellProps {
   item: ReconciliationItem;
-  initialChoice: "VT" | "KT" | "OTHER";
+  initialChoice: "VT" | "KT" | "OTHER" | null;
   initialCustom: { cargo: string; trips: number; loadStatus: string };
   isMatched: boolean;
   onChoiceChange: (
@@ -292,7 +292,7 @@ interface FinalChoiceCellProps {
 
 const FinalChoiceCell = React.memo<FinalChoiceCellProps>(
   ({ item, initialChoice, initialCustom, onChoiceChange }) => {
-    const [choice, setChoice] = useState<"VT" | "KT" | "OTHER">(initialChoice);
+    const [choice, setChoice] = useState<"VT" | "KT" | "OTHER" | null>(initialChoice);
     const [custom, setCustom] = useState(initialCustom);
 
     useEffect(() => {
@@ -313,9 +313,12 @@ const FinalChoiceCell = React.memo<FinalChoiceCellProps>(
 
     const handleCustomChange = useCallback(
       (field: "cargo" | "trips" | "loadStatus", val: any) => {
+        const activeChoice = choice;
         setCustom((prev) => {
           const next = { ...prev, [field]: val };
-          onChoiceChange(item.id, choice, next);
+          if (activeChoice !== null) {
+            onChoiceChange(item.id, activeChoice, next);
+          }
           return next;
         });
       },
@@ -329,8 +332,8 @@ const FinalChoiceCell = React.memo<FinalChoiceCellProps>(
           <label
             className={`inline-flex items-center gap-1 px-1.5 py-1 rounded-md text-xs font-semibold cursor-pointer select-none transition-all border ${
               choice === "VT"
-                ? "bg-blue-100/90 text-blue-900 border-blue-400 dark:bg-blue-950/80 dark:text-blue-200 dark:border-blue-700 shadow-2xs"
-                : "border-transparent text-gray-600 hover:bg-blue-50/60 dark:hover:bg-blue-950/30"
+                ? "bg-emerald-100/90 text-emerald-900 border-emerald-400 dark:bg-emerald-950/80 dark:text-emerald-200 dark:border-emerald-700 shadow-2xs"
+                : "border-transparent text-gray-600 hover:bg-emerald-50/60 dark:hover:bg-emerald-950/30"
             }`}
           >
             <input
@@ -338,7 +341,7 @@ const FinalChoiceCell = React.memo<FinalChoiceCellProps>(
               name={`choice_${item.id}`}
               checked={choice === "VT"}
               onChange={() => handleRadioChange("VT")}
-              className="accent-blue-600 w-3.5 h-3.5 cursor-pointer"
+              className="accent-emerald-600 w-3.5 h-3.5 cursor-pointer"
             />
             <span>Vận tải</span>
           </label>
@@ -450,34 +453,23 @@ const FinalChoiceCell = React.memo<FinalChoiceCellProps>(
 interface ReconciliationComparisonTablesProps {
   items: ReconciliationItem[];
   onDeleteItem?: (id: string) => void;
+  onChoicesChange?: (
+    choices: Record<string, "VT" | "KT" | "OTHER">,
+    customFields: Record<
+      string,
+      { cargo: string; trips: number; loadStatus: string }
+    >,
+  ) => void;
 }
 
 export const ReconciliationComparisonTables: React.FC<
   ReconciliationComparisonTablesProps
-> = ({ items, onDeleteItem }) => {
+> = ({ items, onDeleteItem, onChoicesChange }) => {
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
 
-  // Track user choice for "DỮ LIỆU CHUẨN CUỐI": 'VT' | 'KT' | 'OTHER'
+  // Track user choice for "DỮ LIỆU CHUẨN CUỐI": 'VT' | 'KT' | 'OTHER' (Mặc định không chọn sẵn)
   const [choices, setChoices] = useState<Record<string, "VT" | "KT" | "OTHER">>(
-    () => {
-      const initial: Record<string, "VT" | "KT" | "OTHER"> = {};
-      items.forEach((item) => {
-        const t = item.transportRecord;
-        const m = item.miningRecord;
-        const isMismatch =
-          !t ||
-          !m ||
-          (t.tripCount ?? 0) !== (m.tripCount ?? 0) ||
-          (t.cargoType || "") !== (m.material || m.loadStatus || "");
-
-        if (isMismatch) {
-          initial[item.id] = "OTHER";
-        } else {
-          initial[item.id] = "VT";
-        }
-      });
-      return initial;
-    },
+    () => ({}),
   );
 
   // Track custom fields when 'OTHER' is chosen
@@ -506,12 +498,17 @@ export const ReconciliationComparisonTables: React.FC<
       choice: "VT" | "KT" | "OTHER",
       custom: { cargo: string; trips: number; loadStatus: string },
     ) => {
-      setChoices((prev) =>
-        prev[id] === choice ? prev : { ...prev, [id]: choice },
-      );
-      setCustomFields((prev) => ({ ...prev, [id]: custom }));
+      setChoices((prev) => {
+        const nextChoices = { ...prev, [id]: choice };
+        setCustomFields((prevCustom) => {
+          const nextCustom = { ...prevCustom, [id]: custom };
+          onChoicesChange?.(nextChoices, nextCustom);
+          return nextCustom;
+        });
+        return nextChoices;
+      });
     },
-    [],
+    [onChoicesChange],
   );
 
   const isMatched = useCallback((item: ReconciliationItem) => {
@@ -661,7 +658,7 @@ export const ReconciliationComparisonTables: React.FC<
             header: "Loại hàng",
             cell: ({ row }) =>
               row.original.transportRecord?.cargoType || "-",
-            size: 75,
+            size: 95,
           },
           {
             id: "transTrips",
@@ -671,7 +668,7 @@ export const ReconciliationComparisonTables: React.FC<
                 {row.original.transportRecord?.tripCount ?? "-"}
               </span>
             ),
-            size: 65,
+            size: 90,
           },
           {
             id: "transLoadStatus",
@@ -686,14 +683,14 @@ export const ReconciliationComparisonTables: React.FC<
                 "-"
               );
             },
-            size: 75,
+            size: 95,
           },
           {
             id: "transBadgeNo",
             header: "Số thẻ lương",
             cell: ({ row }) =>
               row.original.transportRecord?.operatorBadgeNo || "-",
-            size: 75,
+            size: 100,
           },
         ],
       },
@@ -710,7 +707,7 @@ export const ReconciliationComparisonTables: React.FC<
               row.original.miningRecord?.material ||
               row.original.miningRecord?.loadStatus ||
               "-",
-            size: 75,
+            size: 95,
           },
           {
             id: "miningTrips",
@@ -720,7 +717,7 @@ export const ReconciliationComparisonTables: React.FC<
                 {row.original.miningRecord?.tripCount ?? "-"}
               </span>
             ),
-            size: 65,
+            size: 90,
           },
           {
             id: "miningLoadStatus",
@@ -735,14 +732,14 @@ export const ReconciliationComparisonTables: React.FC<
                 "-"
               );
             },
-            size: 75,
+            size: 95,
           },
           {
             id: "miningBadgeNo",
             header: "Số thẻ lương",
             cell: ({ row }) =>
               row.original.miningRecord?.operatorBadgeNo || "-",
-            size: 75,
+            size: 100,
           },
         ],
       },
@@ -763,7 +760,7 @@ export const ReconciliationComparisonTables: React.FC<
               ) : (
                 <span className="text-gray-400 font-bold">-</span>
               ),
-            size: 50,
+            size: 65,
           },
           {
             id: "mismatched",
@@ -776,7 +773,7 @@ export const ReconciliationComparisonTables: React.FC<
               ) : (
                 <span className="text-gray-400 font-bold">-</span>
               ),
-            size: 60,
+            size: 75,
           },
         ],
       },
@@ -784,7 +781,14 @@ export const ReconciliationComparisonTables: React.FC<
       // 5. DỮ LIỆU CHUẨN CUỐI (Chọn 1 trong 3 phương án)
       {
         id: "group_final_decision",
-        header: "DỮ LIỆU CHUẨN CUỐI (Chọn 1 trong 3 phương án)",
+        header: () => (
+          <div>
+            <div>DỮ LIỆU CHUẨN CUỐI</div>
+            <div className="text-xs font-normal text-gray-500 dark:text-gray-400 mt-0.5">
+              (Chọn 1 trong 3 phương án)
+            </div>
+          </div>
+        ),
         columns: [
           {
             id: "finalChoice",
@@ -792,8 +796,7 @@ export const ReconciliationComparisonTables: React.FC<
             cell: ({ row }) => {
               const item = row.original;
               const matched = isMatched(item);
-              const initialChoice =
-                choicesRef.current[item.id] || (matched ? "VT" : "OTHER");
+              const initialChoice = choicesRef.current[item.id] || null;
               const initialCustom = customFieldsRef.current[item.id] || {
                 cargo:
                   item.miningRecord?.material ||
@@ -893,17 +896,42 @@ export const ReconciliationComparisonTables: React.FC<
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow
                 key={headerGroup.id}
-                className={
-                  headerGroup.depth === 0
-                    ? "bg-gray-100/90 dark:bg-gray-800/90 text-gray-800 dark:text-gray-200 text-xs font-bold border-b border-gray-200 dark:border-gray-800"
-                    : "bg-gray-50 dark:bg-gray-900 text-gray-700 dark:text-gray-300 text-xs font-semibold border-b border-gray-200 dark:border-gray-800"
-                }
+                className="border-b border-gray-200 dark:border-gray-800 text-sm font-bold"
               >
                 {headerGroup.headers.map((header) => {
                   const isTopLevelGroup = header.depth === 0;
                   const isActionCol = header.column.id === "actions";
                   const isCommonInfoPanel =
                     header.column.id === "common_info_panel";
+
+                  const colId = header.column.id;
+
+                  // Distinct color styling ONLY for top-level group headers (row 1)
+                  let colorClass = "bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-200";
+                  if (isTopLevelGroup) {
+                    switch (colId) {
+                      case "group_common_info":
+                        colorClass = "bg-slate-200 dark:bg-slate-800 text-slate-900 dark:text-slate-100 border-r-2 border-slate-300 dark:border-slate-700";
+                        break;
+                      case "group_transport_data":
+                        colorClass = "bg-emerald-200 dark:bg-emerald-900 text-emerald-950 dark:text-emerald-100 border-r-2 border-emerald-300 dark:border-emerald-700";
+                        break;
+                      case "group_mining_data":
+                        colorClass = "bg-blue-200 dark:bg-blue-900 text-blue-950 dark:text-blue-100 border-r-2 border-blue-300 dark:border-blue-700";
+                        break;
+                      case "group_reconciliation_result":
+                        colorClass = "bg-amber-200 dark:bg-amber-900 text-amber-950 dark:text-amber-100 border-r-2 border-amber-300 dark:border-amber-700";
+                        break;
+                      case "group_final_decision":
+                        colorClass = "bg-purple-200 dark:bg-purple-900 text-purple-950 dark:text-purple-100 border-r-2 border-purple-300 dark:border-purple-700";
+                        break;
+                      case "actions":
+                        colorClass = "bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-300";
+                        break;
+                      default:
+                        colorClass = "bg-gray-200 dark:bg-gray-800 text-gray-900 dark:text-gray-100";
+                    }
+                  }
 
                   return (
                     <TableHead
@@ -914,11 +942,9 @@ export const ReconciliationComparisonTables: React.FC<
                         overflow: isCommonInfoPanel ? "hidden" : undefined,
                         padding: isCommonInfoPanel ? 0 : undefined,
                       }}
-                      className={`px-1.5 py-2 text-center text-xs border-r border-gray-200 dark:border-gray-800 whitespace-normal break-words leading-tight ${
-                        isTopLevelGroup
-                          ? "border-r border-gray-300 dark:border-gray-700"
-                          : ""
-                      } ${isActionCol ? "text-red-600" : ""}`}
+                      className={`px-1.5 py-2 text-center text-sm font-bold border-r border-gray-200 dark:border-gray-800 whitespace-normal break-words leading-tight ${colorClass} ${
+                        isActionCol ? "text-red-600" : ""
+                      }`}
                     >
                       {header.isPlaceholder ? null : isCommonInfoPanel ? (
                         // Render scrollable sub-header with sync
@@ -926,13 +952,13 @@ export const ReconciliationComparisonTables: React.FC<
                           ref={headerScrollRef}
                           onScroll={onHeaderScroll}
                           {...dragProps}
-                          className="flex overflow-x-auto [&::-webkit-scrollbar]:hidden cursor-grab select-none h-full items-center"
+                          className="flex overflow-x-auto [&::-webkit-scrollbar]:hidden cursor-grab select-none h-full items-center bg-gray-50 dark:bg-gray-900"
                           style={{ scrollbarWidth: "none" }}
                         >
                           {COMMON_SUB_FIELDS.map((f) => (
                             <div
                               key={f.id}
-                              className="shrink-0 px-1.5 py-1.5 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 border-r border-gray-200 dark:border-gray-700 last:border-r-0 flex items-center justify-center h-full min-h-[32px]"
+                              className="shrink-0 px-1.5 py-1.5 text-center text-sm font-bold text-gray-900 dark:text-gray-100 border-r border-gray-200 dark:border-gray-700 last:border-r-0 flex items-center justify-center h-full min-h-[32px]"
                               style={{ width: SUB_FIELD_WIDTHS[f.id] }}
                             >
                               {f.label}
@@ -966,7 +992,7 @@ export const ReconciliationComparisonTables: React.FC<
                     "bg-blue-100/80 dark:bg-blue-950/60 border-l-4 border-l-blue-600 font-medium";
                 } else if (choice === "VT") {
                   rowHighlightClass =
-                    "bg-sky-50/75 dark:bg-sky-950/30 hover:bg-sky-100/60 dark:hover:bg-sky-900/40 border-l-4 border-l-sky-500";
+                    "bg-emerald-50/75 dark:bg-emerald-950/30 hover:bg-emerald-100/60 dark:hover:bg-emerald-900/40 border-l-4 border-l-emerald-500";
                 } else if (choice === "KT") {
                   rowHighlightClass =
                     "bg-blue-50/75 dark:bg-blue-950/30 hover:bg-blue-100/60 dark:hover:bg-blue-900/40 border-l-4 border-l-blue-500";

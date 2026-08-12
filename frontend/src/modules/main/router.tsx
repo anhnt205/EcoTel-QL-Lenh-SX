@@ -22,6 +22,11 @@ const ReconciliationPage = lazy(() =>
     default: m.ReconciliationPage,
   }))
 );
+const StandardTripReportPage = lazy(() =>
+  import("@/modules/reconciliation/pages/StandardTripReportPage").then((m) => ({
+    default: m.StandardTripReportPage,
+  }))
+);
 
 const DepartmentsPage = lazy(() => import("@/modules/departments/Departments"));
 const VehiclesPage = lazy(() => import("@/modules/vehicles/Vehicles"));
@@ -69,6 +74,16 @@ export const mainRoutes = (
           <ModuleRoleGuard allowedRoles={["ROLE_STATISTICIAN"]}>
             <Suspense fallback={<PageLoader />}>
               <ReconciliationPage />
+            </Suspense>
+          </ModuleRoleGuard>
+        }
+      />
+      <Route
+        path={ROUTES.RECONCILIATION.TRIP_REPORT}
+        element={
+          <ModuleRoleGuard allowedRoles={["ROLE_STATISTICIAN"]}>
+            <Suspense fallback={<PageLoader />}>
+              <StandardTripReportPage />
             </Suspense>
           </ModuleRoleGuard>
         }

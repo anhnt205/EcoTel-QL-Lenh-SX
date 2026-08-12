@@ -8,7 +8,7 @@ export const trvelLogValidationSchema = yup.object({
     shift: yup.string().required('Vui lòng chọn ca'),
     routes: yup.array().of(
         yup.object().shape({
-            location: yup.string().required('Vui lòng chọn điểm đổ tải'),
+            location: yup.string().required('Vui lòng chọn vị trí'),
             fullDistanceKm: yup.string().required('Vui lòng nhập cung độ'),
         })
     ),
@@ -84,7 +84,7 @@ export const materialValidationSchema = yup.object({
 });
 // diem do tai
 export const locationValidationSchema = yup.object({
-    name: yup.string().required('Vui lòng nhập tên điểm đổ tải'),
+    name: yup.string().required('Vui lòng nhập tên vị trí'),
     coordinates: yup.object({
         lat: yup.number().required('Vui lòng chọn vĩ độ'),
         lng: yup.number().required('Vui lòng chọn kinh độ'),

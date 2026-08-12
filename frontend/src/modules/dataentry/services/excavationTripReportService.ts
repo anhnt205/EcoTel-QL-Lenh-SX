@@ -105,6 +105,16 @@ export interface PageResponse<T> {
   number: number;
 }
 
+export interface ExcavationReportBulkUpdateItem {
+  id: number;
+  data: ExcavationTripReportRequest;
+}
+
+export interface BulkDeleteResponse {
+  requestedCount: number;
+  deletedCount: number;
+}
+
 /**
  * Hàm hỗ trợ map dữ liệu từ 1 MiningSessionDraft (màn hình UI) thành ExcavationTripReportRequest (API Backend)
  */
@@ -329,6 +339,43 @@ export async function deleteExcavationTripReport(
 }
 
 /**
+ * Gọi API POST /api/excavation-reports/bulk
+ */
+export async function bulkCreateExcavationTripReports(
+  payloads: ExcavationTripReportRequest[],
+): Promise<ApiResponse<ExcavationReportResponse[]>> {
+  const validatedPayloads = z
+    .array(excavationTripReportRequestSchema)
+    .parse(payloads);
+  const res = await api.post("/excavation-reports/bulk", validatedPayloads);
+  return res.data;
+}
+
+/**
+ * Gọi API PUT /api/excavation-reports/bulk
+ */
+export async function bulkUpdateExcavationTripReports(
+  items: ExcavationReportBulkUpdateItem[],
+): Promise<ApiResponse<ExcavationReportResponse[]>> {
+  const validatedItems = items.map((item) => ({
+    id: item.id,
+    data: excavationTripReportRequestSchema.parse(item.data),
+  }));
+  const res = await api.put("/excavation-reports/bulk", validatedItems);
+  return res.data;
+}
+
+/**
+ * Gọi API DELETE /api/excavation-reports/bulk
+ */
+export async function bulkDeleteExcavationTripReports(
+  ids: number[],
+): Promise<ApiResponse<BulkDeleteResponse>> {
+  const res = await api.delete("/excavation-reports/bulk", { data: { ids } });
+  return res.data;
+}
+
+/**
  * React Query Hooks
  */
 export function useCreateExcavationTripReportMutation() {
@@ -367,6 +414,44 @@ export function useDeleteExcavationTripReportMutation() {
 
   return useMutation({
     mutationFn: (id: number) => deleteExcavationTripReport(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["excavationReports"] });
+      queryClient.invalidateQueries({ queryKey: ["statistics"] });
+    },
+  });
+}
+
+export function useBulkCreateExcavationTripReportMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payloads: ExcavationTripReportRequest[]) =>
+      bulkCreateExcavationTripReports(payloads),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["excavationReports"] });
+      queryClient.invalidateQueries({ queryKey: ["statistics"] });
+    },
+  });
+}
+
+export function useBulkUpdateExcavationTripReportMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (items: ExcavationReportBulkUpdateItem[]) =>
+      bulkUpdateExcavationTripReports(items),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["excavationReports"] });
+      queryClient.invalidateQueries({ queryKey: ["statistics"] });
+    },
+  });
+}
+
+export function useBulkDeleteExcavationTripReportMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (ids: number[]) => bulkDeleteExcavationTripReports(ids),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["excavationReports"] });
       queryClient.invalidateQueries({ queryKey: ["statistics"] });

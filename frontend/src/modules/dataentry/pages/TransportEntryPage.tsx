@@ -7,7 +7,7 @@ import {
   useTransportReportsQuery,
   fetchTransportReportById,
   mapReportResponseToDraft,
-  useDeleteTransportReportMutation,
+  useBulkDeleteTransportReportMutation,
   type TransportReportResponse,
 } from "@/modules/dataentry/services/transportTripReportService";
 import { useTransportDraftStore } from "@/modules/dataentry/store/useTransportDraftStore";
@@ -92,8 +92,8 @@ export const TransportEntryPage: React.FC = () => {
     toDate: endDate,
   });
 
-  const deleteReportMutation = useDeleteTransportReportMutation();
-  const { loadSessionForEdit } = useTransportDraftStore();
+  const bulkDeleteReportMutation = useBulkDeleteTransportReportMutation();
+  const { loadSessionsForEdit } = useTransportDraftStore();
 
   const reportsList = useMemo<TransportReportResponse[]>(() => {
     const raw = apiResponse?.data;
@@ -355,34 +355,49 @@ export const TransportEntryPage: React.FC = () => {
   const handleEditSelected = async () => {
     const selectedIdsArray = Array.from(
       new Set([...selectedTripIds, ...selectedFuelIds]),
-    );
+    )
+      .map(Number)
+      .filter((id) => Boolean(id) && !isNaN(id));
 
     if (selectedIdsArray.length === 0) {
-      setIsEntryModalOpen(true);
-      return;
-    }
-
-    const firstId = Number(selectedIdsArray[0]);
-    if (isNaN(firstId)) {
-      setIsEntryModalOpen(true);
+      toast.warning("Vui lòng chọn bản ghi để chỉnh sửa!");
       return;
     }
 
     try {
-      toast.info("Đang tải dữ liệu báo cáo từ máy chủ...");
-      const res = await fetchTransportReportById(firstId);
-      if (res.success && res.data) {
-        const draft = mapReportResponseToDraft(res.data);
-        loadSessionForEdit(draft);
-        setIsEntryModalOpen(true);
-        toast.success(`Đã mở báo cáo ID #${firstId} để chỉnh sửa`);
-      } else {
-        toast.error("Không tìm thấy dữ liệu báo cáo trên hệ thống!");
+      toast.loading(
+        selectedIdsArray.length === 1
+          ? "Đang tải dữ liệu chi tiết báo cáo..."
+          : `Đang tải dữ liệu ${selectedIdsArray.length} báo cáo...`,
+        { id: "fetch-detail" },
+      );
+
+      const responses = await Promise.all(
+        selectedIdsArray.map((id) =>
+          fetchTransportReportById(id).catch((err) => {
+            console.error(`Lỗi tải báo cáo #${id}:`, err);
+            return null;
+          }),
+        ),
+      );
+
+      toast.dismiss("fetch-detail");
+
+      const drafts = responses
+        .filter((res) => Boolean(res?.success && res?.data))
+        .map((res) => mapReportResponseToDraft(res!.data!));
+
+      if (drafts.length === 0) {
+        toast.error("Không tải được thông tin chi tiết của bản ghi nào!");
+        return;
       }
+
+      loadSessionsForEdit(drafts);
+      setIsEntryModalOpen(true);
     } catch (err: any) {
-      console.error("[Fetch Edit Error]", err);
+      toast.dismiss("fetch-detail");
       toast.error(
-        `Lỗi khi tải dữ liệu báo cáo: ${err.message || "Không thể truy vấn API"}`,
+        `Không thể tải chi tiết báo cáo: ${err.message || "Lỗi máy chủ"}`,
       );
     }
   };
@@ -393,20 +408,18 @@ export const TransportEntryPage: React.FC = () => {
   const handleDeleteSelected = async () => {
     const selectedIdsArray = Array.from(
       new Set([...selectedTripIds, ...selectedFuelIds]),
-    );
+    )
+      .map(Number)
+      .filter((id) => Boolean(id) && !isNaN(id));
 
     if (selectedIdsArray.length === 0) {
-      toast.error("Vui lòng chọn ít nhất 1 dòng để xóa!");
+      toast.warning("Vui lòng chọn ít nhất 1 dòng để xóa!");
       return;
     }
 
-    const numericIds = Array.from(
-      new Set(selectedIdsArray.map((id) => Number(id)).filter((n) => !isNaN(n))),
-    );
-
     const isConfirmed = await confirm({
       title: "Xác nhận xóa báo cáo Vận tải",
-      description: `Bạn có chắc chắn muốn xóa ${numericIds.length > 0 ? numericIds.length : selectedIdsArray.length} báo cáo đã chọn? Hành động này không thể hoàn tác trên CSDL.`,
+      description: `Bạn có chắc chắn muốn xóa ${selectedIdsArray.length} báo cáo đã chọn? Hành động này không thể hoàn tác trên CSDL.`,
       confirmText: "Xóa báo cáo",
       cancelText: "Hủy bỏ",
       variant: "destructive",
@@ -414,16 +427,11 @@ export const TransportEntryPage: React.FC = () => {
 
     if (isConfirmed) {
       try {
-        if (numericIds.length > 0) {
-          for (const id of numericIds) {
-            await deleteReportMutation.mutateAsync(id);
-          }
-          toast.success(`Đã xóa thành công ${numericIds.length} báo cáo từ CSDL!`);
-        } else {
-          toast.success(`Đã xóa các bản ghi tạm khỏi giao diện!`);
-        }
+        const res = await bulkDeleteReportMutation.mutateAsync(selectedIdsArray);
         setSelectedTripIds(new Set());
         setSelectedFuelIds(new Set());
+        const deletedCount = res.data?.deletedCount ?? selectedIdsArray.length;
+        toast.success(`Đã xóa thành công ${deletedCount} báo cáo từ CSDL!`);
         refetch();
       } catch (err: any) {
         console.error("[Delete Report Error]", err);

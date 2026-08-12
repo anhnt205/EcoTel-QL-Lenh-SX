@@ -110,31 +110,31 @@ export const miningColumns: ColumnDef[] = [
   // C. NHIÊN LIỆU (MÁY XÚC)
   {
     key: "initialFuel",
-    label: "NL Tồn đầu",
+    label: "Nhiên liệu tồn đầu",
     type: "number",
     width: "w-28",
   },
   {
     key: "receivedFuel",
-    label: "NL Lĩnh ca",
+    label: "Nhiên liệu lĩnh ca",
     type: "number",
     width: "w-28",
   },
   {
     key: "finalFuel",
-    label: "NL Tồn cuối",
+    label: "Nhiên liệu tồn cuối",
     type: "number",
     width: "w-28",
   },
   {
     key: "fuelConsumption",
-    label: "NL Tiêu thụ",
+    label: "Nhiên liệu tiêu thụ",
     type: "number",
     width: "w-28",
   },
   {
     key: "fuelNorm",
-    label: "Định mức NL",
+    label: "Định mức nhiên liệu",
     type: "number",
     width: "w-28",
   },

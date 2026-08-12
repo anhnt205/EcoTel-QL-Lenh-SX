@@ -54,12 +54,12 @@ export const FIELD_MAP: FieldDef[] = [
   { key: 'hoten', label: 'hoten', width: 150, type: 'string', group: 'Nhân sự', description: 'Họ tên lái xe' },
   { key: 'ms_cb', label: 'ms_cb', width: 85, type: 'string', group: 'Nhân sự', description: 'Mã số cán bộ' },
 
-  // 7. NL TÍNH TOÁN (5)
-  { key: 'gas_dd', label: 'gas_dd', width: 75, type: 'number', group: 'NL tính toán', description: 'Gas định mức' },
-  { key: 'gas_tp', label: 'gas_tp', width: 75, type: 'number', group: 'NL tính toán', description: 'Gas điều chỉnh' },
-  { key: 'dmuc_g', label: 'dmuc_g', width: 80, type: 'number', group: 'NL tính toán', description: 'Định mức gas' },
-  { key: 'tieuchuan', label: 'tieuchuan', width: 90, type: 'number', group: 'NL tính toán', description: 'Tiêu chuẩn NL' },
-  { key: 'dinhmuc', label: 'dinhmuc', width: 80, type: 'number', group: 'NL tính toán', description: 'Định mức nhiên liệu' },
+  // 7. NHIÊN LIỆU TÍNH TOÁN (5)
+  { key: 'gas_dd', label: 'gas_dd', width: 75, type: 'number', group: 'Nhiên liệu tính toán', description: 'Gas định mức' },
+  { key: 'gas_tp', label: 'gas_tp', width: 75, type: 'number', group: 'Nhiên liệu tính toán', description: 'Gas điều chỉnh' },
+  { key: 'dmuc_g', label: 'dmuc_g', width: 80, type: 'number', group: 'Nhiên liệu tính toán', description: 'Định mức gas' },
+  { key: 'tieuchuan', label: 'tieuchuan', width: 90, type: 'number', group: 'Nhiên liệu tính toán', description: 'Tiêu chuẩn nhiên liệu' },
+  { key: 'dinhmuc', label: 'dinhmuc', width: 80, type: 'number', group: 'Nhiên liệu tính toán', description: 'Định mức nhiên liệu' },
 
   // 8. PHÂN LOẠI (6)
   { key: 'doixe', label: 'doixe', width: 110, type: 'string', group: 'Phân loại', description: 'Đội xe' },
@@ -77,9 +77,9 @@ export const FIELD_MAP: FieldDef[] = [
   { key: 'tanggiam', label: 'tanggiam', width: 85, type: 'number', group: 'Điều chỉnh', description: 'Nhiên liệu tăng/giảm' },
   { key: 'timkiem', label: 'timkiem', width: 100, type: 'string', group: 'Điều chỉnh', description: 'Từ khóa' },
 
-  // 11. NL CHI TIẾT (3)
-  { key: 'dau_dm', label: 'dau_dm', width: 75, type: 'number', group: 'NL chi tiết', description: 'Dầu định mức' },
-  { key: 'dau_ad', label: 'dau_ad', width: 75, type: 'number', group: 'NL chi tiết', description: 'Dầu thực tế' },
+  // 11. NHIÊN LIỆU CHI TIẾT (3)
+  { key: 'dau_dm', label: 'dau_dm', width: 75, type: 'number', group: 'Nhiên liệu chi tiết', description: 'Dầu định mức' },
+  { key: 'dau_ad', label: 'dau_ad', width: 75, type: 'number', group: 'Nhiên liệu chi tiết', description: 'Dầu thực tế' },
   { key: 'mo_may', label: 'mo_may', width: 75, type: 'number', group: 'NL chi tiết', description: 'Mỡ máy' },
 
   // 12. VỊ TRÍ (3)

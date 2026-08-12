@@ -13,11 +13,13 @@ export const ROUTES = {
     PRODUCTION: '/nhap-lieu/doi-chieu',
     FUEL: '/nhap-lieu/doi-chieu',
     DASHBOARD: '/nhap-lieu/doi-chieu',
+    TRIP_REPORT: '/nhap-lieu/bao-chuyen',
   },
   DATA_ENTRY: {
     TRANSPORT: '/nhap-lieu/van-tai',
     MINING: '/nhap-lieu/khai-thac',
     RECONCILIATION: '/nhap-lieu/doi-chieu',
+    TRIP_REPORT: '/nhap-lieu/bao-chuyen',
   },
   DANH_MUC: {
     DON_VI: '/danh-muc/don-vi',

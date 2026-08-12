@@ -31,6 +31,11 @@ import { toast } from "sonner";
 
 import { useMasterData } from "@/modules/dataentry/hooks/useMasterData";
 import {
+  addApprovedTripReport,
+  getApprovedTripReports,
+} from "@/modules/dataentry/services/thongKeStorage";
+import {
+  reconciliationService,
   useReconciliationSearchQuery,
   mapRowResponseToReconciliationItem,
 } from "../services/reconciliation.service";
@@ -105,9 +110,13 @@ export const ReconciliationPage: React.FC = () => {
 
   useEffect(() => {
     if (apiResponse?.content) {
-      const mapped = apiResponse.content.map((row, idx) =>
-        mapRowResponseToReconciliationItem(row, idx),
-      );
+      const approvedList = getApprovedTripReports();
+      const approvedIds = new Set(approvedList.map((r) => r.id));
+
+      const mapped = apiResponse.content
+        .map((row, idx) => mapRowResponseToReconciliationItem(row, idx))
+        .filter((item) => !approvedIds.has(item.id));
+
       setRawItems(mapped);
     } else {
       setRawItems([]);
@@ -230,6 +239,145 @@ export const ReconciliationPage: React.FC = () => {
     setSearchKeyword("");
     setCardFilter("all");
     toast.info("Đã làm mới các bộ lọc!");
+  };
+
+  const [tableChoices, setTableChoices] = useState<Record<string, "VT" | "KT" | "OTHER">>({});
+  const [tableCustomFields, setTableCustomFields] = useState<
+    Record<string, { cargo: string; trips: number; loadStatus: string }>
+  >({});
+  const [isSavingBatch, setIsSavingBatch] = useState(false);
+
+  const handleChoicesChange = (
+    choices: Record<string, "VT" | "KT" | "OTHER">,
+    customFields: Record<string, { cargo: string; trips: number; loadStatus: string }>
+  ) => {
+    setTableChoices(choices);
+    setTableCustomFields(customFields);
+  };
+
+  const handleBatchSave = async () => {
+    const selectedItemIds = Object.keys(tableChoices);
+    if (selectedItemIds.length === 0) {
+      toast.warning("Vui lòng chọn phương án chốt cho ít nhất một bản ghi trước khi bấm Lưu!");
+      return;
+    }
+
+    setIsSavingBatch(true);
+    toast.info(`Đang lưu ${selectedItemIds.length} bản ghi quyết định...`);
+
+    const savePromises = selectedItemIds.map(async (itemId) => {
+      const choice = tableChoices[itemId];
+      const custom = tableCustomFields[itemId] || { cargo: "Than", trips: 0, loadStatus: "Đủ tải" };
+      const item = rawItems.find((i) => i.id === itemId) || displayItems.find((i) => i.id === itemId);
+      if (!item) return null;
+
+      const backendRow = (item as any).backendRow;
+      const transportReportTripId = backendRow?.transportReportTripId;
+      const excavationReportTripId = backendRow?.excavationReportTripId;
+
+      const finalOption = choice === "VT" ? "TRANSPORT" : choice === "KT" ? "EXCAVATION" : "OTHER";
+
+      let customCargoTypeId: number | undefined = undefined;
+      let customTripCount: number | undefined = undefined;
+      let customLoadLevelType: "FULL_LOAD" | "RODA_2_3" | "OTHER" | undefined = undefined;
+      let customLoadLevelCustomValue: string | undefined = undefined;
+
+      if (choice === "OTHER") {
+        customCargoTypeId = custom.cargo === "Đá" ? 2 : custom.cargo === "Đất" ? 3 : 1;
+        customTripCount = custom.trips;
+        customLoadLevelType = custom.loadStatus === "Roda (2/3)" ? "RODA_2_3" : custom.loadStatus.includes("Khác") ? "OTHER" : "FULL_LOAD";
+        if (customLoadLevelType === "OTHER") {
+          customLoadLevelCustomValue = "1/2";
+        }
+      }
+
+      if (transportReportTripId || excavationReportTripId) {
+        try {
+          await reconciliationService.saveDecision({
+            transportReportTripId,
+            excavationReportTripId,
+            finalOption,
+            customCargoTypeId,
+            customTripCount,
+            customLoadLevelType,
+            customLoadLevelCustomValue,
+          });
+        } catch (err) {
+          console.error(`Error saving decision for item ${itemId}:`, err);
+        }
+      }
+
+      const cargoName = choice === "VT"
+        ? item.transportRecord?.cargoType || "Than"
+        : choice === "KT"
+        ? item.miningRecord?.material || "Than"
+        : custom.cargo;
+
+      const tripCountNum = choice === "VT"
+        ? item.transportRecord?.tripCount || 0
+        : choice === "KT"
+        ? item.miningRecord?.tripCount || 0
+        : custom.trips;
+
+      const loadStatusStr = choice === "VT"
+        ? item.transportRecord?.loadStatus || "Đủ tải"
+        : choice === "KT"
+        ? item.miningRecord?.loadStatus || "Đủ tải"
+        : custom.loadStatus;
+
+      addApprovedTripReport({
+        id: item.id,
+        reportDate: backendRow?.reportDate || `2026-08-${String(item.commonKey.day).padStart(2, '0')}`,
+        shift: backendRow?.shiftName ? String(backendRow.shiftName) : item.commonKey.shift || "Ca 1",
+        vehicleNo: backendRow?.vehicleCode || item.commonKey.vehicleNo || "-",
+        excavationArea: backendRow?.excavationAreaName || item.transportRecord?.excavationArea || "-",
+        excavatorEquipment: backendRow?.excavatorName || item.transportRecord?.excavatorEquipment || item.miningRecord?.mineCode || "-",
+        pickupLocation: backendRow?.loadingPointName || item.transportRecord?.pickupLocation || item.miningRecord?.pickupLocation || "-",
+        pickupBench: backendRow?.receivingFloor ? String(backendRow.receivingFloor) : item.transportRecord?.pickupBenchGroup ? String(item.transportRecord.pickupBenchGroup) : item.transportRecord?.pickupBench || item.miningRecord?.excavationBench || "-",
+        unloadLocationName: backendRow?.unloadingPointName || item.transportRecord?.unloadLocationName || item.miningRecord?.dumpLocation || "-",
+        unloadBench: backendRow?.unloadingFloor || item.transportRecord?.unloadBench || "-",
+        fullRouteDistance: backendRow?.totalRouteDistanceKm ?? item.transportRecord?.fullRouteDistance ?? 0,
+        fullRouteElevate: backendRow?.totalRouteLiftM ?? item.transportRecord?.fullRouteElevate ?? 0,
+        localSlopeDist: backendRow?.localSlopeDistanceKm ?? item.transportRecord?.localSlopeDist ?? 0,
+        localSlopeDegree: backendRow?.localSlopeM ?? item.transportRecord?.localSlopeDegree ?? 0,
+        operatorBadgeNo: item.transportRecord?.operatorBadgeNo || item.miningRecord?.operatorBadgeNo || "-",
+        isRainyDay: backendRow?.rainyDay ?? item.transportRecord?.isRainyDay ?? false,
+        isTraineeVehicle: backendRow?.supplementaryVehicle ?? item.transportRecord?.isTraineeVehicle ?? false,
+        finalOption,
+        finalOptionLabel: choice === "VT" ? "Vận tải" : choice === "KT" ? "Khai thác" : "Khác",
+        cargoType: cargoName,
+        tripCount: tripCountNum,
+        loadStatus: loadStatusStr,
+        approvedAt: new Date().toLocaleString('vi-VN'),
+        status: "Đã chốt",
+      });
+
+      return item.id;
+    });
+
+    const results = await Promise.allSettled(savePromises);
+    const successfulIds = results
+      .filter((r): r is PromiseFulfilledResult<string | null> => r.status === "fulfilled" && r.value !== null)
+      .map((r) => r.value as string);
+
+    if (successfulIds.length > 0) {
+      setRawItems((prev) => prev.filter((item) => !successfulIds.includes(item.id)));
+      setTableChoices((prev) => {
+        const next = { ...prev };
+        successfulIds.forEach((id) => delete next[id]);
+        return next;
+      });
+      setTableCustomFields((prev) => {
+        const next = { ...prev };
+        successfulIds.forEach((id) => delete next[id]);
+        return next;
+      });
+    }
+
+    setIsSavingBatch(false);
+    toast.success(
+      `Đã lưu thành công ${successfulIds.length}/${selectedItemIds.length} bản ghi quyết định và chuyển dữ liệu sang Báo chuyến!`,
+    );
   };
 
   const handleExportExcel = () => {
@@ -433,23 +581,23 @@ export const ReconciliationPage: React.FC = () => {
           onClick={() => handleCardClick("transport")}
           className={`p-4 rounded-xl border transition-all cursor-pointer flex items-center gap-3.5 select-none ${
             cardFilter === "transport"
-              ? "bg-blue-50/90 dark:bg-blue-950/70 border-blue-500 ring-2 ring-blue-500/40 shadow-md scale-[1.01]"
-              : "bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800 shadow-xs hover:border-blue-300 hover:shadow-md"
+              ? "bg-emerald-50/90 dark:bg-emerald-950/70 border-emerald-500 ring-2 ring-emerald-500/40 shadow-md scale-[1.01]"
+              : "bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800 shadow-xs hover:border-emerald-300 hover:shadow-md"
           }`}
           title="Click để lọc bản ghi có dữ liệu Vận tải"
         >
-          <div className="w-12 h-12 rounded-xl bg-blue-100 dark:bg-blue-900/60 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
+          <div className="w-12 h-12 rounded-xl bg-emerald-100 dark:bg-emerald-900/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
             <Truck className="w-6 h-6" />
           </div>
           <div>
-            <div className="text-[11px] font-bold uppercase tracking-wider text-blue-900 dark:text-blue-300">
+            <div className="text-[11px] font-bold uppercase tracking-wider text-emerald-900 dark:text-emerald-300">
               TỔNG SỐ CHUYẾN (VẬN TẢI)
             </div>
             <div className="flex items-baseline gap-1 mt-0.5">
-              <span className="text-xl font-extrabold text-blue-900 dark:text-blue-200">
+              <span className="text-xl font-extrabold text-emerald-900 dark:text-emerald-200">
                 {totalTransportTrips}
               </span>
-              <span className="text-xs text-blue-600 dark:text-blue-400 font-medium">
+              <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
                 chuyến
               </span>
             </div>
@@ -553,10 +701,11 @@ export const ReconciliationPage: React.FC = () => {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => toast.success("Đã lưu dữ liệu đối chiếu chuẩn!")}
+              disabled={isSavingBatch}
+              onClick={handleBatchSave}
               className="h-9 px-6 text-xs font-semibold border-blue-600 text-blue-700 hover:bg-blue-50 dark:border-blue-500 dark:text-blue-400 shadow-2xs"
             >
-              Lưu
+              {isSavingBatch ? "Đang lưu..." : "Lưu"}
             </Button>
 
             <Button
@@ -572,6 +721,7 @@ export const ReconciliationPage: React.FC = () => {
         <ReconciliationComparisonTables
           items={displayItems}
           onDeleteItem={handleDeleteItem}
+          onChoicesChange={handleChoicesChange}
         />
       </div>
     </div>

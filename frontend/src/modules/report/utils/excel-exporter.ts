@@ -22,8 +22,8 @@ export const TRANSPORT_EXCEL_HEADERS = [
   'Tên gọi nơi dỡ tải',
   'Roda',
   'Trừ với đất',
-  'NL Tồn',
-  'Linh',
+  'Nhiên liệu tồn',
+  'Lĩnh',
   'Tồn',
 ];
 

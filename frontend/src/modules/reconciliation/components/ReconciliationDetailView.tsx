@@ -221,7 +221,7 @@ const COMPARISON_FIELDS: ComparisonField[] = [
   },
   {
     key: "initialFuel",
-    label: "NL tồn đầu",
+    label: "Nhiên liệu tồn đầu",
     unit: "L",
     type: "number",
     group: "Nhiên liệu",
@@ -230,7 +230,7 @@ const COMPARISON_FIELDS: ComparisonField[] = [
   },
   {
     key: "receivedFuel",
-    label: "NL lĩnh",
+    label: "Nhiên liệu lĩnh",
     unit: "L",
     type: "number",
     group: "Nhiên liệu",
@@ -239,7 +239,7 @@ const COMPARISON_FIELDS: ComparisonField[] = [
   },
   {
     key: "finalFuel",
-    label: "NL tồn cuối",
+    label: "Nhiên liệu tồn cuối",
     unit: "L",
     type: "number",
     group: "Nhiên liệu",
@@ -734,7 +734,7 @@ export const ReconciliationDetailView: React.FC<Props> = ({
               }`}
             >
               <div className="flex items-center justify-center gap-1.5 rounded bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 px-2 py-1 font-medium text-gray-700 dark:text-gray-300">
-                <Truck className="h-3.5 w-3.5 text-blue-600" /> Bên Vận tải
+                <Truck className="h-3.5 w-3.5 text-emerald-600" /> Bên Vận tải
               </div>
               <div className="flex items-center justify-center gap-1.5 rounded bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 px-2 py-1 font-medium text-gray-700 dark:text-gray-300">
                 <Pickaxe className="h-3.5 w-3.5 text-blue-600" /> Bên Khai thác

@@ -112,11 +112,11 @@ export const MiningDetailPanel: React.FC<MiningDetailPanelProps> = ({
       {/* C. Nhiên liệu */}
       <SectionTitle icon={<Layers className="h-3.5 w-3.5" />} label="C. Nhiên liệu (Máy xúc)" />
       <div className="rounded-md border border-border/60 bg-muted/20 px-3 py-1 divide-y divide-border/40">
-        <Field label="NL tồn đầu" value={record.initialFuel != null ? `${record.initialFuel} L` : undefined} />
-        <Field label="NL lĩnh trong ca" value={record.receivedFuel != null ? `${record.receivedFuel} L` : undefined} />
-        <Field label="NL tồn cuối" value={record.finalFuel != null ? `${record.finalFuel} L` : undefined} />
-        <Field label="NL tiêu thụ" value={fuelCons != null ? `${fuelCons} L` : undefined} />
-        <Field label="Định mức NL" value={record.fuelNorm != null ? `${record.fuelNorm} L` : undefined} />
+        <Field label="Nhiên liệu tồn đầu" value={record.initialFuel != null ? `${record.initialFuel} L` : undefined} />
+        <Field label="Nhiên liệu lĩnh trong ca" value={record.receivedFuel != null ? `${record.receivedFuel} L` : undefined} />
+        <Field label="Nhiên liệu tồn cuối" value={record.finalFuel != null ? `${record.finalFuel} L` : undefined} />
+        <Field label="Nhiên liệu tiêu thụ" value={fuelCons != null ? `${fuelCons} L` : undefined} />
+        <Field label="Định mức nhiên liệu" value={record.fuelNorm != null ? `${record.fuelNorm} L` : undefined} />
         <Field
           label="Tiết kiệm / Vượt"
           value={

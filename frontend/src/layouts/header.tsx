@@ -15,6 +15,7 @@ import {
   MapPin,
   Building2,
   Clock,
+  FileCheck,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -204,14 +205,14 @@ export function Header() {
                 </NavLink>
               </DropdownMenuItem>
 
-              {/* Điểm đổ tải */}
+              {/* Vị trí */}
               <DropdownMenuItem asChild>
                 <NavLink
                   to={ROUTES.DANH_MUC.DIEM_DO_TAI}
                   className="flex items-center gap-2 px-2.5 py-2 text-sm rounded hover:bg-blue-50 cursor-pointer"
                 >
                   <MapPin className="h-4 w-4 text-blue-600" />
-                  Điểm đổ tải
+                  Vị trí
                 </NavLink>
               </DropdownMenuItem>
 
@@ -262,6 +263,19 @@ export function Header() {
             <GitCompareArrows className="h-4 w-4 mr-0.5" />
             Đối chiếu
           </NavLink>
+
+          {/* Báo chuyến */}
+          <NavLink
+            to={ROUTES.RECONCILIATION.TRIP_REPORT}
+            className={({ isActive }) =>
+              navItemClass(
+                isActive || pathname.startsWith(ROUTES.RECONCILIATION.TRIP_REPORT),
+              )
+            }
+          >
+            <FileCheck className="h-4 w-4 mr-0.5 text-blue-200" />
+            Báo chuyến
+          </NavLink>
         </nav>
 
         {/* Mobile menu trigger */}
@@ -306,6 +320,14 @@ export function Header() {
                 >
                   <GitCompareArrows className="h-4 w-4 text-indigo-600" /> Đối
                   chiếu
+                </NavLink>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <NavLink
+                  to={ROUTES.RECONCILIATION.TRIP_REPORT}
+                  className="flex items-center gap-2 px-2 py-2 text-sm font-medium"
+                >
+                  <FileCheck className="h-4 w-4 text-teal-600" /> Báo chuyến
                 </NavLink>
               </DropdownMenuItem>
 
