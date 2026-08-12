@@ -19,14 +19,7 @@ import {
 } from "../../../components/ui/select.tsx";
 import { ComboboxInput } from "../../../components/ui/combobox-input.tsx";
 import { Progress } from "../../../components/ui/progress.tsx";
-import {
-  Plus,
-  Trash2,
-  Save,
-  XCircle,
-  Truck,
-  X,
-} from "lucide-react";
+import { Plus, Trash2, Save, XCircle, Truck, X } from "lucide-react";
 import { toast } from "sonner";
 
 import type { TransportRecord } from "@/modules/dataentry/types/thong-ke.ts";
@@ -171,7 +164,6 @@ export const TransportHeaderDetailModal: React.FC<
   const batchProgress = getBatchProgress();
 
   const createDefaultTripRow = useCallback(
-
     (area?: string): TransportTripRow => {
       return {
         _tempId: `trip_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
@@ -218,8 +210,24 @@ export const TransportHeaderDetailModal: React.FC<
     };
   }, [firstShift, createDefaultTripRow]);
 
-
   const tableBottomRef = useRef<HTMLDivElement>(null);
+
+  // ── Khởi tạo dữ liệu khi mở modal ───────────────────────────────────────
+  // Nếu store đang rỗng (trường hợp "Thêm chuyến (F3)" mở modal mà không đi
+  // qua handleEditSelected để loadSessionsForEdit trước), tự động tạo 1 bản
+  // ghi mặc định để form hiển thị được (nếu không, sess sẽ là undefined và
+  // component return null → không thấy gì, không bấm được nút nào cả).
+  const wasOpenRef = useRef(false);
+  useEffect(() => {
+    if (isOpen && !wasOpenRef.current) {
+      // Vừa chuyển từ đóng → mở
+      if (sessions.length === 0) {
+        initDrafts(createDefaultSession());
+      }
+    }
+    wasOpenRef.current = isOpen;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
 
   // ── Cập nhật session header ─────────────────────────────────────────────
   const handleUpdateSession = useCallback(
@@ -249,7 +257,6 @@ export const TransportHeaderDetailModal: React.FC<
     );
   }, [addTripRow, createDefaultTripRow, sessions, activeIdx]);
 
-
   const handleRemoveTripAction = (tIdx: number) => {
     const success = removeTripRow(tIdx);
     if (!success) {
@@ -261,7 +268,6 @@ export const TransportHeaderDetailModal: React.FC<
   const handleAddSessionAction = () => {
     addSession(createDefaultSession());
   };
-
 
   // ── Keyboard Navigation (Tab / Enter) giữa các ô nhập liệu ────────────
   const { handleKeyDown } = useFormTabNavigation({
@@ -295,7 +301,9 @@ export const TransportHeaderDetailModal: React.FC<
         payloads.push(payload);
       } catch (err: any) {
         console.error(`[Mapping Data Error] Lỗi bản ghi ca ${i + 1}:`, err);
-        toast.error(`Bản ghi #${i + 1}: ${err.message || "Lỗi dữ liệu không hợp lệ"}`);
+        toast.error(
+          `Bản ghi #${i + 1}: ${err.message || "Lỗi dữ liệu không hợp lệ"}`,
+        );
         setActiveIdx(i);
         return;
       }
@@ -330,7 +338,10 @@ export const TransportHeaderDetailModal: React.FC<
         }
         apiSuccessCount += createItems.length;
       } catch (err: any) {
-        console.error("[API Create Error] Lỗi khi tạo mới báo cáo vận tải:", err);
+        console.error(
+          "[API Create Error] Lỗi khi tạo mới báo cáo vận tải:",
+          err,
+        );
         const msg =
           err.response?.data?.message ||
           err.message ||
@@ -352,7 +363,10 @@ export const TransportHeaderDetailModal: React.FC<
         }
         apiSuccessCount += updateItems.length;
       } catch (err: any) {
-        console.error("[API Update Error] Lỗi khi cập nhật báo cáo vận tải:", err);
+        console.error(
+          "[API Update Error] Lỗi khi cập nhật báo cáo vận tải:",
+          err,
+        );
         const msg =
           err.response?.data?.message ||
           err.message ||
@@ -413,9 +427,7 @@ export const TransportHeaderDetailModal: React.FC<
     }
 
     if (apiSuccessCount > 0) {
-      toast.success(
-        `Đã gửi thành công ${apiSuccessCount} bản ghi!`,
-      );
+      toast.success(`Đã gửi thành công ${apiSuccessCount} bản ghi!`);
       onSuccess();
 
       if (andAddNew) {
@@ -463,7 +475,12 @@ export const TransportHeaderDetailModal: React.FC<
 
   // ════════════════════════════════════════════════════════════════════════
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) handleCancel(); }}>
+    <Dialog
+      open={isOpen}
+      onOpenChange={(open) => {
+        if (!open) handleCancel();
+      }}
+    >
       <DialogContent
         className="w-[99vw] max-w-[99vw] sm:max-w-[99vw] h-[96vh] max-h-[96vh] flex flex-col p-0
                    bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800
@@ -513,7 +530,10 @@ export const TransportHeaderDetailModal: React.FC<
               const progress = getSessionProgress(i);
 
               return (
-                <div key={s._tempId} className="flex items-center group shrink-0">
+                <div
+                  key={s._tempId}
+                  className="flex items-center group shrink-0"
+                >
                   <button
                     onClick={() => setActiveIdx(i)}
                     className={`flex flex-col gap-1.5 px-4 py-2.5 text-xs font-semibold rounded-xl border transition-all whitespace-nowrap min-w-[140px] ${
@@ -530,7 +550,9 @@ export const TransportHeaderDetailModal: React.FC<
                             ? "bg-blue-500 shadow-xs shadow-blue-500"
                             : "bg-amber-400 animate-pulse"
                         }`}
-                        title={isValid ? "Đã hợp lệ" : "Chưa hoàn thành thông tin"}
+                        title={
+                          isValid ? "Đã hợp lệ" : "Chưa hoàn thành thông tin"
+                        }
                       />
                       <span>Bản ghi {i + 1}</span>
                     </div>
@@ -539,9 +561,7 @@ export const TransportHeaderDetailModal: React.FC<
                     <Progress
                       value={progress}
                       className={`h-1.5 w-full rounded-full bg-gray-100 dark:bg-gray-800 ${
-                        isValid
-                          ? "[&>div]:bg-blue-500"
-                          : "[&>div]:bg-amber-500"
+                        isValid ? "[&>div]:bg-blue-500" : "[&>div]:bg-amber-500"
                       }`}
                     />
                   </button>
@@ -568,7 +588,6 @@ export const TransportHeaderDetailModal: React.FC<
             </button>
           </div>
         </div>
-
 
         {/* ══ BODY (cuộn) ════════════════════════════════════════════════ */}
         <div
@@ -598,7 +617,9 @@ export const TransportHeaderDetailModal: React.FC<
               <Select
                 value={
                   sess.shift
-                    ? String(sess.shift).replace(/^ca\s+/i, "").trim()
+                    ? String(sess.shift)
+                        .replace(/^ca\s+/i, "")
+                        .trim()
                     : undefined
                 }
                 onValueChange={(v) => handleUpdateSession({ shift: v })}
@@ -665,13 +686,19 @@ export const TransportHeaderDetailModal: React.FC<
                       Tầng dỡ tải
                     </th>
                     <th className="px-2 py-2 border-r border-b border-gray-200 dark:border-gray-700 text-center min-w-[145px]">
-                      Cung độ<br />toàn tuyến (km)
+                      Cung độ
+                      <br />
+                      toàn tuyến (km)
                     </th>
                     <th className="px-2 py-2 border-r border-b border-gray-200 dark:border-gray-700 text-center min-w-[145px]">
-                      Nâng tải<br />toàn tuyến (m)
+                      Nâng tải
+                      <br />
+                      toàn tuyến (m)
                     </th>
                     <th className="px-2 py-2 border-r border-b border-gray-200 dark:border-gray-700 text-center min-w-[145px]">
-                      Cung độ dốc<br />cục bộ (km)
+                      Cung độ dốc
+                      <br />
+                      cục bộ (km)
                     </th>
                     <th className="px-2 py-2 border-r border-b border-gray-200 dark:border-gray-700 text-center min-w-[125px]">
                       Dốc cục bộ (m)
@@ -701,7 +728,9 @@ export const TransportHeaderDetailModal: React.FC<
                       Xe bổ túc
                     </th>
                     <th className="px-2 py-2 border-r border-b border-gray-200 dark:border-gray-700 text-center min-w-[160px]">
-                      Đơn vị quản lý<br />thiết bị
+                      Đơn vị quản lý
+                      <br />
+                      thiết bị
                     </th>
                     <th className="px-2 py-2 border-r border-b border-gray-200 dark:border-gray-700 text-center min-w-[120px]">
                       Chủng loại
@@ -894,8 +923,15 @@ export const TransportHeaderDetailModal: React.FC<
                             value={trip.cargoGroup}
                             onChange={(v) => {
                               const validTypes = getCargoTypesByGroup(v);
-                              const keepType = validTypes.includes(trip.cargoType) ? trip.cargoType : "";
-                              handleUpdateTrip(tIdx, { cargoGroup: v, cargoType: keepType });
+                              const keepType = validTypes.includes(
+                                trip.cargoType,
+                              )
+                                ? trip.cargoType
+                                : "";
+                              handleUpdateTrip(tIdx, {
+                                cargoGroup: v,
+                                cargoType: keepType,
+                              });
                             }}
                             placeholder=""
                           />
@@ -1053,10 +1089,10 @@ export const TransportHeaderDetailModal: React.FC<
                         </td>
 
                         {/* Nút xóa dòng */}
-                      <td className="px-2 py-1.5 border-b border-gray-200 dark:border-gray-700 text-center">
-                        <button
-                          onClick={() => handleRemoveTripAction(tIdx)}
-                          title="Xóa chuyến"
+                        <td className="px-2 py-1.5 border-b border-gray-200 dark:border-gray-700 text-center">
+                          <button
+                            onClick={() => handleRemoveTripAction(tIdx)}
+                            title="Xóa chuyến"
                             className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 transition-colors p-1 rounded hover:bg-red-50 dark:hover:bg-red-950/30"
                           >
                             <Trash2 className="w-4 h-4" />
@@ -1243,9 +1279,6 @@ export const TransportHeaderDetailModal: React.FC<
               : "Lưu bản ghi (F5)"}
           </Button>
         </DialogFooter>
-
-
-
       </DialogContent>
     </Dialog>
   );
