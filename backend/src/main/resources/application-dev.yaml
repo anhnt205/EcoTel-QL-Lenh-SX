@@ -1,6 +1,12 @@
 spring:
   application:
     name: thong-ke-cao-son
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+
   datasource:
     url: jdbc:postgresql://localhost:5440/thong_ke?reWriteBatchedInserts=true
     username: postgres
@@ -20,7 +26,7 @@ spring:
     oauth2:
       resourceserver:
         jwt:
-          jwks-uri: http://localhost:8080/.well-known/jwks.json # endpoint lấy public key từ Portal
+          jwk-set-uri: http://localhost:8080/.well-known/jwks.json # endpoint lấy public key từ Portal
 
 server:
   port: 8088

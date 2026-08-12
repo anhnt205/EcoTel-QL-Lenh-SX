@@ -1,11 +1,11 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/sonner";
-import { useAuthStore } from "@/modules/auth/stores/auth.store";
 import { authRoutes } from "@/modules/auth/router";
 import { mainRoutes } from "@/modules/main/router";
 import { NotFoundPage } from "@/components/not-found-page";
-import { useEffect } from "react";
+import { ROUTES } from "@/constants/routes";
+import { AuthGate } from "@/auth/AuthGate";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -16,16 +16,7 @@ const queryClient = new QueryClient({
   },
 });
 
-import { ROUTES } from "@/constants/routes";
-import { Navigate } from "react-router-dom";
-
 function AppRoutes() {
-  const { initAuth } = useAuthStore();
-
-  useEffect(() => {
-    initAuth();
-  }, []);
-
   return (
     <Routes>
       {/* Root redirect to Module Thống Kê */}
@@ -52,10 +43,12 @@ function AppRoutes() {
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <AppRoutes />
-        <Toaster position="top-right" richColors />
-      </BrowserRouter>
+      <AuthGate>
+        <BrowserRouter>
+          <AppRoutes />
+          <Toaster position="top-right" richColors />
+        </BrowserRouter>
+      </AuthGate>
     </QueryClientProvider>
   );
 }

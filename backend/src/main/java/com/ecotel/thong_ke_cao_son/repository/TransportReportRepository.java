@@ -14,13 +14,15 @@ import java.util.Optional;
 public interface TransportReportRepository extends JpaRepository<TransportReport, Long> {
 
     @Query("""
-        SELECT DISTINCT r.id FROM TransportReport r
-        JOIN r.trips t
-        WHERE r.reportDate BETWEEN :fromDate AND :toDate
-          AND (:shiftIds IS NULL OR r.shift.id IN :shiftIds)
-          AND (:deviceIds IS NULL OR t.vehicle.id IN :deviceIds)
-        ORDER BY r.reportDate DESC
-        """)
+    SELECT r.id FROM TransportReport r
+    WHERE r.reportDate BETWEEN :fromDate AND :toDate
+      AND (:shiftIds IS NULL OR r.shift.id IN :shiftIds)
+      AND (:deviceIds IS NULL OR EXISTS (
+          SELECT 1 FROM TransportReportTrip t
+          WHERE t.transportReport = r AND t.vehicle.id IN :deviceIds
+      ))
+    ORDER BY r.reportDate DESC
+    """)
     Page<Long> searchIds(
             @Param("fromDate") LocalDate fromDate,
             @Param("toDate") LocalDate toDate,
@@ -42,11 +44,13 @@ public interface TransportReportRepository extends JpaRepository<TransportReport
 
 
     @Query("""
-    SELECT DISTINCT r.id FROM TransportReport r
-    JOIN r.trips t
+    SELECT r.id FROM TransportReport r
     WHERE r.reportDate BETWEEN :fromDate AND :toDate
       AND (:shiftIds IS NULL OR r.shift.id IN :shiftIds)
-      AND (:deviceIds IS NULL OR t.vehicle.id IN :deviceIds)
+      AND (:deviceIds IS NULL OR EXISTS (
+          SELECT 1 FROM TransportReportTrip t
+          WHERE t.transportReport = r AND t.vehicle.id IN :deviceIds
+      ))
     ORDER BY r.reportDate DESC
     """)
     List<Long> searchAllIds(

@@ -2,6 +2,12 @@ spring:
   application:
     name: thong-ke-cao-son
 
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+
   datasource:
     url: ${SPRING_DATASOURCE_URL}
     username: ${SPRING_DATASOURCE_USERNAME}
@@ -22,7 +28,7 @@ spring:
     oauth2:
       resourceserver:
         jwt:
-          jwks-uri: ${PORTAL_JWKS_URI}
+          jwk-uri: ${PORTAL_JWKS_URI}
 
 server:
   port: ${THONG_KE_PORT}

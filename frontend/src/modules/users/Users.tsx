@@ -1,7 +1,6 @@
 import { useState, useMemo } from "react";
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
 
-import { RoleEnum } from "@/enums";
 import UserService from "./services/userService";
 import { getUserColumns } from "./columns";
 
@@ -14,11 +13,10 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
-import { useAuthStore } from "../auth/stores/auth.store";
 
 const Users = () => {
-  const user = useAuthStore((state) => state.user);
-  const isAdmin = user?.role === RoleEnum.ADMIN;
+  // TODO: Bật lại isAdmin check khi cần phân quyền
+  const isAdmin = true;
 
   const [searchValue, setSearchValue] = useState("");
   const [page, setPage] = useState(0);

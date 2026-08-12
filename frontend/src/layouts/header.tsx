@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from "react-router-dom";
-import { useAuthStore } from "@/modules/auth/stores/auth.store";
+import { useAuth } from "@/auth/useAuth";
 import logo from "@/assets/logo.png";
 import {
   ChevronDown,
@@ -29,9 +29,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { ROUTES } from "@/constants/routes";
-import { ROLE_LABELS } from "@/constants/roles";
 export function Header() {
-  const { user, signOut } = useAuthStore();
+  const { user, signOut } = useAuth();
   const { pathname } = useLocation();
 
   const navItemClass = (isActive: boolean) =>
@@ -104,33 +103,30 @@ export function Header() {
       <div className="bg-black/10 backdrop-blur-xs text-white px-4 py-1 flex items-center justify-between border-t border-white/10">
         {/* Left Side: Navigation Links */}
         <nav className="hidden md:flex items-center gap-1">
-          {/* Nhập liệu Khai thác & Nhập liệu Vận tải (Admin & Nhập liệu) */}
-          {(user?.role === "admin" || user?.role === "nhap_lieu") && (
-            <>
-              <NavLink
-                to="/nhap-lieu/khai-thac"
-                className={({ isActive }) =>
-                  navItemClass(
-                    isActive || pathname.startsWith("/nhap-lieu/khai-thac"),
-                  )
-                }
-              >
-                <Pickaxe className="h-4 w-4 mr-0.5" />
-                Nhập liệu Khai thác
-              </NavLink>
-              <NavLink
-                to="/nhap-lieu/van-tai"
-                className={({ isActive }) =>
-                  navItemClass(
-                    isActive || pathname.startsWith("/nhap-lieu/van-tai"),
-                  )
-                }
-              >
-                <Truck className="h-4 w-4 mr-0.5" />
-                Nhập liệu Vận tải
-              </NavLink>
-            </>
-          )}
+          {/* Nhập liệu Khai thác & Nhập liệu Vận tải */}
+          {/* TODO: Bật lại role check khi cần phân quyền */}
+          <NavLink
+            to="/nhap-lieu/khai-thac"
+            className={({ isActive }) =>
+              navItemClass(
+                isActive || pathname.startsWith("/nhap-lieu/khai-thac"),
+              )
+            }
+          >
+            <Pickaxe className="h-4 w-4 mr-0.5" />
+            Nhập liệu Khai thác
+          </NavLink>
+          <NavLink
+            to="/nhap-lieu/van-tai"
+            className={({ isActive }) =>
+              navItemClass(
+                isActive || pathname.startsWith("/nhap-lieu/van-tai"),
+              )
+            }
+          >
+            <Truck className="h-4 w-4 mr-0.5" />
+            Nhập liệu Vận tải
+          </NavLink>
 
           {/* Danh mục ∨ */}
           <DropdownMenu>
@@ -254,8 +250,6 @@ export function Header() {
             </DropdownMenuContent>
           </DropdownMenu>
 
-
-
           {/* Đối chiếu */}
           <NavLink
             to="/nhap-lieu/doi-chieu"
@@ -286,28 +280,25 @@ export function Header() {
               align="start"
               className="w-64 p-2 bg-white text-gray-800 shadow-xl border border-gray-200 rounded-lg"
             >
-              {(user?.role === "admin" || user?.role === "nhap_lieu") && (
-                <>
-                  <DropdownMenuItem asChild>
-                    <NavLink
-                      to="/nhap-lieu/khai-thac"
-                      className="flex items-center gap-2 px-2 py-2 text-sm font-medium"
-                    >
-                      <Pickaxe className="h-4 w-4 text-amber-600" /> Nhập liệu
-                      Khai thác
-                    </NavLink>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <NavLink
-                      to="/nhap-lieu/van-tai"
-                      className="flex items-center gap-2 px-2 py-2 text-sm font-medium"
-                    >
-                      <Truck className="h-4 w-4 text-blue-600" /> Nhập liệu
-                      Vận tải
-                    </NavLink>
-                  </DropdownMenuItem>
-                </>
-              )}
+              {/* TODO: Bật lại role check khi cần phân quyền */}
+              <DropdownMenuItem asChild>
+                <NavLink
+                  to="/nhap-lieu/khai-thac"
+                  className="flex items-center gap-2 px-2 py-2 text-sm font-medium"
+                >
+                  <Pickaxe className="h-4 w-4 text-amber-600" /> Nhập liệu Khai
+                  thác
+                </NavLink>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <NavLink
+                  to="/nhap-lieu/van-tai"
+                  className="flex items-center gap-2 px-2 py-2 text-sm font-medium"
+                >
+                  <Truck className="h-4 w-4 text-emerald-600" /> Nhập liệu Vận
+                  tải
+                </NavLink>
+              </DropdownMenuItem>
               <DropdownMenuItem asChild>
                 <NavLink
                   to="/nhap-lieu/doi-chieu"
@@ -406,8 +397,7 @@ export function Header() {
                   to={ROUTES.DANH_MUC.NGUOI_DUNG}
                   className="flex items-center gap-2 px-2 py-2 text-sm font-medium"
                 >
-                  <User className="h-4 w-4 text-blue-600" /> Người dùng & Lái
-                  xe
+                  <User className="h-4 w-4 text-blue-600" /> Người dùng & Lái xe
                 </NavLink>
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -423,7 +413,7 @@ export function Header() {
             >
               <User className="h-4.5 w-4.5" />
               <span className="font-semibold">
-                {user?.hoTen || "System Admin"}
+                {user?.fullName || "System Admin"}
               </span>
               <ChevronDown className="h-3.5 w-3.5 opacity-80" />
             </Button>
@@ -434,10 +424,10 @@ export function Header() {
           >
             <DropdownMenuLabel className="px-3 py-2 border-b border-gray-100">
               <p className="text-sm font-bold text-gray-900">
-                {user?.hoTen || "System Admin"}
+                {user?.fullName || "System Admin"}
               </p>
-              <p className="text-xs text-blue-700 font-medium mt-0.5">
-                {user ? ROLE_LABELS[user.role] : "Quản trị hệ thống"}
+              <p className="text-xs text-emerald-700 font-medium mt-0.5">
+                {user?.app || "Thống kê Cao Sơn"}
               </p>
             </DropdownMenuLabel>
 

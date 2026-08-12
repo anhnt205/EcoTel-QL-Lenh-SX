@@ -282,7 +282,7 @@ export function buildTransportReportRequest(
       loadingPointId,
       receivingFloor:
         t.pickupBench !== "" && t.pickupBench !== undefined && t.pickupBench !== null
-          ? Number(t.pickupBench) || null
+          ? parseInt(String(t.pickupBench), 10) || null
           : null,
       unloadingFloor: t.unloadBench || null,
       totalRouteDistanceKm:

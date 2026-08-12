@@ -1,12 +1,11 @@
-import { lazy, Suspense } from 'react';
-import { Route, Outlet } from 'react-router-dom';
-import { ROUTES } from '@/constants/routes';
+import { lazy, Suspense } from "react";
+import { Route, Outlet } from "react-router-dom";
+import { ROUTES } from "@/constants/routes";
 
-const SignInPage = lazy(() =>
-  import('@/modules/auth/pages/sign-in-page').then((m) => ({ default: m.SignInPage }))
-);
 const ForbiddenPage = lazy(() =>
-  import('@/modules/auth/pages/forbidden-page').then((m) => ({ default: m.ForbiddenPage }))
+  import("@/modules/auth/pages/forbidden-page").then((m) => ({
+    default: m.ForbiddenPage,
+  })),
 );
 
 const PageLoader = () => (
@@ -23,8 +22,6 @@ export const authRoutes = (
       </Suspense>
     }
   >
-    <Route path={ROUTES.AUTH.LOGIN} element={<SignInPage />} />
     <Route path={ROUTES.FORBIDDEN} element={<ForbiddenPage />} />
   </Route>
 );
-

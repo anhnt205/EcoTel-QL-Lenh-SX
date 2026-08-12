@@ -1,14 +1,15 @@
-package com.ecotel.thong_ke_cao_son.config;
+package com.ecotel.thong_ke_cao_son.security;
 
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
@@ -26,22 +27,23 @@ public class SecurityConfig {
     };
 
 
-    private final JwtConverterConfig jwtConverter;
+    private final AppTokenFilter appTokenFilter;
+    private final PermissionFilter permissionFilter;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         return http
-                .cors(cors -> cors.configurationSource(corsConfigurationSource())) // <-- thêm dòng này
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                // .oauth2ResourceServer(oauth2 -> oauth2.jwt(Customizer.withDefaults()))
                 .authorizeHttpRequests(authorize -> authorize
                                 .requestMatchers(PUBLIC_ENDPOINT).permitAll()
-//                        .anyRequest().authenticated()
+                    //    .anyRequest().authenticated()
                                 .anyRequest().permitAll() // test
                 )
-//                .oauth2ResourceServer(oauth2 -> oauth2
-//                        .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtConverter))
-//                )
+                // .addFilterAfter(appTokenFilter, BearerTokenAuthenticationFilter.class)  // ← sau khi Spring verify xong
+                // .addFilterAfter(permissionFilter, AppTokenFilter.class)
                 .httpBasic(AbstractHttpConfigurer::disable) // Tat Login Swagger
                 .formLogin(AbstractHttpConfigurer::disable)
                 .build();
@@ -51,11 +53,11 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration corsConfiguration = new CorsConfiguration();
 
-        corsConfiguration.addAllowedOriginPattern("http://localhost:5174");
+        corsConfiguration.addAllowedOriginPattern("*");
         corsConfiguration.addAllowedMethod("*");
         corsConfiguration.addAllowedHeader("*");
         corsConfiguration.addExposedHeader("*");
-        corsConfiguration.setAllowCredentials(true);
+        corsConfiguration.setAllowCredentials(false); // phải false khi dùng wildcard origin
         corsConfiguration.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source =

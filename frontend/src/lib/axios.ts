@@ -1,102 +1,63 @@
-import axios from 'axios';
-import { API } from '@/constants/api-endpoint';
-import { useAuthStore } from '@/modules/auth/stores/auth.store';
+import axios from "axios";
+import { tokenService } from "../auth/tokenService";
 
-const rawBaseUrl = import.meta.env.VITE_API_BASE_URL;
-
-if (!rawBaseUrl && import.meta.env.PROD) {
-  throw new Error(
-    '[Config Error] VITE_API_BASE_URL is not defined. ' +
-      'Set this environment variable before building for production.'
-  );
-}
-
-const BASE_URL = rawBaseUrl ?? 'http://localhost:3000';
+const API_URL = import.meta.env.VITE_API_BASE_URL;
+const PORTAL_URL = import.meta.env.VITE_PORTAL_URL;
 
 const api = axios.create({
-  baseURL: BASE_URL,
-  timeout: 15000,
-  headers: { 'Content-Type': 'application/json' },
+  baseURL: API_URL,
+  headers: { "Content-Type": "application/json" },
 });
 
-// ─── Request interceptor: gắn access token ────────────────────────────
-api.interceptors.request.use(
-  (config) => {
-    const token = useAuthStore.getState().accessToken;
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
+api.interceptors.request.use((config) => {
+  const token = tokenService.getAppToken();
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
 
-// ─── Response interceptor: xử lý 401 → refresh → retry ────────────────
-let isRefreshing = false;
-let pendingQueue: Array<{
-  resolve: (token: string) => void;
-  reject: (err: unknown) => void;
-}> = [];
+let refreshPromise: Promise<string> | null = null;
 
-const processPendingQueue = (error: unknown, token: string | null) => {
-  pendingQueue.forEach(({ resolve, reject }) => {
-    if (error) reject(error);
-    else resolve(token!);
+async function doRefresh(): Promise<string> {
+  const stored = tokenService.get();
+  if (!stored?.refreshToken) {
+    throw new Error("No refresh token");
+  }
+  const { data } = await axios.post(`${API_URL}/auth/refresh`, {
+    refreshToken: stored.refreshToken,
   });
-  pendingQueue = [];
-};
+  tokenService.saveTokens(data.appToken, data.refreshToken);
+  return data.appToken;
+}
 
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
-    const originalRequest = error.config;
-
-    // Chỉ thử refresh 1 lần
-    if (error.response?.status !== 401 || originalRequest._retry) {
-      return Promise.reject(error);
-    }
-
-    // Nếu đang refresh → đưa request vào queue chờ
-    if (isRefreshing) {
-      return new Promise((resolve, reject) => {
-        pendingQueue.push({ resolve, reject });
-      }).then((token) => {
-        originalRequest.headers.Authorization = `Bearer ${token}`;
-        return api(originalRequest);
-      });
-    }
-
-    originalRequest._retry = true;
-    isRefreshing = true;
-
-    try {
-      const { accessToken, refreshToken } = useAuthStore.getState();
-
-      if (!accessToken || !refreshToken) {
-        throw new Error('No tokens available');
+    const original = error.config;
+    if (error.response?.status === 401 && !original._retry) {
+      original._retry = true;
+      try {
+        if (!refreshPromise) {
+          refreshPromise = doRefresh().finally(() => {
+            refreshPromise = null;
+          });
+        }
+        const newToken = await refreshPromise;
+        original.headers.Authorization = `Bearer ${newToken}`;
+        return api(original);
+      } catch {
+        tokenService.clear();
+        if (PORTAL_URL) {
+          window.location.href = PORTAL_URL;
+        } else {
+          console.error("[Auth] VITE_PORTAL_URL is not configured");
+        }
+        return Promise.reject(error);
       }
-
-      // Dùng axios gốc (không có interceptor) để tránh loop
-      const refreshResponse = await axios.post(
-        `${BASE_URL}${API.AUTH.REFRESH}`,
-        { accessToken, refreshToken }
-      );
-
-      const newTokens = refreshResponse.data.result;
-      useAuthStore.getState().setTokens(newTokens);
-
-      processPendingQueue(null, newTokens.accessToken);
-
-      originalRequest.headers.Authorization = `Bearer ${newTokens.accessToken}`;
-      return api(originalRequest);
-    } catch (refreshError) {
-      processPendingQueue(refreshError, null);
-      console.warn('[Mock Mode] Refresh token failed - Bypassing redirect to sign-in');
-      return Promise.reject(refreshError);
-    } finally {
-      isRefreshing = false;
     }
-  }
+    return Promise.reject(error);
+  },
 );
 
 export default api;

@@ -1,6 +1,7 @@
 package com.ecotel.thong_ke_cao_son.dto.request;
 
 import com.ecotel.thong_ke_cao_son.enums.LoadLevelType;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import lombok.Getter;
@@ -39,11 +40,13 @@ public class TransportReportTripRequest {
     @NotNull(message = "Loại hàng là bắt buộc")
     private Long cargoTypeId;
 
+    @NotNull(message = "Số chuyến là bắt buộc")
+    @Min(value = 1, message = "Số chuyến phải >= 1")
     private Integer tripCount;
 
     @NotNull(message = "Mức tải là bắt buộc")
     private LoadLevelType loadLevelType;
 
-    @Pattern(regexp = "^\\d+/\\d+$", message = "Giá trị mức tải phải dạng x/y, ví dụ 1/2")
+    @Pattern(regexp = "^\\d+/[1-9]\\d*$", message = "Giá trị mức tải phải dạng x/y (y >= 1), ví dụ 1/2")
     private String loadLevelCustomValue;
 }
