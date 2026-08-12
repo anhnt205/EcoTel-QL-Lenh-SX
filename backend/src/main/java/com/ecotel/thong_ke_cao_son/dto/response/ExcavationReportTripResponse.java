@@ -17,9 +17,6 @@ public class ExcavationReportTripResponse {
 
     private Integer tripCount;
 
-    private Long dropOffLocationId;
-    private String dropOffLocationName;
-
     private Long cargoTypeId;
     private String cargoTypeName;
 

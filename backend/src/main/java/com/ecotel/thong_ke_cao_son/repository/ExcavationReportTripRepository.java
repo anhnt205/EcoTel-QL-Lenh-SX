@@ -11,19 +11,17 @@ import java.util.List;
 public interface ExcavationReportTripRepository extends JpaRepository<ExcavationReportTrip, Long> {
 
     @Query("""
-            SELECT t FROM TransportReportTrip t
-            JOIN FETCH t.transportReport r
+            SELECT t FROM ExcavationReportTrip t
+            JOIN FETCH t.excavationReport r
             JOIN FETCH r.shift
-            JOIN FETCH r.device
+            JOIN FETCH r.excavatorDevice
             JOIN FETCH r.employee
-            JOIN FETCH t.excavationArea
-            JOIN FETCH t.excavator
-            JOIN FETCH t.loadingPoint
-            JOIN FETCH t.unloadingPoint
+            JOIN FETCH t.vehicle
             JOIN FETCH t.cargoType
+            JOIN FETCH t.cargoGroup
             WHERE r.reportDate BETWEEN :fromDate AND :toDate
               AND (:shiftIds IS NULL OR r.shift.id IN :shiftIds)
-              AND (:deviceIds IS NULL OR r.device.id IN :deviceIds)
+              AND (:deviceIds IS NULL OR t.vehicle.id IN :deviceIds)
             ORDER BY r.reportDate, t.id
             """)
     List<ExcavationReportTrip> findForReconciliation(

@@ -29,30 +29,34 @@ public class TransportReportTrip {
     @JoinColumn(name = "transport_report_id", nullable = false)
     private TransportReport transportReport;
 
-    // "Khu vực xúc"
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "vehicle_id", nullable = false)
+    private Device vehicle;
+
+    @Column(name = "rainy_day", nullable = false)
+    private Boolean rainyDay = false;
+
+    @Column(name = "supplementary_vehicle", nullable = false)
+    private Boolean supplementaryVehicle = false;
+
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "excavation_area_id", nullable = false)
     private Location excavationArea;
 
-    // "Máy xúc" — cũng là 1 Device (lọc theo category.name ở tầng API, không ràng buộc cứng ở entity)
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "excavator_device_id", nullable = false)
     private Device excavator;
 
-    // "Nơi nhận tải"
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "loading_point_id", nullable = false)
     private Location loadingPoint;
 
-    // "Tầng nhận tải" — lưu số để tính "Nhóm tầng nhận tải"
     @Column(name = "receiving_floor")
     private Integer receivingFloor;
 
-    // "Nhóm tầng nhận tải" — tính tự động, không cho nhập tay
     @Column(name = "receiving_floor_group")
     private Integer receivingFloorGroup;
 
-    // "Tầng dỡ tải" — giữ String vì không có công thức tính, đúng như mô tả "(text)"
     @Column(name = "unloading_floor")
     private String unloadingFloor;
 
@@ -68,7 +72,6 @@ public class TransportReportTrip {
     @Column(name = "local_slope_m")
     private Double localSlopeM;
 
-    // "Nơi dỡ tải"
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "unloading_point_id", nullable = false)
     private Location unloadingPoint;

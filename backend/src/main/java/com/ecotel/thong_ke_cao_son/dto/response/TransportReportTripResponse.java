@@ -9,12 +9,19 @@ import lombok.Getter;
 public class TransportReportTripResponse {
     private Long id;
 
+    private Long vehicleId;
+    private String vehicleCode;
+    private String vehicleName;
+    private String vehicleDepartmentName; // "Đơn vị quản lý thiết bị"
+    private String vehicleCategoryName;   // "Chủng loại xe"
+
+    private Boolean rainyDay;
+    private Boolean supplementaryVehicle;
+
     private Long excavationAreaId;
     private String excavationAreaName;
-
     private Long excavatorDeviceId;
     private String excavatorDeviceName;
-
     private Long loadingPointId;
     private String loadingPointName;
 
@@ -32,7 +39,6 @@ public class TransportReportTripResponse {
 
     private Long cargoTypeId;
     private String cargoTypeName;
-
     private Long cargoGroupId;
     private String cargoGroupName;
 

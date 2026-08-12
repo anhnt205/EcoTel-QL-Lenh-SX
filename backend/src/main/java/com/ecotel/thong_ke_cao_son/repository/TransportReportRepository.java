@@ -14,19 +14,44 @@ import java.util.Optional;
 public interface TransportReportRepository extends JpaRepository<TransportReport, Long> {
 
     @Query("""
-    SELECT r FROM TransportReport r
-    WHERE r.reportDate BETWEEN :fromDate AND :toDate
-      AND (:shiftIds IS NULL OR r.shift.id IN :shiftIds)
-      AND (:deviceIds IS NULL OR r.device.id IN :deviceIds)
-    ORDER BY r.reportDate DESC
-    """)
-    Page<TransportReport> search(
+        SELECT DISTINCT r.id FROM TransportReport r
+        JOIN r.trips t
+        WHERE r.reportDate BETWEEN :fromDate AND :toDate
+          AND (:shiftIds IS NULL OR r.shift.id IN :shiftIds)
+          AND (:deviceIds IS NULL OR t.vehicle.id IN :deviceIds)
+        ORDER BY r.reportDate DESC
+        """)
+    Page<Long> searchIds(
             @Param("fromDate") LocalDate fromDate,
             @Param("toDate") LocalDate toDate,
             @Param("shiftIds") List<Long> shiftIds,
             @Param("deviceIds") List<Long> deviceIds,
             Pageable pageable);
 
-    Optional<TransportReport> findByReportDateAndShiftIdAndDeviceIdAndEmployeeId(
-            LocalDate reportDate, Long shiftId, Long deviceId, Long employeeId);
+    @Query("""
+        SELECT r FROM TransportReport r
+        JOIN FETCH r.shift
+        JOIN FETCH r.employee
+        WHERE r.id IN :ids
+        ORDER BY r.reportDate DESC
+        """)
+    List<TransportReport> findAllByIdWithDetails(@Param("ids") List<Long> ids);
+
+    Optional<TransportReport> findByReportDateAndShiftIdAndEmployeeId(
+            LocalDate reportDate, Long shiftId, Long employeeId);
+
+
+    @Query("""
+    SELECT DISTINCT r.id FROM TransportReport r
+    JOIN r.trips t
+    WHERE r.reportDate BETWEEN :fromDate AND :toDate
+      AND (:shiftIds IS NULL OR r.shift.id IN :shiftIds)
+      AND (:deviceIds IS NULL OR t.vehicle.id IN :deviceIds)
+    ORDER BY r.reportDate DESC
+    """)
+    List<Long> searchAllIds(
+            @Param("fromDate") LocalDate fromDate,
+            @Param("toDate") LocalDate toDate,
+            @Param("shiftIds") List<Long> shiftIds,
+            @Param("deviceIds") List<Long> deviceIds);
 }

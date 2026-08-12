@@ -44,21 +44,9 @@ public class TransportReport {
     @JoinColumn(name = "shift_id", nullable = false)
     private Shift shift;
 
-    // "Số xe" — xe thực hiện chuyến, tham chiếu Device
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "device_id", nullable = false)
-    private Device device;
-
-    // "Số thẻ lương" / "Họ và tên" / "Đơn vị" — derive từ User này
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "employee_id", nullable = false)
     private User employee;
-
-    @Column(name = "rainy_day", nullable = false)
-    private Boolean rainyDay = false;
-
-    @Column(name = "supplementary_vehicle", nullable = false)
-    private Boolean supplementaryVehicle = false;
 
     @Column(name = "fuel_beginning")
     private Double fuelBeginning;
@@ -69,7 +57,6 @@ public class TransportReport {
     @Column(name = "fuel_received")
     private Double fuelReceived;
 
-    // Nhiên liệu sử dụng = tồn đầu + lĩnh - tồn cuối — tính tự động, không cho nhập tay
     @Column(name = "fuel_used")
     private Double fuelUsed;
 

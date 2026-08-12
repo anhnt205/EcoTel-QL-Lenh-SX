@@ -15,9 +15,9 @@ import java.util.List;
 public class TransportReportExcelExporter {
 
     private static final String[] HEADERS = {
-            "Thời gian", "Ca", "Số xe", "Số thẻ lương",
-            "Họ và tên", "Đơn vị", "Ngày mưa", "Xe bổ túc",
+            "Thời gian", "Ca", "Số thẻ lương", "Họ và tên", "Đơn vị",
             "Nhiên liệu tồn đầu", "Nhiên liệu tồn cuối", "Nhiên liệu lĩnh", "Nhiên liệu sử dụng",
+            "Số xe", "Ngày mưa", "Xe bổ túc",
             "Khu vực xúc", "Máy xúc", "Nơi nhận tải", "Tầng nhận tải", "Nhóm tầng nhận tải",
             "Tầng dỡ tải", "Cung độ toàn tuyến (km)", "Nâng tải toàn tuyến (m)",
             "Cung độ dốc cục bộ (km)", "Dốc cục bộ (m)", "Nơi dỡ tải", "Loại hàng", "Nhóm hàng",
@@ -25,10 +25,10 @@ public class TransportReportExcelExporter {
             "Đơn vị quản lý thiết bị", "Chủng loại xe"
     };
 
-    // Độ rộng cột tính theo đơn vị character-width * 256 (chuẩn Apache POI)
     private static final int[] COLUMN_WIDTHS = {
-            12, 6, 12, 14, 22, 18, 10, 10,
+            12, 6, 14, 22, 18,
             14, 14, 12, 14,
+            12, 10, 10,
             16, 12, 16, 12, 14,
             14, 16, 16,
             16, 12, 16, 16, 16,
@@ -48,7 +48,7 @@ public class TransportReportExcelExporter {
             CellStyle numericDataStyle = buildDataStyle(workbook, true);
 
             Row headerRow = sheet.createRow(0);
-            headerRow.setHeightInPoints(32); // padding trên/dưới lớn hơn nhờ tăng chiều cao dòng
+            headerRow.setHeightInPoints(32);
             for (int i = 0; i < HEADERS.length; i++) {
                 Cell cell = headerRow.createCell(i);
                 cell.setCellValue(HEADERS[i]);
@@ -67,7 +67,7 @@ public class TransportReportExcelExporter {
                 }
             }
 
-            sheet.createFreezePane(0, 1); // cố định dòng header khi cuộn
+            sheet.createFreezePane(0, 1);
 
             workbook.write(out);
             return out.toByteArray();
@@ -78,18 +78,15 @@ public class TransportReportExcelExporter {
 
     private void writeRow(Row row, TransportReport report, TransportReportTrip trip,
                           CellStyle dataStyle, CellStyle numericDataStyle) {
-        row.setHeightInPoints(-1); // để Excel/LibreOffice tự tính chiều cao theo nội dung wrap
+        row.setHeightInPoints(-1);
         int c = 0;
 
         setText(row, c++, report.getReportDate().format(DATE_FMT), dataStyle);
         setNumeric(row, c++, report.getShift().getName(), numericDataStyle);
-        setText(row, c++, report.getDevice().getCode(), dataStyle);
         setText(row, c++, report.getEmployee().getSalaryCode(), dataStyle);
         setText(row, c++, report.getEmployee().getFullName(), dataStyle);
         setText(row, c++, report.getEmployee().getDepartment() != null
                 ? report.getEmployee().getDepartment().getName() : "", dataStyle);
-        setText(row, c++, Boolean.TRUE.equals(report.getRainyDay()) ? "x" : "", dataStyle);
-        setText(row, c++, Boolean.TRUE.equals(report.getSupplementaryVehicle()) ? "x" : "", dataStyle);
         setNumeric(row, c++, report.getFuelBeginning(), numericDataStyle);
         setNumeric(row, c++, report.getFuelEnding(), numericDataStyle);
         setNumeric(row, c++, report.getFuelReceived(), numericDataStyle);
@@ -103,6 +100,9 @@ public class TransportReportExcelExporter {
             return;
         }
 
+        setText(row, c++, trip.getVehicle().getCode(), dataStyle);
+        setText(row, c++, Boolean.TRUE.equals(trip.getRainyDay()) ? "x" : "", dataStyle);
+        setText(row, c++, Boolean.TRUE.equals(trip.getSupplementaryVehicle()) ? "x" : "", dataStyle);
         setText(row, c++, trip.getExcavationArea().getName(), dataStyle);
         setText(row, c++, trip.getExcavator().getCode(), dataStyle);
         setText(row, c++, trip.getLoadingPoint().getName(), dataStyle);
@@ -119,10 +119,10 @@ public class TransportReportExcelExporter {
         setNumeric(row, c++, trip.getTripCount() != null ? trip.getTripCount().doubleValue() : null, numericDataStyle);
         setText(row, c++, loadLevelLabel(trip.getLoadLevel().getType()), dataStyle);
         setText(row, c++, trip.getLoadLevel().getCustomValue() != null ? trip.getLoadLevel().getCustomValue() : "", dataStyle);
-        setText(row, c++, trip.getExcavator().getDepartment() != null
-                ? trip.getExcavator().getDepartment().getName() : "", dataStyle);
-        setText(row, c, trip.getExcavator().getCategory() != null
-                ? trip.getExcavator().getCategory().getName() : "", dataStyle);
+        setText(row, c++, trip.getVehicle().getDepartment() != null
+                ? trip.getVehicle().getDepartment().getName() : "", dataStyle);
+        setText(row, c, trip.getVehicle().getCategory() != null
+                ? trip.getVehicle().getCategory().getName() : "", dataStyle);
     }
 
     private void setText(Row row, int col, String value, CellStyle style) {
@@ -178,21 +178,14 @@ public class TransportReportExcelExporter {
         style.setFont(font);
         style.setAlignment(numeric ? HorizontalAlignment.RIGHT : HorizontalAlignment.LEFT);
         style.setVerticalAlignment(VerticalAlignment.CENTER);
-        style.setWrapText(true); // xuống dòng thay vì ẩn khi text dài hơn độ rộng cột
+        style.setWrapText(true);
         applyBorder(style);
         applyPadding(style);
         return style;
     }
 
-    /**
-     * Apache POI (chuẩn OOXML) không có thuộc tính "padding" trực tiếp như CSS.
-     * Cách xấp xỉ padding trên/dưới lớn hơn 2 bên:
-     * - Padding trên/dưới: dùng setHeightInPoints ở dòng header (đã set 32pt ở trên)
-     *   + verticalAlignment CENTER để nội dung không dính sát viền trên/dưới.
-     * - Padding trái/phải: dùng setIndention (thụt lề nhẹ), tương đương padding ngang nhỏ hơn.
-     */
     private void applyPadding(CellStyle style) {
-        style.setIndention((short) 1); // thụt lề nhẹ 2 bên, giữ trống hẹp hơn khoảng trên/dưới
+        style.setIndention((short) 1);
     }
 
     private void applyBorder(CellStyle style) {

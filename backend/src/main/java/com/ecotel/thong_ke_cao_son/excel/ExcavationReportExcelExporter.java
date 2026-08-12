@@ -101,7 +101,6 @@ public class ExcavationReportExcelExporter {
 
         setText(row, c++, trip.getVehicle().getCode(), dataStyle);
         setNumeric(row, c++, trip.getTripCount() != null ? trip.getTripCount().doubleValue() : null, numericDataStyle);
-        setText(row, c++, trip.getDropOffLocation().getName(), dataStyle);
         setText(row, c++, trip.getCargoType().getName(), dataStyle);
         setText(row, c++, trip.getCargoGroup().getName(), dataStyle);
         setText(row, c++, loadLevelLabel(trip.getLoadLevel().getType()), dataStyle);

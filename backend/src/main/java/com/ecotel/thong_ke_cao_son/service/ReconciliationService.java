@@ -78,7 +78,7 @@ public class ReconciliationService {
     private String buildTransportKey(TransportReportTrip tt) {
         TransportReport header = tt.getTransportReport();
         return header.getReportDate() + "_" + header.getShift().getId() + "_"
-                + header.getDevice().getId() + "_" + tt.getExcavator().getId();
+                + tt.getVehicle().getId() + "_" + tt.getExcavator().getId();
     }
 
     private String buildExcavationKey(ExcavationReportTrip et) {
@@ -95,7 +95,7 @@ public class ReconciliationService {
             builder.transportReportTripId(tt.getId())
                     .reportDate(header.getReportDate())
                     .shiftName(header.getShift().getName())
-                    .vehicleCode(header.getDevice().getCode())
+                    .vehicleCode(tt.getVehicle().getCode())   // đổi từ header.getDevice() -> tt.getVehicle()
                     .excavationAreaName(tt.getExcavationArea().getName())
                     .excavatorName(tt.getExcavator().getName())
                     .loadingPointName(tt.getLoadingPoint().getName())
@@ -106,8 +106,8 @@ public class ReconciliationService {
                     .localSlopeDistanceKm(tt.getLocalSlopeDistanceKm())
                     .localSlopeM(tt.getLocalSlopeM())
                     .unloadingPointName(tt.getUnloadingPoint().getName())
-                    .rainyDay(header.getRainyDay())
-                    .supplementaryVehicle(header.getSupplementaryVehicle())
+                    .rainyDay(tt.getRainyDay())                          // đổi từ header -> trip
+                    .supplementaryVehicle(tt.getSupplementaryVehicle())  // đổi từ header -> trip
                     .transportData(ReconciliationTripDataResponse.builder()
                             .cargoTypeName(tt.getCargoType().getName())
                             .tripCount(tt.getTripCount())
@@ -116,8 +116,6 @@ public class ReconciliationService {
                             .employeeSalaryCode(header.getEmployee().getSalaryCode())
                             .build());
         } else {
-            // Chỉ có ở Khai thác — không có dữ liệu chi tiết Vận tải,
-            // chỉ điền được các field trùng khóa (ngày/ca/xe/máy xúc).
             ExcavationReport header = et.getExcavationReport();
             builder.reportDate(header.getReportDate())
                     .shiftName(header.getShift().getName())

@@ -53,7 +53,6 @@ public class ExcavationReportExcelImporter {
                 rowData.put("fuelReceived", formatter.formatCellValue(row.getCell(10)).trim());
                 rowData.put("vehicleCode", formatter.formatCellValue(row.getCell(12)).trim());
                 rowData.put("tripCount", formatter.formatCellValue(row.getCell(13)).trim());
-                rowData.put("dropOffLocationName", formatter.formatCellValue(row.getCell(14)).trim());
                 rowData.put("cargoTypeName", formatter.formatCellValue(row.getCell(15)).trim());
                 rowData.put("loadLevelLabel", formatter.formatCellValue(row.getCell(17)).trim());
                 rowData.put("loadLevelCustomValue", formatter.formatCellValue(row.getCell(18)).trim());
@@ -150,7 +149,6 @@ public class ExcavationReportExcelImporter {
 
         trip.setVehicle(findOrThrow(deviceRepository.findByCode(row.get("vehicleCode")), "Số xe", row.get("vehicleCode")));
         trip.setTripCount(parseIntOrNull(row.get("tripCount")));
-        trip.setDropOffLocation(findOrThrow(locationRepository.findByName(row.get("dropOffLocationName")), "Vị trí đổ", row.get("dropOffLocationName")));
 
         CargoType cargoType = findOrThrow(cargoTypeRepository.findByName(row.get("cargoTypeName")), "Loại hàng", row.get("cargoTypeName"));
         trip.setCargoType(cargoType);
@@ -172,7 +170,6 @@ public class ExcavationReportExcelImporter {
     private boolean isSameTrip(ExcavationReportTrip a, ExcavationReportTrip b) {
         return Objects.equals(a.getVehicle().getId(), b.getVehicle().getId())
                 && Objects.equals(a.getTripCount(), b.getTripCount())
-                && Objects.equals(a.getDropOffLocation().getId(), b.getDropOffLocation().getId())
                 && Objects.equals(a.getCargoType().getId(), b.getCargoType().getId())
                 && a.getLoadLevel().getType() == b.getLoadLevel().getType()
                 && Objects.equals(a.getLoadLevel().getCustomValue(), b.getLoadLevel().getCustomValue());

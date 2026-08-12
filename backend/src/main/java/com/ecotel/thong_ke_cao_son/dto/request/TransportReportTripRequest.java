@@ -10,6 +10,12 @@ import lombok.Setter;
 @Setter
 public class TransportReportTripRequest {
 
+    @NotNull(message = "Số xe là bắt buộc")
+    private Long vehicleId;
+
+    private Boolean rainyDay = false;
+    private Boolean supplementaryVehicle = false;
+
     @NotNull(message = "Khu vực xúc là bắt buộc")
     private Long excavationAreaId;
 
@@ -36,8 +42,8 @@ public class TransportReportTripRequest {
     private Integer tripCount;
 
     @NotNull(message = "Mức tải là bắt buộc")
-    private LoadLevelType loadLevelType; // FULL_LOAD, RODA_2_3, OTHER
+    private LoadLevelType loadLevelType;
 
     @Pattern(regexp = "^\\d+/\\d+$", message = "Giá trị mức tải phải dạng x/y, ví dụ 1/2")
-    private String loadLevelCustomValue; // chỉ bắt buộc khi loadLevelType = OTHER
+    private String loadLevelCustomValue;
 }

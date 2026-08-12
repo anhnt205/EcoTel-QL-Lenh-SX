@@ -46,13 +46,13 @@ public class TransportReportExcelImporter {
                 rowData.put("_excelRow", String.valueOf(r + 1));
                 rowData.put("reportDate", formatter.formatCellValue(row.getCell(0)).trim());
                 rowData.put("shiftName", formatter.formatCellValue(row.getCell(1)).trim());
-                rowData.put("deviceCode", formatter.formatCellValue(row.getCell(2)).trim());
-                rowData.put("salaryCode", formatter.formatCellValue(row.getCell(3)).trim());
-                rowData.put("rainyDay", formatter.formatCellValue(row.getCell(6)).trim());
-                rowData.put("supplementaryVehicle", formatter.formatCellValue(row.getCell(7)).trim());
-                rowData.put("fuelBeginning", formatter.formatCellValue(row.getCell(8)).trim());
-                rowData.put("fuelEnding", formatter.formatCellValue(row.getCell(9)).trim());
-                rowData.put("fuelReceived", formatter.formatCellValue(row.getCell(10)).trim());
+                rowData.put("salaryCode", formatter.formatCellValue(row.getCell(2)).trim());
+                rowData.put("fuelBeginning", formatter.formatCellValue(row.getCell(5)).trim());
+                rowData.put("fuelEnding", formatter.formatCellValue(row.getCell(6)).trim());
+                rowData.put("fuelReceived", formatter.formatCellValue(row.getCell(7)).trim());
+                rowData.put("vehicleCode", formatter.formatCellValue(row.getCell(9)).trim());
+                rowData.put("rainyDay", formatter.formatCellValue(row.getCell(10)).trim());
+                rowData.put("supplementaryVehicle", formatter.formatCellValue(row.getCell(11)).trim());
                 rowData.put("excavationAreaName", formatter.formatCellValue(row.getCell(12)).trim());
                 rowData.put("excavatorCode", formatter.formatCellValue(row.getCell(13)).trim());
                 rowData.put("loadingPointName", formatter.formatCellValue(row.getCell(14)).trim());
@@ -74,7 +74,7 @@ public class TransportReportExcelImporter {
             throw new RuntimeException("Không đọc được file Excel: " + e.getMessage(), e);
         }
 
-        // Gom nhóm theo key: Thời gian + Ca + Số xe + Số thẻ lương — xác định 1 báo cáo
+        // Gom nhóm theo key: Thời gian + Ca + Số thẻ lương (KHÔNG còn Số xe — đã chuyển xuống trip)
         List<List<Map<String, String>>> groups = groupRows(rawRows);
 
         int successCount = 0;
@@ -114,8 +114,7 @@ public class TransportReportExcelImporter {
     }
 
     private String buildHeaderKey(Map<String, String> row) {
-        return row.get("reportDate") + "|" + row.get("shiftName") + "|"
-                + row.get("deviceCode") + "|" + row.get("salaryCode");
+        return row.get("reportDate") + "|" + row.get("shiftName") + "|" + row.get("salaryCode");
     }
 
     private void processGroup(List<Map<String, String>> group) {
@@ -123,30 +122,21 @@ public class TransportReportExcelImporter {
 
         LocalDate reportDate = parseDate(firstRow.get("reportDate"));
         Shift shift = findOrThrow(shiftRepository.findByName(parseInt(firstRow.get("shiftName"))), "Ca", firstRow.get("shiftName"));
-        Device device = findOrThrow(deviceRepository.findByCode(firstRow.get("deviceCode")), "Số xe", firstRow.get("deviceCode"));
         User employee = findOrThrow(userRepository.findBySalaryCode(firstRow.get("salaryCode")), "Số thẻ lương", firstRow.get("salaryCode"));
 
-        // Xác định báo cáo mới hay đã tồn tại dựa trên Thời gian + Ca + Số xe + Số thẻ lương
+        // Xác định báo cáo mới hay đã tồn tại: Thời gian + Ca + Số thẻ lương (không còn Số xe)
         TransportReport report = transportReportRepository
-                .findByReportDateAndShiftIdAndDeviceIdAndEmployeeId(reportDate, shift.getId(), device.getId(), employee.getId())
+                .findByReportDateAndShiftIdAndEmployeeId(reportDate, shift.getId(), employee.getId())
                 .orElseGet(TransportReport::new);
 
         report.setReportDate(reportDate);
         report.setShift(shift);
-        report.setDevice(device);
         report.setEmployee(employee);
-        report.setRainyDay("x".equalsIgnoreCase(firstRow.get("rainyDay")));
-        report.setSupplementaryVehicle("x".equalsIgnoreCase(firstRow.get("supplementaryVehicle")));
         report.setFuelBeginning(parseDouble(firstRow.get("fuelBeginning")));
         report.setFuelEnding(parseDouble(firstRow.get("fuelEnding")));
         report.setFuelReceived(parseDouble(firstRow.get("fuelReceived")));
         report.recalculateFuelUsed();
 
-        // Vì không còn ID chuyến để phân biệt sửa/thêm, và yêu cầu "chỉ thêm, không xóa":
-        // mỗi dòng trong file được coi là 1 chuyến cần có mặt trong báo cáo.
-        // Nếu báo cáo đã tồn tại 1 chuyến với đúng nội dung (dedup theo toàn bộ field),
-        // bỏ qua để tránh tạo trùng lặp khi import lại cùng file nhiều lần.
-        // Ngược lại, thêm chuyến mới.
         for (Map<String, String> row : group) {
             TransportReportTrip newTrip = buildTrip(row);
             boolean alreadyExists = report.getTrips().stream().anyMatch(existing -> isSameTrip(existing, newTrip));
@@ -161,6 +151,10 @@ public class TransportReportExcelImporter {
 
     private TransportReportTrip buildTrip(Map<String, String> row) {
         TransportReportTrip trip = new TransportReportTrip();
+
+        trip.setVehicle(findOrThrow(deviceRepository.findByCode(row.get("vehicleCode")), "Số xe", row.get("vehicleCode")));
+        trip.setRainyDay("x".equalsIgnoreCase(row.get("rainyDay")));
+        trip.setSupplementaryVehicle("x".equalsIgnoreCase(row.get("supplementaryVehicle")));
 
         Location excavationArea = findOrThrow(
                 locationRepository.findByName(row.get("excavationAreaName")), "Khu vực xúc", row.get("excavationAreaName"));
@@ -198,12 +192,11 @@ public class TransportReportExcelImporter {
         return trip;
     }
 
-    /**
-     * So sánh 2 chuyến có cùng nội dung hay không — dùng để tránh tạo trùng lặp
-     * khi người dùng import lại đúng file nhiều lần (do không còn ID để đối chiếu).
-     */
     private boolean isSameTrip(TransportReportTrip a, TransportReportTrip b) {
-        return Objects.equals(a.getExcavationArea().getId(), b.getExcavationArea().getId())
+        return Objects.equals(a.getVehicle().getId(), b.getVehicle().getId())
+                && Objects.equals(a.getRainyDay(), b.getRainyDay())
+                && Objects.equals(a.getSupplementaryVehicle(), b.getSupplementaryVehicle())
+                && Objects.equals(a.getExcavationArea().getId(), b.getExcavationArea().getId())
                 && Objects.equals(a.getExcavator().getId(), b.getExcavator().getId())
                 && Objects.equals(a.getLoadingPoint().getId(), b.getLoadingPoint().getId())
                 && Objects.equals(a.getUnloadingPoint().getId(), b.getUnloadingPoint().getId())
@@ -260,7 +253,7 @@ public class TransportReportExcelImporter {
     }
 
     private boolean isRowEmpty(Row row, DataFormatter formatter) {
-        for (int c = 0; c < 4; c++) {
+        for (int c = 0; c < 3; c++) {
             if (!formatter.formatCellValue(row.getCell(c)).trim().isEmpty()) return false;
         }
         return true;

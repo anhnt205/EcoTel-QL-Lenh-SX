@@ -92,10 +92,7 @@ public class TransportReportController {
             @RequestParam(required = false) List<Long> shiftIds,
             @RequestParam(required = false) List<Long> deviceIds) {
 
-        List<TransportReport> reports = transportReportRepository
-                .search(fromDate, toDate, shiftIds, deviceIds, Pageable.unpaged())
-                .getContent();
-
+        List<TransportReport> reports = transportReportService.findAllForExport(fromDate, toDate, shiftIds, deviceIds);
         byte[] excelBytes = transportReportExcelExporter.export(reports);
 
         String filename = "bao-cao-van-tai_" + fromDate + "_" + toDate + ".xlsx";

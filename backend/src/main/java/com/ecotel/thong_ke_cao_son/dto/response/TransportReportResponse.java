@@ -16,19 +16,10 @@ public class TransportReportResponse {
     private Long shiftId;
     private Integer shiftName;
 
-    private Long deviceId;
-    private String deviceCode;
-    private String deviceName;
-    private String deviceDepartmentName; // "Đơn vị quản lý thiết bị"
-    private String deviceCategoryName;   // "Chủng loại xe"
-
     private Long employeeId;
-    private String employeeSalaryCode;   // "Số thẻ lương"
-    private String employeeFullName;     // "Họ và tên"
-    private String employeeDepartmentName; // "Đơn vị"
-
-    private Boolean rainyDay;
-    private Boolean supplementaryVehicle;
+    private String employeeSalaryCode;
+    private String employeeFullName;
+    private String employeeDepartmentName;
 
     private Double fuelBeginning;
     private Double fuelEnding;

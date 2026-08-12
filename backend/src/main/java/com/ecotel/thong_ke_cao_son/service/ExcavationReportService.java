@@ -104,8 +104,6 @@ public class ExcavationReportService {
         trip.setExcavationReport(report);
 
         trip.setVehicle(getOrThrow(deviceRepository, tripReq.getVehicleId(), "Số xe"));
-        trip.setDropOffLocation(getOrThrow(locationRepository, tripReq.getDropOffLocationId(), "Vị trí đổ"));
-
         CargoType cargoType = getOrThrow(cargoTypeRepository, tripReq.getCargoTypeId(), "Loại hàng");
         trip.setCargoType(cargoType);
         trip.setCargoGroup(cargoType.getCargoGroup()); // tự động lấy theo Loại hàng

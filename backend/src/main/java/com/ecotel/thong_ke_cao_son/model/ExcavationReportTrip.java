@@ -37,11 +37,6 @@ public class ExcavationReportTrip {
     @Column(name = "trip_count")
     private Integer tripCount;
 
-    // "Vị trí đổ"
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "drop_off_location_id", nullable = false)
-    private Location dropOffLocation;
-
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "cargo_type_id", nullable = false)
     private CargoType cargoType;

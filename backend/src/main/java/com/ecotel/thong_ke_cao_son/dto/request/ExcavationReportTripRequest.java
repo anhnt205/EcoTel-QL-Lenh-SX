@@ -15,9 +15,6 @@ public class ExcavationReportTripRequest {
 
     private Integer tripCount;
 
-    @NotNull(message = "Vị trí đổ là bắt buộc")
-    private Long dropOffLocationId;
-
     @NotNull(message = "Loại hàng là bắt buộc")
     private Long cargoTypeId;
 

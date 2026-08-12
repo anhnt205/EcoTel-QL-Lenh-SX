@@ -12,15 +12,15 @@ import com.ecotel.thong_ke_cao_son.mapper.TransportReportMapper;
 import com.ecotel.thong_ke_cao_son.repository.*;
 import lombok.RequiredArgsConstructor;
 import com.ecotel.thong_ke_cao_son.dto.response.PageResponse;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -76,13 +76,32 @@ public class TransportReportService {
         return transportReportMapper.toResponse(report);
     }
 
+    // TransportReportService.search() — cập nhật để dùng 2 bước
     @Transactional(readOnly = true)
     public PageResponse<TransportReportResponse> search(LocalDate fromDate, LocalDate toDate,
                                                        List<Long> shiftIds, List<Long> deviceIds,
                                                        Pageable pageable) {
-        return PageResponse.from(
-                transportReportRepository.search(fromDate, toDate, shiftIds, deviceIds, pageable)
-                        .map(transportReportMapper::toResponse));
+        Page<Long> idPage = transportReportRepository.searchIds(fromDate, toDate, shiftIds, deviceIds, pageable);
+        List<TransportReport> reports = transportReportRepository.findAllByIdWithDetails(idPage.getContent());
+
+        // Giữ đúng thứ tự theo idPage (JPA IN không đảm bảo thứ tự trả về)
+        Map<Long, TransportReport> reportById = reports.stream()
+                .collect(Collectors.toMap(TransportReport::getId, r -> r));
+        List<TransportReportResponse> content = idPage.getContent().stream()
+                .map(reportById::get)
+                .filter(Objects::nonNull)
+                .map(transportReportMapper::toResponse)
+                .toList();
+
+        return PageResponse.from(new PageImpl<>(content, pageable, idPage.getTotalElements()));
+    }
+
+    // Thêm vào TransportReportService
+    @Transactional(readOnly = true)
+    public List<TransportReport> findAllForExport(LocalDate fromDate, LocalDate toDate,
+                                                  List<Long> shiftIds, List<Long> deviceIds) {
+        List<Long> ids = transportReportRepository.searchAllIds(fromDate, toDate, shiftIds, deviceIds);
+        return transportReportRepository.findAllByIdWithDetails(ids);
     }
 
     @Transactional
@@ -96,7 +115,6 @@ public class TransportReportService {
 
     private void applyRelations(TransportReport report, TransportReportRequest request) {
         report.setShift(getOrThrow(shiftRepository, request.getShiftId(), "Ca"));
-        report.setDevice(getOrThrow(deviceRepository, request.getDeviceId(), "Xe"));
         report.setEmployee(getOrThrow(userRepository, request.getEmployeeId(), "Nhân viên"));
     }
 
@@ -104,19 +122,20 @@ public class TransportReportService {
         TransportReportTrip trip = transportReportMapper.toTripEntity(tripReq);
         trip.setTransportReport(report);
 
+        trip.setVehicle(getOrThrow(deviceRepository, tripReq.getVehicleId(), "Số xe"));
+        trip.setRainyDay(tripReq.getRainyDay() != null ? tripReq.getRainyDay() : false);
+        trip.setSupplementaryVehicle(tripReq.getSupplementaryVehicle() != null ? tripReq.getSupplementaryVehicle() : false);
+
         Location excavationArea = getOrThrow(locationRepository, tripReq.getExcavationAreaId(), "Khu vực xúc");
         trip.setExcavationArea(excavationArea);
         trip.setExcavator(getOrThrow(deviceRepository, tripReq.getExcavatorDeviceId(), "Máy xúc"));
         trip.setLoadingPoint(getOrThrow(locationRepository, tripReq.getLoadingPointId(), "Nơi nhận tải"));
         trip.setUnloadingPoint(getOrThrow(locationRepository, tripReq.getUnloadingPointId(), "Nơi dỡ tải"));
 
-        // Loại hàng chọn trực tiếp; Nhóm hàng LUÔN lấy tự động theo cargoType.cargoGroup,
-        // không nhận cargoGroupId từ request (đúng nghiệp vụ: 1 Nhóm hàng có nhiều Loại hàng).
         CargoType cargoType = getOrThrow(cargoTypeRepository, tripReq.getCargoTypeId(), "Loại hàng");
         trip.setCargoType(cargoType);
         trip.setCargoGroup(cargoType.getCargoGroup());
 
-        // Nhóm tầng nhận tải — tính tự động, không nhận từ request
         trip.setReceivingFloorGroup(
                 floorGroupCalculator.calculate(excavationArea.getName(), tripReq.getReceivingFloor()));
 
