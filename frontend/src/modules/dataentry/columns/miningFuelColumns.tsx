@@ -52,7 +52,7 @@ export const getMiningFuelColumns = (
     id: "stt",
     header: "STT",
     cell: ({ row }) => (
-      <span className="text-gray-500 font-semibold">{row.index + 1}</span>
+      <span className="text-gray-500">{row.index + 1}</span>
     ),
     size: 65,
     enableSorting: false,
@@ -88,7 +88,7 @@ export const getMiningFuelColumns = (
     id: "shift",
     header: "Ca",
     cell: ({ row }) => (
-      <span className="font-semibold">{row.original.shift || "Ca 1"}</span>
+      <span>{row.original.shift || "Ca 1"}</span>
     ),
     size: 90,
   },
@@ -157,11 +157,18 @@ export const getMiningFuelColumns = (
     size: 190,
   },
   {
+    accessorKey: "departmentName",
+    id: "departmentName",
+    header: "Đơn vị (Báo cáo)",
+    cell: ({ row }) => row.original.departmentName || "-",
+    size: 160,
+  },
+  {
     accessorKey: "operatorUnit",
     id: "operatorUnit",
-    header: "Đơn vị",
+    header: "Đơn vị công tác",
     cell: ({ row }) => row.original.operatorUnit || "VT7",
-    size: 110,
+    size: 160,
   },
   {
     accessorKey: "initialFuel",
@@ -203,7 +210,7 @@ export const getMiningFuelColumns = (
             (Number(row.original.finalFuel) || 120),
         );
       return (
-        <span className="font-semibold">
+        <span>
           {fuelUsed}
         </span>
       );

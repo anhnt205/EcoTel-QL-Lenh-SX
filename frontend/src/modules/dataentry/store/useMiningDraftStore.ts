@@ -25,6 +25,7 @@ export const createDefaultSession = (): MiningSessionDraft => ({
   _tempId: `sess_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
   workingDate: todayStr(),
   shift: "",
+  department: "",
   pickupLocation: "",
   excavator: "",
   totalScoops: "",

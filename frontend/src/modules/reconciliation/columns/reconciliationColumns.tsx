@@ -32,7 +32,7 @@ export const getReconciliationColumns = (
     id: "shift",
     header: "Ca",
     cell: (info) => (
-      <div className="text-center font-semibold">
+      <div className="text-center">
         {info.getValue<string>()}
       </div>
     ),
@@ -42,7 +42,7 @@ export const getReconciliationColumns = (
     id: "vehicleNo",
     header: "Số xe",
     cell: (info) => (
-      <div className="font-bold text-blue-700 dark:text-blue-400">
+      <div className="text-blue-700 dark:text-blue-400">
         {info.getValue<string>()}
       </div>
     ),

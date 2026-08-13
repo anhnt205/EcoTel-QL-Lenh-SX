@@ -39,6 +39,7 @@ export const excavationTripReportRequestSchema = z.object({
   employeeId: z
     .number({ message: "Số thẻ lương là bắt buộc" })
     .min(1, "Số thẻ lương là bắt buộc"),
+  departmentId: z.number().nullable().optional(),
   trips: z
     .array(excavationTripReportTripRequestSchema)
     .min(1, "Cần ít nhất 1 chuyến"),
@@ -94,6 +95,8 @@ export interface ExcavationReportResponse {
   employeeSalaryCode: string;
   employeeFullName: string;
   employeeDepartmentName?: string;
+  departmentId?: number;
+  departmentName?: string;
   trips: ExcavationReportTripResponse[];
 }
 
@@ -115,6 +118,13 @@ export interface BulkDeleteResponse {
   deletedCount: number;
 }
 
+export interface ExcelImportResultResponse {
+  totalRows: number;
+  successReportCount: number;
+  errorRowCount: number;
+  errors: string[];
+}
+
 /**
  * Hàm hỗ trợ map dữ liệu từ 1 MiningSessionDraft (màn hình UI) thành ExcavationTripReportRequest (API Backend)
  */
@@ -127,6 +137,7 @@ export function buildExcavationReportRequest(
     rawVehicles: any[];
     rawUsers: any[];
     rawCargoTypes: any[];
+    rawDepartments?: any[];
   },
 ): ExcavationTripReportRequest {
   // 1. Map shiftId
@@ -180,6 +191,17 @@ export function buildExcavationReportRequest(
     );
   }
   const employeeId = Number(userItem.id);
+
+  // 4. Map departmentId (Đơn vị)
+  let departmentId: number | undefined;
+  if (sess.department && masterData.rawDepartments) {
+    const dept = masterData.rawDepartments.find(
+      (d) => String(d.name).trim().toLowerCase() === String(sess.department).trim().toLowerCase()
+    );
+    if (dept) {
+      departmentId = Number(dept.id);
+    }
+  }
 
   // 5. Map danh sách chuyến (trips)
   const trips: ExcavationTripReportTripRequest[] = sess.trips.map((t) => {
@@ -238,6 +260,7 @@ export function buildExcavationReportRequest(
     fuelEnding: Number(sess.finalFuel),
     fuelReceived: Number(sess.receivedFuel),
     employeeId,
+    departmentId,
     trips,
   };
 }
@@ -253,6 +276,7 @@ export function mapReportResponseToDraft(
     reportId: report.id,
     workingDate: report.reportDate || "",
     shift: report.shiftName || String(report.shiftId || ""),
+    department: report.departmentName || "",
     pickupLocation: report.receivingLocationName || "",
     excavator: report.excavatorDeviceCode || report.excavatorDeviceName || "",
     totalScoops: report.excavationFloor ? Number(report.excavationFloor) || "" : "",
@@ -376,8 +400,52 @@ export async function bulkDeleteExcavationTripReports(
 }
 
 /**
+ * Gọi API GET /api/excavation-reports/export
+ */
+export async function exportExcavationReports(params: {
+  fromDate: string;
+  toDate: string;
+  shiftIds?: number[];
+  excavatorIds?: number[];
+}): Promise<Blob> {
+  const res = await api.get("/excavation-reports/export", {
+    params,
+    responseType: "blob",
+  });
+  return res.data;
+}
+
+/**
+ * Gọi API POST /api/excavation-reports/import
+ */
+export async function importExcavationReports(
+  file: File,
+): Promise<ApiResponse<ExcelImportResultResponse>> {
+  const formData = new FormData();
+  formData.append("file", file);
+  const res = await api.post("/excavation-reports/import", formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });
+  return res.data;
+}
+
+/**
  * React Query Hooks
  */
+export function useImportExcavationReportsMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (file: File) => importExcavationReports(file),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["excavationReports"] });
+      queryClient.invalidateQueries({ queryKey: ["statistics"] });
+    },
+  });
+}
+
 export function useCreateExcavationTripReportMutation() {
   const queryClient = useQueryClient();
 

@@ -292,7 +292,9 @@ interface FinalChoiceCellProps {
 
 const FinalChoiceCell = React.memo<FinalChoiceCellProps>(
   ({ item, initialChoice, initialCustom, onChoiceChange }) => {
-    const [choice, setChoice] = useState<"VT" | "KT" | "OTHER" | null>(initialChoice);
+    const [choice, setChoice] = useState<"VT" | "KT" | "OTHER" | null>(
+      initialChoice,
+    );
     const [custom, setCustom] = useState(initialCustom);
 
     useEffect(() => {
@@ -611,7 +613,7 @@ export const ReconciliationComparisonTables: React.FC<
       {
         id: "group_common_info",
         header: () => (
-          <div className="text-center font-bold text-gray-800 dark:text-gray-200 text-xs">
+          <div className="text-center font-bold text-gray-800 dark:text-gray-200 ">
             THÔNG TIN CHUNG
           </div>
         ),
@@ -656,8 +658,7 @@ export const ReconciliationComparisonTables: React.FC<
           {
             id: "transCargo",
             header: "Loại hàng",
-            cell: ({ row }) =>
-              row.original.transportRecord?.cargoType || "-",
+            cell: ({ row }) => row.original.transportRecord?.cargoType || "-",
             size: 95,
           },
           {
@@ -907,29 +908,37 @@ export const ReconciliationComparisonTables: React.FC<
                   const colId = header.column.id;
 
                   // Distinct color styling ONLY for top-level group headers (row 1)
-                  let colorClass = "bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-200";
+                  let colorClass =
+                    "bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-200";
                   if (isTopLevelGroup) {
                     switch (colId) {
                       case "group_common_info":
-                        colorClass = "bg-slate-200 dark:bg-slate-800 text-slate-900 dark:text-slate-100 border-r-2 border-slate-300 dark:border-slate-700";
+                        colorClass =
+                          "bg-slate-200 dark:bg-slate-800 text-slate-900 dark:text-slate-100 border-r-2 border-slate-300 dark:border-slate-700";
                         break;
                       case "group_transport_data":
-                        colorClass = "bg-emerald-200 dark:bg-emerald-900 text-emerald-950 dark:text-emerald-100 border-r-2 border-emerald-300 dark:border-emerald-700";
+                        colorClass =
+                          "bg-emerald-200 dark:bg-emerald-900 text-emerald-950 dark:text-emerald-100 border-r-2 border-emerald-300 dark:border-emerald-700";
                         break;
                       case "group_mining_data":
-                        colorClass = "bg-blue-200 dark:bg-blue-900 text-blue-950 dark:text-blue-100 border-r-2 border-blue-300 dark:border-blue-700";
+                        colorClass =
+                          "bg-blue-200 dark:bg-blue-900 text-blue-950 dark:text-blue-100 border-r-2 border-blue-300 dark:border-blue-700";
                         break;
                       case "group_reconciliation_result":
-                        colorClass = "bg-amber-200 dark:bg-amber-900 text-amber-950 dark:text-amber-100 border-r-2 border-amber-300 dark:border-amber-700";
+                        colorClass =
+                          "bg-amber-200 dark:bg-amber-900 text-amber-950 dark:text-amber-100 border-r-2 border-amber-300 dark:border-amber-700";
                         break;
                       case "group_final_decision":
-                        colorClass = "bg-purple-200 dark:bg-purple-900 text-purple-950 dark:text-purple-100 border-r-2 border-purple-300 dark:border-purple-700";
+                        colorClass =
+                          "bg-purple-200 dark:bg-purple-900 text-purple-950 dark:text-purple-100 border-r-2 border-purple-300 dark:border-purple-700";
                         break;
                       case "actions":
-                        colorClass = "bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-300";
+                        colorClass =
+                          "bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-300";
                         break;
                       default:
-                        colorClass = "bg-gray-200 dark:bg-gray-800 text-gray-900 dark:text-gray-100";
+                        colorClass =
+                          "bg-gray-200 dark:bg-gray-800 text-gray-900 dark:text-gray-100";
                     }
                   }
 

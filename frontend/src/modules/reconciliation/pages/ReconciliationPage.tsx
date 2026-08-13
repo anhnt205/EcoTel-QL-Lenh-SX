@@ -31,13 +31,10 @@ import { toast } from "sonner";
 
 import { useMasterData } from "@/modules/dataentry/hooks/useMasterData";
 import {
-  addApprovedTripReport,
-  getApprovedTripReports,
-} from "@/modules/dataentry/services/thongKeStorage";
-import {
   reconciliationService,
   useReconciliationSearchQuery,
   mapRowResponseToReconciliationItem,
+  type ReconciliationDecisionRequest,
 } from "../services/reconciliation.service";
 
 type CardFilterType = "all" | "transport" | "mining" | "matched" | "mismatch";
@@ -106,17 +103,14 @@ export const ReconciliationPage: React.FC = () => {
     toDate: endDate,
     shiftIds,
     deviceIds,
+    finalizedOnly: false,
   });
 
   useEffect(() => {
     if (apiResponse?.content) {
-      const approvedList = getApprovedTripReports();
-      const approvedIds = new Set(approvedList.map((r) => r.id));
-
-      const mapped = apiResponse.content
-        .map((row, idx) => mapRowResponseToReconciliationItem(row, idx))
-        .filter((item) => !approvedIds.has(item.id));
-
+      const mapped = apiResponse.content.map((row, idx) =>
+        mapRowResponseToReconciliationItem(row, idx)
+      );
       setRawItems(mapped);
     } else {
       setRawItems([]);
@@ -265,119 +259,73 @@ export const ReconciliationPage: React.FC = () => {
     setIsSavingBatch(true);
     toast.info(`Đang lưu ${selectedItemIds.length} bản ghi quyết định...`);
 
-    const savePromises = selectedItemIds.map(async (itemId) => {
-      const choice = tableChoices[itemId];
-      const custom = tableCustomFields[itemId] || { cargo: "Than", trips: 0, loadStatus: "Đủ tải" };
-      const item = rawItems.find((i) => i.id === itemId) || displayItems.find((i) => i.id === itemId);
-      if (!item) return null;
+    const decisionsPayload: ReconciliationDecisionRequest[] = selectedItemIds
+      .map((itemId): ReconciliationDecisionRequest | null => {
+        const choice = tableChoices[itemId];
+        const custom = tableCustomFields[itemId] || { cargo: "Than", trips: 0, loadStatus: "Đủ tải" };
+        const item = rawItems.find((i) => i.id === itemId) || displayItems.find((i) => i.id === itemId);
+        if (!item) return null;
 
-      const backendRow = (item as any).backendRow;
-      const transportReportTripId = backendRow?.transportReportTripId;
-      const excavationReportTripId = backendRow?.excavationReportTripId;
+        const backendRow = (item as any).backendRow;
+        const transportReportTripId = backendRow?.transportReportTripId;
+        const excavationReportTripId = backendRow?.excavationReportTripId;
 
-      const finalOption = choice === "VT" ? "TRANSPORT" : choice === "KT" ? "EXCAVATION" : "OTHER";
+        const finalOption: "TRANSPORT" | "EXCAVATION" | "OTHER" =
+          choice === "VT" ? "TRANSPORT" : choice === "KT" ? "EXCAVATION" : "OTHER";
 
-      let customCargoTypeId: number | undefined = undefined;
-      let customTripCount: number | undefined = undefined;
-      let customLoadLevelType: "FULL_LOAD" | "RODA_2_3" | "OTHER" | undefined = undefined;
-      let customLoadLevelCustomValue: string | undefined = undefined;
+        let customCargoTypeId: number | undefined = undefined;
+        let customTripCount: number | undefined = undefined;
+        let customLoadLevelType: "FULL_LOAD" | "RODA_2_3" | "OTHER" | undefined = undefined;
+        let customLoadLevelCustomValue: string | undefined = undefined;
 
-      if (choice === "OTHER") {
-        customCargoTypeId = custom.cargo === "Đá" ? 2 : custom.cargo === "Đất" ? 3 : 1;
-        customTripCount = custom.trips;
-        customLoadLevelType = custom.loadStatus === "Roda (2/3)" ? "RODA_2_3" : custom.loadStatus.includes("Khác") ? "OTHER" : "FULL_LOAD";
-        if (customLoadLevelType === "OTHER") {
-          customLoadLevelCustomValue = "1/2";
+        if (choice === "OTHER") {
+          customCargoTypeId = custom.cargo === "Đá" ? 2 : custom.cargo === "Đất" ? 3 : 1;
+          customTripCount = custom.trips;
+          customLoadLevelType = custom.loadStatus === "Roda (2/3)" ? "RODA_2_3" : custom.loadStatus.includes("Khác") ? "OTHER" : "FULL_LOAD";
+          if (customLoadLevelType === "OTHER") {
+            customLoadLevelCustomValue = custom.loadStatus.replace(/^Khác\s*\(?|\)?$/g, '') || "1/2";
+          }
         }
-      }
 
-      if (transportReportTripId || excavationReportTripId) {
-        try {
-          await reconciliationService.saveDecision({
-            transportReportTripId,
-            excavationReportTripId,
-            finalOption,
-            customCargoTypeId,
-            customTripCount,
-            customLoadLevelType,
-            customLoadLevelCustomValue,
-          });
-        } catch (err) {
-          console.error(`Error saving decision for item ${itemId}:`, err);
-        }
-      }
+        return {
+          transportReportTripId,
+          excavationReportTripId,
+          finalOption,
+          customCargoTypeId,
+          customTripCount,
+          customLoadLevelType,
+          customLoadLevelCustomValue,
+        };
+      })
+      .filter((d): d is ReconciliationDecisionRequest => d !== null);
 
-      const cargoName = choice === "VT"
-        ? item.transportRecord?.cargoType || "Than"
-        : choice === "KT"
-        ? item.miningRecord?.material || "Than"
-        : custom.cargo;
-
-      const tripCountNum = choice === "VT"
-        ? item.transportRecord?.tripCount || 0
-        : choice === "KT"
-        ? item.miningRecord?.tripCount || 0
-        : custom.trips;
-
-      const loadStatusStr = choice === "VT"
-        ? item.transportRecord?.loadStatus || "Đủ tải"
-        : choice === "KT"
-        ? item.miningRecord?.loadStatus || "Đủ tải"
-        : custom.loadStatus;
-
-      addApprovedTripReport({
-        id: item.id,
-        reportDate: backendRow?.reportDate || `2026-08-${String(item.commonKey.day).padStart(2, '0')}`,
-        shift: backendRow?.shiftName ? String(backendRow.shiftName) : item.commonKey.shift || "Ca 1",
-        vehicleNo: backendRow?.vehicleCode || item.commonKey.vehicleNo || "-",
-        excavationArea: backendRow?.excavationAreaName || item.transportRecord?.excavationArea || "-",
-        excavatorEquipment: backendRow?.excavatorName || item.transportRecord?.excavatorEquipment || item.miningRecord?.mineCode || "-",
-        pickupLocation: backendRow?.loadingPointName || item.transportRecord?.pickupLocation || item.miningRecord?.pickupLocation || "-",
-        pickupBench: backendRow?.receivingFloor ? String(backendRow.receivingFloor) : item.transportRecord?.pickupBenchGroup ? String(item.transportRecord.pickupBenchGroup) : item.transportRecord?.pickupBench || item.miningRecord?.excavationBench || "-",
-        unloadLocationName: backendRow?.unloadingPointName || item.transportRecord?.unloadLocationName || item.miningRecord?.dumpLocation || "-",
-        unloadBench: backendRow?.unloadingFloor || item.transportRecord?.unloadBench || "-",
-        fullRouteDistance: backendRow?.totalRouteDistanceKm ?? item.transportRecord?.fullRouteDistance ?? 0,
-        fullRouteElevate: backendRow?.totalRouteLiftM ?? item.transportRecord?.fullRouteElevate ?? 0,
-        localSlopeDist: backendRow?.localSlopeDistanceKm ?? item.transportRecord?.localSlopeDist ?? 0,
-        localSlopeDegree: backendRow?.localSlopeM ?? item.transportRecord?.localSlopeDegree ?? 0,
-        operatorBadgeNo: item.transportRecord?.operatorBadgeNo || item.miningRecord?.operatorBadgeNo || "-",
-        isRainyDay: backendRow?.rainyDay ?? item.transportRecord?.isRainyDay ?? false,
-        isTraineeVehicle: backendRow?.supplementaryVehicle ?? item.transportRecord?.isTraineeVehicle ?? false,
-        finalOption,
-        finalOptionLabel: choice === "VT" ? "Vận tải" : choice === "KT" ? "Khai thác" : "Khác",
-        cargoType: cargoName,
-        tripCount: tripCountNum,
-        loadStatus: loadStatusStr,
-        approvedAt: new Date().toLocaleString('vi-VN'),
-        status: "Đã chốt",
-      });
-
-      return item.id;
-    });
-
-    const results = await Promise.allSettled(savePromises);
-    const successfulIds = results
-      .filter((r): r is PromiseFulfilledResult<string | null> => r.status === "fulfilled" && r.value !== null)
-      .map((r) => r.value as string);
-
-    if (successfulIds.length > 0) {
-      setRawItems((prev) => prev.filter((item) => !successfulIds.includes(item.id)));
-      setTableChoices((prev) => {
-        const next = { ...prev };
-        successfulIds.forEach((id) => delete next[id]);
-        return next;
-      });
-      setTableCustomFields((prev) => {
-        const next = { ...prev };
-        successfulIds.forEach((id) => delete next[id]);
-        return next;
-      });
+    if (decisionsPayload.length === 0) {
+      setIsSavingBatch(false);
+      toast.error("Không có bản ghi hợp lệ để lưu!");
+      return;
     }
 
-    setIsSavingBatch(false);
-    toast.success(
-      `Đã lưu thành công ${successfulIds.length}/${selectedItemIds.length} bản ghi quyết định và chuyển dữ liệu sang Báo chuyến!`,
-    );
+    try {
+      await reconciliationService.saveDecisionsBulk({ decisions: decisionsPayload });
+      toast.success(`Đã lưu thành công ${decisionsPayload.length} bản ghi quyết định!`);
+
+      // Refetch updated reconciliation data from server
+      const res = await refetchApi();
+      if (res.data?.content) {
+        const mapped = res.data.content.map((row, idx) =>
+          mapRowResponseToReconciliationItem(row, idx)
+        );
+        setRawItems(mapped);
+      }
+
+      setTableChoices({});
+      setTableCustomFields({});
+    } catch (err) {
+      console.error("Error saving bulk decisions:", err);
+      toast.error("Lỗi khi lưu quyết định đối chiếu!");
+    } finally {
+      setIsSavingBatch(false);
+    }
   };
 
   const handleExportExcel = () => {

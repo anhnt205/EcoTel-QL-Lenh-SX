@@ -5,6 +5,31 @@ import type {
 } from "@/modules/dataentry/components/TransportHeaderDetailModal.tsx";
 import { validateTransportSession } from "@/modules/dataentry/schemas/thong-ke.schema.ts";
 
+export const newTransportTripRow = (): TransportTripRow => ({
+  _tempId: `trip_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+  excavationArea: "",
+  excavatorEquipment: "",
+  pickupLocation: "",
+  pickupBench: "",
+  pickupBenchGroup: "",
+  unloadBench: "",
+  fullRouteDistance: "",
+  fullRouteElevate: "",
+  localSlopeDist: "",
+  localSlopeDegree: "",
+  unloadLocationName: "",
+  cargoType: "",
+  cargoGroup: "",
+  vehicleNo: "",
+  tripCount: "",
+  loadStatus: "Đủ tải",
+  loadStatusNote: "",
+  isRainyDay: false,
+  isTraineeVehicle: false,
+  equipmentUnit: "",
+  vehicleType: "",
+});
+
 interface TransportDraftStore {
   sessions: TransportSessionDraft[];
   activeIdx: number;
@@ -23,7 +48,7 @@ interface TransportDraftStore {
     getVehicleDetails?: (vehicleNo: string) => { vehicleManagementUnit: string; vehicleType: string },
     getCargoGroupDetails?: (cargoType: string) => string
   ) => void;
-  addTripRow: (defaultTrip: TransportTripRow) => void;
+  addTripRow: () => void;
   removeTripRow: (tIdx: number) => boolean;
   loadSessionForEdit: (draft: TransportSessionDraft) => void;
   loadSessionsForEdit: (drafts: TransportSessionDraft[]) => void;
@@ -130,7 +155,7 @@ export const useTransportDraftStore = create<TransportDraftStore>((set, get) => 
     set({ sessions: next });
   },
 
-  addTripRow: (defaultTrip: TransportTripRow) => {
+  addTripRow: () => {
     const { sessions, activeIdx } = get();
     if (!sessions[activeIdx]) return;
 
@@ -138,7 +163,7 @@ export const useTransportDraftStore = create<TransportDraftStore>((set, get) => 
     const next = [...sessions];
     next[activeIdx] = {
       ...currentSess,
-      trips: [...currentSess.trips, { ...defaultTrip, _tempId: `trip_${Date.now()}_${Math.random().toString(36).slice(2, 6)}` }],
+      trips: [...currentSess.trips, newTransportTripRow()],
     };
     set({ sessions: next });
   },

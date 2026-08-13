@@ -52,7 +52,7 @@ export const getTransportFuelColumns = (
     id: "stt",
     header: "STT",
     cell: ({ row }) => (
-      <span className="text-gray-500 font-semibold">{row.index + 1}</span>
+      <span className="text-gray-500">{row.index + 1}</span>
     ),
     size: 45,
     enableSorting: false,
@@ -88,7 +88,7 @@ export const getTransportFuelColumns = (
     id: "shift",
     header: "Ca",
     cell: ({ row }) => (
-      <span className="font-semibold">{row.original.shift || "Ca 1"}</span>
+      <span>{row.original.shift || "Ca 1"}</span>
     ),
     size: 70,
   },
@@ -107,7 +107,7 @@ export const getTransportFuelColumns = (
       </Button>
     ),
     cell: ({ row }) => (
-      <span className="font-bold text-gray-900 dark:text-gray-100">
+      <span>
         {row.original.vehicleNo || "505"}
       </span>
     ),
@@ -118,7 +118,7 @@ export const getTransportFuelColumns = (
     id: "initialFuel",
     header: "Nhiên liệu tồn đầu (lít)",
     cell: ({ row }) => (
-      <span className="font-semibold">
+      <span>
         {row.original.initialFuel
           ? Number(row.original.initialFuel).toLocaleString("vi-VN")
           : "1,188"}
@@ -131,7 +131,7 @@ export const getTransportFuelColumns = (
     id: "receivedFuel",
     header: "Nhiên liệu lĩnh (lít)",
     cell: ({ row }) => (
-      <span className="font-semibold">
+      <span>
         {row.original.receivedFuel
           ? Number(row.original.receivedFuel).toLocaleString("vi-VN")
           : "590"}
@@ -144,7 +144,7 @@ export const getTransportFuelColumns = (
     id: "finalFuel",
     header: "Nhiên liệu tồn cuối (lít)",
     cell: ({ row }) => (
-      <span className="font-semibold">
+      <span>
         {row.original.finalFuel
           ? Number(row.original.finalFuel).toLocaleString("vi-VN")
           : "831"}
@@ -165,7 +165,7 @@ export const getTransportFuelColumns = (
             (Number(row.original.finalFuel) || 831),
         );
       return (
-        <span className="font-semibold">
+        <span>
           {Number(fuelUsed).toLocaleString("vi-VN")}
         </span>
       );
@@ -194,11 +194,18 @@ export const getTransportFuelColumns = (
     size: 105,
   },
   {
+    accessorKey: "departmentName",
+    id: "departmentName",
+    header: "Đơn vị (Báo cáo)",
+    cell: ({ row }) => row.original.departmentName || "-",
+    size: 160,
+  },
+  {
     accessorKey: "operatorUnit",
     id: "operatorUnit",
-    header: "Đơn vị",
+    header: "Đơn vị công tác",
     cell: ({ row }) => row.original.operatorUnit || "VT7",
-    size: 90,
+    size: 160,
   },
   {
     accessorKey: "createdBy",

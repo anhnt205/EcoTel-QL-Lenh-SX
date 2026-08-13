@@ -52,7 +52,7 @@ export const getMiningTripsColumns = (
     id: "stt",
     header: "STT",
     cell: ({ row }) => (
-      <span className="text-gray-500 font-semibold">{row.index + 1}</span>
+      <span className="text-gray-500">{row.index + 1}</span>
     ),
     size: 70,
     enableSorting: false,
@@ -98,7 +98,7 @@ export const getMiningTripsColumns = (
       </Button>
     ),
     cell: ({ row }) => (
-      <span className="font-semibold">{row.original.shift || "Ca 1"}</span>
+      <span>{row.original.shift || "Ca 1"}</span>
     ),
     size: 120,
   },
@@ -156,7 +156,7 @@ export const getMiningTripsColumns = (
       </Button>
     ),
     cell: ({ row }) => (
-      <span className="font-bold text-gray-900 dark:text-gray-100">
+      <span>
         {row.original.transportVehicleNo || "473"}
       </span>
     ),
@@ -236,11 +236,18 @@ export const getMiningTripsColumns = (
     size: 180,
   },
   {
+    accessorKey: "departmentName",
+    id: "departmentName",
+    header: "Đơn vị (Báo cáo)",
+    cell: ({ row }) => row.original.departmentName || "-",
+    size: 160,
+  },
+  {
     accessorKey: "operatorUnit",
     id: "operatorUnit",
-    header: "Đơn vị",
+    header: "Đơn vị công tác",
     cell: ({ row }) => row.original.operatorUnit || "VT7",
-    size: 120,
+    size: 160,
   },
   {
     accessorKey: "createdBy",

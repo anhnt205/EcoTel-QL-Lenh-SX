@@ -8,6 +8,7 @@ interface BatchEntryModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
+  mode?: "add" | "edit";
 }
 
 export const BatchEntryModal: React.FC<BatchEntryModalProps> = ({
@@ -15,6 +16,7 @@ export const BatchEntryModal: React.FC<BatchEntryModalProps> = ({
   isOpen,
   onClose,
   onSuccess,
+  mode = "add",
 }) => {
   if (role === "ROLE_TRANSPORT") {
     return (
@@ -22,6 +24,7 @@ export const BatchEntryModal: React.FC<BatchEntryModalProps> = ({
         isOpen={isOpen}
         onClose={onClose}
         onSuccess={onSuccess}
+        mode={mode}
       />
     );
   }
@@ -31,6 +34,7 @@ export const BatchEntryModal: React.FC<BatchEntryModalProps> = ({
       isOpen={isOpen}
       onClose={onClose}
       onSuccess={onSuccess}
+      mode={mode}
     />
   );
 };

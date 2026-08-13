@@ -52,7 +52,7 @@ export const getTransportTripsColumns = (
     id: "stt",
     header: "STT",
     cell: ({ row }) => (
-      <span className="text-gray-500 font-semibold">{row.index + 1}</span>
+      <span className="text-gray-500">{row.index + 1}</span>
     ),
     size: 45,
     enableSorting: false,
@@ -98,7 +98,7 @@ export const getTransportTripsColumns = (
       </Button>
     ),
     cell: ({ row }) => (
-      <span className="font-semibold">{row.original.shift || "Ca 1"}</span>
+      <span>{row.original.shift || "Ca 1"}</span>
     ),
     size: 60,
   },
@@ -228,7 +228,7 @@ export const getTransportTripsColumns = (
       </Button>
     ),
     cell: ({ row }) => (
-      <span className="font-bold text-gray-900 dark:text-gray-100">
+      <span>
         {row.original.vehicleNo || "505"}
       </span>
     ),
@@ -333,11 +333,18 @@ export const getTransportTripsColumns = (
     size: 140,
   },
   {
+    accessorKey: "departmentName",
+    id: "departmentName",
+    header: "Đơn vị (Báo cáo)",
+    cell: ({ row }) => row.original.departmentName || "-",
+    size: 160,
+  },
+  {
     accessorKey: "operatorUnit",
     id: "operatorUnit",
-    header: "Đơn vị",
+    header: "Đơn vị công tác",
     cell: ({ row }) => row.original.operatorUnit || "VT7",
-    size: 85,
+    size: 160,
   },
   {
     accessorKey: "createdBy",

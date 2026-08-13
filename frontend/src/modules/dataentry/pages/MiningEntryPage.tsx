@@ -3,11 +3,11 @@ import {
   fetchExcavationReportById,
   mapReportResponseToDraft,
   useBulkDeleteExcavationTripReportMutation,
+  importExcavationReports,
+  exportExcavationReports,
   type ExcavationReportResponse,
 } from "@/modules/dataentry/services/excavationTripReportService";
 import { useMiningDraftStore } from "@/modules/dataentry/store/useMiningDraftStore";
-import { validateImportRows } from "@/modules/dataentry/utils/importValidator";
-import { excelService } from "@/modules/report/utils/excel-exporter";
 import { BatchEntryModal } from "@/modules/dataentry/components/BatchEntryModal.tsx";
 import { MiningTripsDataTable } from "@/modules/dataentry/components/MiningTripsDataTable";
 import { MiningFuelDataTable } from "@/modules/dataentry/components/MiningFuelDataTable";
@@ -42,7 +42,6 @@ import { toast } from "sonner";
 import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { MiningRecord } from "../types/thong-ke";
-import { saveMiningRecords } from "../services/thongKeStorage";
 
 export const MiningEntryPage: React.FC = () => {
   const role = "ROLE_MINING";
@@ -52,7 +51,9 @@ export const MiningEntryPage: React.FC = () => {
   const scoopAnchorRef = useComboboxAnchor();
 
   const [isEntryModalOpen, setIsEntryModalOpen] = useState(false);
+  const [entryModalMode, setEntryModalMode] = useState<"add" | "edit">("add");
   const [isImporting, setIsImporting] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // ── Filters state ────────────────────────────────────────────────────────
@@ -135,6 +136,8 @@ export const MiningEntryPage: React.FC = () => {
             report.employeeSalaryCode || String(report.employeeId),
           operatorName: report.employeeFullName || "",
           operatorUnit: report.employeeDepartmentName || "",
+          departmentId: report.departmentId,
+          departmentName: report.departmentName,
           createdAt: report.reportDate,
         });
       });
@@ -147,7 +150,8 @@ export const MiningEntryPage: React.FC = () => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "F3") {
         e.preventDefault();
-        setIsEntryModalOpen(true);
+        setEntryModalMode("add");
+        handleAddNew();
       }
     };
     window.addEventListener("keydown", handleKeyDown);
@@ -310,6 +314,7 @@ export const MiningEntryPage: React.FC = () => {
 
   const handleAddNew = () => {
     initDrafts();
+    setEntryModalMode("add");
     setIsEntryModalOpen(true);
   };
 
@@ -354,6 +359,7 @@ export const MiningEntryPage: React.FC = () => {
       }
 
       loadSessionsForEdit(drafts);
+      setEntryModalMode("edit");
       setIsEntryModalOpen(true);
     } catch (err: any) {
       toast.dismiss("fetch-detail");
@@ -411,35 +417,34 @@ export const MiningEntryPage: React.FC = () => {
     }
 
     setIsImporting(true);
+    const toastId = toast.loading("Đang nạp dữ liệu file Excel lên máy chủ...");
+
     try {
-      const rawRows = await excelService.parseExcelFile(file);
-      if (!rawRows || rawRows.length === 0) {
-        toast.error("File Excel không chứa bản ghi dữ liệu nào!");
-        return;
+      const response = await importExcavationReports(file);
+      const data = response.data;
+
+      if (data) {
+        if (data.errorRowCount > 0 && data.errors && data.errors.length > 0) {
+          toast.warning(
+            `Nhập dữ liệu hoàn tất! Thành công: ${data.successReportCount}/${data.totalRows} báo cáo. Có ${data.errorRowCount} dòng lỗi:\n${data.errors.slice(0, 3).join("\n")}${data.errors.length > 3 ? "\n..." : ""}`,
+            { id: toastId, duration: 6000 }
+          );
+        } else {
+          toast.success(
+            `Đã nạp thành công ${data.successReportCount}/${data.totalRows} báo cáo từ file "${file.name}"!`,
+            { id: toastId }
+          );
+        }
+      } else {
+        toast.success(`Đã nạp dữ liệu từ file "${file.name}" thành công!`, { id: toastId });
       }
 
-      const results = validateImportRows<MiningRecord>(rawRows, role);
-      const validRows = results
-        .filter((r) => r.isValid)
-        .map((r) => ({
-          ...r.rowData,
-          id: `imp_mine_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-          createdAt: new Date().toISOString(),
-        }));
-
-      if (validRows.length === 0) {
-        toast.error("Không tìm thấy dòng dữ liệu hợp lệ nào trong file Excel!");
-        return;
-      }
-
-      saveMiningRecords(validRows as MiningRecord[]);
       refetch();
-      toast.success(
-        `Đã nạp thành công ${validRows.length}/${results.length} bản ghi từ file "${file.name}"!`,
-      );
     } catch (err: any) {
+      console.error("Lỗi import Excel Khai thác:", err);
       toast.error(
-        `Lỗi đọc file Excel: ${err.message || "Không thể xử lý file"}`,
+        `Lỗi khi nạp file Excel: ${err.response?.data?.message || err.message || "Lỗi máy chủ"}`,
+        { id: toastId }
       );
     } finally {
       setIsImporting(false);
@@ -447,14 +452,42 @@ export const MiningEntryPage: React.FC = () => {
     }
   };
 
-  const handleExportData = () => {
-    excelService.exportToExcel(
-      filteredRecords,
-      "DanhSach_BaoChuyen_KhaiThac",
-      "BÁO CHUYẾN",
-    );
-    toast.success("Đã xuất danh sách báo chuyến Khai thác ra file Excel!");
+  const handleExportData = async () => {
+    if (!startDate || !endDate) {
+      toast.warning("Vui lòng chọn thời gian bắt đầu và kết thúc để xuất Excel!");
+      return;
+    }
+
+    setIsExporting(true);
+    const toastId = toast.loading("Đang xuất file Excel báo cáo Khai thác từ máy chủ...");
+
+    try {
+      const blob = await exportExcavationReports({
+        fromDate: startDate,
+        toDate: endDate,
+      });
+
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `bao-cao-khai-thac_${startDate}_${endDate}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      toast.success("Đã xuất danh sách báo chuyến Khai thác ra file Excel!", { id: toastId });
+    } catch (err: any) {
+      console.error("Lỗi xuất Excel Khai thác:", err);
+      toast.error(
+        `Lỗi khi xuất file Excel: ${err.response?.data?.message || err.message || "Lỗi máy chủ"}`,
+        { id: toastId }
+      );
+    } finally {
+      setIsExporting(false);
+    }
   };
+
 
   // ════════════════════════════════════════════════════════════════════════
   return (
@@ -499,6 +532,7 @@ export const MiningEntryPage: React.FC = () => {
             variant="outline"
             size="sm"
             onClick={handleExportData}
+            disabled={isExporting}
             className="h-9 text-xs gap-1.5 border-gray-300 text-gray-700 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-300"
           >
             <Download className="w-3.5 h-3.5 text-gray-600 dark:text-gray-400" />
@@ -847,6 +881,7 @@ export const MiningEntryPage: React.FC = () => {
       <BatchEntryModal
         role={role}
         isOpen={isEntryModalOpen}
+        mode={entryModalMode}
         onClose={() => setIsEntryModalOpen(false)}
         onSuccess={() => {
           refetch();

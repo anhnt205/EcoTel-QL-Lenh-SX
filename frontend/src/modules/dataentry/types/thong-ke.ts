@@ -18,6 +18,8 @@ export interface TransportRecord {
   operatorBadgeNo?: string; // Số thẻ lương
   operatorName?: string; // Họ và tên
   operatorUnit?: string; // Đơn vị công tác
+  departmentId?: number; // ID đơn vị báo cáo
+  departmentName?: string; // Tên đơn vị báo cáo
 
   isRainyDay?: boolean; // Ngày mưa
   isTraineeVehicle?: boolean; // Xe bổ túc
@@ -98,6 +100,8 @@ export interface MiningRecord {
   operatorBadgeNo?: string; // Số thẻ lương (Danh mục)
   operatorName?: string; // Họ và tên (Auto từ Số thẻ lương)
   operatorUnit?: string; // Đơn vị công tác (Auto từ Số thẻ lương)
+  departmentId?: number; // ID đơn vị báo cáo
+  departmentName?: string; // Tên đơn vị báo cáo
 
   // Trường tương thích cũ & UI
   vehicleNo?: string;

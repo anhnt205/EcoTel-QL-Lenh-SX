@@ -52,6 +52,7 @@ export const transportReportRequestSchema = z.object({
   fuelBeginning: z.number({ message: "Nhiên liệu tồn đầu là bắt buộc" }),
   fuelEnding: z.number({ message: "Nhiên liệu tồn cuối là bắt buộc" }),
   fuelReceived: z.number({ message: "Nhiên liệu lĩnh là bắt buộc" }),
+  departmentId: z.number().nullable().optional(),
   trips: z
     .array(transportReportTripRequestSchema)
     .min(1, "Cần ít nhất 1 chuyến"),
@@ -114,6 +115,8 @@ export interface TransportReportResponse {
   employeeSalaryCode: string;
   employeeFullName: string;
   employeeDepartmentName?: string;
+  departmentId?: number;
+  departmentName?: string;
   fuelBeginning: number;
   fuelEnding: number;
   fuelReceived: number;
@@ -137,6 +140,13 @@ export interface TransportReportBulkUpdateItem {
 export interface BulkDeleteResponse {
   requestedCount: number;
   deletedCount: number;
+}
+
+export interface ExcelImportResultResponse {
+  totalRows: number;
+  successReportCount: number;
+  errorRowCount: number;
+  errors: string[];
 }
 
 /**
@@ -183,7 +193,18 @@ export function buildTransportReportRequest(
   }
   const employeeId = Number(userItem.id);
 
-  // 3. Map danh sách chuyến (trips)
+  // 3. Map departmentId (Đơn vị)
+  let departmentId: number | undefined;
+  if (sess.operatorUnit && masterData.rawDepartments) {
+    const dept = masterData.rawDepartments.find(
+      (d) => String(d.name).trim().toLowerCase() === String(sess.operatorUnit).trim().toLowerCase()
+    );
+    if (dept) {
+      departmentId = Number(dept.id);
+    }
+  }
+
+  // 4. Map danh sách chuyến (trips)
   const trips: TransportReportTripRequest[] = sess.trips.map((t, idx) => {
     // Map vehicleId
     const vehicleItem = masterData.rawVehicles.find(
@@ -324,6 +345,7 @@ export function buildTransportReportRequest(
     reportDate: sess.workingDate,
     shiftId,
     employeeId,
+    departmentId,
     fuelBeginning: Number(sess.initialFuel),
     fuelEnding: Number(sess.finalFuel),
     fuelReceived: Number(sess.receivedFuel),
@@ -345,6 +367,7 @@ export function mapReportResponseToDraft(
     reportId: report.id,
     workingDate: report.reportDate || "",
     shift: cleanShift,
+    department: report.departmentName || "",
     initialFuel: report.fuelBeginning ?? "",
     receivedFuel: report.fuelReceived ?? "",
     finalFuel: report.fuelEnding ?? "",
@@ -479,8 +502,52 @@ export async function bulkDeleteTransportReports(
 }
 
 /**
+ * Gọi API GET /api/transport-reports/export
+ */
+export async function exportTransportReports(params: {
+  fromDate: string;
+  toDate: string;
+  shiftIds?: number[];
+  deviceIds?: number[];
+}): Promise<Blob> {
+  const res = await api.get("/transport-reports/export", {
+    params,
+    responseType: "blob",
+  });
+  return res.data;
+}
+
+/**
+ * Gọi API POST /api/transport-reports/import
+ */
+export async function importTransportReports(
+  file: File,
+): Promise<ApiResponse<ExcelImportResultResponse>> {
+  const formData = new FormData();
+  formData.append("file", file);
+  const res = await api.post("/transport-reports/import", formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });
+  return res.data;
+}
+
+/**
  * React Query Hooks cho Vận tải
  */
+export function useImportTransportReportsMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (file: File) => importTransportReports(file),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["transportReports"] });
+      queryClient.invalidateQueries({ queryKey: ["statistics"] });
+    },
+  });
+}
+
 export function useCreateTransportReportMutation() {
   const queryClient = useQueryClient();
 

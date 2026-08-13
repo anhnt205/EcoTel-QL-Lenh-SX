@@ -1,18 +1,15 @@
 import React, { useEffect, useState, useMemo, useRef } from "react";
 import type { TransportRecord } from "@/modules/dataentry/types/thong-ke";
 import {
-  saveTransportRecords,
-} from "@/modules/dataentry/services/thongKeStorage";
-import {
   useTransportReportsQuery,
   fetchTransportReportById,
   mapReportResponseToDraft,
   useBulkDeleteTransportReportMutation,
+  importTransportReports,
+  exportTransportReports,
   type TransportReportResponse,
 } from "@/modules/dataentry/services/transportTripReportService";
 import { useTransportDraftStore } from "@/modules/dataentry/store/useTransportDraftStore";
-import { validateImportRows } from "@/modules/dataentry/utils/importValidator";
-import { excelService } from "@/modules/report/utils/excel-exporter";
 import { BatchEntryModal } from "@/modules/dataentry/components/BatchEntryModal.tsx";
 import { TransportTripsDataTable } from "@/modules/dataentry/components/TransportTripsDataTable";
 import { TransportFuelDataTable } from "@/modules/dataentry/components/TransportFuelDataTable";
@@ -52,7 +49,9 @@ export const TransportEntryPage: React.FC = () => {
   const vehicleAnchorRef = useComboboxAnchor();
 
   const [isEntryModalOpen, setIsEntryModalOpen] = useState(false);
+  const [entryModalMode, setEntryModalMode] = useState<"add" | "edit">("add");
   const [isImporting, setIsImporting] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // ── Main Top Filters ─────────────────────────────────────────────────────
@@ -126,6 +125,8 @@ export const TransportEntryPage: React.FC = () => {
           operatorBadgeNo: report.employeeSalaryCode || "",
           operatorName: report.employeeFullName || "",
           operatorUnit: report.employeeDepartmentName || "",
+          departmentId: report.departmentId,
+          departmentName: report.departmentName,
           isRainyDay: Boolean(t.rainyDay),
           isTraineeVehicle: Boolean(t.supplementaryVehicle),
           initialFuel: report.fuelBeginning ?? 0,
@@ -174,6 +175,7 @@ export const TransportEntryPage: React.FC = () => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "F3") {
         e.preventDefault();
+        setEntryModalMode("add");
         setIsEntryModalOpen(true);
       }
     };
@@ -393,6 +395,7 @@ export const TransportEntryPage: React.FC = () => {
       }
 
       loadSessionsForEdit(drafts);
+      setEntryModalMode("edit");
       setIsEntryModalOpen(true);
     } catch (err: any) {
       toast.dismiss("fetch-detail");
@@ -455,35 +458,34 @@ export const TransportEntryPage: React.FC = () => {
     }
 
     setIsImporting(true);
+    const toastId = toast.loading("Đang nạp dữ liệu file Excel Vận tải lên máy chủ...");
+
     try {
-      const rawRows = await excelService.parseExcelFile(file);
-      if (!rawRows || rawRows.length === 0) {
-        toast.error("File Excel không chứa bản ghi dữ liệu nào!");
-        return;
+      const response = await importTransportReports(file);
+      const data = response.data;
+
+      if (data) {
+        if (data.errorRowCount > 0 && data.errors && data.errors.length > 0) {
+          toast.warning(
+            `Nhập dữ liệu hoàn tất! Thành công: ${data.successReportCount}/${data.totalRows} báo cáo. Có ${data.errorRowCount} dòng lỗi:\n${data.errors.slice(0, 3).join("\n")}${data.errors.length > 3 ? "\n..." : ""}`,
+            { id: toastId, duration: 6000 }
+          );
+        } else {
+          toast.success(
+            `Đã nạp thành công ${data.successReportCount}/${data.totalRows} báo cáo từ file "${file.name}"!`,
+            { id: toastId }
+          );
+        }
+      } else {
+        toast.success(`Đã nạp dữ liệu từ file "${file.name}" thành công!`, { id: toastId });
       }
 
-      const results = validateImportRows<TransportRecord>(rawRows, role);
-      const validRows = results
-        .filter((r) => r.isValid)
-        .map((r) => ({
-          ...r.rowData,
-          id: `imp_trans_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-          createdAt: new Date().toISOString(),
-        }));
-
-      if (validRows.length === 0) {
-        toast.error("Không tìm thấy dòng dữ liệu hợp lệ nào trong file Excel!");
-        return;
-      }
-
-      saveTransportRecords(validRows as TransportRecord[]);
       refetch();
-      toast.success(
-        `Đã nạp thành công ${validRows.length}/${results.length} bản ghi từ file "${file.name}"!`,
-      );
     } catch (err: any) {
+      console.error("Lỗi import Excel Vận tải:", err);
       toast.error(
-        `Lỗi đọc file Excel: ${err.message || "Không thể xử lý file"}`,
+        `Lỗi khi nạp file Excel: ${err.response?.data?.message || err.message || "Lỗi máy chủ"}`,
+        { id: toastId }
       );
     } finally {
       setIsImporting(false);
@@ -491,13 +493,40 @@ export const TransportEntryPage: React.FC = () => {
     }
   };
 
-  const handleExportData = () => {
-    excelService.exportToExcel(
-      filteredRecords,
-      "DanhSach_BaoChuyen_VanTai",
-      "BÁO CHUYẾN",
-    );
-    toast.success("Đã xuất danh sách báo chuyến Vận tải ra file Excel!");
+  const handleExportData = async () => {
+    if (!startDate || !endDate) {
+      toast.warning("Vui lòng chọn thời gian bắt đầu và kết thúc để xuất Excel!");
+      return;
+    }
+
+    setIsExporting(true);
+    const toastId = toast.loading("Đang xuất file Excel báo cáo Vận tải từ máy chủ...");
+
+    try {
+      const blob = await exportTransportReports({
+        fromDate: startDate,
+        toDate: endDate,
+      });
+
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `bao-cao-van-tai_${startDate}_${endDate}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      toast.success("Đã xuất danh sách báo chuyến Vận tải ra file Excel!", { id: toastId });
+    } catch (err: any) {
+      console.error("Lỗi xuất Excel Vận tải:", err);
+      toast.error(
+        `Lỗi khi xuất file Excel: ${err.response?.data?.message || err.message || "Lỗi máy chủ"}`,
+        { id: toastId }
+      );
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   // ════════════════════════════════════════════════════════════════════════
@@ -543,6 +572,7 @@ export const TransportEntryPage: React.FC = () => {
             variant="outline"
             size="sm"
             onClick={handleExportData}
+            disabled={isExporting}
             className="h-9 text-xs gap-1.5 border-gray-300 text-gray-700 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-300"
           >
             <Download className="w-3.5 h-3.5 text-gray-600 dark:text-gray-400" />
@@ -551,7 +581,10 @@ export const TransportEntryPage: React.FC = () => {
 
           {/* Add Trip Modal Trigger */}
           <Button
-            onClick={() => setIsEntryModalOpen(true)}
+            onClick={() => {
+              setEntryModalMode("add");
+              setIsEntryModalOpen(true);
+            }}
             className="h-9 text-xs gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-sm"
           >
             <Plus className="w-4 h-4" />
@@ -761,6 +794,7 @@ export const TransportEntryPage: React.FC = () => {
       <BatchEntryModal
         role={role}
         isOpen={isEntryModalOpen}
+        mode={entryModalMode}
         onClose={() => setIsEntryModalOpen(false)}
         onSuccess={() => {
           refetch();
