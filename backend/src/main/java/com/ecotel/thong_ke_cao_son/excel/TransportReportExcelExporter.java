@@ -46,6 +46,7 @@ public class TransportReportExcelExporter {
             CellStyle headerStyle = buildHeaderStyle(workbook);
             CellStyle dataStyle = buildDataStyle(workbook, false);
             CellStyle numericDataStyle = buildDataStyle(workbook, true);
+            CellStyle dateTextStyle = buildDateTextStyle(workbook); // style riêng cho cột "Thời gian"
 
             Row headerRow = sheet.createRow(0);
             headerRow.setHeightInPoints(32);
@@ -56,14 +57,16 @@ public class TransportReportExcelExporter {
                 sheet.setColumnWidth(i, COLUMN_WIDTHS[i] * 256);
             }
 
+            sheet.setDefaultColumnStyle(0, dateTextStyle);
+
             int rowIdx = 1;
             for (TransportReport report : reports) {
                 if (report.getTrips().isEmpty()) {
-                    writeRow(sheet.createRow(rowIdx++), report, null, dataStyle, numericDataStyle);
+                    writeRow(sheet.createRow(rowIdx++), report, null, dataStyle, numericDataStyle, dateTextStyle);
                     continue;
                 }
                 for (TransportReportTrip trip : report.getTrips()) {
-                    writeRow(sheet.createRow(rowIdx++), report, trip, dataStyle, numericDataStyle);
+                    writeRow(sheet.createRow(rowIdx++), report, trip, dataStyle, numericDataStyle, dateTextStyle);
                 }
             }
 
@@ -77,11 +80,15 @@ public class TransportReportExcelExporter {
     }
 
     private void writeRow(Row row, TransportReport report, TransportReportTrip trip,
-                          CellStyle dataStyle, CellStyle numericDataStyle) {
+                          CellStyle dataStyle, CellStyle numericDataStyle, CellStyle dateTextStyle) {
         row.setHeightInPoints(-1);
         int c = 0;
 
-        setText(row, c++, report.getReportDate().format(DATE_FMT), dataStyle);
+        // Cột "Thời gian" — dùng style Text riêng thay vì dataStyle thường
+        Cell dateCell = row.createCell(c++);
+        dateCell.setCellValue(report.getReportDate().format(DATE_FMT));
+        dateCell.setCellStyle(dateTextStyle);
+
         setNumeric(row, c++, report.getShift().getName(), numericDataStyle);
         setText(row, c++, report.getEmployee().getSalaryCode(), dataStyle);
         setText(row, c++, report.getEmployee().getFullName(), dataStyle);
@@ -123,6 +130,26 @@ public class TransportReportExcelExporter {
                 ? trip.getVehicle().getDepartment().getName() : "", dataStyle);
         setText(row, c, trip.getVehicle().getCategory() != null
                 ? trip.getVehicle().getCategory().getName() : "", dataStyle);
+    }
+
+    private CellStyle buildDateTextStyle(Workbook workbook) {
+        Font font = workbook.createFont();
+        font.setFontName(FONT_NAME);
+        font.setFontHeightInPoints((short) 11);
+
+        CellStyle style = workbook.createCellStyle();
+        style.setFont(font);
+        style.setAlignment(HorizontalAlignment.LEFT);
+        style.setVerticalAlignment(VerticalAlignment.CENTER);
+        style.setWrapText(true);
+
+        // Định dạng số "@" = Text — Excel sẽ luôn lưu giá trị nhập vào cột này
+        DataFormat format = workbook.createDataFormat();
+        style.setDataFormat(format.getFormat("@"));
+
+        applyBorder(style);
+        applyPadding(style);
+        return style;
     }
 
     private void setText(Row row, int col, String value, CellStyle style) {
