@@ -33,6 +33,8 @@ public class ExcavationReportRequest {
     @NotNull(message = "Số thẻ lương là bắt buộc")
     private Long employeeId;
 
+    private Long departmentId;
+
     @Valid
     @NotNull(message = "Cần ít nhất 1 chuyến")
     private List<ExcavationReportTripRequest> trips;

@@ -42,7 +42,8 @@ public class ExcavationReportExcelImporter {
 
                 Map<String, String> rowData = new LinkedHashMap<>();
                 rowData.put("_excelRow", String.valueOf(r + 1));
-                rowData.put("reportDate", formatter.formatCellValue(row.getCell(0)).trim());
+                LocalDate reportDate = readDateCell(row.getCell(0));
+                rowData.put("reportDate", reportDate.toString());
                 rowData.put("shiftName", formatter.formatCellValue(row.getCell(1)).trim());
                 rowData.put("excavatorCode", formatter.formatCellValue(row.getCell(2)).trim());
                 rowData.put("excavationFloor", formatter.formatCellValue(row.getCell(3)).trim());
@@ -83,6 +84,31 @@ public class ExcavationReportExcelImporter {
                 .errorRowCount(errors.size())
                 .errors(errors)
                 .build();
+    }
+
+    private LocalDate readDateCell(Cell cell) {
+        if (cell == null) {
+            throw new IllegalArgumentException("Thời gian không được để trống");
+        }
+
+        // Cell Excel lưu dưới dạng ngày thật -> đọc trực tiếp giá trị ngày,
+        // KHÔNG phụ thuộc cell đang hiển thị theo format nào (M/d/yy, dd/MM/yyyy...)
+        if (cell.getCellType() == CellType.NUMERIC && DateUtil.isCellDateFormatted(cell)) {
+            return cell.getLocalDateTimeCellValue().toLocalDate();
+        }
+
+        // Cell là Text thuần -> chỉ chấp nhận đúng định dạng dd/MM/yyyy
+        String raw = new DataFormatter().formatCellValue(cell).trim();
+        try {
+            return LocalDate.parse(raw, DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+        } catch (Exception e) {
+            throw new IllegalArgumentException(
+                    "Thời gian không hợp lệ: '" + raw + "' (định dạng dd/MM/yyyy)");
+        }
+    }
+
+    private LocalDate parseDate(String value) {
+        return LocalDate.parse(value); // ISO yyyy-MM-dd
     }
 
     private List<List<Map<String, String>>> groupRows(List<Map<String, String>> rows) {
@@ -191,14 +217,6 @@ public class ExcavationReportExcelImporter {
     private <T> T findOrThrow(Optional<T> optional, String label, String value) {
         return optional.orElseThrow(() -> new IllegalArgumentException(
                 "Không tìm thấy " + label + " '" + value + "'"));
-    }
-
-    private LocalDate parseDate(String value) {
-        try {
-            return LocalDate.parse(value, DATE_FMT);
-        } catch (Exception e) {
-            throw new IllegalArgumentException("Thời gian không hợp lệ: '" + value + "' (định dạng dd/MM/yyyy)");
-        }
     }
 
     private Integer parseInt(String value) {

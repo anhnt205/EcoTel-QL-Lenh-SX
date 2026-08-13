@@ -21,6 +21,9 @@ public class TransportReportResponse {
     private String employeeFullName;
     private String employeeDepartmentName;
 
+    private Long departmentId;
+    private String departmentName;
+
     private Double fuelBeginning;
     private Double fuelEnding;
     private Double fuelReceived;

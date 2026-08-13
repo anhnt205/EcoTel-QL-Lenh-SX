@@ -1,5 +1,6 @@
 package com.ecotel.thong_ke_cao_son.controller;
 
+import com.ecotel.thong_ke_cao_son.dto.request.ReconciliationDecisionBulkRequest;
 import com.ecotel.thong_ke_cao_son.dto.request.ReconciliationDecisionRequest;
 import com.ecotel.thong_ke_cao_son.dto.request.ReconciliationSearchRequest;
 import com.ecotel.thong_ke_cao_son.dto.response.ApiResponse;
@@ -28,18 +29,25 @@ public class ReconciliationController {
             @RequestParam LocalDate toDate,
             @RequestParam(required = false) List<Long> shiftIds,
             @RequestParam(required = false) List<Long> deviceIds,
+            @RequestParam(required = false, defaultValue = "false") Boolean finalizedOnly,
             Pageable pageable) {
         ReconciliationSearchRequest request = new ReconciliationSearchRequest();
         request.setFromDate(fromDate);
         request.setToDate(toDate);
         request.setShiftIds(shiftIds);
         request.setDeviceIds(deviceIds);
-        return ApiResponse.success(reconciliationService.search(request, pageable));
+        return ApiResponse.success(reconciliationService.search(request, finalizedOnly, pageable));
     }
 
     @PostMapping("/decisions")
     public ApiResponse<ReconciliationDecisionResponse> saveDecision(
             @Valid @RequestBody ReconciliationDecisionRequest request) {
         return ApiResponse.success(reconciliationService.saveDecision(request));
+    }
+
+    @PostMapping("/decisions/bulk")
+    public ApiResponse<List<ReconciliationDecisionResponse>> saveDecisions(
+            @Valid @RequestBody ReconciliationDecisionBulkRequest request) {
+        return ApiResponse.success(reconciliationService.saveDecisions(request.getDecisions()));
     }
 }

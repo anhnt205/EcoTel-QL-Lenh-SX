@@ -15,6 +15,7 @@ public interface TransportReportMapper {
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "shift", ignore = true)
     @Mapping(target = "employee", ignore = true)
+    @Mapping(target = "department", ignore = true)
     @Mapping(target = "fuelUsed", ignore = true)
     @Mapping(target = "trips", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
@@ -24,6 +25,7 @@ public interface TransportReportMapper {
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "shift", ignore = true)
     @Mapping(target = "employee", ignore = true)
+    @Mapping(target = "department", ignore = true)
     @Mapping(target = "fuelUsed", ignore = true)
     @Mapping(target = "trips", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
@@ -51,6 +53,8 @@ public interface TransportReportMapper {
     @Mapping(target = "employeeSalaryCode", source = "employee.salaryCode")
     @Mapping(target = "employeeFullName", source = "employee.fullName")
     @Mapping(target = "employeeDepartmentName", source = "employee.department.name")
+    @Mapping(target = "departmentId", source = "department.id")
+    @Mapping(target = "departmentName", source = "department.name")
     TransportReportResponse toResponse(TransportReport report);
 
     @Mapping(target = "vehicleId", source = "vehicle.id")

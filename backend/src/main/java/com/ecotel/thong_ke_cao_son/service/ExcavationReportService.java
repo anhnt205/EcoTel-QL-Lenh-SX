@@ -36,6 +36,7 @@ public class ExcavationReportService {
     private final LocationRepository locationRepository;
     private final UserRepository userRepository;
     private final CargoTypeRepository cargoTypeRepository;
+    private final DepartmentRepository departmentRepository;
     private final ExcavationReportMapper excavationReportMapper;
 
     @Transactional
@@ -97,6 +98,11 @@ public class ExcavationReportService {
         report.setExcavatorDevice(getOrThrow(deviceRepository, request.getExcavatorDeviceId(), "Máy xúc"));
         report.setReceivingLocation(getOrThrow(locationRepository, request.getReceivingLocationId(), "Nơi nhận tải"));
         report.setEmployee(getOrThrow(userRepository, request.getEmployeeId(), "Nhân viên"));
+        if (request.getDepartmentId() != null) {
+            report.setDepartment(getOrThrow(departmentRepository, request.getDepartmentId(), "Phòng ban"));
+        } else {
+            report.setDepartment(null);
+        }
     }
 
     private ExcavationReportTrip buildTrip(ExcavationReport report, ExcavationReportTripRequest tripReq) {

@@ -33,6 +33,7 @@ public class TransportReportService {
     private final UserRepository userRepository;
     private final LocationRepository locationRepository;
     private final CargoTypeRepository cargoTypeRepository;
+    private final DepartmentRepository departmentRepository;
     private final ReceivingFloorGroupCalculator floorGroupCalculator;
     private final TransportReportMapper transportReportMapper;
 
@@ -116,6 +117,11 @@ public class TransportReportService {
     private void applyRelations(TransportReport report, TransportReportRequest request) {
         report.setShift(getOrThrow(shiftRepository, request.getShiftId(), "Ca"));
         report.setEmployee(getOrThrow(userRepository, request.getEmployeeId(), "Nhân viên"));
+        if (request.getDepartmentId() != null) {
+            report.setDepartment(getOrThrow(departmentRepository, request.getDepartmentId(), "Phòng ban"));
+        } else {
+            report.setDepartment(null);
+        }
     }
 
     private TransportReportTrip buildTrip(TransportReport report, TransportReportTripRequest tripReq) {

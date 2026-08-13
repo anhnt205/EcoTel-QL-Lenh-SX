@@ -76,6 +76,10 @@ public class ExcavationReport {
     @JoinColumn(name = "employee_id", nullable = false)
     private User employee;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "department_id")
+    private Department department;
+
     @BatchSize(size = 20)
     @OneToMany(mappedBy = "excavationReport", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private List<ExcavationReportTrip> trips = new ArrayList<>();

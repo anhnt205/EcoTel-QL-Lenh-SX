@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -27,15 +28,15 @@ public class ReconciliationService {
     private final ReconciliationDecisionRepository reconciliationDecisionRepository;
     private final CargoTypeRepository cargoTypeRepository;
 
-    public PageResponse<ReconciliationRowResponse> search(ReconciliationSearchRequest request, Pageable pageable) {
+    public PageResponse<ReconciliationRowResponse> search(
+            ReconciliationSearchRequest request, Boolean finalizedOnly, Pageable pageable) {
+
         List<TransportReportTrip> transportTrips = transportReportTripRepository.findForReconciliation(
                 request.getFromDate(), request.getToDate(), request.getShiftIds(), request.getDeviceIds());
 
         List<ExcavationReportTrip> excavationTrips = excavationReportTripRepository.findForReconciliation(
                 request.getFromDate(), request.getToDate(), request.getShiftIds(), request.getDeviceIds());
 
-        // Gom chuyến Khai thác theo key (Ngày+Ca+Số xe+Máy xúc) để bắt cặp 1-1.
-        // Dùng Deque để xử lý đúng trường hợp nhiều chuyến trùng key (poll từng cái một, tránh cross-join sai).
         Map<String, Deque<ExcavationReportTrip>> excavationByKey = new HashMap<>();
         for (ExcavationReportTrip et : excavationTrips) {
             excavationByKey.computeIfAbsent(buildExcavationKey(et), k -> new ArrayDeque<>()).add(et);
@@ -43,7 +44,6 @@ public class ReconciliationService {
 
         List<ReconciliationRowResponse> rows = new ArrayList<>();
 
-        // 1. Duyệt từng chuyến Vận tải, tìm cặp khớp key bên Khai thác (nếu có)
         for (TransportReportTrip tt : transportTrips) {
             Deque<ExcavationReportTrip> candidates = excavationByKey.get(buildTransportKey(tt));
             ExcavationReportTrip matchedExcavation =
@@ -51,11 +51,15 @@ public class ReconciliationService {
             rows.add(buildRow(tt, matchedExcavation));
         }
 
-        // 2. Chuyến Khai thác còn dư (không có cặp Vận tải) — vẫn hiển thị, coi như không khớp
         for (Deque<ExcavationReportTrip> remaining : excavationByKey.values()) {
             for (ExcavationReportTrip et : remaining) {
                 rows.add(buildRow(null, et));
             }
+        }
+
+        // Lọc chỉ giữ những dòng đã chốt phương án, nếu được yêu cầu
+        if (Boolean.TRUE.equals(finalizedOnly)) {
+            rows = rows.stream().filter(row -> row.getDecision() != null).toList();
         }
 
         rows.sort(Comparator
@@ -64,7 +68,6 @@ public class ReconciliationService {
                 .thenComparing(ReconciliationRowResponse::getVehicleCode, Comparator.nullsLast(Comparator.naturalOrder()))
                 .thenComparing(ReconciliationRowResponse::getExcavatorName, Comparator.nullsLast(Comparator.naturalOrder())));
 
-        // Paginate kết quả sau khi match
         int start = (int) pageable.getOffset();
         int end = Math.min(start + pageable.getPageSize(), rows.size());
         List<ReconciliationRowResponse> paginatedContent = start < rows.size()
@@ -146,9 +149,50 @@ public class ReconciliationService {
         }
         if (decision != null) {
             builder.decision(toDecisionResponse(decision));
+            builder.resolvedData(resolveTripData(decision, tt, et));
         }
 
         return builder.build();
+    }
+
+    /**
+     * Trả về dữ liệu hiển thị theo đúng phương án đã chốt:
+     * - TRANSPORT: lấy nguyên dữ liệu từ báo cáo Vận tải
+     * - EXCAVATION: lấy nguyên dữ liệu từ báo cáo Khai thác
+     * - OTHER: lấy dữ liệu người dùng tự nhập khi chốt
+     */
+    private ReconciliationTripDataResponse resolveTripData(
+            ReconciliationDecision decision, TransportReportTrip tt, ExcavationReportTrip et) {
+
+        return switch (decision.getFinalOption()) {
+            case TRANSPORT -> {
+                if (tt == null) yield null; // phương án chốt là Vận tải nhưng chuyến Vận tải không tồn tại -> không có dữ liệu để trả
+                yield ReconciliationTripDataResponse.builder()
+                        .cargoTypeName(tt.getCargoType().getName())
+                        .tripCount(tt.getTripCount())
+                        .loadLevelType(tt.getLoadLevel().getType())
+                        .loadLevelCustomValue(tt.getLoadLevel().getCustomValue())
+                        .employeeSalaryCode(tt.getTransportReport().getEmployee().getSalaryCode())
+                        .build();
+            }
+            case EXCAVATION -> {
+                if (et == null) yield null;
+                yield ReconciliationTripDataResponse.builder()
+                        .cargoTypeName(et.getCargoType().getName())
+                        .tripCount(et.getTripCount())
+                        .loadLevelType(et.getLoadLevel().getType())
+                        .loadLevelCustomValue(et.getLoadLevel().getCustomValue())
+                        .employeeSalaryCode(et.getExcavationReport().getEmployee().getSalaryCode())
+                        .build();
+            }
+            case OTHER -> ReconciliationTripDataResponse.builder()
+                    .cargoTypeName(decision.getCustomCargoType() != null ? decision.getCustomCargoType().getName() : null)
+                    .tripCount(decision.getCustomTripCount())
+                    .loadLevelType(decision.getCustomLoadLevel() != null ? decision.getCustomLoadLevel().getType() : null)
+                    .loadLevelCustomValue(decision.getCustomLoadLevel() != null ? decision.getCustomLoadLevel().getCustomValue() : null)
+                    .employeeSalaryCode(null) // OTHER không có nguồn nhân viên xác định — để trống
+                    .build();
+        };
     }
 
     private boolean isMatched(TransportReportTrip tt, ExcavationReportTrip et) {
@@ -164,32 +208,113 @@ public class ReconciliationService {
 
     @Transactional
     public ReconciliationDecisionResponse saveDecision(ReconciliationDecisionRequest request) {
+        return saveDecisions(List.of(request)).get(0);
+    }
+
+    @Transactional
+    public List<ReconciliationDecisionResponse> saveDecisions(List<ReconciliationDecisionRequest> requests) {
+        if (requests.isEmpty()) {
+            return List.of();
+        }
+
+        // ===== Bước 1: Gom toàn bộ ID cần tra cứu, chỉ query 1 lần cho mỗi loại =====
+        List<Long> transportTripIds = requests.stream()
+                .map(ReconciliationDecisionRequest::getTransportReportTripId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+
+        List<Long> excavationTripIds = requests.stream()
+                .map(ReconciliationDecisionRequest::getExcavationReportTripId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+
+        List<Long> customCargoTypeIds = requests.stream()
+                .filter(r -> r.getFinalOption() == ReconciliationFinalOption.OTHER)
+                .map(ReconciliationDecisionRequest::getCustomCargoTypeId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+
+        // ===== Bước 2: Query hàng loạt, dựng map để tra cứu O(1) =====
+        Map<Long, TransportReportTrip> transportTripById = transportReportTripRepository.findAllById(transportTripIds)
+                .stream().collect(Collectors.toMap(TransportReportTrip::getId, t -> t));
+
+        Map<Long, ExcavationReportTrip> excavationTripById = excavationReportTripRepository.findAllById(excavationTripIds)
+                .stream().collect(Collectors.toMap(ExcavationReportTrip::getId, t -> t));
+
+        Map<Long, CargoType> cargoTypeById = cargoTypeRepository.findAllById(customCargoTypeIds)
+                .stream().collect(Collectors.toMap(CargoType::getId, c -> c));
+
+        // Decision đã tồn tại — tra theo cả 2 chiều (transportTrip / excavationTrip) rồi gộp lại theo id thật
+        Map<Long, ReconciliationDecision> existingByTransportTripId =
+                reconciliationDecisionRepository.findByTransportReportTrip_IdIn(transportTripIds).stream()
+                        .collect(Collectors.toMap(d -> d.getTransportReportTrip().getId(), d -> d));
+
+        Map<Long, ReconciliationDecision> existingByExcavationTripId =
+                reconciliationDecisionRepository.findByExcavationReportTrip_IdIn(excavationTripIds).stream()
+                        .collect(Collectors.toMap(d -> d.getExcavationReportTrip().getId(), d -> d));
+
+        // ===== Bước 3: Xử lý từng request trong bộ nhớ, không query thêm =====
+        List<ReconciliationDecision> toSave = new ArrayList<>();
+        List<String> errors = new ArrayList<>();
+
+        for (int i = 0; i < requests.size(); i++) {
+            ReconciliationDecisionRequest request = requests.get(i);
+            try {
+                toSave.add(buildDecision(request, transportTripById, excavationTripById, cargoTypeById,
+                        existingByTransportTripId, existingByExcavationTripId));
+            } catch (Exception e) {
+                errors.add("Mục thứ " + (i + 1) + ": " + e.getMessage());
+            }
+        }
+
+        if (!errors.isEmpty()) {
+            throw new BadRequestException(String.join("; ", errors));
+        }
+
+        // ===== Bước 4: Lưu 1 lần duy nhất =====
+        List<ReconciliationDecision> saved = reconciliationDecisionRepository.saveAll(toSave);
+        return saved.stream().map(this::toDecisionResponse).toList();
+    }
+
+    private ReconciliationDecision buildDecision(
+            ReconciliationDecisionRequest request,
+            Map<Long, TransportReportTrip> transportTripById,
+            Map<Long, ExcavationReportTrip> excavationTripById,
+            Map<Long, CargoType> cargoTypeById,
+            Map<Long, ReconciliationDecision> existingByTransportTripId,
+            Map<Long, ReconciliationDecision> existingByExcavationTripId) {
+
         if (request.getTransportReportTripId() == null && request.getExcavationReportTripId() == null) {
             throw new BadRequestException("Cần ít nhất 1 trong 2: chuyến Vận tải hoặc chuyến Khai thác");
         }
 
         ReconciliationDecision decision = null;
         if (request.getTransportReportTripId() != null) {
-            decision = reconciliationDecisionRepository
-                    .findByTransportReportTrip_Id(request.getTransportReportTripId()).orElse(null);
+            decision = existingByTransportTripId.get(request.getTransportReportTripId());
         }
         if (decision == null && request.getExcavationReportTripId() != null) {
-            decision = reconciliationDecisionRepository
-                    .findByExcavationReportTrip_Id(request.getExcavationReportTripId()).orElse(null);
+            decision = existingByExcavationTripId.get(request.getExcavationReportTripId());
         }
         if (decision == null) {
             decision = new ReconciliationDecision();
         }
 
         if (request.getTransportReportTripId() != null) {
-            decision.setTransportReportTrip(transportReportTripRepository.findById(request.getTransportReportTripId())
-                    .orElseThrow(() -> new ResourceNotFoundException(
-                            "Không tìm thấy chuyến Vận tải: " + request.getTransportReportTripId())));
+            TransportReportTrip trip = transportTripById.get(request.getTransportReportTripId());
+            if (trip == null) {
+                throw new ResourceNotFoundException("Không tìm thấy chuyến Vận tải: " + request.getTransportReportTripId());
+            }
+            decision.setTransportReportTrip(trip);
         }
         if (request.getExcavationReportTripId() != null) {
-            decision.setExcavationReportTrip(excavationReportTripRepository.findById(request.getExcavationReportTripId())
-                    .orElseThrow(() -> new ResourceNotFoundException(
-                            "Không tìm thấy chuyến Khai thác: " + request.getExcavationReportTripId())));
+            ExcavationReportTrip trip = excavationTripById.get(request.getExcavationReportTripId());
+            if (trip == null) {
+                throw new ResourceNotFoundException("Không tìm thấy chuyến Khai thác: " + request.getExcavationReportTripId());
+            }
+            decision.setExcavationReportTrip(trip);
         }
 
         decision.setFinalOption(request.getFinalOption());
@@ -199,9 +324,10 @@ public class ReconciliationService {
                     || request.getCustomLoadLevelType() == null) {
                 throw new BadRequestException("Chọn 'Khác' cần nhập đủ Loại hàng, Số chuyến, Tải trọng");
             }
-            CargoType customCargoType = cargoTypeRepository.findById(request.getCustomCargoTypeId())
-                    .orElseThrow(() -> new ResourceNotFoundException(
-                            "Loại hàng không tồn tại: " + request.getCustomCargoTypeId()));
+            CargoType customCargoType = cargoTypeById.get(request.getCustomCargoTypeId());
+            if (customCargoType == null) {
+                throw new ResourceNotFoundException("Loại hàng không tồn tại: " + request.getCustomCargoTypeId());
+            }
             decision.setCustomCargoType(customCargoType);
             decision.setCustomTripCount(request.getCustomTripCount());
 
@@ -212,14 +338,12 @@ public class ReconciliationService {
                             ? request.getCustomLoadLevelCustomValue() : null);
             decision.setCustomLoadLevel(customLoadLevel);
         } else {
-            // Không phải OTHER -> xóa dữ liệu custom cũ nếu có, tránh rác
             decision.setCustomCargoType(null);
             decision.setCustomTripCount(null);
             decision.setCustomLoadLevel(null);
         }
 
-        reconciliationDecisionRepository.save(decision);
-        return toDecisionResponse(decision);
+        return decision;
     }
 
     private ReconciliationDecisionResponse toDecisionResponse(ReconciliationDecision decision) {

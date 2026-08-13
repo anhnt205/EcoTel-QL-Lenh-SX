@@ -11,6 +11,9 @@ import com.ecotel.thong_ke_cao_son.model.TransportReportTrip;
 import com.ecotel.thong_ke_cao_son.repository.TransportReportRepository;
 import com.ecotel.thong_ke_cao_son.repository.TransportReportTripRepository;
 import com.ecotel.thong_ke_cao_son.service.TransportReportService;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
@@ -104,9 +107,17 @@ public class TransportReportController {
                 .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
                 .body(excelBytes);
     }
-
-    @PostMapping("/import")
-    public ApiResponse<ExcelImportResultResponse> importExcel(@RequestParam("file") MultipartFile file) {
+    @PostMapping(value = "/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ApiResponse<ExcelImportResultResponse> importExcel(
+            @Parameter(
+                    description = "File Excel cần import",
+                    required = true,
+                    content = @Content(
+                            mediaType = MediaType.MULTIPART_FORM_DATA_VALUE,
+                            schema = @Schema(type = "string", format = "binary")
+                    )
+            )
+            @RequestParam("file") MultipartFile file) {
         return ApiResponse.success(transportReportExcelImporter.importFile(file));
     }
 }

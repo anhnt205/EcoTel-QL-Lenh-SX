@@ -35,6 +35,9 @@ public class ExcavationReportResponse {
     private String employeeFullName;
     private String employeeDepartmentName;
 
+    private Long departmentId;
+    private String departmentName;
+
     private List<ExcavationReportTripResponse> trips;
 
     private LocalDateTime createdAt;
