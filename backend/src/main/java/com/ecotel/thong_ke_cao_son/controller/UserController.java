@@ -21,9 +21,10 @@ public class UserController {
     @GetMapping
     public ApiResponse<PageResponse<UserResponse>> getAll(
             @RequestParam(required = false, defaultValue = "") String keyword,
+            @RequestParam(required = false) Long departmentId,
             @ParameterObject
             @PageableDefault(size = 10, sort = "id", direction = Sort.Direction.DESC) Pageable pageable) {
-        return ApiResponse.success(userService.getAll(keyword, pageable));
+        return ApiResponse.success(userService.getAll(keyword, departmentId, pageable));
     }
 
     @GetMapping("/{id}")

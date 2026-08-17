@@ -19,16 +19,17 @@ public interface UserRepository extends JpaRepository<User, Long> {
         SELECT u FROM User u
         LEFT JOIN u.department dep
         LEFT JOIN u.position pos
-        WHERE :keyword IS NULL OR :keyword = ''
+        WHERE (:departmentId IS NULL OR dep.id = :departmentId)
+           AND (:keyword IS NULL OR :keyword = ''
            OR LOWER(u.username) LIKE LOWER(CONCAT('%', :keyword, '%'))
            OR LOWER(u.fullName) LIKE LOWER(CONCAT('%', :keyword, '%'))
            OR LOWER(u.email) LIKE LOWER(CONCAT('%', :keyword, '%'))
            OR LOWER(u.phone) LIKE LOWER(CONCAT('%', :keyword, '%'))
            OR LOWER(u.salaryCode) LIKE LOWER(CONCAT('%', :keyword, '%'))
            OR LOWER(dep.name) LIKE LOWER(CONCAT('%', :keyword, '%'))
-           OR LOWER(pos.name) LIKE LOWER(CONCAT('%', :keyword, '%'))
+           OR LOWER(pos.name) LIKE LOWER(CONCAT('%', :keyword, '%')))
         """)
-    Page<User> search(@Param("keyword") String keyword, Pageable pageable);
+    Page<User> search(@Param("keyword") String keyword, @Param("departmentId") Long departmentId, Pageable pageable);
 
     Optional<User> findBySalaryCode(String salaryCode);
 }

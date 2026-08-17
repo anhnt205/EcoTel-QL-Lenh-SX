@@ -18,8 +18,8 @@ public class UserService {
     private final UserRepository userRepository;
     private final UserMapper userMapper;
 
-    public PageResponse<UserResponse> getAll(String keyword, Pageable pageable) {
-        Page<UserResponse> page = userRepository.search(keyword, pageable)
+    public PageResponse<UserResponse> getAll(String keyword, Long departmentId, Pageable pageable) {
+        Page<UserResponse> page = userRepository.search(keyword, departmentId, pageable)
                 .map(userMapper::toResponse);
         return PageResponse.from(page);
     }

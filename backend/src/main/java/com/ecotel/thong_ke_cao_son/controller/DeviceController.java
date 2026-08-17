@@ -24,9 +24,10 @@ public class DeviceController {
             @RequestParam(required = false, defaultValue = "") String keyword,
             @RequestParam(required = false) String categoryName,
             @RequestParam(required = false) DeviceGroup categoryGroup,
+            @RequestParam(required = false) Long departmentId,
             @ParameterObject
             @PageableDefault(size = 10, sort = "id", direction = Sort.Direction.DESC) Pageable pageable) {
-        return ApiResponse.success(deviceService.getAll(keyword, categoryName, categoryGroup, pageable));
+        return ApiResponse.success(deviceService.getAll(keyword, categoryName, categoryGroup, departmentId, pageable));
     }
 
     @GetMapping("/{id}")

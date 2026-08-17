@@ -19,8 +19,8 @@ public class DeviceService {
     private final DeviceRepository deviceRepository;
     private final DeviceMapper deviceMapper;
 
-    public PageResponse<DeviceResponse> getAll(String keyword, String categoryName, DeviceGroup categoryGroup, Pageable pageable) {
-        Page<DeviceResponse> page = deviceRepository.search(keyword, categoryName, categoryGroup, pageable)
+    public PageResponse<DeviceResponse> getAll(String keyword, String categoryName, DeviceGroup categoryGroup, Long departmentId, Pageable pageable) {
+        Page<DeviceResponse> page = deviceRepository.search(keyword, categoryName, categoryGroup, departmentId, pageable)
                 .map(deviceMapper::toResponse);
         return PageResponse.from(page);
     }
