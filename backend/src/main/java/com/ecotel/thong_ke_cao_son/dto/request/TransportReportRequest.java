@@ -18,6 +18,9 @@ public class TransportReportRequest {
     @NotNull(message = "Ca là bắt buộc")
     private Long shiftId;
 
+    @NotNull(message = "Số xe là bắt buộc")
+    private Long vehicleId;
+
     @NotNull(message = "Nhân viên là bắt buộc")
     private Long employeeId;
 

@@ -12,7 +12,20 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "transport_report_trips")
+@Table(
+        name = "transport_report_trips",
+        uniqueConstraints = {
+                @UniqueConstraint(name = "uk_transport_trip_dedup",
+                        columnNames = {
+                                "transport_report_id", "excavation_area_id", "excavator_device_id",
+                                "loading_point_id", "unloading_point_id", "cargo_type_id",
+                                "trip_count", "load_level_type", "load_level_custom_value",
+                                "rainy_day", "supplementary_vehicle", "receiving_floor", "unloading_floor",
+                                "total_route_distance_km", "total_route_lift_m",
+                                "local_slope_distance_km", "local_slope_m"
+                        })
+        }
+)
 @Getter
 @Setter
 @NoArgsConstructor
@@ -28,10 +41,6 @@ public class TransportReportTrip {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "transport_report_id", nullable = false)
     private TransportReport transportReport;
-
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "vehicle_id", nullable = false)
-    private Device vehicle;
 
     @Column(name = "rainy_day", nullable = false)
     private Boolean rainyDay = false;

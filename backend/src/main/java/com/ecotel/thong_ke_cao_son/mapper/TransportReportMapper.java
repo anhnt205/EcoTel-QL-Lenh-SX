@@ -14,6 +14,7 @@ import org.mapstruct.MappingTarget;
 public interface TransportReportMapper {
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "shift", ignore = true)
+    @Mapping(target = "vehicle", ignore = true)
     @Mapping(target = "employee", ignore = true)
     @Mapping(target = "department", ignore = true)
     @Mapping(target = "fuelUsed", ignore = true)
@@ -24,6 +25,7 @@ public interface TransportReportMapper {
 
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "shift", ignore = true)
+    @Mapping(target = "vehicle", ignore = true)
     @Mapping(target = "employee", ignore = true)
     @Mapping(target = "department", ignore = true)
     @Mapping(target = "fuelUsed", ignore = true)
@@ -34,7 +36,6 @@ public interface TransportReportMapper {
 
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "transportReport", ignore = true)
-    @Mapping(target = "vehicle", ignore = true)
     @Mapping(target = "excavationArea", ignore = true)
     @Mapping(target = "excavator", ignore = true)
     @Mapping(target = "loadingPoint", ignore = true)
@@ -55,13 +56,13 @@ public interface TransportReportMapper {
     @Mapping(target = "employeeDepartmentName", source = "employee.department.name")
     @Mapping(target = "departmentId", source = "department.id")
     @Mapping(target = "departmentName", source = "department.name")
-    TransportReportResponse toResponse(TransportReport report);
-
     @Mapping(target = "vehicleId", source = "vehicle.id")
     @Mapping(target = "vehicleCode", source = "vehicle.code")
     @Mapping(target = "vehicleName", source = "vehicle.name")
     @Mapping(target = "vehicleDepartmentName", source = "vehicle.department.name")
     @Mapping(target = "vehicleCategoryName", source = "vehicle.category.name")
+    TransportReportResponse toResponse(TransportReport report);
+
     @Mapping(target = "excavationAreaId", source = "excavationArea.id")
     @Mapping(target = "excavationAreaName", source = "excavationArea.name")
     @Mapping(target = "excavatorDeviceId", source = "excavator.id")

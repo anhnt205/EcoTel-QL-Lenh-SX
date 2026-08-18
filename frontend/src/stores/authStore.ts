@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { tokenService } from "@/auth/tokenService";
+import { tokenService, decodeJwtPayload } from "@/auth/tokenService";
 
 export interface PermissionDto {
   c: boolean;
@@ -36,7 +36,9 @@ interface AuthState {
 
 function decodeUserFromToken(token: string): AppUser | null {
   try {
-    const payload = JSON.parse(atob(token.split(".")[1]));
+    const payload = decodeJwtPayload(token);
+    console.log("[AuthStore] Decoded JWT payload:", payload);
+    if (!payload) return null;
     return {
       username: payload.username,
       fullName: payload.fullName,
@@ -44,21 +46,26 @@ function decodeUserFromToken(token: string): AppUser | null {
       app: payload.app,
       permissions: payload.permissions ?? {},
     };
-  } catch {
+  } catch (e) {
+    console.error("[AuthStore] decodeUserFromToken failed:", e);
     return null;
   }
 }
 
-export const useAuthStore = create<AuthState>()((set) => ({
-  loading: false, // [AUTH DISABLED] - không cần chờ xác thực
+export const useAuthStore = create<AuthState>()((set, get) => ({
+  loading: true,
   user: null,
 
   initAuth: () => {
     const token = tokenService.getAppToken();
-    if (token && tokenService.isValid()) {
+    const isValid = tokenService.isValid();
+    console.log("[AuthStore] initAuth running:", { hasToken: !!token, isValid });
+    if (token && isValid) {
       const user = decodeUserFromToken(token);
+      console.log("[AuthStore] initAuth setting user:", user);
       set({ user, loading: false });
     } else {
+      console.warn("[AuthStore] initAuth failed validation, clearing user state");
       set({ user: null, loading: false });
     }
   },
@@ -75,7 +82,11 @@ export const useAuthStore = create<AuthState>()((set) => ({
   },
 
   isAuthenticated: () => {
-    return true; // [AUTH DISABLED] - luôn cho phép truy cập
+    const { user } = get();
+    const isValid = tokenService.isValid();
+    const isAuthed = user !== null && isValid;
+    console.log("[AuthStore] isAuthenticated:", { hasUser: !!user, isValid, isAuthed });
+    return isAuthed;
   },
 }));
 

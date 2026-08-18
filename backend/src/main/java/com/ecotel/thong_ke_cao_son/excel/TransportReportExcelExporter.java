@@ -1,5 +1,6 @@
 package com.ecotel.thong_ke_cao_son.excel;
 
+import com.ecotel.thong_ke_cao_son.model.LoadLevel;
 import com.ecotel.thong_ke_cao_son.model.TransportReport;
 import com.ecotel.thong_ke_cao_son.model.TransportReportTrip;
 import com.ecotel.thong_ke_cao_son.enums.LoadLevelType;
@@ -17,23 +18,23 @@ public class TransportReportExcelExporter {
     private static final String[] HEADERS = {
             "Thời gian", "Ca", "Số thẻ lương", "Họ và tên", "Đơn vị",
             "Nhiên liệu tồn đầu", "Nhiên liệu tồn cuối", "Nhiên liệu lĩnh", "Nhiên liệu sử dụng",
-            "Số xe", "Ngày mưa", "Xe bổ túc",
+            "Số xe", "Đơn vị quản lý thiết bị", "Chủng loại xe",
+            "Ngày mưa", "Xe bổ túc",
             "Khu vực xúc", "Máy xúc", "Nơi nhận tải", "Tầng nhận tải", "Nhóm tầng nhận tải",
             "Tầng dỡ tải", "Cung độ toàn tuyến (km)", "Nâng tải toàn tuyến (m)",
             "Cung độ dốc cục bộ (km)", "Dốc cục bộ (m)", "Nơi dỡ tải", "Loại hàng", "Nhóm hàng",
-            "Số chuyến", "Mức tải", "Giá trị mức tải khác",
-            "Đơn vị quản lý thiết bị", "Chủng loại xe"
+            "Số chuyến", "Mức tải"
     };
 
     private static final int[] COLUMN_WIDTHS = {
             12, 6, 14, 22, 18,
             14, 14, 12, 14,
-            12, 10, 10,
+            12, 20, 16,
+            10, 10,
             16, 12, 16, 12, 14,
             14, 16, 16,
             16, 12, 16, 16, 16,
-            10, 14, 16,
-            20, 16
+            10, 14
     };
 
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
@@ -46,7 +47,8 @@ public class TransportReportExcelExporter {
             CellStyle headerStyle = buildHeaderStyle(workbook);
             CellStyle dataStyle = buildDataStyle(workbook, false);
             CellStyle numericDataStyle = buildDataStyle(workbook, true);
-            CellStyle dateTextStyle = buildDateTextStyle(workbook); // style riêng cho cột "Thời gian"
+            CellStyle dateTextStyle = buildDateTextStyle(workbook);          // Text + border — dùng cho cell có dữ liệu
+            CellStyle dateColumnDefaultStyle = buildDateColumnDefaultStyle(workbook); // Chỉ Text, KHÔNG border — dùng cho cả cột
 
             Row headerRow = sheet.createRow(0);
             headerRow.setHeightInPoints(32);
@@ -57,7 +59,7 @@ public class TransportReportExcelExporter {
                 sheet.setColumnWidth(i, COLUMN_WIDTHS[i] * 256);
             }
 
-            sheet.setDefaultColumnStyle(0, dateTextStyle);
+            sheet.setDefaultColumnStyle(0, dateColumnDefaultStyle);
 
             int rowIdx = 1;
             for (TransportReport report : reports) {
@@ -99,6 +101,12 @@ public class TransportReportExcelExporter {
         setNumeric(row, c++, report.getFuelReceived(), numericDataStyle);
         setNumeric(row, c++, report.getFuelUsed(), numericDataStyle);
 
+        setText(row, c++, report.getVehicle().getCode(), dataStyle);
+        setText(row, c++, report.getVehicle().getDepartment() != null
+                ? report.getVehicle().getDepartment().getName() : "", dataStyle);
+        setText(row, c++, report.getVehicle().getCategory() != null
+                ? report.getVehicle().getCategory().getName() : "", dataStyle);
+
         if (trip == null) {
             for (int i = c; i < HEADERS.length; i++) {
                 Cell cell = row.createCell(i);
@@ -107,7 +115,6 @@ public class TransportReportExcelExporter {
             return;
         }
 
-        setText(row, c++, trip.getVehicle().getCode(), dataStyle);
         setText(row, c++, Boolean.TRUE.equals(trip.getRainyDay()) ? "x" : "", dataStyle);
         setText(row, c++, Boolean.TRUE.equals(trip.getSupplementaryVehicle()) ? "x" : "", dataStyle);
         setText(row, c++, trip.getExcavationArea().getName(), dataStyle);
@@ -122,14 +129,9 @@ public class TransportReportExcelExporter {
         setNumeric(row, c++, trip.getLocalSlopeM(), numericDataStyle);
         setText(row, c++, trip.getUnloadingPoint().getName(), dataStyle);
         setText(row, c++, trip.getCargoType().getName(), dataStyle);
-        setText(row, c++, trip.getCargoGroup().getName(), dataStyle);
+        setText(row, c++, trip.getCargoGroup() != null ? trip.getCargoGroup().getName() : "", dataStyle);
         setNumeric(row, c++, trip.getTripCount() != null ? trip.getTripCount().doubleValue() : null, numericDataStyle);
-        setText(row, c++, loadLevelLabel(trip.getLoadLevel().getType()), dataStyle);
-        setText(row, c++, trip.getLoadLevel().getCustomValue() != null ? trip.getLoadLevel().getCustomValue() : "", dataStyle);
-        setText(row, c++, trip.getVehicle().getDepartment() != null
-                ? trip.getVehicle().getDepartment().getName() : "", dataStyle);
-        setText(row, c, trip.getVehicle().getCategory() != null
-                ? trip.getVehicle().getCategory().getName() : "", dataStyle);
+        setText(row, c++, loadLevelLabel(trip.getLoadLevel()), dataStyle);
     }
 
     private CellStyle buildDateTextStyle(Workbook workbook) {
@@ -143,12 +145,27 @@ public class TransportReportExcelExporter {
         style.setVerticalAlignment(VerticalAlignment.CENTER);
         style.setWrapText(true);
 
-        // Định dạng số "@" = Text — Excel sẽ luôn lưu giá trị nhập vào cột này
         DataFormat format = workbook.createDataFormat();
         style.setDataFormat(format.getFormat("@"));
 
         applyBorder(style);
         applyPadding(style);
+        return style;
+    }
+
+    // Style rút gọn: CHỈ Text format, không border/font đặc biệt — dùng cho cả cột (setDefaultColumnStyle)
+    private CellStyle buildDateColumnDefaultStyle(Workbook workbook) {
+        Font font = workbook.createFont();
+        font.setFontName(FONT_NAME);
+        font.setFontHeightInPoints((short) 11);
+
+        CellStyle style = workbook.createCellStyle();
+        style.setFont(font);
+
+        DataFormat format = workbook.createDataFormat();
+        style.setDataFormat(format.getFormat("@"));
+
+        // Không gọi applyBorder() ở đây — đây chính là điểm khác biệt giải quyết vấn đề border lan ra dòng trống
         return style;
     }
 
@@ -170,11 +187,12 @@ public class TransportReportExcelExporter {
         cell.setCellStyle(style);
     }
 
-    private String loadLevelLabel(LoadLevelType type) {
-        return switch (type) {
+    // Với mức tải OTHER, chỉ hiển thị giá trị dạng x/y (không kèm chữ "Khác")
+    private String loadLevelLabel(LoadLevel loadLevel) {
+        return switch (loadLevel.getType()) {
             case FULL_LOAD -> "Đủ tải";
             case RODA_2_3 -> "Roda (2/3)";
-            case OTHER -> "Khác";
+            case OTHER -> loadLevel.getCustomValue() != null ? loadLevel.getCustomValue() : "";
         };
     }
 

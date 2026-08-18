@@ -24,7 +24,7 @@ jobs:
       - name: Create .env for frontend
         run: |
           cat > ./frontend/.env << EOF
-          VITE_API_BASE_URL=${{ secrets.VITE_API_BASE_URL }}
+          VITE_API_KONG_URL=${{ secrets.VITE_API_KONG_URL }}
           EOF
 
       # ============ BUILD & PUSH IMAGES ============

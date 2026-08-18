@@ -1,9 +1,7 @@
 package com.ecotel.thong_ke_cao_son.dto.request;
 
-import com.ecotel.thong_ke_cao_son.enums.LoadLevelType;
-import com.ecotel.thong_ke_cao_son.enums.ReconciliationFinalOption;
+import com.ecotel.thong_ke_cao_son.enums.ReconciliationStatus;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Pattern;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -11,17 +9,11 @@ import lombok.Setter;
 @Setter
 public class ReconciliationDecisionRequest {
 
-    private Long transportReportTripId;    // nullable — ít nhất 1 trong 2 phải có
+    private Long transportReportTripId;
     private Long excavationReportTripId;
 
-    @NotNull(message = "Phương án chốt là bắt buộc")
-    private ReconciliationFinalOption finalOption;
+    @NotNull(message = "Trạng thái duyệt là bắt buộc")
+    private ReconciliationStatus status;
 
-    // Chỉ bắt buộc khi finalOption = OTHER
-    private Long customCargoTypeId;
-    private Integer customTripCount;
-    private LoadLevelType customLoadLevelType;
-
-    @Pattern(regexp = "^\\d+/\\d+$", message = "Giá trị mức tải phải dạng x/y, ví dụ 1/2")
-    private String customLoadLevelCustomValue;
+    private String note; // không bắt buộc
 }

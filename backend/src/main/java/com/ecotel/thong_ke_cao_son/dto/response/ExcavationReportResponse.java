@@ -20,6 +20,12 @@ public class ExcavationReportResponse {
     private String excavatorDeviceCode;
     private String excavatorDeviceName;
 
+    private Long vehicleId;
+    private String vehicleCode;
+    private String vehicleName;
+    private String vehicleDepartmentName;
+    private String vehicleCategoryName;
+
     private String excavationFloor;
 
     private Long receivingLocationId;

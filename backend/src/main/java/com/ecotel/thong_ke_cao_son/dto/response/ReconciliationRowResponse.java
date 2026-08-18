@@ -35,8 +35,6 @@ public class ReconciliationRowResponse {
 
     private Boolean matched;
 
-    private ReconciliationDecisionResponse decision; // null nếu chưa chốt phương án
+    private ReconciliationDecisionResponse decision;
 
-    // Dữ liệu hiển thị theo đúng phương án đã chốt
-    private ReconciliationTripDataResponse resolvedData;
 }

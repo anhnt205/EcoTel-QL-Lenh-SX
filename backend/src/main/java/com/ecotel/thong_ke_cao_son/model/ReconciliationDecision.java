@@ -1,6 +1,6 @@
 package com.ecotel.thong_ke_cao_son.model;
 
-import com.ecotel.thong_ke_cao_son.enums.ReconciliationFinalOption;
+import com.ecotel.thong_ke_cao_son.enums.ReconciliationStatus;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -32,7 +32,6 @@ public class ReconciliationDecision {
     @SequenceGenerator(name = "reconciliation_decision_seq", sequenceName = "reconciliation_decision_seq", allocationSize = 50)
     private Long id;
 
-    // Nullable — chuyến có thể chỉ tồn tại ở 1 phía (không khớp)
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "transport_report_trip_id")
     private TransportReportTrip transportReportTrip;
@@ -42,19 +41,11 @@ public class ReconciliationDecision {
     private ExcavationReportTrip excavationReportTrip;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "final_option", nullable = false)
-    private ReconciliationFinalOption finalOption;
+    @Column(name = "status", nullable = false)
+    private ReconciliationStatus status = ReconciliationStatus.NOT_APPROVED;
 
-    // Chỉ có giá trị khi finalOption = OTHER
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "custom_cargo_type_id")
-    private CargoType customCargoType;
-
-    @Column(name = "custom_trip_count")
-    private Integer customTripCount;
-
-    @Embedded
-    private LoadLevel customLoadLevel;
+    @Column(name = "note", columnDefinition = "TEXT")
+    private String note;
 
     @CreatedDate
     @Column(name = "created_at", updatable = false)

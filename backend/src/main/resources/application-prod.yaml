@@ -30,6 +30,11 @@ spring:
         jwt:
           jwk-uri: ${PORTAL_JWKS_URI}
 
+portal:
+  internal-url: http://portal-service:8080
+app:
+  code: tkcs
+
 server:
   port: ${THONG_KE_PORT}
 

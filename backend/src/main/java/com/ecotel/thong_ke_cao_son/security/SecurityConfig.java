@@ -39,7 +39,7 @@ public class SecurityConfig {
                 // .oauth2ResourceServer(oauth2 -> oauth2.jwt(Customizer.withDefaults()))
                 .authorizeHttpRequests(authorize -> authorize
                                 .requestMatchers(PUBLIC_ENDPOINT).permitAll()
-                    //    .anyRequest().authenticated()
+//                        .anyRequest().authenticated()
                                 .anyRequest().permitAll() // test
                 )
                 // .addFilterAfter(appTokenFilter, BearerTokenAuthenticationFilter.class)  // ← sau khi Spring verify xong

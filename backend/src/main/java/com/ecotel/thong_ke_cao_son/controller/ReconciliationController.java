@@ -3,6 +3,7 @@ package com.ecotel.thong_ke_cao_son.controller;
 import com.ecotel.thong_ke_cao_son.dto.request.ReconciliationDecisionBulkRequest;
 import com.ecotel.thong_ke_cao_son.dto.request.ReconciliationDecisionRequest;
 import com.ecotel.thong_ke_cao_son.dto.request.ReconciliationSearchRequest;
+import com.ecotel.thong_ke_cao_son.dto.request.ReconciliationTripUpdateRequest;
 import com.ecotel.thong_ke_cao_son.dto.response.ApiResponse;
 import com.ecotel.thong_ke_cao_son.dto.response.PageResponse;
 import com.ecotel.thong_ke_cao_son.dto.response.ReconciliationDecisionResponse;
@@ -49,5 +50,12 @@ public class ReconciliationController {
     public ApiResponse<List<ReconciliationDecisionResponse>> saveDecisions(
             @Valid @RequestBody ReconciliationDecisionBulkRequest request) {
         return ApiResponse.success(reconciliationService.saveDecisions(request.getDecisions()));
+    }
+
+    @PutMapping("/trips/bulk")
+    public ApiResponse<Void> updateTrips(
+            @Valid @RequestBody List<@Valid ReconciliationTripUpdateRequest> requests) {
+        reconciliationService.updateTrips(requests);
+        return ApiResponse.success(null);
     }
 }

@@ -18,18 +18,18 @@ public class ExcavationReportExcelExporter {
             "Thời gian", "Ca", "Máy xúc", "Tầng xúc", "Nơi nhận tải",
             "Số thẻ lương", "Họ và tên", "Đơn vị",
             "Nhiên liệu tồn đầu", "Nhiên liệu tồn cuối", "Nhiên liệu lĩnh", "Nhiên liệu sử dụng",
-            "Số xe", "Số chuyến", "Vị trí đổ", "Loại hàng", "Nhóm hàng",
-            "Mức tải", "Giá trị mức tải khác",
-            "Đơn vị quản lý thiết bị", "Chủng loại xe"
+            "Số xe", "Đơn vị quản lý thiết bị", "Chủng loại xe",
+            "Số chuyến", "Loại hàng", "Nhóm hàng",
+            "Mức tải"
     };
 
     private static final int[] COLUMN_WIDTHS = {
             12, 6, 12, 12, 16,
             14, 22, 18,
             14, 14, 12, 14,
-            12, 10, 16, 16, 16,
-            14, 16,
-            20, 16
+            12, 20, 16,
+            10, 16, 16,
+            18
     };
 
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
@@ -37,12 +37,13 @@ public class ExcavationReportExcelExporter {
 
     public byte[] export(List<ExcavationReport> reports) {
         try (Workbook workbook = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
-            Sheet sheet = workbook.createSheet("Báo cáo vận tải");
+            Sheet sheet = workbook.createSheet("Báo cáo khai thác");
 
             CellStyle headerStyle = buildHeaderStyle(workbook);
             CellStyle dataStyle = buildDataStyle(workbook, false);
             CellStyle numericDataStyle = buildDataStyle(workbook, true);
-            CellStyle dateTextStyle = buildDateTextStyle(workbook); // style riêng cho cột "Thời gian"
+            CellStyle dateTextStyle = buildDateTextStyle(workbook);
+            CellStyle dateColumnDefaultStyle = buildDateColumnDefaultStyle(workbook);
 
             Row headerRow = sheet.createRow(0);
             headerRow.setHeightInPoints(32);
@@ -53,7 +54,7 @@ public class ExcavationReportExcelExporter {
                 sheet.setColumnWidth(i, COLUMN_WIDTHS[i] * 256);
             }
 
-            sheet.setDefaultColumnStyle(0, dateTextStyle);
+            sheet.setDefaultColumnStyle(0, dateColumnDefaultStyle);
 
             int rowIdx = 1;
             for (ExcavationReport report : reports) {
@@ -71,7 +72,7 @@ public class ExcavationReportExcelExporter {
             workbook.write(out);
             return out.toByteArray();
         } catch (Exception e) {
-            throw new RuntimeException("Lỗi khi xuất Excel báo cáo vận tải", e);
+            throw new RuntimeException("Lỗi khi xuất Excel báo cáo khai thác", e);
         }
     }
 
@@ -80,7 +81,6 @@ public class ExcavationReportExcelExporter {
         row.setHeightInPoints(-1);
         int c = 0;
 
-        // Cột "Thời gian" — dùng style Text riêng thay vì dataStyle thường
         Cell dateCell = row.createCell(c++);
         dateCell.setCellValue(report.getReportDate().format(DATE_FMT));
         dateCell.setCellStyle(dateTextStyle);
@@ -98,6 +98,12 @@ public class ExcavationReportExcelExporter {
         setNumeric(row, c++, report.getFuelReceived(), numericDataStyle);
         setNumeric(row, c++, report.getFuelUsed(), numericDataStyle);
 
+        setText(row, c++, report.getVehicle().getCode(), dataStyle);
+        setText(row, c++, report.getVehicle().getDepartment() != null
+                ? report.getVehicle().getDepartment().getName() : "", dataStyle);
+        setText(row, c++, report.getVehicle().getCategory() != null
+                ? report.getVehicle().getCategory().getName() : "", dataStyle);
+
         if (trip == null) {
             for (int i = c; i < HEADERS.length; i++) {
                 Cell cell = row.createCell(i);
@@ -106,16 +112,10 @@ public class ExcavationReportExcelExporter {
             return;
         }
 
-        setText(row, c++, trip.getVehicle().getCode(), dataStyle);
         setNumeric(row, c++, trip.getTripCount() != null ? trip.getTripCount().doubleValue() : null, numericDataStyle);
         setText(row, c++, trip.getCargoType().getName(), dataStyle);
         setText(row, c++, trip.getCargoGroup().getName(), dataStyle);
-        setText(row, c++, loadLevelLabel(trip.getLoadLevel().getType()), dataStyle);
-        setText(row, c++, trip.getLoadLevel().getCustomValue() != null ? trip.getLoadLevel().getCustomValue() : "", dataStyle);
-        setText(row, c++, trip.getVehicle().getDepartment() != null
-                ? trip.getVehicle().getDepartment().getName() : "", dataStyle);
-        setText(row, c, trip.getVehicle().getCategory() != null
-                ? trip.getVehicle().getCategory().getName() : "", dataStyle);
+        setText(row, c++, loadLevelDisplay(trip.getLoadLevel().getType(), trip.getLoadLevel().getCustomValue()), dataStyle);
     }
 
     private CellStyle buildDateTextStyle(Workbook workbook) {
@@ -129,13 +129,25 @@ public class ExcavationReportExcelExporter {
         style.setVerticalAlignment(VerticalAlignment.CENTER);
         style.setWrapText(true);
 
-        // Định dạng số "@" = Text — Excel sẽ luôn lưu giá trị nhập vào cột này
-        // dưới dạng chuỗi thuần, KHÔNG tự động parse thành ngày dù người dùng gõ 7/8/2026 hay 08-07-2026.
         DataFormat format = workbook.createDataFormat();
         style.setDataFormat(format.getFormat("@"));
 
         applyBorder(style);
         applyPadding(style);
+        return style;
+    }
+
+    private CellStyle buildDateColumnDefaultStyle(Workbook workbook) {
+        Font font = workbook.createFont();
+        font.setFontName(FONT_NAME);
+        font.setFontHeightInPoints((short) 11);
+
+        CellStyle style = workbook.createCellStyle();
+        style.setFont(font);
+
+        DataFormat format = workbook.createDataFormat();
+        style.setDataFormat(format.getFormat("@"));
+
         return style;
     }
 
@@ -157,11 +169,12 @@ public class ExcavationReportExcelExporter {
         cell.setCellStyle(style);
     }
 
-    private String loadLevelLabel(LoadLevelType type) {
+    // Gộp Mức tải + Giá trị khác vào cùng 1 cột — ví dụ "Khác (3/4)"
+    private String loadLevelDisplay(LoadLevelType type, String customValue) {
         return switch (type) {
             case FULL_LOAD -> "Đủ tải";
             case RODA_2_3 -> "Roda (2/3)";
-            case OTHER -> "Khác";
+            case OTHER -> "Khác (" + (customValue != null ? customValue : "") + ")";
         };
     }
 

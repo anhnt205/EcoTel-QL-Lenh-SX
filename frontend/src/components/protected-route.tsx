@@ -1,7 +1,5 @@
-import { Navigate, Outlet } from "react-router-dom";
+import { Outlet } from "react-router-dom";
 import { useAuthStore } from "@/stores/authStore";
-
-const PORTAL_URL = import.meta.env.VITE_PORTAL_URL;
 
 export function ProtectedRoute() {
   const { loading, isAuthenticated } = useAuthStore();
@@ -18,12 +16,8 @@ export function ProtectedRoute() {
   }
 
   if (!isAuthenticated()) {
-    // AuthGate đã xử lý redirect, đây là safety net
-    if (PORTAL_URL) {
-      window.location.href = PORTAL_URL;
-      return null;
-    }
-    return <Navigate to="/" replace />;
+    // AuthGate đã hiển thị lỗi, giữ nguyên trang
+    return null;
   }
 
   return <Outlet />;

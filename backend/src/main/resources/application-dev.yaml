@@ -26,7 +26,12 @@ spring:
     oauth2:
       resourceserver:
         jwt:
-          jwk-set-uri: http://localhost:8080/.well-known/jwks.json # endpoint lấy public key từ Portal
+          jwk-set-uri: http://localhost:1188/.well-known/jwks.json # endpoint lấy public key từ Portal
+
+portal:
+  internal-url: http://localhost:1188
+app:
+  code: tkcs
 
 server:
   port: 8088

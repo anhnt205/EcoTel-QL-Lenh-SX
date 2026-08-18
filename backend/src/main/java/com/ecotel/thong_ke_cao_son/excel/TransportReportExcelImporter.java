@@ -14,6 +14,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.regex.Pattern;
 
 @Component
 @RequiredArgsConstructor
@@ -28,6 +29,7 @@ public class TransportReportExcelImporter {
     private final ReceivingFloorGroupCalculator floorGroupCalculator;
 
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+    private static final Pattern OTHER_LOAD_VALUE_PATTERN = Pattern.compile("^\\d+/\\d+$");
 
     @Transactional
     public ExcelImportResultResponse importFile(MultipartFile file) {
@@ -67,7 +69,6 @@ public class TransportReportExcelImporter {
                 rowData.put("cargoTypeName", formatter.formatCellValue(row.getCell(23)).trim());
                 rowData.put("tripCount", formatter.formatCellValue(row.getCell(25)).trim());
                 rowData.put("loadLevelLabel", formatter.formatCellValue(row.getCell(26)).trim());
-                rowData.put("loadLevelCustomValue", formatter.formatCellValue(row.getCell(27)).trim());
 
                 rawRows.add(rowData);
             }
@@ -140,7 +141,7 @@ public class TransportReportExcelImporter {
     }
 
     private String buildHeaderKey(Map<String, String> row) {
-        return row.get("reportDate") + "|" + row.get("shiftName") + "|" + row.get("salaryCode");
+        return row.get("reportDate") + "|" + row.get("shiftName") + "|" + row.get("vehicleCode") + "|" + row.get("salaryCode");
     }
 
     private void processGroup(List<Map<String, String>> group) {
@@ -149,14 +150,16 @@ public class TransportReportExcelImporter {
         LocalDate reportDate = parseDate(firstRow.get("reportDate"));
         Shift shift = findOrThrow(shiftRepository.findByName(parseInt(firstRow.get("shiftName"))), "Ca", firstRow.get("shiftName"));
         User employee = findOrThrow(userRepository.findBySalaryCode(firstRow.get("salaryCode")), "Số thẻ lương", firstRow.get("salaryCode"));
+        Device vehicle = findOrThrow(deviceRepository.findByCode(firstRow.get("vehicleCode")), "Số xe", firstRow.get("vehicleCode"));
 
-        // Xác định báo cáo mới hay đã tồn tại: Thời gian + Ca + Số thẻ lương (không còn Số xe)
+        // Xác định báo cáo mới hay đã tồn tại: Thời gian + Ca + Số xe + Số thẻ lương
         TransportReport report = transportReportRepository
-                .findByReportDateAndShiftIdAndEmployeeId(reportDate, shift.getId(), employee.getId())
+                .findByReportDateAndShiftIdAndVehicleIdAndEmployeeId(reportDate, shift.getId(), vehicle.getId(), employee.getId())
                 .orElseGet(TransportReport::new);
 
         report.setReportDate(reportDate);
         report.setShift(shift);
+        report.setVehicle(vehicle);
         report.setEmployee(employee);
         report.setFuelBeginning(parseDouble(firstRow.get("fuelBeginning")));
         report.setFuelEnding(parseDouble(firstRow.get("fuelEnding")));
@@ -178,7 +181,6 @@ public class TransportReportExcelImporter {
     private TransportReportTrip buildTrip(Map<String, String> row) {
         TransportReportTrip trip = new TransportReportTrip();
 
-        trip.setVehicle(findOrThrow(deviceRepository.findByCode(row.get("vehicleCode")), "Số xe", row.get("vehicleCode")));
         trip.setRainyDay("x".equalsIgnoreCase(row.get("rainyDay")));
         trip.setSupplementaryVehicle("x".equalsIgnoreCase(row.get("supplementaryVehicle")));
 
@@ -205,22 +207,13 @@ public class TransportReportExcelImporter {
 
         trip.setTripCount(parseIntOrNull(row.get("tripCount")));
 
-        LoadLevel loadLevel = new LoadLevel();
-        LoadLevelType type = parseLoadLevelLabel(row.get("loadLevelLabel"));
-        loadLevel.setType(type);
-        loadLevel.setCustomValue(type == LoadLevelType.OTHER ? row.get("loadLevelCustomValue") : null);
-        if (type == LoadLevelType.OTHER
-                && (loadLevel.getCustomValue() == null || !loadLevel.getCustomValue().matches("^\\d+/\\d+$"))) {
-            throw new IllegalArgumentException("Mức tải 'Khác' cần giá trị dạng x/y, ví dụ 1/2");
-        }
-        trip.setLoadLevel(loadLevel);
+        trip.setLoadLevel(parseLoadLevel(row.get("loadLevelLabel")));
 
         return trip;
     }
 
     private boolean isSameTrip(TransportReportTrip a, TransportReportTrip b) {
-        return Objects.equals(a.getVehicle().getId(), b.getVehicle().getId())
-                && Objects.equals(a.getRainyDay(), b.getRainyDay())
+        return Objects.equals(a.getRainyDay(), b.getRainyDay())
                 && Objects.equals(a.getSupplementaryVehicle(), b.getSupplementaryVehicle())
                 && Objects.equals(a.getExcavationArea().getId(), b.getExcavationArea().getId())
                 && Objects.equals(a.getExcavator().getId(), b.getExcavator().getId())
@@ -238,13 +231,29 @@ public class TransportReportExcelImporter {
         return (value == null || value.isBlank()) ? null : value;
     }
 
-    private LoadLevelType parseLoadLevelLabel(String label) {
-        return switch (label) {
-            case "Đủ tải" -> LoadLevelType.FULL_LOAD;
-            case "Roda (2/3)" -> LoadLevelType.RODA_2_3;
-            case "Khác" -> LoadLevelType.OTHER;
-            default -> throw new IllegalArgumentException("Mức tải không hợp lệ: '" + label + "'");
-        };
+    // Cột "Mức tải" chấp nhận: "Đủ tải", "Roda (2/3)", hoặc giá trị dạng x/y (ví dụ "1/2") cho mức tải Khác
+    private LoadLevel parseLoadLevel(String raw) {
+        String value = raw == null ? "" : raw.trim();
+        LoadLevel loadLevel = new LoadLevel();
+
+        if ("Đủ tải".equals(value)) {
+            loadLevel.setType(LoadLevelType.FULL_LOAD);
+            loadLevel.setCustomValue(null);
+            return loadLevel;
+        }
+        if ("Roda (2/3)".equals(value)) {
+            loadLevel.setType(LoadLevelType.RODA_2_3);
+            loadLevel.setCustomValue(null);
+            return loadLevel;
+        }
+        if (OTHER_LOAD_VALUE_PATTERN.matcher(value).matches()) {
+            loadLevel.setType(LoadLevelType.OTHER);
+            loadLevel.setCustomValue(value);
+            return loadLevel;
+        }
+
+        throw new IllegalArgumentException(
+                "Mức tải không hợp lệ: '" + value + "' (chấp nhận: 'Đủ tải', 'Roda (2/3)', hoặc dạng x/y ví dụ 1/2)");
     }
 
     private <T> T findOrThrow(Optional<T> optional, String label, String value) {

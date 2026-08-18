@@ -9,12 +9,6 @@ import lombok.Getter;
 public class ExcavationReportTripResponse {
     private Long id;
 
-    private Long vehicleId;
-    private String vehicleCode;
-    private String vehicleName;
-    private String vehicleDepartmentName; // "Đơn vị quản lý thiết bị"
-    private String vehicleCategoryName;   // "Chủng loại xe"
-
     private Integer tripCount;
 
     private Long cargoTypeId;

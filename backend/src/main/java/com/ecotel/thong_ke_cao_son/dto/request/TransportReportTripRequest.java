@@ -11,9 +11,6 @@ import lombok.Setter;
 @Setter
 public class TransportReportTripRequest {
 
-    @NotNull(message = "Số xe là bắt buộc")
-    private Long vehicleId;
-
     private Boolean rainyDay = false;
     private Boolean supplementaryVehicle = false;
 

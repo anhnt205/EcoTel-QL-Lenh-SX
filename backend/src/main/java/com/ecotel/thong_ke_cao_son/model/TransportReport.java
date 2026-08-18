@@ -21,7 +21,7 @@ import java.util.List;
         name = "transport_reports",
         uniqueConstraints = {
                 @UniqueConstraint(name = "uk_transport_report_key",
-                        columnNames = {"report_date", "shift_id", "device_id", "employee_id"})
+                        columnNames = {"report_date", "shift_id", "vehicle_id", "employee_id"})
         }
 )
 @Getter
@@ -43,6 +43,10 @@ public class TransportReport {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "shift_id", nullable = false)
     private Shift shift;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "vehicle_id", nullable = false)
+    private Device vehicle;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "employee_id", nullable = false)

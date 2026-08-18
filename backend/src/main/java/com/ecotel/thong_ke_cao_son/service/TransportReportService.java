@@ -116,6 +116,7 @@ public class TransportReportService {
 
     private void applyRelations(TransportReport report, TransportReportRequest request) {
         report.setShift(getOrThrow(shiftRepository, request.getShiftId(), "Ca"));
+        report.setVehicle(getOrThrow(deviceRepository, request.getVehicleId(), "Số xe"));
         report.setEmployee(getOrThrow(userRepository, request.getEmployeeId(), "Nhân viên"));
         if (request.getDepartmentId() != null) {
             report.setDepartment(getOrThrow(departmentRepository, request.getDepartmentId(), "Phòng ban"));
@@ -128,7 +129,6 @@ public class TransportReportService {
         TransportReportTrip trip = transportReportMapper.toTripEntity(tripReq);
         trip.setTransportReport(report);
 
-        trip.setVehicle(getOrThrow(deviceRepository, tripReq.getVehicleId(), "Số xe"));
         trip.setRainyDay(tripReq.getRainyDay() != null ? tripReq.getRainyDay() : false);
         trip.setSupplementaryVehicle(tripReq.getSupplementaryVehicle() != null ? tripReq.getSupplementaryVehicle() : false);
 

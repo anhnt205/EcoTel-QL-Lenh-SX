@@ -5,17 +5,26 @@ export interface StoredToken {
 
 const PORTAL_KEY = "token_portal";
 
-function isTokenExpiryValid(token: string): boolean {
+export function decodeJwtPayload(token: string): any {
   try {
-    const payload = JSON.parse(atob(token.split(".")[1]));
-    return (
-      typeof payload.exp === "number" &&
-      payload.exp > Math.floor(Date.now() / 1000)
+    const base64Url = token.split(".")[1];
+    if (!base64Url) return null;
+    const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+    const padLen = (4 - (base64.length % 4)) % 4;
+    const padded = base64 + "=".repeat(padLen);
+    const jsonPayload = decodeURIComponent(
+      atob(padded)
+        .split("")
+        .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+        .join("")
     );
-  } catch {
-    return false;
+    return JSON.parse(jsonPayload);
+  } catch (e) {
+    console.error("[TokenService] Failed to decode JWT payload:", e);
+    return null;
   }
 }
+
 
 function parseStoredToken(raw: string | null): StoredToken | null {
   if (!raw) return null;
@@ -48,7 +57,9 @@ export const tokenService = {
 
   isValid(): boolean {
     const token = this.getAppToken();
-    return !!token && isTokenExpiryValid(token);
+    // Ở frontend chỉ cần kiểm tra xem có token hay không. 
+    // Nếu token hết hạn, backend sẽ trả về 401 và Axios Interceptor sẽ tự động refresh.
+    return !!token;
   },
 
   hasValidPortalToken(): boolean {

@@ -15,7 +15,7 @@ public interface TransportReportTripRepository extends JpaRepository<TransportRe
         JOIN FETCH t.transportReport r
         JOIN FETCH r.shift
         JOIN FETCH r.employee
-        JOIN FETCH t.vehicle
+        JOIN FETCH r.vehicle
         JOIN FETCH t.excavationArea
         JOIN FETCH t.excavator
         JOIN FETCH t.loadingPoint
@@ -23,7 +23,7 @@ public interface TransportReportTripRepository extends JpaRepository<TransportRe
         JOIN FETCH t.cargoType
         WHERE r.reportDate BETWEEN :fromDate AND :toDate
           AND (:shiftIds IS NULL OR r.shift.id IN :shiftIds)
-          AND (:deviceIds IS NULL OR t.vehicle.id IN :deviceIds)
+          AND (:deviceIds IS NULL OR r.vehicle.id IN :deviceIds)
         """)
     List<TransportReportTrip> findForReconciliation(
             @Param("fromDate") LocalDate fromDate,

@@ -24,6 +24,12 @@ public class TransportReportResponse {
     private Long departmentId;
     private String departmentName;
 
+    private Long vehicleId;
+    private String vehicleCode;
+    private String vehicleName;
+    private String vehicleDepartmentName;
+    private String vehicleCategoryName;
+
     private Double fuelBeginning;
     private Double fuelEnding;
     private Double fuelReceived;

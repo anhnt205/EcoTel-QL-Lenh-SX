@@ -14,14 +14,14 @@ public interface ExcavationReportTripRepository extends JpaRepository<Excavation
             SELECT t FROM ExcavationReportTrip t
             JOIN FETCH t.excavationReport r
             JOIN FETCH r.shift
+            JOIN FETCH r.vehicle
             JOIN FETCH r.excavatorDevice
             JOIN FETCH r.employee
-            JOIN FETCH t.vehicle
             JOIN FETCH t.cargoType
             JOIN FETCH t.cargoGroup
             WHERE r.reportDate BETWEEN :fromDate AND :toDate
               AND (:shiftIds IS NULL OR r.shift.id IN :shiftIds)
-              AND (:deviceIds IS NULL OR t.vehicle.id IN :deviceIds)
+              AND (:deviceIds IS NULL OR r.vehicle.id IN :deviceIds)
             ORDER BY r.reportDate, t.id
             """)
     List<ExcavationReportTrip> findForReconciliation(

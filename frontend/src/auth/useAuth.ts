@@ -1,4 +1,4 @@
-import { tokenService } from "./tokenService";
+import { tokenService, decodeJwtPayload } from "./tokenService";
 
 interface PermissionDto {
   c: boolean;
@@ -20,7 +20,8 @@ function decodeUser(): AppUser | null {
   const token = tokenService.getAppToken();
   if (!token) return null;
   try {
-    const payload = JSON.parse(atob(token.split(".")[1]));
+    const payload = decodeJwtPayload(token);
+    if (!payload) return null;
     return {
       username: payload.username,
       fullName: payload.fullName,

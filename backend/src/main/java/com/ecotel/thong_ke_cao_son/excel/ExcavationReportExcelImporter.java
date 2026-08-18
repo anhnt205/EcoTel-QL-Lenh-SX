@@ -13,6 +13,8 @@ import org.springframework.web.multipart.MultipartFile;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Component
 @RequiredArgsConstructor
@@ -26,6 +28,9 @@ public class ExcavationReportExcelImporter {
     private final CargoTypeRepository cargoTypeRepository;
 
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+
+    // Khớp "Khác (3/4)" -> nhóm 1 = "3/4"
+    private static final Pattern OTHER_LOAD_LEVEL_PATTERN = Pattern.compile("^Khác\\s*\\(([^)]*)\\)$");
 
     @Transactional
     public ExcelImportResultResponse importFile(MultipartFile file) {
@@ -42,8 +47,17 @@ public class ExcavationReportExcelImporter {
 
                 Map<String, String> rowData = new LinkedHashMap<>();
                 rowData.put("_excelRow", String.valueOf(r + 1));
+
                 LocalDate reportDate = readDateCell(row.getCell(0));
                 rowData.put("reportDate", reportDate.toString());
+
+                // Layout mới (khớp đúng ExcavationReportExcelExporter đã sửa):
+                // 0:Thời gian 1:Ca 2:Máy xúc 3:Tầng xúc 4:Nơi nhận tải
+                // 5:Số thẻ lương 6:Họ và tên 7:Đơn vị
+                // 8:Nhiên liệu tồn đầu 9:Nhiên liệu tồn cuối 10:Nhiên liệu lĩnh 11:Nhiên liệu sử dụng
+                // 12:Số xe 13:Số chuyến 14:Loại hàng 15:Nhóm hàng
+                // 16:Mức tải
+                // 17:Đơn vị quản lý thiết bị 18:Chủng loại xe
                 rowData.put("shiftName", formatter.formatCellValue(row.getCell(1)).trim());
                 rowData.put("excavatorCode", formatter.formatCellValue(row.getCell(2)).trim());
                 rowData.put("excavationFloor", formatter.formatCellValue(row.getCell(3)).trim());
@@ -54,9 +68,10 @@ public class ExcavationReportExcelImporter {
                 rowData.put("fuelReceived", formatter.formatCellValue(row.getCell(10)).trim());
                 rowData.put("vehicleCode", formatter.formatCellValue(row.getCell(12)).trim());
                 rowData.put("tripCount", formatter.formatCellValue(row.getCell(13)).trim());
-                rowData.put("cargoTypeName", formatter.formatCellValue(row.getCell(15)).trim());
-                rowData.put("loadLevelLabel", formatter.formatCellValue(row.getCell(17)).trim());
-                rowData.put("loadLevelCustomValue", formatter.formatCellValue(row.getCell(18)).trim());
+                rowData.put("cargoTypeName", formatter.formatCellValue(row.getCell(14)).trim());
+                // Cột "Nhóm hàng" (15) chỉ để hiển thị/đối chiếu, KHÔNG dùng để import —
+                // Nhóm hàng luôn tự lấy theo Loại hàng (cargoType.getCargoGroup()), giữ đúng nghiệp vụ đã thống nhất.
+                rowData.put("loadLevelDisplay", formatter.formatCellValue(row.getCell(16)).trim());
 
                 rawRows.add(rowData);
             }
@@ -64,7 +79,6 @@ public class ExcavationReportExcelImporter {
             throw new RuntimeException("Không đọc được file Excel: " + e.getMessage(), e);
         }
 
-        // Gom nhóm theo key: Thời gian + Ca + Máy xúc + Số thẻ lương — xác định 1 báo cáo
         List<List<Map<String, String>>> groups = groupRows(rawRows);
 
         int successCount = 0;
@@ -91,13 +105,10 @@ public class ExcavationReportExcelImporter {
             throw new IllegalArgumentException("Thời gian không được để trống");
         }
 
-        // Cell Excel lưu dưới dạng ngày thật -> đọc trực tiếp giá trị ngày,
-        // KHÔNG phụ thuộc cell đang hiển thị theo format nào (M/d/yy, dd/MM/yyyy...)
         if (cell.getCellType() == CellType.NUMERIC && DateUtil.isCellDateFormatted(cell)) {
             return cell.getLocalDateTimeCellValue().toLocalDate();
         }
 
-        // Cell là Text thuần -> chỉ chấp nhận đúng định dạng dd/MM/yyyy
         String raw = new DataFormatter().formatCellValue(cell).trim();
         try {
             return LocalDate.parse(raw, DateTimeFormatter.ofPattern("dd/MM/yyyy"));
@@ -130,7 +141,7 @@ public class ExcavationReportExcelImporter {
 
     private String buildHeaderKey(Map<String, String> row) {
         return row.get("reportDate") + "|" + row.get("shiftName") + "|"
-                + row.get("excavatorCode") + "|" + row.get("salaryCode");
+                + row.get("vehicleCode") + "|" + row.get("excavatorCode") + "|" + row.get("salaryCode");
     }
 
     private void processGroup(List<Map<String, String>> group) {
@@ -138,16 +149,17 @@ public class ExcavationReportExcelImporter {
 
         LocalDate reportDate = parseDate(firstRow.get("reportDate"));
         Shift shift = findOrThrow(shiftRepository.findByName(parseInt(firstRow.get("shiftName"))), "Ca", firstRow.get("shiftName"));
+        Device vehicle = findOrThrow(deviceRepository.findByCode(firstRow.get("vehicleCode")), "Số xe", firstRow.get("vehicleCode"));
         Device excavatorDevice = findOrThrow(deviceRepository.findByCode(firstRow.get("excavatorCode")), "Máy xúc", firstRow.get("excavatorCode"));
         User employee = findOrThrow(userRepository.findBySalaryCode(firstRow.get("salaryCode")), "Số thẻ lương", firstRow.get("salaryCode"));
 
-        // Xác định báo cáo mới hay đã tồn tại dựa trên Thời gian + Ca + Máy xúc + Số thẻ lương
         ExcavationReport report = excavationReportRepository
-                .findByReportDateAndShiftIdAndExcavatorDeviceIdAndEmployeeId(reportDate, shift.getId(), excavatorDevice.getId(), employee.getId())
+                .findByReportDateAndShiftIdAndVehicleIdAndExcavatorDeviceIdAndEmployeeId(reportDate, shift.getId(), vehicle.getId(), excavatorDevice.getId(), employee.getId())
                 .orElseGet(ExcavationReport::new);
 
         report.setReportDate(reportDate);
         report.setShift(shift);
+        report.setVehicle(vehicle);
         report.setExcavatorDevice(excavatorDevice);
         report.setExcavationFloor(emptyToNull(firstRow.get("excavationFloor")));
         report.setReceivingLocation(findOrThrow(locationRepository.findByName(firstRow.get("receivingLocationName")), "Nơi nhận tải", firstRow.get("receivingLocationName")));
@@ -157,7 +169,6 @@ public class ExcavationReportExcelImporter {
         report.setFuelReceived(parseDouble(firstRow.get("fuelReceived")));
         report.recalculateFuelUsed();
 
-        // Chỉ thêm mới, không xóa. Dedup theo nội dung để tránh trùng khi import lại cùng file.
         for (Map<String, String> row : group) {
             ExcavationReportTrip newTrip = buildTrip(row);
             boolean alreadyExists = report.getTrips().stream().anyMatch(existing -> isSameTrip(existing, newTrip));
@@ -173,29 +184,57 @@ public class ExcavationReportExcelImporter {
     private ExcavationReportTrip buildTrip(Map<String, String> row) {
         ExcavationReportTrip trip = new ExcavationReportTrip();
 
-        trip.setVehicle(findOrThrow(deviceRepository.findByCode(row.get("vehicleCode")), "Số xe", row.get("vehicleCode")));
         trip.setTripCount(parseIntOrNull(row.get("tripCount")));
 
         CargoType cargoType = findOrThrow(cargoTypeRepository.findByName(row.get("cargoTypeName")), "Loại hàng", row.get("cargoTypeName"));
         trip.setCargoType(cargoType);
-        trip.setCargoGroup(cargoType.getCargoGroup());
+        trip.setCargoGroup(cargoType.getCargoGroup()); // luôn tự lấy theo Loại hàng, không đọc từ cột Excel
 
-        LoadLevel loadLevel = new LoadLevel();
-        LoadLevelType type = parseLoadLevelLabel(row.get("loadLevelLabel"));
-        loadLevel.setType(type);
-        loadLevel.setCustomValue(type == LoadLevelType.OTHER ? row.get("loadLevelCustomValue") : null);
-        if (type == LoadLevelType.OTHER
-                && (loadLevel.getCustomValue() == null || !loadLevel.getCustomValue().matches("^\\d+/\\d+$"))) {
-            throw new IllegalArgumentException("Mức tải 'Khác' cần giá trị dạng x/y, ví dụ 1/2");
-        }
+        LoadLevel loadLevel = parseLoadLevelDisplay(row.get("loadLevelDisplay"));
         trip.setLoadLevel(loadLevel);
 
         return trip;
     }
 
+    /**
+     * Parse ngược chuỗi hiển thị gộp từ cột "Mức tải":
+     * - "Đủ tải"       -> FULL_LOAD
+     * - "Roda (2/3)"   -> RODA_2_3
+     * - "Khác (3/4)"   -> OTHER, customValue = "3/4"
+     */
+    private LoadLevel parseLoadLevelDisplay(String display) {
+        LoadLevel loadLevel = new LoadLevel();
+
+        if ("Đủ tải".equals(display)) {
+            loadLevel.setType(LoadLevelType.FULL_LOAD);
+            loadLevel.setCustomValue(null);
+            return loadLevel;
+        }
+
+        if ("Roda (2/3)".equals(display)) {
+            loadLevel.setType(LoadLevelType.RODA_2_3);
+            loadLevel.setCustomValue(null);
+            return loadLevel;
+        }
+
+        Matcher matcher = OTHER_LOAD_LEVEL_PATTERN.matcher(display != null ? display.trim() : "");
+        if (matcher.matches()) {
+            String customValue = matcher.group(1).trim();
+            if (!customValue.matches("^\\d+/\\d+$")) {
+                throw new IllegalArgumentException(
+                        "Mức tải 'Khác' cần giá trị dạng x/y, ví dụ 'Khác (1/2)' — nhận được: '" + display + "'");
+            }
+            loadLevel.setType(LoadLevelType.OTHER);
+            loadLevel.setCustomValue(customValue);
+            return loadLevel;
+        }
+
+        throw new IllegalArgumentException(
+                "Mức tải không hợp lệ: '" + display + "' (chấp nhận: 'Đủ tải', 'Roda (2/3)', hoặc 'Khác (x/y)')");
+    }
+
     private boolean isSameTrip(ExcavationReportTrip a, ExcavationReportTrip b) {
-        return Objects.equals(a.getVehicle().getId(), b.getVehicle().getId())
-                && Objects.equals(a.getTripCount(), b.getTripCount())
+        return Objects.equals(a.getTripCount(), b.getTripCount())
                 && Objects.equals(a.getCargoType().getId(), b.getCargoType().getId())
                 && a.getLoadLevel().getType() == b.getLoadLevel().getType()
                 && Objects.equals(a.getLoadLevel().getCustomValue(), b.getLoadLevel().getCustomValue());
@@ -203,15 +242,6 @@ public class ExcavationReportExcelImporter {
 
     private String emptyToNull(String value) {
         return (value == null || value.isBlank()) ? null : value;
-    }
-
-    private LoadLevelType parseLoadLevelLabel(String label) {
-        return switch (label) {
-            case "Đủ tải" -> LoadLevelType.FULL_LOAD;
-            case "Roda (2/3)" -> LoadLevelType.RODA_2_3;
-            case "Khác" -> LoadLevelType.OTHER;
-            default -> throw new IllegalArgumentException("Mức tải không hợp lệ: '" + label + "'");
-        };
     }
 
     private <T> T findOrThrow(Optional<T> optional, String label, String value) {

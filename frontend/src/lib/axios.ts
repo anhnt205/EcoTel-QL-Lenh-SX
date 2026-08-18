@@ -1,8 +1,7 @@
 import axios from "axios";
 import { tokenService } from "../auth/tokenService";
 
-const API_URL = import.meta.env.VITE_API_BASE_URL;
-const PORTAL_URL = import.meta.env.VITE_PORTAL_URL;
+const API_URL = import.meta.env.VITE_API_KONG_URL;
 
 const api = axios.create({
   baseURL: API_URL,
@@ -47,12 +46,10 @@ api.interceptors.response.use(
         original.headers.Authorization = `Bearer ${newToken}`;
         return api(original);
       } catch {
-        tokenService.clear();
-        if (PORTAL_URL) {
-          window.location.href = PORTAL_URL;
-        } else {
-          console.error("[Auth] VITE_PORTAL_URL is not configured");
-        }
+        // Refresh thất bại — xóa token và clear authStore để React cập nhật UI
+        const { useAuthStore } = await import("@/stores/authStore");
+        useAuthStore.getState().clearAuth();
+        console.error("[Auth] Token refresh failed");
         return Promise.reject(error);
       }
     }

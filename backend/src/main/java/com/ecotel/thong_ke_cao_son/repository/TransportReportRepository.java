@@ -17,10 +17,7 @@ public interface TransportReportRepository extends JpaRepository<TransportReport
     SELECT r.id FROM TransportReport r
     WHERE r.reportDate BETWEEN :fromDate AND :toDate
       AND (:shiftIds IS NULL OR r.shift.id IN :shiftIds)
-      AND (:deviceIds IS NULL OR EXISTS (
-          SELECT 1 FROM TransportReportTrip t
-          WHERE t.transportReport = r AND t.vehicle.id IN :deviceIds
-      ))
+      AND (:deviceIds IS NULL OR r.vehicle.id IN :deviceIds)
     ORDER BY r.reportDate DESC
     """)
     Page<Long> searchIds(
@@ -34,23 +31,21 @@ public interface TransportReportRepository extends JpaRepository<TransportReport
         SELECT r FROM TransportReport r
         JOIN FETCH r.shift
         JOIN FETCH r.employee
+        JOIN FETCH r.vehicle
         WHERE r.id IN :ids
         ORDER BY r.reportDate DESC
         """)
     List<TransportReport> findAllByIdWithDetails(@Param("ids") List<Long> ids);
 
-    Optional<TransportReport> findByReportDateAndShiftIdAndEmployeeId(
-            LocalDate reportDate, Long shiftId, Long employeeId);
+    Optional<TransportReport> findByReportDateAndShiftIdAndVehicleIdAndEmployeeId(
+            LocalDate reportDate, Long shiftId, Long vehicleId, Long employeeId);
 
 
     @Query("""
     SELECT r.id FROM TransportReport r
     WHERE r.reportDate BETWEEN :fromDate AND :toDate
       AND (:shiftIds IS NULL OR r.shift.id IN :shiftIds)
-      AND (:deviceIds IS NULL OR EXISTS (
-          SELECT 1 FROM TransportReportTrip t
-          WHERE t.transportReport = r AND t.vehicle.id IN :deviceIds
-      ))
+      AND (:deviceIds IS NULL OR r.vehicle.id IN :deviceIds)
     ORDER BY r.reportDate DESC
     """)
     List<Long> searchAllIds(

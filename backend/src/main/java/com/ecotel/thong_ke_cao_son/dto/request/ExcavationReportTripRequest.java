@@ -10,9 +10,6 @@ import lombok.Setter;
 @Setter
 public class ExcavationReportTripRequest {
 
-    @NotNull(message = "Số xe là bắt buộc")
-    private Long vehicleId;
-
     private Integer tripCount;
 
     @NotNull(message = "Loại hàng là bắt buộc")
