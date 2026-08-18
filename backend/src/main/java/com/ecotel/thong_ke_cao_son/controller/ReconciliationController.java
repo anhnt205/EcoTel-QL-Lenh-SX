@@ -4,6 +4,7 @@ import com.ecotel.thong_ke_cao_son.dto.request.ReconciliationDecisionBulkRequest
 import com.ecotel.thong_ke_cao_son.dto.request.ReconciliationDecisionRequest;
 import com.ecotel.thong_ke_cao_son.dto.request.ReconciliationSearchRequest;
 import com.ecotel.thong_ke_cao_son.dto.request.ReconciliationTripUpdateRequest;
+import com.ecotel.thong_ke_cao_son.dto.request.ReportStatusUpdateRequest;
 import com.ecotel.thong_ke_cao_son.dto.response.ApiResponse;
 import com.ecotel.thong_ke_cao_son.dto.response.PageResponse;
 import com.ecotel.thong_ke_cao_son.dto.response.ReconciliationDecisionResponse;
@@ -56,6 +57,20 @@ public class ReconciliationController {
     public ApiResponse<Void> updateTrips(
             @Valid @RequestBody List<@Valid ReconciliationTripUpdateRequest> requests) {
         reconciliationService.updateTrips(requests);
+        return ApiResponse.success(null);
+    }
+
+    @PutMapping("/report-status")
+    public ApiResponse<Void> updateReportStatus(
+            @Valid @RequestBody ReportStatusUpdateRequest request) {
+        reconciliationService.updateReportStatus(request);
+        return ApiResponse.success(null);
+    }
+
+    @PutMapping("/report-status/batch")
+    public ApiResponse<Void> updateReportStatusBatch(
+            @Valid @RequestBody List<@Valid ReportStatusUpdateRequest> requests) {
+        reconciliationService.updateReportStatusBatch(requests);
         return ApiResponse.success(null);
     }
 }

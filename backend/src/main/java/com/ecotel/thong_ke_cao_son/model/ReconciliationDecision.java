@@ -1,6 +1,6 @@
 package com.ecotel.thong_ke_cao_son.model;
 
-import com.ecotel.thong_ke_cao_son.enums.ReconciliationStatus;
+import com.ecotel.thong_ke_cao_son.enums.ApprovalStatus;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -41,8 +41,8 @@ public class ReconciliationDecision {
     private ExcavationReportTrip excavationReportTrip;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false)
-    private ReconciliationStatus status = ReconciliationStatus.NOT_APPROVED;
+    @Column(name = "status", nullable = false, length = 30)
+    private ApprovalStatus status = ApprovalStatus.PENDING;
 
     @Column(name = "note", columnDefinition = "TEXT")
     private String note;

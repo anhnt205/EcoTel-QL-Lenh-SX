@@ -1,5 +1,6 @@
 package com.ecotel.thong_ke_cao_son.dto.response;
 
+import com.ecotel.thong_ke_cao_son.enums.ApprovalStatus;
 import lombok.Builder;
 import lombok.Getter;
 
@@ -43,6 +44,9 @@ public class ExcavationReportResponse {
 
     private Long departmentId;
     private String departmentName;
+
+    private ApprovalStatus status;
+    private String note;
 
     private List<ExcavationReportTripResponse> trips;
 

@@ -3,7 +3,9 @@ package com.ecotel.thong_ke_cao_son.service;
 import com.ecotel.thong_ke_cao_son.dto.request.ReconciliationDecisionRequest;
 import com.ecotel.thong_ke_cao_son.dto.request.ReconciliationSearchRequest;
 import com.ecotel.thong_ke_cao_son.dto.request.ReconciliationTripUpdateRequest;
+import com.ecotel.thong_ke_cao_son.dto.request.ReportStatusUpdateRequest;
 import com.ecotel.thong_ke_cao_son.dto.response.*;
+import com.ecotel.thong_ke_cao_son.enums.ApprovalStatus;
 import com.ecotel.thong_ke_cao_son.enums.LoadLevelType;
 import com.ecotel.thong_ke_cao_son.exception.BadRequestException;
 import com.ecotel.thong_ke_cao_son.exception.ResourceNotFoundException;
@@ -62,7 +64,7 @@ public class ReconciliationService {
             }
         }
 
-        // "finalizedOnly" giờ nghĩa là "đã có quyết định duyệt" (bất kể APPROVED hay NOT_APPROVED,
+        // "finalizedOnly" giờ nghĩa là "đã có quyết định duyệt" (bất kể APPROVED hay PENDING,
         // miễn là đã từng bấm Duyệt) — giữ nguyên định nghĩa cũ: có decision != null.
         if (Boolean.TRUE.equals(finalizedOnly)) {
             rows = rows.stream().filter(row -> row.getDecision() != null).toList();
@@ -512,6 +514,53 @@ public class ReconciliationService {
             loadLevel.setCustomValue(customValue);
         } else {
             loadLevel.setCustomValue(null);
+        }
+    }
+
+    // ================= UPDATE REPORT STATUS =================
+
+    @Transactional
+    public void updateReportStatus(ReportStatusUpdateRequest request) {
+        updateReportStatusBatch(List.of(request));
+    }
+
+    @Transactional
+    public void updateReportStatusBatch(List<ReportStatusUpdateRequest> requests) {
+        if (requests.isEmpty()) {
+            return;
+        }
+
+        List<String> errors = new ArrayList<>();
+
+        for (int i = 0; i < requests.size(); i++) {
+            ReportStatusUpdateRequest req = requests.get(i);
+            try {
+                applyReportStatus(req);
+            } catch (Exception e) {
+                errors.add("Mục thứ " + (i + 1) + ": " + e.getMessage());
+            }
+        }
+
+        if (!errors.isEmpty()) {
+            throw new BadRequestException(String.join("; ", errors));
+        }
+    }
+
+    private void applyReportStatus(ReportStatusUpdateRequest req) {
+        if (req.getReportType() == ReportStatusUpdateRequest.ReportType.TRANSPORT) {
+            TransportReport report = transportReportRepository.findById(req.getReportId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy báo cáo Vận tải: " + req.getReportId()));
+            report.setStatus(req.getStatus());
+            report.setNote(req.getNote());
+            transportReportRepository.save(report);
+        } else if (req.getReportType() == ReportStatusUpdateRequest.ReportType.EXCAVATION) {
+            ExcavationReport report = excavationReportRepository.findById(req.getReportId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy báo cáo Khai thác: " + req.getReportId()));
+            report.setStatus(req.getStatus());
+            report.setNote(req.getNote());
+            excavationReportRepository.save(report);
+        } else {
+            throw new BadRequestException("Loại báo cáo không hợp lệ: " + req.getReportType());
         }
     }
 }

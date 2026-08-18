@@ -1,5 +1,6 @@
 package com.ecotel.thong_ke_cao_son.model;
 
+import com.ecotel.thong_ke_cao_son.enums.ApprovalStatus;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
@@ -67,6 +68,13 @@ public class TransportReport {
 
     @Column(name = "fuel_used")
     private Double fuelUsed;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false, length = 30)
+    private ApprovalStatus status = ApprovalStatus.PENDING;
+
+    @Column(name = "note", columnDefinition = "TEXT")
+    private String note;
 
     @BatchSize(size = 20)
     @OneToMany(mappedBy = "transportReport", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
