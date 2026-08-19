@@ -15,17 +15,17 @@ import java.util.List;
 public class ExcavationReportExcelExporter {
 
     private static final String[] HEADERS = {
-            "Thời gian", "Ca", "Máy xúc", "Tầng xúc", "Nơi nhận tải",
-            "Số thẻ lương", "Họ và tên", "Đơn vị",
+            "Thời gian", "Ca", "Máy xúc", "Đơn vị quản lý thiết bị", "Tầng xúc", "Nơi nhận tải",
+            "Số thẻ lương", "Họ và tên",
             "Nhiên liệu tồn đầu", "Nhiên liệu tồn cuối", "Nhiên liệu lĩnh", "Nhiên liệu sử dụng",
-            "Số xe", "Đơn vị quản lý thiết bị", "Chủng loại xe",
+            "Số xe", "Đơn vị công tác", "Chủng loại xe",
             "Số chuyến", "Loại hàng", "Nhóm hàng",
             "Mức tải"
     };
 
     private static final int[] COLUMN_WIDTHS = {
-            12, 6, 12, 12, 16,
-            14, 22, 18,
+            12, 6, 12, 20, 12, 16,
+            14, 22,
             14, 14, 12, 14,
             12, 20, 16,
             10, 16, 16,
@@ -87,12 +87,12 @@ public class ExcavationReportExcelExporter {
 
         setNumeric(row, c++, report.getShift().getName(), numericDataStyle);
         setText(row, c++, report.getExcavatorDevice().getCode(), dataStyle);
+        setText(row, c++, report.getExcavatorDevice().getDepartment() != null
+                ? report.getExcavatorDevice().getDepartment().getName() : "", dataStyle);
         setText(row, c++, report.getExcavationFloor() != null ? report.getExcavationFloor() : "", dataStyle);
         setText(row, c++, report.getReceivingLocation().getName(), dataStyle);
         setText(row, c++, report.getEmployee().getSalaryCode(), dataStyle);
         setText(row, c++, report.getEmployee().getFullName(), dataStyle);
-        setText(row, c++, report.getEmployee().getDepartment() != null
-                ? report.getEmployee().getDepartment().getName() : "", dataStyle);
         setNumeric(row, c++, report.getFuelBeginning(), numericDataStyle);
         setNumeric(row, c++, report.getFuelEnding(), numericDataStyle);
         setNumeric(row, c++, report.getFuelReceived(), numericDataStyle);

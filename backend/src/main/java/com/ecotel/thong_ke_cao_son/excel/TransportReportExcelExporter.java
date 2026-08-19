@@ -16,9 +16,9 @@ import java.util.List;
 public class TransportReportExcelExporter {
 
     private static final String[] HEADERS = {
-            "Thời gian", "Ca", "Số thẻ lương", "Họ và tên", "Đơn vị",
+            "Thời gian", "Ca", "Số thẻ lương", "Họ và tên",
             "Nhiên liệu tồn đầu", "Nhiên liệu tồn cuối", "Nhiên liệu lĩnh", "Nhiên liệu sử dụng",
-            "Số xe", "Đơn vị quản lý thiết bị", "Chủng loại xe",
+            "Số xe", "Đơn vị công tác", "Chủng loại xe",
             "Ngày mưa", "Xe bổ túc",
             "Khu vực xúc", "Máy xúc", "Nơi nhận tải", "Tầng nhận tải", "Nhóm tầng nhận tải",
             "Tầng dỡ tải", "Cung độ toàn tuyến (km)", "Nâng tải toàn tuyến (m)",
@@ -27,7 +27,7 @@ public class TransportReportExcelExporter {
     };
 
     private static final int[] COLUMN_WIDTHS = {
-            12, 6, 14, 22, 18,
+            12, 6, 14, 22,
             14, 14, 12, 14,
             12, 20, 16,
             10, 10,
@@ -94,8 +94,6 @@ public class TransportReportExcelExporter {
         setNumeric(row, c++, report.getShift().getName(), numericDataStyle);
         setText(row, c++, report.getEmployee().getSalaryCode(), dataStyle);
         setText(row, c++, report.getEmployee().getFullName(), dataStyle);
-        setText(row, c++, report.getEmployee().getDepartment() != null
-                ? report.getEmployee().getDepartment().getName() : "", dataStyle);
         setNumeric(row, c++, report.getFuelBeginning(), numericDataStyle);
         setNumeric(row, c++, report.getFuelEnding(), numericDataStyle);
         setNumeric(row, c++, report.getFuelReceived(), numericDataStyle);

@@ -342,6 +342,14 @@ public class ReconciliationService {
             throw new BadRequestException(String.join("; ", errors));
         }
 
+        // Tự động reset status về PENDING khi report bị sửa chuyến
+        for (TransportReport r : transportReportsTouched) {
+            r.setStatus(ApprovalStatus.PENDING);
+        }
+        for (ExcavationReport r : excavationReportsTouched) {
+            r.setStatus(ApprovalStatus.PENDING);
+        }
+
         // Report nào rỗng (hết chuyến sau khi bị chuyển đi) -> xóa; còn lại -> lưu
         List<TransportReport> transportToSave = new ArrayList<>();
         List<TransportReport> transportToDelete = new ArrayList<>();

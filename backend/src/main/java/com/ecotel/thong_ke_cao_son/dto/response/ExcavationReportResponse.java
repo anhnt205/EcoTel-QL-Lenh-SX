@@ -20,6 +20,7 @@ public class ExcavationReportResponse {
     private Long excavatorDeviceId;
     private String excavatorDeviceCode;
     private String excavatorDeviceName;
+    private String excavatorDeviceDepartmentName;
 
     private Long vehicleId;
     private String vehicleCode;
@@ -40,10 +41,6 @@ public class ExcavationReportResponse {
     private Long employeeId;
     private String employeeSalaryCode;
     private String employeeFullName;
-    private String employeeDepartmentName;
-
-    private Long departmentId;
-    private String departmentName;
 
     private ApprovalStatus status;
     private String note;

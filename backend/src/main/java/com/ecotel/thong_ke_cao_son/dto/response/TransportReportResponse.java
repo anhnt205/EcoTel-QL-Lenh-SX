@@ -20,10 +20,6 @@ public class TransportReportResponse {
     private Long employeeId;
     private String employeeSalaryCode;
     private String employeeFullName;
-    private String employeeDepartmentName;
-
-    private Long departmentId;
-    private String departmentName;
 
     private Long vehicleId;
     private String vehicleCode;

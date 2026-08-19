@@ -24,8 +24,6 @@ public class TransportReportRequest {
     @NotNull(message = "Nhân viên là bắt buộc")
     private Long employeeId;
 
-    private Long departmentId;
-
     private Double fuelBeginning;
     private Double fuelEnding;
     private Double fuelReceived;

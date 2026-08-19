@@ -53,10 +53,6 @@ public class TransportReport {
     @JoinColumn(name = "employee_id", nullable = false)
     private User employee;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "department_id")
-    private Department department;
-
     @Column(name = "fuel_beginning")
     private Double fuelBeginning;
 
