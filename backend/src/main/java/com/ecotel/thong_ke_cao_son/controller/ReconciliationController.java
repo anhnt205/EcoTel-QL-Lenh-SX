@@ -9,6 +9,7 @@ import com.ecotel.thong_ke_cao_son.dto.response.ApiResponse;
 import com.ecotel.thong_ke_cao_son.dto.response.PageResponse;
 import com.ecotel.thong_ke_cao_son.dto.response.ReconciliationDecisionResponse;
 import com.ecotel.thong_ke_cao_son.dto.response.ReconciliationRowResponse;
+import com.ecotel.thong_ke_cao_son.enums.ApprovalStatus;
 import com.ecotel.thong_ke_cao_son.service.ReconciliationService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -31,14 +32,15 @@ public class ReconciliationController {
             @RequestParam LocalDate toDate,
             @RequestParam(required = false) List<Long> shiftIds,
             @RequestParam(required = false) List<Long> deviceIds,
-            @RequestParam(required = false, defaultValue = "false") Boolean finalizedOnly,
+            @RequestParam(required = false) ApprovalStatus status,
             Pageable pageable) {
         ReconciliationSearchRequest request = new ReconciliationSearchRequest();
         request.setFromDate(fromDate);
         request.setToDate(toDate);
         request.setShiftIds(shiftIds);
         request.setDeviceIds(deviceIds);
-        return ApiResponse.success(reconciliationService.search(request, finalizedOnly, pageable));
+        request.setStatus(status);
+        return ApiResponse.success(reconciliationService.search(request, pageable));
     }
 
     @PostMapping("/decisions")

@@ -36,7 +36,7 @@ public class ReconciliationService {
     // ================= SEARCH (không đổi logic ghép cặp) =================
 
     public PageResponse<ReconciliationRowResponse> search(
-            ReconciliationSearchRequest request, Boolean finalizedOnly, Pageable pageable) {
+            ReconciliationSearchRequest request, Pageable pageable) {
 
         List<TransportReportTrip> transportTrips = transportReportTripRepository.findForReconciliation(
                 request.getFromDate(), request.getToDate(), request.getShiftIds(), request.getDeviceIds());
@@ -64,10 +64,16 @@ public class ReconciliationService {
             }
         }
 
-        // "finalizedOnly" giờ nghĩa là "đã có quyết định duyệt" (bất kể APPROVED hay PENDING,
-        // miễn là đã từng bấm Duyệt) — giữ nguyên định nghĩa cũ: có decision != null.
-        if (Boolean.TRUE.equals(finalizedOnly)) {
-            rows = rows.stream().filter(row -> row.getDecision() != null).toList();
+        // Lọc theo trạng thái duyệt của báo cáo (status trên header)
+        if (request.getStatus() != null) {
+            ApprovalStatus filterStatus = request.getStatus();
+            rows = rows.stream().filter(row -> {
+                boolean transportMatch = row.getTransportReportTripId() != null
+                        && getTransportReportStatus(row.getTransportReportTripId()) == filterStatus;
+                boolean excavationMatch = row.getExcavationReportTripId() != null
+                        && getExcavationReportStatus(row.getExcavationReportTripId()) == filterStatus;
+                return transportMatch || excavationMatch;
+            }).toList();
         }
 
         rows.sort(Comparator
@@ -510,6 +516,18 @@ public class ReconciliationService {
                 excavationReportsTouched.add(targetReport);
             }
         }
+    }
+
+    private ApprovalStatus getTransportReportStatus(Long tripId) {
+        return transportReportTripRepository.findById(tripId)
+                .map(t -> t.getTransportReport().getStatus())
+                .orElse(null);
+    }
+
+    private ApprovalStatus getExcavationReportStatus(Long tripId) {
+        return excavationReportTripRepository.findById(tripId)
+                .map(t -> t.getExcavationReport().getStatus())
+                .orElse(null);
     }
 
     private void applyLoadLevel(LoadLevel loadLevel, LoadLevelType type, String customValue) {

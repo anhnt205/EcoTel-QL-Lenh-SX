@@ -1,5 +1,6 @@
 package com.ecotel.thong_ke_cao_son.dto.request;
 
+import com.ecotel.thong_ke_cao_son.enums.ApprovalStatus;
 import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
 import lombok.Setter;
@@ -19,4 +20,6 @@ public class ReconciliationSearchRequest {
 
     private List<Long> shiftIds;
     private List<Long> deviceIds;
+
+    private ApprovalStatus status; // lọc theo trạng thái duyệt của báo cáo
 }
