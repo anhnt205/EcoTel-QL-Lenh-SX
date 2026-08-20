@@ -5,8 +5,6 @@ import com.ecotel.thong_ke_cao_son.dto.request.TransportReportRequest;
 import com.ecotel.thong_ke_cao_son.dto.request.TransportReportTripRequest;
 import com.ecotel.thong_ke_cao_son.dto.response.BulkDeleteResponse;
 import com.ecotel.thong_ke_cao_son.dto.response.TransportReportResponse;
-import com.ecotel.thong_ke_cao_son.enums.ApprovalStatus;
-import com.ecotel.thong_ke_cao_son.exception.BadRequestException;
 import com.ecotel.thong_ke_cao_son.exception.ResourceNotFoundException;
 import com.ecotel.thong_ke_cao_son.model.*;
 import com.ecotel.thong_ke_cao_son.enums.LoadLevelType;
@@ -42,7 +40,6 @@ public class TransportReportService {
     public TransportReportResponse create(TransportReportRequest request) {
         TransportReport report = transportReportMapper.toEntity(request);
         applyRelations(report, request);
-        report.setStatus(ApprovalStatus.PENDING);
         report.recalculateFuelUsed();
 
         for (TransportReportTripRequest tripReq : request.getTrips()) {
@@ -58,13 +55,8 @@ public class TransportReportService {
         TransportReport report = transportReportRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy báo cáo: " + id));
 
-        if (report.getStatus() == ApprovalStatus.APPROVED) {
-            throw new BadRequestException("Không thể sửa báo cáo đã duyệt");
-        }
-
         transportReportMapper.updateEntity(request, report);
         applyRelations(report, request);
-        report.setStatus(ApprovalStatus.PENDING);
         report.recalculateFuelUsed();
 
         // Replace toàn bộ trips cũ — orphanRemoval=true tự xóa trip cũ khi flush
@@ -116,9 +108,6 @@ public class TransportReportService {
     public void delete(Long id) {
         TransportReport report = transportReportRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy báo cáo: " + id));
-        if (report.getStatus() == ApprovalStatus.APPROVED) {
-            throw new BadRequestException("Không thể xóa báo cáo đã duyệt");
-        }
         transportReportRepository.delete(report);
     }
 
@@ -189,13 +178,6 @@ public class TransportReportService {
             Set<Long> foundIds = reports.stream().map(TransportReport::getId).collect(Collectors.toSet());
             List<Long> missingIds = ids.stream().filter(id -> !foundIds.contains(id)).toList();
             throw new ResourceNotFoundException("Không tìm thấy báo cáo với ID: " + missingIds);
-        }
-        List<Long> approvedIds = reports.stream()
-                .filter(r -> r.getStatus() == ApprovalStatus.APPROVED)
-                .map(TransportReport::getId)
-                .toList();
-        if (!approvedIds.isEmpty()) {
-            throw new BadRequestException("Không thể xóa báo cáo đã duyệt: " + approvedIds);
         }
         transportReportRepository.deleteAll(reports);
         return BulkDeleteResponse.builder()

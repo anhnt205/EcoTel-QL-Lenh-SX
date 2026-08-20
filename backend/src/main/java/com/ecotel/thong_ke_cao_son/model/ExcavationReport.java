@@ -1,6 +1,5 @@
 package com.ecotel.thong_ke_cao_son.model;
 
-import com.ecotel.thong_ke_cao_son.enums.ApprovalStatus;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
@@ -71,13 +70,6 @@ public class ExcavationReport {
     // Nhiên liệu sử dụng = tồn đầu + lĩnh - tồn cuối — tính tự động, không nhận từ request
     @Column(name = "fuel_used")
     private Double fuelUsed;
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false, length = 30)
-    private ApprovalStatus status = ApprovalStatus.PENDING;
-
-    @Column(name = "note", columnDefinition = "TEXT")
-    private String note;
 
     // "Số thẻ lương" — Họ và tên / Đơn vị derive từ đây ở tầng response
     @ManyToOne(fetch = FetchType.LAZY, optional = false)

@@ -12,8 +12,8 @@ public class ReportStatusUpdateRequest {
     @NotNull(message = "Loại báo cáo là bắt buộc")
     private ReportType reportType; // TRANSPORT hoặc EXCAVATION
 
-    @NotNull(message = "ID báo cáo là bắt buộc")
-    private Long reportId;
+    @NotNull(message = "ID chuyến là bắt buộc")
+    private Long tripId;
 
     @NotNull(message = "Trạng thái là bắt buộc")
     private ApprovalStatus status;

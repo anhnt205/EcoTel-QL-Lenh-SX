@@ -1,6 +1,5 @@
 package com.ecotel.thong_ke_cao_son.dto.response;
 
-import com.ecotel.thong_ke_cao_son.enums.ApprovalStatus;
 import lombok.Builder;
 import lombok.Getter;
 
@@ -31,9 +30,6 @@ public class TransportReportResponse {
     private Double fuelEnding;
     private Double fuelReceived;
     private Double fuelUsed;
-
-    private ApprovalStatus status;
-    private String note;
 
     private List<TransportReportTripResponse> trips;
 

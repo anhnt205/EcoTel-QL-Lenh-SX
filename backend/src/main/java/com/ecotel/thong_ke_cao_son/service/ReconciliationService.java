@@ -64,14 +64,14 @@ public class ReconciliationService {
             }
         }
 
-        // Lọc theo trạng thái duyệt của báo cáo (status trên header)
+        // Lọc theo trạng thái duyệt của chuyến (status trên trip)
         if (request.getStatus() != null) {
             ApprovalStatus filterStatus = request.getStatus();
             rows = rows.stream().filter(row -> {
                 boolean transportMatch = row.getTransportReportTripId() != null
-                        && getTransportReportStatus(row.getTransportReportTripId()) == filterStatus;
+                        && getTripStatus(row.getTransportReportTripId(), true) == filterStatus;
                 boolean excavationMatch = row.getExcavationReportTripId() != null
-                        && getExcavationReportStatus(row.getExcavationReportTripId()) == filterStatus;
+                        && getTripStatus(row.getExcavationReportTripId(), false) == filterStatus;
                 return transportMatch || excavationMatch;
             }).toList();
         }
@@ -348,14 +348,6 @@ public class ReconciliationService {
             throw new BadRequestException(String.join("; ", errors));
         }
 
-        // Tự động reset status về PENDING khi report bị sửa chuyến
-        for (TransportReport r : transportReportsTouched) {
-            r.setStatus(ApprovalStatus.PENDING);
-        }
-        for (ExcavationReport r : excavationReportsTouched) {
-            r.setStatus(ApprovalStatus.PENDING);
-        }
-
         // Report nào rỗng (hết chuyến sau khi bị chuyển đi) -> xóa; còn lại -> lưu
         List<TransportReport> transportToSave = new ArrayList<>();
         List<TransportReport> transportToDelete = new ArrayList<>();
@@ -518,16 +510,16 @@ public class ReconciliationService {
         }
     }
 
-    private ApprovalStatus getTransportReportStatus(Long tripId) {
-        return transportReportTripRepository.findById(tripId)
-                .map(t -> t.getTransportReport().getStatus())
-                .orElse(null);
-    }
-
-    private ApprovalStatus getExcavationReportStatus(Long tripId) {
-        return excavationReportTripRepository.findById(tripId)
-                .map(t -> t.getExcavationReport().getStatus())
-                .orElse(null);
+    private ApprovalStatus getTripStatus(Long tripId, boolean isTransport) {
+        if (isTransport) {
+            return transportReportTripRepository.findById(tripId)
+                    .map(TransportReportTrip::getStatus)
+                    .orElse(null);
+        } else {
+            return excavationReportTripRepository.findById(tripId)
+                    .map(ExcavationReportTrip::getStatus)
+                    .orElse(null);
+        }
     }
 
     private void applyLoadLevel(LoadLevel loadLevel, LoadLevelType type, String customValue) {
@@ -573,17 +565,17 @@ public class ReconciliationService {
 
     private void applyReportStatus(ReportStatusUpdateRequest req) {
         if (req.getReportType() == ReportStatusUpdateRequest.ReportType.TRANSPORT) {
-            TransportReport report = transportReportRepository.findById(req.getReportId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy báo cáo Vận tải: " + req.getReportId()));
-            report.setStatus(req.getStatus());
-            report.setNote(req.getNote());
-            transportReportRepository.save(report);
+            TransportReportTrip trip = transportReportTripRepository.findById(req.getTripId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy chuyến Vận tải: " + req.getTripId()));
+            trip.setStatus(req.getStatus());
+            trip.setNote(req.getNote());
+            transportReportTripRepository.save(trip);
         } else if (req.getReportType() == ReportStatusUpdateRequest.ReportType.EXCAVATION) {
-            ExcavationReport report = excavationReportRepository.findById(req.getReportId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy báo cáo Khai thác: " + req.getReportId()));
-            report.setStatus(req.getStatus());
-            report.setNote(req.getNote());
-            excavationReportRepository.save(report);
+            ExcavationReportTrip trip = excavationReportTripRepository.findById(req.getTripId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy chuyến Khai thác: " + req.getTripId()));
+            trip.setStatus(req.getStatus());
+            trip.setNote(req.getNote());
+            excavationReportTripRepository.save(trip);
         } else {
             throw new BadRequestException("Loại báo cáo không hợp lệ: " + req.getReportType());
         }

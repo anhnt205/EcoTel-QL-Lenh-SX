@@ -40,7 +40,8 @@ public class ReconciliationController {
         request.setShiftIds(shiftIds);
         request.setDeviceIds(deviceIds);
         request.setStatus(status);
-        return ApiResponse.success(reconciliationService.search(request, pageable));
+        Pageable cleanPageable = Pageable.ofSize(pageable.getPageSize()).withPage(pageable.getPageNumber());
+        return ApiResponse.success(reconciliationService.search(request, cleanPageable));
     }
 
     @PostMapping("/decisions")

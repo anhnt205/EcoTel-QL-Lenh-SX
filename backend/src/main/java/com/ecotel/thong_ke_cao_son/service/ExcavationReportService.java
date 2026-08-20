@@ -6,9 +6,7 @@ import com.ecotel.thong_ke_cao_son.dto.response.BulkDeleteResponse;
 import com.ecotel.thong_ke_cao_son.dto.response.ExcavationReportBulkUpdateItem;
 import com.ecotel.thong_ke_cao_son.dto.response.ExcavationReportResponse;
 import com.ecotel.thong_ke_cao_son.dto.response.PageResponse;
-import com.ecotel.thong_ke_cao_son.enums.ApprovalStatus;
 import com.ecotel.thong_ke_cao_son.enums.LoadLevelType;
-import com.ecotel.thong_ke_cao_son.exception.BadRequestException;
 import com.ecotel.thong_ke_cao_son.exception.ResourceNotFoundException;
 import com.ecotel.thong_ke_cao_son.mapper.ExcavationReportMapper;
 import com.ecotel.thong_ke_cao_son.model.CargoType;
@@ -44,7 +42,6 @@ public class ExcavationReportService {
     public ExcavationReportResponse create(ExcavationReportRequest request) {
         ExcavationReport report = excavationReportMapper.toEntity(request);
         applyRelations(report, request);
-        report.setStatus(ApprovalStatus.PENDING);
         report.recalculateFuelUsed();
 
         for (ExcavationReportTripRequest tripReq : request.getTrips()) {
@@ -60,13 +57,8 @@ public class ExcavationReportService {
         ExcavationReport report = excavationReportRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy báo cáo: " + id));
 
-        if (report.getStatus() == ApprovalStatus.APPROVED) {
-            throw new BadRequestException("Không thể sửa báo cáo đã duyệt");
-        }
-
         excavationReportMapper.updateEntity(request, report);
         applyRelations(report, request);
-        report.setStatus(ApprovalStatus.PENDING);
         report.recalculateFuelUsed();
 
         report.getTrips().clear();
@@ -97,9 +89,6 @@ public class ExcavationReportService {
     public void delete(Long id) {
         ExcavationReport report = excavationReportRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy báo cáo: " + id));
-        if (report.getStatus() == ApprovalStatus.APPROVED) {
-            throw new BadRequestException("Không thể xóa báo cáo đã duyệt");
-        }
         excavationReportRepository.delete(report);
     }
 
@@ -159,13 +148,6 @@ public class ExcavationReportService {
             Set<Long> foundIds = reports.stream().map(ExcavationReport::getId).collect(Collectors.toSet());
             List<Long> missingIds = ids.stream().filter(id -> !foundIds.contains(id)).toList();
             throw new ResourceNotFoundException("Không tìm thấy báo cáo với ID: " + missingIds);
-        }
-        List<Long> approvedIds = reports.stream()
-                .filter(r -> r.getStatus() == ApprovalStatus.APPROVED)
-                .map(ExcavationReport::getId)
-                .toList();
-        if (!approvedIds.isEmpty()) {
-            throw new BadRequestException("Không thể xóa báo cáo đã duyệt: " + approvedIds);
         }
         excavationReportRepository.deleteAll(reports);
         return BulkDeleteResponse.builder()
