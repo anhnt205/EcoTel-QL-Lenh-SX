@@ -27,6 +27,6 @@ public interface ExcavationReportRepository extends JpaRepository<ExcavationRepo
             @Param("excavatorIds") List<Long> excavatorIds,
             Pageable pageable);
 
-    Optional<ExcavationReport> findByReportDateAndShiftIdAndVehicleIdAndExcavatorDeviceIdAndEmployeeId(
-            LocalDate reportDate, Long shiftId, Long vehicleId, Long excavatorDeviceId, Long employeeId);
+    Optional<ExcavationReport> findByReportDateAndShiftIdAndExcavatorDeviceIdAndEmployeeId(
+            LocalDate reportDate, Long shiftId, Long excavatorDeviceId, Long employeeId);
 }

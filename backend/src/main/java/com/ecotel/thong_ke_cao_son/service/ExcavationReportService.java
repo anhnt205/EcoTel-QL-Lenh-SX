@@ -105,7 +105,6 @@ public class ExcavationReportService {
 
     private void applyRelations(ExcavationReport report, ExcavationReportRequest request) {
         report.setShift(getOrThrow(shiftRepository, request.getShiftId(), "Ca"));
-        report.setVehicle(getOrThrow(deviceRepository, request.getVehicleId(), "Số xe"));
         report.setExcavatorDevice(getOrThrow(deviceRepository, request.getExcavatorDeviceId(), "Máy xúc"));
         report.setReceivingLocation(getOrThrow(locationRepository, request.getReceivingLocationId(), "Nơi nhận tải"));
         report.setEmployee(getOrThrow(userRepository, request.getEmployeeId(), "Nhân viên"));
@@ -114,6 +113,8 @@ public class ExcavationReportService {
     private ExcavationReportTrip buildTrip(ExcavationReport report, ExcavationReportTripRequest tripReq) {
         ExcavationReportTrip trip = excavationReportMapper.toTripEntity(tripReq);
         trip.setExcavationReport(report);
+
+        trip.setVehicle(getOrThrow(deviceRepository, tripReq.getVehicleId(), "Số xe"));
 
         CargoType cargoType = getOrThrow(cargoTypeRepository, tripReq.getCargoTypeId(), "Loại hàng");
         trip.setCargoType(cargoType);

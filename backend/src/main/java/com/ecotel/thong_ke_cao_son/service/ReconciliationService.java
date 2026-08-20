@@ -96,7 +96,7 @@ public class ReconciliationService {
     private String buildExcavationKey(ExcavationReportTrip et) {
         ExcavationReport header = et.getExcavationReport();
         return header.getReportDate() + "_" + header.getShift().getId() + "_"
-                + header.getVehicle().getId() + "_" + header.getExcavatorDevice().getId() + "_"
+                + et.getVehicle().getId() + "_" + header.getExcavatorDevice().getId() + "_"
                 + et.getCargoType().getId();
     }
 
@@ -132,7 +132,7 @@ public class ReconciliationService {
             ExcavationReport header = et.getExcavationReport();
             builder.reportDate(header.getReportDate())
                     .shiftName(header.getShift().getName())
-                    .vehicleCode(header.getVehicle().getCode())
+                    .vehicleCode(et.getVehicle().getCode())
                     .excavatorName(header.getExcavatorDevice().getName());
         }
 
@@ -482,17 +482,16 @@ public class ReconciliationService {
                 }
 
                 String key = oldReport.getReportDate() + "|" + oldReport.getShift().getId() + "|"
-                        + oldReport.getVehicle().getId() + "|" + oldReport.getExcavatorDevice().getId() + "|" + newEmployee.getId();
+                        + oldReport.getExcavatorDevice().getId() + "|" + newEmployee.getId();
                 ExcavationReport targetReport = excavationReportCache.computeIfAbsent(key, k ->
                         excavationReportRepository
-                                .findByReportDateAndShiftIdAndVehicleIdAndExcavatorDeviceIdAndEmployeeId(
+                                .findByReportDateAndShiftIdAndExcavatorDeviceIdAndEmployeeId(
                                         oldReport.getReportDate(), oldReport.getShift().getId(),
-                                        oldReport.getVehicle().getId(), oldReport.getExcavatorDevice().getId(), newEmployee.getId())
+                                        oldReport.getExcavatorDevice().getId(), newEmployee.getId())
                                 .orElseGet(() -> {
                                     ExcavationReport newReport = new ExcavationReport();
                                     newReport.setReportDate(oldReport.getReportDate());
                                     newReport.setShift(oldReport.getShift());
-                                    newReport.setVehicle(oldReport.getVehicle());
                                     newReport.setExcavatorDevice(oldReport.getExcavatorDevice());
                                     newReport.setExcavationFloor(oldReport.getExcavationFloor());
                                     newReport.setReceivingLocation(oldReport.getReceivingLocation());

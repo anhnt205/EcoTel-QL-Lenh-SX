@@ -21,9 +21,6 @@ public class ExcavationReportRequest {
     @NotNull(message = "Máy xúc là bắt buộc")
     private Long excavatorDeviceId;
 
-    @NotNull(message = "Số xe là bắt buộc")
-    private Long vehicleId;
-
     private String excavationFloor;
 
     @NotNull(message = "Nơi nhận tải là bắt buộc")

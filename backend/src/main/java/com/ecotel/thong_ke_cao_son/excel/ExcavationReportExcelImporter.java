@@ -141,7 +141,7 @@ public class ExcavationReportExcelImporter {
 
     private String buildHeaderKey(Map<String, String> row) {
         return row.get("reportDate") + "|" + row.get("shiftName") + "|"
-                + row.get("vehicleCode") + "|" + row.get("excavatorCode") + "|" + row.get("salaryCode");
+                + row.get("excavatorCode") + "|" + row.get("salaryCode");
     }
 
     private void processGroup(List<Map<String, String>> group) {
@@ -149,17 +149,15 @@ public class ExcavationReportExcelImporter {
 
         LocalDate reportDate = parseDate(firstRow.get("reportDate"));
         Shift shift = findOrThrow(shiftRepository.findByName(parseInt(firstRow.get("shiftName"))), "Ca", firstRow.get("shiftName"));
-        Device vehicle = findOrThrow(deviceRepository.findByCode(firstRow.get("vehicleCode")), "Số xe", firstRow.get("vehicleCode"));
         Device excavatorDevice = findOrThrow(deviceRepository.findByCode(firstRow.get("excavatorCode")), "Máy xúc", firstRow.get("excavatorCode"));
         User employee = findOrThrow(userRepository.findBySalaryCode(firstRow.get("salaryCode")), "Số thẻ lương", firstRow.get("salaryCode"));
 
         ExcavationReport report = excavationReportRepository
-                .findByReportDateAndShiftIdAndVehicleIdAndExcavatorDeviceIdAndEmployeeId(reportDate, shift.getId(), vehicle.getId(), excavatorDevice.getId(), employee.getId())
+                .findByReportDateAndShiftIdAndExcavatorDeviceIdAndEmployeeId(reportDate, shift.getId(), excavatorDevice.getId(), employee.getId())
                 .orElseGet(ExcavationReport::new);
 
         report.setReportDate(reportDate);
         report.setShift(shift);
-        report.setVehicle(vehicle);
         report.setExcavatorDevice(excavatorDevice);
         report.setExcavationFloor(emptyToNull(firstRow.get("excavationFloor")));
         report.setReceivingLocation(findOrThrow(locationRepository.findByName(firstRow.get("receivingLocationName")), "Nơi nhận tải", firstRow.get("receivingLocationName")));
@@ -184,6 +182,7 @@ public class ExcavationReportExcelImporter {
     private ExcavationReportTrip buildTrip(Map<String, String> row) {
         ExcavationReportTrip trip = new ExcavationReportTrip();
 
+        trip.setVehicle(findOrThrow(deviceRepository.findByCode(row.get("vehicleCode")), "Số xe", row.get("vehicleCode")));
         trip.setTripCount(parseIntOrNull(row.get("tripCount")));
 
         CargoType cargoType = findOrThrow(cargoTypeRepository.findByName(row.get("cargoTypeName")), "Loại hàng", row.get("cargoTypeName"));
@@ -234,7 +233,8 @@ public class ExcavationReportExcelImporter {
     }
 
     private boolean isSameTrip(ExcavationReportTrip a, ExcavationReportTrip b) {
-        return Objects.equals(a.getTripCount(), b.getTripCount())
+        return Objects.equals(a.getVehicle().getId(), b.getVehicle().getId())
+                && Objects.equals(a.getTripCount(), b.getTripCount())
                 && Objects.equals(a.getCargoType().getId(), b.getCargoType().getId())
                 && a.getLoadLevel().getType() == b.getLoadLevel().getType()
                 && Objects.equals(a.getLoadLevel().getCustomValue(), b.getLoadLevel().getCustomValue());

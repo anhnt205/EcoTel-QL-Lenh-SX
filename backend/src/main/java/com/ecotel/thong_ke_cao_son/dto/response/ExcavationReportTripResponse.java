@@ -9,6 +9,12 @@ import lombok.Getter;
 public class ExcavationReportTripResponse {
     private Long id;
 
+    private Long vehicleId;
+    private String vehicleCode;
+    private String vehicleName;
+    private String vehicleDepartmentName;
+    private String vehicleCategoryName;
+
     private Integer tripCount;
 
     private Long cargoTypeId;

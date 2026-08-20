@@ -17,7 +17,7 @@ import java.time.LocalDateTime;
         uniqueConstraints = {
                 @UniqueConstraint(name = "uk_excavation_trip_dedup",
                         columnNames = {
-                                "excavation_report_id", "cargo_type_id", "trip_count",
+                                "excavation_report_id", "vehicle_device_id", "cargo_type_id", "trip_count",
                                 "load_level_type", "load_level_custom_value"
                         })
         }
@@ -37,6 +37,11 @@ public class ExcavationReportTrip {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "excavation_report_id", nullable = false)
     private ExcavationReport excavationReport;
+
+    // "Số xe" — Đơn vị quản lý thiết bị / Chủng loại xe derive từ đây ở tầng response
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "vehicle_device_id", nullable = false)
+    private Device vehicle;
 
     @Column(name = "trip_count")
     private Integer tripCount;

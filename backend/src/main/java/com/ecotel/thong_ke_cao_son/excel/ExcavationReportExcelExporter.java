@@ -98,12 +98,6 @@ public class ExcavationReportExcelExporter {
         setNumeric(row, c++, report.getFuelReceived(), numericDataStyle);
         setNumeric(row, c++, report.getFuelUsed(), numericDataStyle);
 
-        setText(row, c++, report.getVehicle().getCode(), dataStyle);
-        setText(row, c++, report.getVehicle().getDepartment() != null
-                ? report.getVehicle().getDepartment().getName() : "", dataStyle);
-        setText(row, c++, report.getVehicle().getCategory() != null
-                ? report.getVehicle().getCategory().getName() : "", dataStyle);
-
         if (trip == null) {
             for (int i = c; i < HEADERS.length; i++) {
                 Cell cell = row.createCell(i);
@@ -111,6 +105,12 @@ public class ExcavationReportExcelExporter {
             }
             return;
         }
+
+        setText(row, c++, trip.getVehicle().getCode(), dataStyle);
+        setText(row, c++, trip.getVehicle().getDepartment() != null
+                ? trip.getVehicle().getDepartment().getName() : "", dataStyle);
+        setText(row, c++, trip.getVehicle().getCategory() != null
+                ? trip.getVehicle().getCategory().getName() : "", dataStyle);
 
         setNumeric(row, c++, trip.getTripCount() != null ? trip.getTripCount().doubleValue() : null, numericDataStyle);
         setText(row, c++, trip.getCargoType().getName(), dataStyle);

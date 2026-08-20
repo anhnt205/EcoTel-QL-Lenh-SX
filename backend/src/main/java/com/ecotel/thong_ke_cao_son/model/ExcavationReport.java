@@ -22,7 +22,7 @@ import java.util.List;
         name = "excavation_reports",
         uniqueConstraints = {
                 @UniqueConstraint(name = "uk_excavation_report_key",
-                        columnNames = {"report_date", "shift_id", "vehicle_id", "excavator_device_id", "employee_id"})
+                        columnNames = {"report_date", "shift_id", "excavator_device_id", "employee_id"})
         }
 
 )
@@ -45,11 +45,6 @@ public class ExcavationReport {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "shift_id", nullable = false)
     private Shift shift;
-
-    // "Số xe" — Device (chủng loại xe)
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "vehicle_id", nullable = false)
-    private Device vehicle;
 
     // "Máy xúc" — Device có category.name = "Máy xúc" (lọc ở tầng API, không ràng buộc cứng ở entity)
     @ManyToOne(fetch = FetchType.LAZY, optional = false)

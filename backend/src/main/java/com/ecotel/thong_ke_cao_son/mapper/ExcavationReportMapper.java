@@ -14,7 +14,6 @@ import org.mapstruct.MappingTarget;
 public interface ExcavationReportMapper {
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "shift", ignore = true)
-    @Mapping(target = "vehicle", ignore = true)
     @Mapping(target = "excavatorDevice", ignore = true)
     @Mapping(target = "receivingLocation", ignore = true)
     @Mapping(target = "employee", ignore = true)
@@ -26,7 +25,6 @@ public interface ExcavationReportMapper {
 
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "shift", ignore = true)
-    @Mapping(target = "vehicle", ignore = true)
     @Mapping(target = "excavatorDevice", ignore = true)
     @Mapping(target = "receivingLocation", ignore = true)
     @Mapping(target = "employee", ignore = true)
@@ -38,6 +36,7 @@ public interface ExcavationReportMapper {
 
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "excavationReport", ignore = true)
+    @Mapping(target = "vehicle", ignore = true)
     @Mapping(target = "cargoType", ignore = true)
     @Mapping(target = "cargoGroup", ignore = true)
     @Mapping(target = "loadLevel", ignore = true)
@@ -56,13 +55,13 @@ public interface ExcavationReportMapper {
     @Mapping(target = "employeeId", source = "employee.id")
     @Mapping(target = "employeeSalaryCode", source = "employee.salaryCode")
     @Mapping(target = "employeeFullName", source = "employee.fullName")
+    ExcavationReportResponse toResponse(ExcavationReport report);
+
     @Mapping(target = "vehicleId", source = "vehicle.id")
     @Mapping(target = "vehicleCode", source = "vehicle.code")
     @Mapping(target = "vehicleName", source = "vehicle.name")
     @Mapping(target = "vehicleDepartmentName", source = "vehicle.department.name")
     @Mapping(target = "vehicleCategoryName", source = "vehicle.category.name")
-    ExcavationReportResponse toResponse(ExcavationReport report);
-
     @Mapping(target = "cargoTypeId", source = "cargoType.id")
     @Mapping(target = "cargoTypeName", source = "cargoType.name")
     @Mapping(target = "cargoGroupId", source = "cargoGroup.id")
