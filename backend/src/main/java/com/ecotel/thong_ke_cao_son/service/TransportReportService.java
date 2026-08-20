@@ -3,14 +3,19 @@ package com.ecotel.thong_ke_cao_son.service;
 import com.ecotel.thong_ke_cao_son.dto.request.TransportReportBulkUpdateItem;
 import com.ecotel.thong_ke_cao_son.dto.request.TransportReportRequest;
 import com.ecotel.thong_ke_cao_son.dto.request.TransportReportTripRequest;
+import com.ecotel.thong_ke_cao_son.dto.request.TripBulkUpdateItem;
 import com.ecotel.thong_ke_cao_son.dto.response.BulkDeleteResponse;
 import com.ecotel.thong_ke_cao_son.dto.response.TransportReportResponse;
+import com.ecotel.thong_ke_cao_son.dto.response.TransportReportTripResponse;
+import com.ecotel.thong_ke_cao_son.enums.ApprovalStatus;
+import com.ecotel.thong_ke_cao_son.exception.BadRequestException;
 import com.ecotel.thong_ke_cao_son.exception.ResourceNotFoundException;
 import com.ecotel.thong_ke_cao_son.model.*;
 import com.ecotel.thong_ke_cao_son.enums.LoadLevelType;
 import com.ecotel.thong_ke_cao_son.mapper.TransportReportMapper;
 import com.ecotel.thong_ke_cao_son.repository.*;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.annotation.Lazy;
 import com.ecotel.thong_ke_cao_son.dto.response.PageResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -35,6 +40,8 @@ public class TransportReportService {
     private final CargoTypeRepository cargoTypeRepository;
     private final ReceivingFloorGroupCalculator floorGroupCalculator;
     private final TransportReportMapper transportReportMapper;
+    @Lazy
+    private final ReconciliationService reconciliationService;
 
     @Transactional
     public TransportReportResponse create(TransportReportRequest request) {
@@ -184,5 +191,130 @@ public class TransportReportService {
                 .requestedCount(ids.size())
                 .deletedCount(reports.size())
                 .build();
+    }
+
+    // ================= TRIP-LEVEL OPERATIONS =================
+
+    @Transactional
+    public TransportReportTripResponse updateTrip(Long reportId, Long tripId, TransportReportTripRequest request) {
+        TransportReport report = transportReportRepository.findById(reportId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy báo cáo: " + reportId));
+
+        TransportReportTrip trip = report.getTrips().stream()
+                .filter(t -> t.getId().equals(tripId))
+                .findFirst()
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy chuyến: " + tripId));
+
+        updateTripFields(trip, request);
+        trip.setStatus(ApprovalStatus.PENDING);
+        transportReportRepository.save(report);
+
+        // Sync reconciliation decision về PENDING
+        reconciliationService.syncTripStatusToPending(trip.getId(), true);
+
+        return transportReportMapper.toTripResponse(trip);
+    }
+
+    @Transactional
+    public void deleteTrip(Long reportId, Long tripId) {
+        TransportReport report = transportReportRepository.findById(reportId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy báo cáo: " + reportId));
+
+        boolean removed = report.getTrips().removeIf(t -> t.getId().equals(tripId));
+        if (!removed) {
+            throw new ResourceNotFoundException("Không tìm thấy chuyến: " + tripId);
+        }
+
+        if (report.getTrips().isEmpty()) {
+            transportReportRepository.delete(report);
+        } else {
+            transportReportRepository.save(report);
+        }
+    }
+
+    @Transactional
+    public List<TransportReportTripResponse> bulkUpdateTrips(Long reportId, List<TripBulkUpdateItem> items) {
+        TransportReport report = transportReportRepository.findById(reportId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy báo cáo: " + reportId));
+
+        List<TransportReportTripResponse> results = new ArrayList<>();
+        for (TripBulkUpdateItem item : items) {
+            TransportReportTrip trip = report.getTrips().stream()
+                    .filter(t -> t.getId().equals(item.getId()))
+                    .findFirst()
+                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy chuyến: " + item.getId()));
+
+            updateTripFields(trip, item.getData());
+            trip.setStatus(ApprovalStatus.PENDING);
+            results.add(transportReportMapper.toTripResponse(trip));
+
+            // Sync reconciliation decision về PENDING
+            reconciliationService.syncTripStatusToPending(trip.getId(), true);
+        }
+
+        transportReportRepository.save(report);
+        return results;
+    }
+
+    @Transactional
+    public BulkDeleteResponse bulkDeleteTrips(Long reportId, List<Long> tripIds) {
+        TransportReport report = transportReportRepository.findById(reportId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy báo cáo: " + reportId));
+
+        Set<Long> existingIds = report.getTrips().stream()
+                .map(TransportReportTrip::getId)
+                .collect(Collectors.toSet());
+        List<Long> missingIds = tripIds.stream()
+                .filter(id -> !existingIds.contains(id))
+                .toList();
+        if (!missingIds.isEmpty()) {
+            throw new ResourceNotFoundException("Không tìm thấy chuyến: " + missingIds);
+        }
+
+        report.getTrips().removeIf(t -> tripIds.contains(t.getId()));
+
+        if (report.getTrips().isEmpty()) {
+            transportReportRepository.delete(report);
+            return BulkDeleteResponse.builder()
+                    .requestedCount(tripIds.size())
+                    .deletedCount(tripIds.size())
+                    .build();
+        }
+
+        transportReportRepository.save(report);
+        return BulkDeleteResponse.builder()
+                .requestedCount(tripIds.size())
+                .deletedCount(tripIds.size())
+                .build();
+    }
+
+    private void updateTripFields(TransportReportTrip trip, TransportReportTripRequest request) {
+        trip.setRainyDay(request.getRainyDay() != null ? request.getRainyDay() : false);
+        trip.setSupplementaryVehicle(request.getSupplementaryVehicle() != null ? request.getSupplementaryVehicle() : false);
+
+        trip.setExcavationArea(getOrThrow(locationRepository, request.getExcavationAreaId(), "Khu vực xúc"));
+        trip.setExcavator(getOrThrow(deviceRepository, request.getExcavatorDeviceId(), "Máy xúc"));
+        trip.setLoadingPoint(getOrThrow(locationRepository, request.getLoadingPointId(), "Nơi nhận tải"));
+        trip.setUnloadingPoint(getOrThrow(locationRepository, request.getUnloadingPointId(), "Nơi dỡ tải"));
+
+        trip.setReceivingFloor(request.getReceivingFloor());
+        trip.setReceivingFloorGroup(floorGroupCalculator.calculate(trip.getExcavationArea().getName(), request.getReceivingFloor()));
+        trip.setUnloadingFloor(request.getUnloadingFloor());
+        trip.setTotalRouteDistanceKm(request.getTotalRouteDistanceKm());
+        trip.setTotalRouteLiftM(request.getTotalRouteLiftM());
+        trip.setLocalSlopeDistanceKm(request.getLocalSlopeDistanceKm());
+        trip.setLocalSlopeM(request.getLocalSlopeM());
+
+        CargoType cargoType = getOrThrow(cargoTypeRepository, request.getCargoTypeId(), "Loại hàng");
+        trip.setCargoType(cargoType);
+        trip.setCargoGroup(cargoType.getCargoGroup());
+
+        trip.setTripCount(request.getTripCount());
+
+        LoadLevel loadLevel = new LoadLevel();
+        loadLevel.setType(request.getLoadLevelType());
+        loadLevel.setCustomValue(
+                request.getLoadLevelType() == LoadLevelType.OTHER ? request.getLoadLevelCustomValue() : null);
+        trip.setLoadLevel(loadLevel);
     }
 }

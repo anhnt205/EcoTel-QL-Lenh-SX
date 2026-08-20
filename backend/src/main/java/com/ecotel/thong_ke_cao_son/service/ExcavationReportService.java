@@ -2,12 +2,15 @@ package com.ecotel.thong_ke_cao_son.service;
 
 import com.ecotel.thong_ke_cao_son.dto.request.ExcavationReportRequest;
 import com.ecotel.thong_ke_cao_son.dto.request.ExcavationReportTripRequest;
+import com.ecotel.thong_ke_cao_son.dto.request.ExcavationTripBulkUpdateItem;
 import com.ecotel.thong_ke_cao_son.dto.response.BulkDeleteResponse;
 import com.ecotel.thong_ke_cao_son.dto.response.ExcavationReportBulkUpdateItem;
 import com.ecotel.thong_ke_cao_son.dto.response.ExcavationReportResponse;
+import com.ecotel.thong_ke_cao_son.dto.response.ExcavationReportTripResponse;
 import com.ecotel.thong_ke_cao_son.dto.response.PageResponse;
 import com.ecotel.thong_ke_cao_son.enums.LoadLevelType;
 import com.ecotel.thong_ke_cao_son.exception.ResourceNotFoundException;
+import com.ecotel.thong_ke_cao_son.enums.ApprovalStatus;
 import com.ecotel.thong_ke_cao_son.mapper.ExcavationReportMapper;
 import com.ecotel.thong_ke_cao_son.model.CargoType;
 import com.ecotel.thong_ke_cao_son.model.ExcavationReport;
@@ -15,6 +18,7 @@ import com.ecotel.thong_ke_cao_son.model.ExcavationReportTrip;
 import com.ecotel.thong_ke_cao_son.model.LoadLevel;
 import com.ecotel.thong_ke_cao_son.repository.*;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Service;
@@ -37,6 +41,8 @@ public class ExcavationReportService {
     private final UserRepository userRepository;
     private final CargoTypeRepository cargoTypeRepository;
     private final ExcavationReportMapper excavationReportMapper;
+    @Lazy
+    private final ReconciliationService reconciliationService;
 
     @Transactional
     public ExcavationReportResponse create(ExcavationReportRequest request) {
@@ -154,5 +160,116 @@ public class ExcavationReportService {
                 .requestedCount(ids.size())
                 .deletedCount(reports.size())
                 .build();
+    }
+
+    // ================= TRIP-LEVEL OPERATIONS =================
+
+    @Transactional
+    public ExcavationReportTripResponse updateTrip(Long reportId, Long tripId, ExcavationReportTripRequest request) {
+        ExcavationReport report = excavationReportRepository.findById(reportId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy báo cáo: " + reportId));
+
+        ExcavationReportTrip trip = report.getTrips().stream()
+                .filter(t -> t.getId().equals(tripId))
+                .findFirst()
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy chuyến: " + tripId));
+
+        updateTripFields(trip, request);
+        trip.setStatus(ApprovalStatus.PENDING);
+        excavationReportRepository.save(report);
+
+        // Sync reconciliation decision về PENDING
+        reconciliationService.syncTripStatusToPending(trip.getId(), false);
+
+        return excavationReportMapper.toTripResponse(trip);
+    }
+
+    @Transactional
+    public void deleteTrip(Long reportId, Long tripId) {
+        ExcavationReport report = excavationReportRepository.findById(reportId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy báo cáo: " + reportId));
+
+        boolean removed = report.getTrips().removeIf(t -> t.getId().equals(tripId));
+        if (!removed) {
+            throw new ResourceNotFoundException("Không tìm thấy chuyến: " + tripId);
+        }
+
+        if (report.getTrips().isEmpty()) {
+            excavationReportRepository.delete(report);
+        } else {
+            excavationReportRepository.save(report);
+        }
+    }
+
+    @Transactional
+    public List<ExcavationReportTripResponse> bulkUpdateTrips(Long reportId, List<ExcavationTripBulkUpdateItem> items) {
+        ExcavationReport report = excavationReportRepository.findById(reportId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy báo cáo: " + reportId));
+
+        List<ExcavationReportTripResponse> results = new ArrayList<>();
+        for (ExcavationTripBulkUpdateItem item : items) {
+            ExcavationReportTrip trip = report.getTrips().stream()
+                    .filter(t -> t.getId().equals(item.getId()))
+                    .findFirst()
+                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy chuyến: " + item.getId()));
+
+            updateTripFields(trip, item.getData());
+            trip.setStatus(ApprovalStatus.PENDING);
+            results.add(excavationReportMapper.toTripResponse(trip));
+
+            // Sync reconciliation decision về PENDING
+            reconciliationService.syncTripStatusToPending(trip.getId(), false);
+        }
+
+        excavationReportRepository.save(report);
+        return results;
+    }
+
+    @Transactional
+    public BulkDeleteResponse bulkDeleteTrips(Long reportId, List<Long> tripIds) {
+        ExcavationReport report = excavationReportRepository.findById(reportId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy báo cáo: " + reportId));
+
+        Set<Long> existingIds = report.getTrips().stream()
+                .map(ExcavationReportTrip::getId)
+                .collect(Collectors.toSet());
+        List<Long> missingIds = tripIds.stream()
+                .filter(id -> !existingIds.contains(id))
+                .toList();
+        if (!missingIds.isEmpty()) {
+            throw new ResourceNotFoundException("Không tìm thấy chuyến: " + missingIds);
+        }
+
+        report.getTrips().removeIf(t -> tripIds.contains(t.getId()));
+
+        if (report.getTrips().isEmpty()) {
+            excavationReportRepository.delete(report);
+            return BulkDeleteResponse.builder()
+                    .requestedCount(tripIds.size())
+                    .deletedCount(tripIds.size())
+                    .build();
+        }
+
+        excavationReportRepository.save(report);
+        return BulkDeleteResponse.builder()
+                .requestedCount(tripIds.size())
+                .deletedCount(tripIds.size())
+                .build();
+    }
+
+    private void updateTripFields(ExcavationReportTrip trip, ExcavationReportTripRequest request) {
+        trip.setVehicle(getOrThrow(deviceRepository, request.getVehicleId(), "Số xe"));
+
+        CargoType cargoType = getOrThrow(cargoTypeRepository, request.getCargoTypeId(), "Loại hàng");
+        trip.setCargoType(cargoType);
+        trip.setCargoGroup(cargoType.getCargoGroup());
+
+        trip.setTripCount(request.getTripCount());
+
+        LoadLevel loadLevel = new LoadLevel();
+        loadLevel.setType(request.getLoadLevelType());
+        loadLevel.setCustomValue(
+                request.getLoadLevelType() == LoadLevelType.OTHER ? request.getLoadLevelCustomValue() : null);
+        trip.setLoadLevel(loadLevel);
     }
 }

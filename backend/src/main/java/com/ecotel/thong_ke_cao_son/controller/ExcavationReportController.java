@@ -2,6 +2,8 @@ package com.ecotel.thong_ke_cao_son.controller;
 
 import com.ecotel.thong_ke_cao_son.dto.request.BulkDeleteRequest;
 import com.ecotel.thong_ke_cao_son.dto.request.ExcavationReportRequest;
+import com.ecotel.thong_ke_cao_son.dto.request.ExcavationReportTripRequest;
+import com.ecotel.thong_ke_cao_son.dto.request.ExcavationTripBulkUpdateItem;
 import com.ecotel.thong_ke_cao_son.dto.response.*;
 import com.ecotel.thong_ke_cao_son.excel.ExcavationReportExcelExporter;
 import com.ecotel.thong_ke_cao_son.excel.ExcavationReportExcelImporter;
@@ -84,6 +86,38 @@ public class ExcavationReportController {
     @DeleteMapping("/bulk")
     public ApiResponse<BulkDeleteResponse> bulkDelete(@Valid @RequestBody BulkDeleteRequest request) {
         return ApiResponse.success(excavationReportService.bulkDelete(request.getIds()));
+    }
+
+    // ================= TRIP-LEVEL OPERATIONS =================
+
+    @PutMapping("/{reportId}/trips/{tripId}")
+    public ApiResponse<ExcavationReportTripResponse> updateTrip(
+            @PathVariable Long reportId,
+            @PathVariable Long tripId,
+            @Valid @RequestBody ExcavationReportTripRequest request) {
+        return ApiResponse.success(excavationReportService.updateTrip(reportId, tripId, request));
+    }
+
+    @DeleteMapping("/{reportId}/trips/{tripId}")
+    public ApiResponse<Void> deleteTrip(
+            @PathVariable Long reportId,
+            @PathVariable Long tripId) {
+        excavationReportService.deleteTrip(reportId, tripId);
+        return ApiResponse.success(null);
+    }
+
+    @PutMapping("/{reportId}/trips/bulk")
+    public ApiResponse<List<ExcavationReportTripResponse>> bulkUpdateTrips(
+            @PathVariable Long reportId,
+            @Valid @RequestBody List<@Valid ExcavationTripBulkUpdateItem> items) {
+        return ApiResponse.success(excavationReportService.bulkUpdateTrips(reportId, items));
+    }
+
+    @DeleteMapping("/{reportId}/trips/bulk")
+    public ApiResponse<BulkDeleteResponse> bulkDeleteTrips(
+            @PathVariable Long reportId,
+            @Valid @RequestBody BulkDeleteRequest request) {
+        return ApiResponse.success(excavationReportService.bulkDeleteTrips(reportId, request.getIds()));
     }
 
     @GetMapping("/export")

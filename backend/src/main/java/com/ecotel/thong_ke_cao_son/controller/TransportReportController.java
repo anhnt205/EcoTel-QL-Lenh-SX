@@ -3,6 +3,8 @@ package com.ecotel.thong_ke_cao_son.controller;
 import com.ecotel.thong_ke_cao_son.dto.request.BulkDeleteRequest;
 import com.ecotel.thong_ke_cao_son.dto.request.TransportReportBulkUpdateItem;
 import com.ecotel.thong_ke_cao_son.dto.request.TransportReportRequest;
+import com.ecotel.thong_ke_cao_son.dto.request.TransportReportTripRequest;
+import com.ecotel.thong_ke_cao_son.dto.request.TripBulkUpdateItem;
 import com.ecotel.thong_ke_cao_son.dto.response.*;
 import com.ecotel.thong_ke_cao_son.excel.TransportReportExcelExporter;
 import com.ecotel.thong_ke_cao_son.excel.TransportReportExcelImporter;
@@ -86,6 +88,38 @@ public class TransportReportController {
     @DeleteMapping("/bulk")
     public ApiResponse<BulkDeleteResponse> bulkDelete(@Valid @RequestBody BulkDeleteRequest request) {
         return ApiResponse.success(transportReportService.bulkDelete(request.getIds()));
+    }
+
+    // ================= TRIP-LEVEL OPERATIONS =================
+
+    @PutMapping("/{reportId}/trips/{tripId}")
+    public ApiResponse<TransportReportTripResponse> updateTrip(
+            @PathVariable Long reportId,
+            @PathVariable Long tripId,
+            @Valid @RequestBody TransportReportTripRequest request) {
+        return ApiResponse.success(transportReportService.updateTrip(reportId, tripId, request));
+    }
+
+    @DeleteMapping("/{reportId}/trips/{tripId}")
+    public ApiResponse<Void> deleteTrip(
+            @PathVariable Long reportId,
+            @PathVariable Long tripId) {
+        transportReportService.deleteTrip(reportId, tripId);
+        return ApiResponse.success(null);
+    }
+
+    @PutMapping("/{reportId}/trips/bulk")
+    public ApiResponse<List<TransportReportTripResponse>> bulkUpdateTrips(
+            @PathVariable Long reportId,
+            @Valid @RequestBody List<@Valid TripBulkUpdateItem> items) {
+        return ApiResponse.success(transportReportService.bulkUpdateTrips(reportId, items));
+    }
+
+    @DeleteMapping("/{reportId}/trips/bulk")
+    public ApiResponse<BulkDeleteResponse> bulkDeleteTrips(
+            @PathVariable Long reportId,
+            @Valid @RequestBody BulkDeleteRequest request) {
+        return ApiResponse.success(transportReportService.bulkDeleteTrips(reportId, request.getIds()));
     }
 
     @GetMapping("/export")

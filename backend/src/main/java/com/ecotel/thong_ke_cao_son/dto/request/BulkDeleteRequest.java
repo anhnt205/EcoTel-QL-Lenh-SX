@@ -9,7 +9,6 @@ import java.util.List;
 @Getter
 @Setter
 public class BulkDeleteRequest {
-
-    @NotEmpty(message = "Cần ít nhất 1 ID để xóa")
+    @NotEmpty(message = "Danh sách ID không được rỗng")
     private List<Long> ids;
 }

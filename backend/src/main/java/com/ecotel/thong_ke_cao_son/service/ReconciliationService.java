@@ -241,6 +241,20 @@ public class ReconciliationService {
         }
 
         List<ReconciliationDecision> saved = reconciliationDecisionRepository.saveAll(toSave);
+
+        // Sync trip status theo decision
+        for (ReconciliationDecision decision : saved) {
+            ApprovalStatus newStatus = decision.getStatus();
+            if (decision.getTransportReportTrip() != null) {
+                decision.getTransportReportTrip().setStatus(newStatus);
+                transportReportTripRepository.save(decision.getTransportReportTrip());
+            }
+            if (decision.getExcavationReportTrip() != null) {
+                decision.getExcavationReportTrip().setStatus(newStatus);
+                excavationReportTripRepository.save(decision.getExcavationReportTrip());
+            }
+        }
+
         return saved.stream().map(this::toDecisionResponse).toList();
     }
 
@@ -578,6 +592,25 @@ public class ReconciliationService {
             excavationReportTripRepository.save(trip);
         } else {
             throw new BadRequestException("Loại báo cáo không hợp lệ: " + req.getReportType());
+        }
+    }
+
+    // ================= SYNC TRIP STATUS =================
+
+    /**
+     * Khi report trip chuyển về PENDING (do bị update), đồng bộ reconciliation decision về PENDING.
+     * Gọi từ TransportReportService / ExcavationReportService sau khi trip được update.
+     */
+    public void syncTripStatusToPending(Long tripId, boolean isTransport) {
+        ReconciliationDecision decision = null;
+        if (isTransport) {
+            decision = reconciliationDecisionRepository.findByTransportReportTrip_Id(tripId).orElse(null);
+        } else {
+            decision = reconciliationDecisionRepository.findByExcavationReportTrip_Id(tripId).orElse(null);
+        }
+        if (decision != null) {
+            decision.setStatus(ApprovalStatus.PENDING);
+            reconciliationDecisionRepository.save(decision);
         }
     }
 }
