@@ -3,7 +3,6 @@ package com.ecotel.thong_ke_cao_son.service;
 import com.ecotel.thong_ke_cao_son.dto.request.ReconciliationDecisionRequest;
 import com.ecotel.thong_ke_cao_son.dto.request.ReconciliationSearchRequest;
 import com.ecotel.thong_ke_cao_son.dto.request.ReconciliationTripUpdateRequest;
-import com.ecotel.thong_ke_cao_son.dto.request.ReportStatusUpdateRequest;
 import com.ecotel.thong_ke_cao_son.dto.response.*;
 import com.ecotel.thong_ke_cao_son.enums.ApprovalStatus;
 import com.ecotel.thong_ke_cao_son.enums.LoadLevelType;
@@ -545,53 +544,6 @@ public class ReconciliationService {
             loadLevel.setCustomValue(customValue);
         } else {
             loadLevel.setCustomValue(null);
-        }
-    }
-
-    // ================= UPDATE REPORT STATUS =================
-
-    @Transactional
-    public void updateReportStatus(ReportStatusUpdateRequest request) {
-        updateReportStatusBatch(List.of(request));
-    }
-
-    @Transactional
-    public void updateReportStatusBatch(List<ReportStatusUpdateRequest> requests) {
-        if (requests.isEmpty()) {
-            return;
-        }
-
-        List<String> errors = new ArrayList<>();
-
-        for (int i = 0; i < requests.size(); i++) {
-            ReportStatusUpdateRequest req = requests.get(i);
-            try {
-                applyReportStatus(req);
-            } catch (Exception e) {
-                errors.add("Mục thứ " + (i + 1) + ": " + e.getMessage());
-            }
-        }
-
-        if (!errors.isEmpty()) {
-            throw new BadRequestException(String.join("; ", errors));
-        }
-    }
-
-    private void applyReportStatus(ReportStatusUpdateRequest req) {
-        if (req.getReportType() == ReportStatusUpdateRequest.ReportType.TRANSPORT) {
-            TransportReportTrip trip = transportReportTripRepository.findById(req.getTripId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy chuyến Vận tải: " + req.getTripId()));
-            trip.setStatus(req.getStatus());
-            trip.setNote(req.getNote());
-            transportReportTripRepository.save(trip);
-        } else if (req.getReportType() == ReportStatusUpdateRequest.ReportType.EXCAVATION) {
-            ExcavationReportTrip trip = excavationReportTripRepository.findById(req.getTripId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy chuyến Khai thác: " + req.getTripId()));
-            trip.setStatus(req.getStatus());
-            trip.setNote(req.getNote());
-            excavationReportTripRepository.save(trip);
-        } else {
-            throw new BadRequestException("Loại báo cáo không hợp lệ: " + req.getReportType());
         }
     }
 

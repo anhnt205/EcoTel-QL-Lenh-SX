@@ -92,34 +92,34 @@ public class TransportReportController {
 
     // ================= TRIP-LEVEL OPERATIONS =================
 
-    @PutMapping("/{reportId}/trips/{tripId}")
-    public ApiResponse<TransportReportTripResponse> updateTrip(
-            @PathVariable Long reportId,
-            @PathVariable Long tripId,
-            @Valid @RequestBody TransportReportTripRequest request) {
-        return ApiResponse.success(transportReportService.updateTrip(reportId, tripId, request));
+    @GetMapping("/trips/{tripId}")
+    public ApiResponse<TransportReportTripResponse> getTrip(@PathVariable Long tripId) {
+        return ApiResponse.success(transportReportService.getTrip(tripId));
     }
 
-    @DeleteMapping("/{reportId}/trips/{tripId}")
-    public ApiResponse<Void> deleteTrip(
-            @PathVariable Long reportId,
-            @PathVariable Long tripId) {
-        transportReportService.deleteTrip(reportId, tripId);
+    @PutMapping("/trips/{tripId}")
+    public ApiResponse<TransportReportTripResponse> updateTrip(
+            @PathVariable Long tripId,
+            @Valid @RequestBody TransportReportTripRequest request) {
+        return ApiResponse.success(transportReportService.updateTrip(tripId, request));
+    }
+
+    @DeleteMapping("/trips/{tripId}")
+    public ApiResponse<Void> deleteTrip(@PathVariable Long tripId) {
+        transportReportService.deleteTrip(tripId);
         return ApiResponse.success(null);
     }
 
-    @PutMapping("/{reportId}/trips/bulk")
+    @PutMapping("/trips/bulk")
     public ApiResponse<List<TransportReportTripResponse>> bulkUpdateTrips(
-            @PathVariable Long reportId,
             @Valid @RequestBody List<@Valid TripBulkUpdateItem> items) {
-        return ApiResponse.success(transportReportService.bulkUpdateTrips(reportId, items));
+        return ApiResponse.success(transportReportService.bulkUpdateTrips(items));
     }
 
-    @DeleteMapping("/{reportId}/trips/bulk")
+    @DeleteMapping("/trips/bulk")
     public ApiResponse<BulkDeleteResponse> bulkDeleteTrips(
-            @PathVariable Long reportId,
             @Valid @RequestBody BulkDeleteRequest request) {
-        return ApiResponse.success(transportReportService.bulkDeleteTrips(reportId, request.getIds()));
+        return ApiResponse.success(transportReportService.bulkDeleteTrips(request.getIds()));
     }
 
     @GetMapping("/export")

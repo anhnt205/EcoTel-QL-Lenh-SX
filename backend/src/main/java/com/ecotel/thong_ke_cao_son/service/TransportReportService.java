@@ -33,6 +33,7 @@ import java.util.stream.Collectors;
 public class TransportReportService {
 
     private final TransportReportRepository transportReportRepository;
+    private final TransportReportTripRepository transportReportTripRepository;
     private final ShiftRepository shiftRepository;
     private final DeviceRepository deviceRepository;
     private final UserRepository userRepository;
@@ -195,19 +196,21 @@ public class TransportReportService {
 
     // ================= TRIP-LEVEL OPERATIONS =================
 
-    @Transactional
-    public TransportReportTripResponse updateTrip(Long reportId, Long tripId, TransportReportTripRequest request) {
-        TransportReport report = transportReportRepository.findById(reportId)
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy báo cáo: " + reportId));
+    @Transactional(readOnly = true)
+    public TransportReportTripResponse getTrip(Long tripId) {
+        TransportReportTrip trip = transportReportTripRepository.findById(tripId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy chuyến: " + tripId));
+        return transportReportMapper.toTripResponse(trip);
+    }
 
-        TransportReportTrip trip = report.getTrips().stream()
-                .filter(t -> t.getId().equals(tripId))
-                .findFirst()
+    @Transactional
+    public TransportReportTripResponse updateTrip(Long tripId, TransportReportTripRequest request) {
+        TransportReportTrip trip = transportReportTripRepository.findById(tripId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy chuyến: " + tripId));
 
         updateTripFields(trip, request);
         trip.setStatus(ApprovalStatus.PENDING);
-        transportReportRepository.save(report);
+        transportReportTripRepository.save(trip);
 
         // Sync reconciliation decision về PENDING
         reconciliationService.syncTripStatusToPending(trip.getId(), true);
@@ -216,14 +219,12 @@ public class TransportReportService {
     }
 
     @Transactional
-    public void deleteTrip(Long reportId, Long tripId) {
-        TransportReport report = transportReportRepository.findById(reportId)
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy báo cáo: " + reportId));
+    public void deleteTrip(Long tripId) {
+        TransportReportTrip trip = transportReportTripRepository.findById(tripId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy chuyến: " + tripId));
 
-        boolean removed = report.getTrips().removeIf(t -> t.getId().equals(tripId));
-        if (!removed) {
-            throw new ResourceNotFoundException("Không tìm thấy chuyến: " + tripId);
-        }
+        TransportReport report = trip.getTransportReport();
+        report.getTrips().remove(trip);
 
         if (report.getTrips().isEmpty()) {
             transportReportRepository.delete(report);
@@ -233,15 +234,10 @@ public class TransportReportService {
     }
 
     @Transactional
-    public List<TransportReportTripResponse> bulkUpdateTrips(Long reportId, List<TripBulkUpdateItem> items) {
-        TransportReport report = transportReportRepository.findById(reportId)
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy báo cáo: " + reportId));
-
+    public List<TransportReportTripResponse> bulkUpdateTrips(List<TripBulkUpdateItem> items) {
         List<TransportReportTripResponse> results = new ArrayList<>();
         for (TripBulkUpdateItem item : items) {
-            TransportReportTrip trip = report.getTrips().stream()
-                    .filter(t -> t.getId().equals(item.getId()))
-                    .findFirst()
+            TransportReportTrip trip = transportReportTripRepository.findById(item.getId())
                     .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy chuyến: " + item.getId()));
 
             updateTripFields(trip, item.getData());
@@ -252,39 +248,39 @@ public class TransportReportService {
             reconciliationService.syncTripStatusToPending(trip.getId(), true);
         }
 
-        transportReportRepository.save(report);
+        transportReportTripRepository.saveAll(results.stream()
+                .map(r -> transportReportTripRepository.findById(r.getId()).orElseThrow())
+                .toList());
         return results;
     }
 
     @Transactional
-    public BulkDeleteResponse bulkDeleteTrips(Long reportId, List<Long> tripIds) {
-        TransportReport report = transportReportRepository.findById(reportId)
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy báo cáo: " + reportId));
-
-        Set<Long> existingIds = report.getTrips().stream()
-                .map(TransportReportTrip::getId)
-                .collect(Collectors.toSet());
-        List<Long> missingIds = tripIds.stream()
-                .filter(id -> !existingIds.contains(id))
-                .toList();
-        if (!missingIds.isEmpty()) {
+    public BulkDeleteResponse bulkDeleteTrips(List<Long> tripIds) {
+        List<TransportReportTrip> trips = transportReportTripRepository.findAllById(tripIds);
+        if (trips.size() != tripIds.size()) {
+            Set<Long> foundIds = trips.stream().map(TransportReportTrip::getId).collect(Collectors.toSet());
+            List<Long> missingIds = tripIds.stream().filter(id -> !foundIds.contains(id)).toList();
             throw new ResourceNotFoundException("Không tìm thấy chuyến: " + missingIds);
         }
 
-        report.getTrips().removeIf(t -> tripIds.contains(t.getId()));
+        // Nhóm chuyến theo report
+        Map<Long, List<TransportReportTrip>> tripsByReport = trips.stream()
+                .collect(Collectors.groupingBy(t -> t.getTransportReport().getId()));
 
-        if (report.getTrips().isEmpty()) {
-            transportReportRepository.delete(report);
-            return BulkDeleteResponse.builder()
-                    .requestedCount(tripIds.size())
-                    .deletedCount(tripIds.size())
-                    .build();
+        for (Map.Entry<Long, List<TransportReportTrip>> entry : tripsByReport.entrySet()) {
+            TransportReport report = entry.getValue().get(0).getTransportReport();
+            report.getTrips().removeAll(entry.getValue());
+
+            if (report.getTrips().isEmpty()) {
+                transportReportRepository.delete(report);
+            } else {
+                transportReportRepository.save(report);
+            }
         }
 
-        transportReportRepository.save(report);
         return BulkDeleteResponse.builder()
                 .requestedCount(tripIds.size())
-                .deletedCount(tripIds.size())
+                .deletedCount(trips.size())
                 .build();
     }
 

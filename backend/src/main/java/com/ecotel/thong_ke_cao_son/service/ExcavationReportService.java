@@ -27,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -35,6 +36,7 @@ import java.util.stream.Collectors;
 public class ExcavationReportService {
 
     private final ExcavationReportRepository excavationReportRepository;
+    private final ExcavationReportTripRepository excavationReportTripRepository;
     private final ShiftRepository shiftRepository;
     private final DeviceRepository deviceRepository;
     private final LocationRepository locationRepository;
@@ -164,19 +166,21 @@ public class ExcavationReportService {
 
     // ================= TRIP-LEVEL OPERATIONS =================
 
-    @Transactional
-    public ExcavationReportTripResponse updateTrip(Long reportId, Long tripId, ExcavationReportTripRequest request) {
-        ExcavationReport report = excavationReportRepository.findById(reportId)
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy báo cáo: " + reportId));
+    @Transactional(readOnly = true)
+    public ExcavationReportTripResponse getTrip(Long tripId) {
+        ExcavationReportTrip trip = excavationReportTripRepository.findById(tripId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy chuyến: " + tripId));
+        return excavationReportMapper.toTripResponse(trip);
+    }
 
-        ExcavationReportTrip trip = report.getTrips().stream()
-                .filter(t -> t.getId().equals(tripId))
-                .findFirst()
+    @Transactional
+    public ExcavationReportTripResponse updateTrip(Long tripId, ExcavationReportTripRequest request) {
+        ExcavationReportTrip trip = excavationReportTripRepository.findById(tripId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy chuyến: " + tripId));
 
         updateTripFields(trip, request);
         trip.setStatus(ApprovalStatus.PENDING);
-        excavationReportRepository.save(report);
+        excavationReportTripRepository.save(trip);
 
         // Sync reconciliation decision về PENDING
         reconciliationService.syncTripStatusToPending(trip.getId(), false);
@@ -185,14 +189,12 @@ public class ExcavationReportService {
     }
 
     @Transactional
-    public void deleteTrip(Long reportId, Long tripId) {
-        ExcavationReport report = excavationReportRepository.findById(reportId)
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy báo cáo: " + reportId));
+    public void deleteTrip(Long tripId) {
+        ExcavationReportTrip trip = excavationReportTripRepository.findById(tripId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy chuyến: " + tripId));
 
-        boolean removed = report.getTrips().removeIf(t -> t.getId().equals(tripId));
-        if (!removed) {
-            throw new ResourceNotFoundException("Không tìm thấy chuyến: " + tripId);
-        }
+        ExcavationReport report = trip.getExcavationReport();
+        report.getTrips().remove(trip);
 
         if (report.getTrips().isEmpty()) {
             excavationReportRepository.delete(report);
@@ -202,15 +204,10 @@ public class ExcavationReportService {
     }
 
     @Transactional
-    public List<ExcavationReportTripResponse> bulkUpdateTrips(Long reportId, List<ExcavationTripBulkUpdateItem> items) {
-        ExcavationReport report = excavationReportRepository.findById(reportId)
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy báo cáo: " + reportId));
-
+    public List<ExcavationReportTripResponse> bulkUpdateTrips(List<ExcavationTripBulkUpdateItem> items) {
         List<ExcavationReportTripResponse> results = new ArrayList<>();
         for (ExcavationTripBulkUpdateItem item : items) {
-            ExcavationReportTrip trip = report.getTrips().stream()
-                    .filter(t -> t.getId().equals(item.getId()))
-                    .findFirst()
+            ExcavationReportTrip trip = excavationReportTripRepository.findById(item.getId())
                     .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy chuyến: " + item.getId()));
 
             updateTripFields(trip, item.getData());
@@ -221,39 +218,39 @@ public class ExcavationReportService {
             reconciliationService.syncTripStatusToPending(trip.getId(), false);
         }
 
-        excavationReportRepository.save(report);
+        excavationReportTripRepository.saveAll(results.stream()
+                .map(r -> excavationReportTripRepository.findById(r.getId()).orElseThrow())
+                .toList());
         return results;
     }
 
     @Transactional
-    public BulkDeleteResponse bulkDeleteTrips(Long reportId, List<Long> tripIds) {
-        ExcavationReport report = excavationReportRepository.findById(reportId)
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy báo cáo: " + reportId));
-
-        Set<Long> existingIds = report.getTrips().stream()
-                .map(ExcavationReportTrip::getId)
-                .collect(Collectors.toSet());
-        List<Long> missingIds = tripIds.stream()
-                .filter(id -> !existingIds.contains(id))
-                .toList();
-        if (!missingIds.isEmpty()) {
+    public BulkDeleteResponse bulkDeleteTrips(List<Long> tripIds) {
+        List<ExcavationReportTrip> trips = excavationReportTripRepository.findAllById(tripIds);
+        if (trips.size() != tripIds.size()) {
+            Set<Long> foundIds = trips.stream().map(ExcavationReportTrip::getId).collect(Collectors.toSet());
+            List<Long> missingIds = tripIds.stream().filter(id -> !foundIds.contains(id)).toList();
             throw new ResourceNotFoundException("Không tìm thấy chuyến: " + missingIds);
         }
 
-        report.getTrips().removeIf(t -> tripIds.contains(t.getId()));
+        // Nhóm chuyến theo report
+        Map<Long, List<ExcavationReportTrip>> tripsByReport = trips.stream()
+                .collect(Collectors.groupingBy(t -> t.getExcavationReport().getId()));
 
-        if (report.getTrips().isEmpty()) {
-            excavationReportRepository.delete(report);
-            return BulkDeleteResponse.builder()
-                    .requestedCount(tripIds.size())
-                    .deletedCount(tripIds.size())
-                    .build();
+        for (Map.Entry<Long, List<ExcavationReportTrip>> entry : tripsByReport.entrySet()) {
+            ExcavationReport report = entry.getValue().get(0).getExcavationReport();
+            report.getTrips().removeAll(entry.getValue());
+
+            if (report.getTrips().isEmpty()) {
+                excavationReportRepository.delete(report);
+            } else {
+                excavationReportRepository.save(report);
+            }
         }
 
-        excavationReportRepository.save(report);
         return BulkDeleteResponse.builder()
                 .requestedCount(tripIds.size())
-                .deletedCount(tripIds.size())
+                .deletedCount(trips.size())
                 .build();
     }
 
