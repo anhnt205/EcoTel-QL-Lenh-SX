@@ -31,6 +31,7 @@ public class ReconciliationController {
             @RequestParam LocalDate toDate,
             @RequestParam(required = false) List<Long> shiftIds,
             @RequestParam(required = false) List<Long> deviceIds,
+            @RequestParam(required = false) List<Long> excavatorIds,
             @RequestParam(required = false) ApprovalStatus status,
             Pageable pageable) {
         ReconciliationSearchRequest request = new ReconciliationSearchRequest();
@@ -38,6 +39,7 @@ public class ReconciliationController {
         request.setToDate(toDate);
         request.setShiftIds(shiftIds);
         request.setDeviceIds(deviceIds);
+        request.setExcavatorIds(excavatorIds);
         request.setStatus(status);
         Pageable cleanPageable = Pageable.ofSize(pageable.getPageSize()).withPage(pageable.getPageNumber());
         return ApiResponse.success(reconciliationService.search(request, cleanPageable));

@@ -43,6 +43,14 @@ public class ReconciliationService {
         List<ExcavationReportTrip> excavationTrips = excavationReportTripRepository.findForReconciliation(
                 request.getFromDate(), request.getToDate(), request.getShiftIds(), request.getDeviceIds());
 
+        // Lọc theo excavatorIds
+        if (request.getExcavatorIds() != null && !request.getExcavatorIds().isEmpty()) {
+            Set<Long> excavatorIdSet = new HashSet<>(request.getExcavatorIds());
+            excavationTrips = excavationTrips.stream()
+                    .filter(et -> excavatorIdSet.contains(et.getExcavationReport().getExcavatorDevice().getId()))
+                    .collect(Collectors.toList());
+        }
+
         Map<String, Deque<ExcavationReportTrip>> excavationByKey = new HashMap<>();
         for (ExcavationReportTrip et : excavationTrips) {
             excavationByKey.computeIfAbsent(buildExcavationKey(et), k -> new ArrayDeque<>()).add(et);
@@ -72,7 +80,7 @@ public class ReconciliationService {
                 boolean excavationMatch = row.getExcavationReportTripId() != null
                         && getTripStatus(row.getExcavationReportTripId(), false) == filterStatus;
                 return transportMatch || excavationMatch;
-            }).toList();
+            }).collect(Collectors.toList());
         }
 
         rows.sort(Comparator
@@ -132,6 +140,7 @@ public class ReconciliationService {
                             .loadLevelType(tt.getLoadLevel().getType())
                             .loadLevelCustomValue(tt.getLoadLevel().getCustomValue())
                             .employeeSalaryCode(header.getEmployee().getSalaryCode())
+                            .employeeFullName(header.getEmployee().getFullName())
                             .build());
         } else {
             ExcavationReport header = et.getExcavationReport();
@@ -150,6 +159,7 @@ public class ReconciliationService {
                             .loadLevelType(et.getLoadLevel().getType())
                             .loadLevelCustomValue(et.getLoadLevel().getCustomValue())
                             .employeeSalaryCode(header.getEmployee().getSalaryCode())
+                            .employeeFullName(header.getEmployee().getFullName())
                             .build());
         }
 

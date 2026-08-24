@@ -20,6 +20,7 @@ public class ReconciliationSearchRequest {
 
     private List<Long> shiftIds;
     private List<Long> deviceIds;
+    private List<Long> excavatorIds;
 
     private ApprovalStatus status; // lọc theo trạng thái duyệt của báo cáo
 }

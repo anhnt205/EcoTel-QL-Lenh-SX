@@ -37,6 +37,7 @@ public class ExcavationReportService {
 
     private final ExcavationReportRepository excavationReportRepository;
     private final ExcavationReportTripRepository excavationReportTripRepository;
+    private final ReconciliationDecisionRepository reconciliationDecisionRepository;
     private final ShiftRepository shiftRepository;
     private final DeviceRepository deviceRepository;
     private final LocationRepository locationRepository;
@@ -193,6 +194,10 @@ public class ExcavationReportService {
         ExcavationReportTrip trip = excavationReportTripRepository.findById(tripId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy chuyến: " + tripId));
 
+        // Xóa reconciliation decision liên quan trước
+        reconciliationDecisionRepository.findByExcavationReportTrip_Id(tripId)
+                .ifPresent(reconciliationDecisionRepository::delete);
+
         ExcavationReport report = trip.getExcavationReport();
         report.getTrips().remove(trip);
 
@@ -232,6 +237,10 @@ public class ExcavationReportService {
             List<Long> missingIds = tripIds.stream().filter(id -> !foundIds.contains(id)).toList();
             throw new ResourceNotFoundException("Không tìm thấy chuyến: " + missingIds);
         }
+
+        // Xóa reconciliation decisions liên quan trước
+        reconciliationDecisionRepository.findByExcavationReportTrip_IdIn(tripIds)
+                .forEach(reconciliationDecisionRepository::delete);
 
         // Nhóm chuyến theo report
         Map<Long, List<ExcavationReportTrip>> tripsByReport = trips.stream()

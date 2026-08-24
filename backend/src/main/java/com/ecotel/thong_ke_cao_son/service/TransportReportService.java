@@ -34,6 +34,7 @@ public class TransportReportService {
 
     private final TransportReportRepository transportReportRepository;
     private final TransportReportTripRepository transportReportTripRepository;
+    private final ReconciliationDecisionRepository reconciliationDecisionRepository;
     private final ShiftRepository shiftRepository;
     private final DeviceRepository deviceRepository;
     private final UserRepository userRepository;
@@ -223,6 +224,10 @@ public class TransportReportService {
         TransportReportTrip trip = transportReportTripRepository.findById(tripId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy chuyến: " + tripId));
 
+        // Xóa reconciliation decision liên quan trước
+        reconciliationDecisionRepository.findByTransportReportTrip_Id(tripId)
+                .ifPresent(reconciliationDecisionRepository::delete);
+
         TransportReport report = trip.getTransportReport();
         report.getTrips().remove(trip);
 
@@ -262,6 +267,10 @@ public class TransportReportService {
             List<Long> missingIds = tripIds.stream().filter(id -> !foundIds.contains(id)).toList();
             throw new ResourceNotFoundException("Không tìm thấy chuyến: " + missingIds);
         }
+
+        // Xóa reconciliation decisions liên quan trước
+        reconciliationDecisionRepository.findByTransportReportTrip_IdIn(tripIds)
+                .forEach(reconciliationDecisionRepository::delete);
 
         // Nhóm chuyến theo report
         Map<Long, List<TransportReportTrip>> tripsByReport = trips.stream()

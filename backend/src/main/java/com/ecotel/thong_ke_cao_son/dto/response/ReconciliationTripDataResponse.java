@@ -12,4 +12,5 @@ public class ReconciliationTripDataResponse {
     private LoadLevelType loadLevelType;
     private String loadLevelCustomValue;
     private String employeeSalaryCode;
+    private String employeeFullName;
 }
