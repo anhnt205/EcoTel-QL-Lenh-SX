@@ -32,6 +32,9 @@ export const API = {
     SEARCH: "/reconciliation",
     DECISIONS: "/reconciliation/decisions",
     DECISIONS_BULK: "/reconciliation/decisions/bulk",
+    TRIPS_BULK: "/reconciliation/trips/bulk",
+    REPORT_STATUS: "/reconciliation/report-status",
+    REPORT_STATUS_BATCH: "/reconciliation/report-status/batch",
     PRODUCTION: {
       LIST: "/v1/reconciliation/production",
       EXPORT: "/v1/reconciliation/export/production",

@@ -8,6 +8,7 @@ interface LoadStatusRadioGroupProps {
   onChange: (value: string, note: string) => void;
   onNoteChange: (note: string) => void;
   direction?: "row" | "column";
+  colorScheme?: "blue" | "emerald" | "sky";
 }
 
 // Dùng chung cho cả bảng Mining (radio ngang) và Transport (radio dọc)
@@ -17,8 +18,23 @@ export const LoadStatusRadioGroup: React.FC<LoadStatusRadioGroupProps> = ({
   onChange,
   onNoteChange,
   direction = "row",
+  colorScheme = "blue",
 }) => {
   const isRow = direction === "row";
+
+  const getActiveClass = () => {
+    if (colorScheme === "emerald") return "border-emerald-600 bg-emerald-600";
+    if (colorScheme === "sky") return "border-sky-600 bg-sky-600";
+    return "border-blue-600 bg-blue-600";
+  };
+
+  const getInactiveClass = () => {
+    if (colorScheme === "emerald")
+      return "border-emerald-300 dark:border-emerald-700 bg-white dark:bg-gray-900";
+    if (colorScheme === "sky")
+      return "border-sky-300 dark:border-sky-700 bg-white dark:bg-gray-900";
+    return "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900";
+  };
 
   return (
     <div
@@ -43,9 +59,7 @@ export const LoadStatusRadioGroup: React.FC<LoadStatusRadioGroupProps> = ({
               <div
                 onClick={() => onChange(opt.value, isNoteOption ? note : "")}
                 className={`${isRow ? "w-4 h-4" : "w-3.5 h-3.5"} rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${
-                  active
-                    ? "border-blue-600 bg-blue-600"
-                    : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900"
+                  active ? getActiveClass() : getInactiveClass()
                 }`}
               >
                 {active && (

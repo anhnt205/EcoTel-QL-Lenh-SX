@@ -30,9 +30,13 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { ROUTES } from "@/constants/routes";
+import { useRoleStore, ROLE_DETAILS } from "@/stores/useRoleStore";
+import type { RoleType } from "@/modules/dataentry/types/thong-ke";
+
 export function Header() {
   const { user, signOut } = useAuth();
   const { pathname } = useLocation();
+  const { currentRole, setRole } = useRoleStore();
 
   const navItemClass = (isActive: boolean) =>
     `flex items-center gap-1.5 px-3 py-1.5 rounded text-sm font-medium transition-colors hover:bg-white/15 ${
@@ -269,7 +273,8 @@ export function Header() {
             to={ROUTES.RECONCILIATION.TRIP_REPORT}
             className={({ isActive }) =>
               navItemClass(
-                isActive || pathname.startsWith(ROUTES.RECONCILIATION.TRIP_REPORT),
+                isActive ||
+                  pathname.startsWith(ROUTES.RECONCILIATION.TRIP_REPORT),
               )
             }
           >
@@ -426,42 +431,84 @@ export function Header() {
           </DropdownMenu>
         </div>
 
-        {/* Right Side: System Admin User Profile Dropdown */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              className="flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors hover:bg-white/15 outline-none cursor-pointer text-white h-auto py-1.5"
-            >
-              <User className="h-4.5 w-4.5" />
-              <span className="font-semibold">
-                {user?.fullName || "System Admin"}
-              </span>
-              <ChevronDown className="h-3.5 w-3.5 opacity-80" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent
-            align="end"
-            className="w-64 p-2 bg-white text-gray-800 shadow-xl border border-gray-200 rounded-xl"
-          >
-            <DropdownMenuLabel className="px-3 py-2 border-b border-gray-100">
-              <p className="text-sm font-bold text-gray-900">
-                {user?.fullName || "System Admin"}
-              </p>
-              <p className="text-xs text-emerald-700 font-medium mt-0.5">
-                {user?.app || "Thống kê Cao Sơn"}
-              </p>
-            </DropdownMenuLabel>
+        {/* Right Side Actions (User Profile) */}
+        <div className="flex items-center gap-2">
+          {/* Tạm ẩn thông báo theo yêu cầu */}
+          {/* <NotificationCenter
+            notifications={notifications}
+            onSelectNotification={handleSelectNotification}
+            onMarkAllAsRead={markAllAsRead}
+          /> */}
 
-            <DropdownMenuItem
-              onClick={() => signOut?.()}
-              className="flex items-center gap-2 px-3 py-2 mt-1 rounded-lg text-xs font-semibold text-rose-600 hover:bg-rose-50 cursor-pointer"
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="flex items-center gap-2 px-3 py-1.5 rounded text-sm font-semibold transition-all hover:bg-white/15 outline-none cursor-pointer text-white h-auto select-none">
+                <User className="h-4.5 w-4.5" />
+                <span>{user?.fullName || "System Admin"}</span>
+                <ChevronDown className="h-3.5 w-3.5 opacity-80" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              align="end"
+              className="w-64 p-2 bg-white text-gray-800 shadow-xl border border-gray-200 rounded-xl"
             >
-              <LogOut className="h-4 w-4" />
-              Đăng xuất hệ thống
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+              <DropdownMenuLabel className="px-3 py-2 border-b border-gray-100">
+                <p className="text-sm font-bold text-gray-900">
+                  {user?.fullName || "System Admin"}
+                </p>
+                <div className="flex items-center gap-1.5 mt-1.5">
+                  <span className="text-[11px] text-gray-500 font-medium">
+                    Vai trò:
+                  </span>
+                  <span
+                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                      ROLE_DETAILS[currentRole]?.badgeColor ||
+                      "bg-blue-600 text-white"
+                    }`}
+                  >
+                    {ROLE_DETAILS[currentRole]?.label || currentRole}
+                  </span>
+                </div>
+              </DropdownMenuLabel>
+
+              {/* Role Switcher Menu */}
+              <div className="py-1.5 px-1 border-b border-gray-100">
+                <p className="text-[10px] font-bold uppercase text-gray-400 px-2 py-1 tracking-wider">
+                  Chuyển vai trò test
+                </p>
+                {(Object.keys(ROLE_DETAILS) as RoleType[]).map((r) => {
+                  const isSelected = currentRole === r;
+                  return (
+                    <DropdownMenuItem
+                      key={r}
+                      onClick={() => setRole(r)}
+                      className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-medium cursor-pointer ${
+                        isSelected
+                          ? "bg-blue-50 text-blue-700 font-bold dark:bg-blue-950/50 dark:text-blue-300"
+                          : "hover:bg-gray-100 text-gray-700 dark:text-gray-300"
+                      }`}
+                    >
+                      <span>{ROLE_DETAILS[r].label}</span>
+                      {isSelected && (
+                        <span className="text-xs text-blue-600 font-bold">
+                          ✓
+                        </span>
+                      )}
+                    </DropdownMenuItem>
+                  );
+                })}
+              </div>
+
+              <DropdownMenuItem
+                onClick={() => signOut?.()}
+                className="flex items-center gap-2 px-3 py-2 mt-1 rounded-lg text-xs font-semibold text-rose-600 hover:bg-rose-50 cursor-pointer"
+              >
+                <LogOut className="h-4 w-4" />
+                Đăng xuất hệ thống
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
     </header>
   );

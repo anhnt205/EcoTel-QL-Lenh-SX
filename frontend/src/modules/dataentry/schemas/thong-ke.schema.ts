@@ -88,6 +88,8 @@ export const miningRecordRowSchema = z.object({
   vehicleNo: z.string({ message: 'Số xe không được để trống' })
     .trim()
     .min(1, 'Số xe không được để trống'),
+  vehicleManagementUnit: z.string().optional(),
+  vehicleType: z.string().optional(),
   tripCount: z.union([z.number(), z.string()])
     .transform((v) => Number(v))
     .refine((n) => !isNaN(n) && n >= 1, { message: 'Số chuyến phải lớn hơn hoặc bằng 1' }),
@@ -98,8 +100,6 @@ export const miningRecordRowSchema = z.object({
     .trim()
     .min(1, 'Tải trọng không được để trống'),
   loadStatusNote: z.string().optional(),
-  vehicleManagementUnit: z.string().optional(),
-  vehicleType: z.string().optional(),
 }).superRefine((data, ctx) => {
   if (data.loadStatus === 'Khác') {
     const note = data.loadStatusNote?.trim().replace(/\s+/g, '') || '';
@@ -132,6 +132,7 @@ export const miningSessionDraftSchema = z.object({
   excavator: z.string({ message: 'Máy xúc không được để trống' })
     .trim()
     .min(1, 'Máy xúc không được để trống'),
+  excavatorManagementUnit: z.string().optional(),
   totalScoops: z.union([z.number(), z.literal('')])
     .refine((v) => v !== '', { message: 'Tầng xúc không được để trống' })
     .refine((v) => typeof v === 'number' && v > 0, { message: 'Tầng xúc phải lớn hơn 0' }),
@@ -173,6 +174,7 @@ export const validateMiningSession = (
 };
 
 // 5. Schema cho Dòng chuyến Vận tải (Xe Vận Tải Batch Entry)
+// ponytail: Minimal transport trip schema without header vehicle fields
 export const transportTripRowSchema = z.object({
   excavationArea: z.string({ message: 'Khu vực xúc không được để trống' })
     .trim()
@@ -189,9 +191,6 @@ export const transportTripRowSchema = z.object({
   cargoType: z.string({ message: 'Loại hàng không được để trống' })
     .trim()
     .min(1, 'Loại hàng không được để trống'),
-  vehicleNo: z.string({ message: 'Số xe không được để trống' })
-    .trim()
-    .min(1, 'Số xe không được để trống'),
   tripCount: z.union([z.number(), z.string()])
     .transform((v) => Number(v))
     .refine((n) => !isNaN(n) && n >= 1, { message: 'Số chuyến phải lớn hơn hoặc bằng 1' }),
@@ -208,8 +207,6 @@ export const transportTripRowSchema = z.object({
   localSlopeDegree: z.union([z.number(), z.literal('')]).optional(),
   isRainyDay: z.boolean().optional(),
   isTraineeVehicle: z.boolean().optional(),
-  equipmentUnit: z.string().optional(),
-  vehicleType: z.string().optional(),
   cargoGroup: z.string({ message: 'Nhóm hàng không được để trống' })
     .trim()
     .min(1, 'Nhóm hàng không được để trống'),
@@ -239,6 +236,11 @@ export const transportSessionDraftSchema = z.object({
   shift: z.string({ message: 'Ca làm việc không được để trống' })
     .trim()
     .min(1, 'Ca làm việc không được để trống'),
+  vehicleNo: z.string({ message: 'Số xe không được để trống' })
+    .trim()
+    .min(1, 'Số xe không được để trống'),
+  equipmentUnit: z.string().optional(),
+  vehicleType: z.string().optional(),
   initialFuel: z.union([z.number(), z.literal('')])
     .refine((v) => v !== '', { message: 'Nhiên liệu tồn đầu không được để trống' })
     .refine((v) => typeof v === 'number' && v >= 0, { message: 'Nhiên liệu tồn đầu phải lớn hơn hoặc bằng 0' }),

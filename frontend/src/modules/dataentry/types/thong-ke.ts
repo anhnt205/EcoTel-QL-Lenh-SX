@@ -3,10 +3,20 @@
  */
 
 export type RoleType = "ROLE_TRANSPORT" | "ROLE_MINING" | "ROLE_STATISTICIAN";
+export type ReconcileWorkflowStatus =
+  "PENDING" | "APPROVED" | "REVISION_REQUESTED";
+export type DepartmentTarget = "MINING" | "TRANSPORT" | "BOTH";
+export type ApprovalStatus = "PENDING" | "APPROVED" | "REVISION_REQUESTED";
 
 // 2. Bản ghi Nhập liệu bên VẬN TẢI (Xe) - Header & Detail
 export interface TransportRecord {
   id?: string;
+  reportId?: number;
+  tripId?: number;
+  status?: ApprovalStatus;
+  note?: string;
+  changeRequestNote?: string;
+  year?: number;
   month?: number;
   day?: number;
   shift?: string; // Ca
@@ -14,12 +24,13 @@ export interface TransportRecord {
   vehicleNo?: string; // Số xe
   vehicleType?: string; // Chủng loại xe
   equipmentUnit?: string; // Đơn vị quản lý thiết bị
+  departmentId?: number;
+  departmentName?: string;
 
   operatorBadgeNo?: string; // Số thẻ lương
   operatorName?: string; // Họ và tên
   operatorUnit?: string; // Đơn vị công tác
-  departmentId?: number; // ID đơn vị báo cáo
-  departmentName?: string; // Tên đơn vị báo cáo
+  employeeFullName?: string; // Họ tên người nhập chuyến (nhập tay, độc lập với Số thẻ lương)
 
   isRainyDay?: boolean; // Ngày mưa
   isTraineeVehicle?: boolean; // Xe bổ túc
@@ -54,6 +65,7 @@ export interface TransportRecord {
   tripCount?: number; // Số chuyến
   loadStatus?: string; // Mức tải
   createdBy?: string; // Người nhập
+  createdByName?: string; // Tên người nhập chuyến
 
   // Additional fields used in UI & reconciliation
   fleet?: string;
@@ -70,12 +82,20 @@ export interface TransportRecord {
 export interface MiningRecord {
   // A. Thông tin chung ca
   id?: string;
+  reportId?: number;
+  tripId?: number;
+  status?: ApprovalStatus;
+  note?: string;
+  changeRequestNote?: string;
+  year?: number;
   month?: number;
   day?: number;
   shift?: string;
   miningUnit?: string; // Đơn vị khai thác (Danh mục)
   mineCode: string; // Máy xúc (Danh mục, VD: MX-01, EKG-5A)
   excavationBench?: string; // Tầng xúc (Danh mục / Text)
+  departmentId?: number;
+  departmentName?: string;
   // B. Chuyến xe nhận tải
   tripCount: number;
   transportVehicleNo?: string;
@@ -100,8 +120,7 @@ export interface MiningRecord {
   operatorBadgeNo?: string; // Số thẻ lương (Danh mục)
   operatorName?: string; // Họ và tên (Auto từ Số thẻ lương)
   operatorUnit?: string; // Đơn vị công tác (Auto từ Số thẻ lương)
-  departmentId?: number; // ID đơn vị báo cáo
-  departmentName?: string; // Tên đơn vị báo cáo
+  employeeFullName?: string; // Họ tên người nhập chuyến (nhập tay, độc lập với Số thẻ lương)
 
   // Trường tương thích cũ & UI
   vehicleNo?: string;
@@ -113,6 +132,7 @@ export interface MiningRecord {
   extraLoad?: string | number;
   createdAt?: string;
   createdBy?: string;
+  createdByName?: string; // Tên người nhập chuyến
 }
 
 // 4. View mode cho Batch Entry Form
@@ -143,4 +163,24 @@ export interface ReconciliationItem {
   transportRecord?: TransportRecord;
   miningRecord?: MiningRecord;
   status: MatchStatus;
+
+  // QTM / Workflow status
+  reconciliationStatus?: ReconcileWorkflowStatus;
+  requestNote?: string;
+  targetDepartment?: DepartmentTarget;
+  requestedAt?: string;
+  backendRow?: any;
+}
+
+export interface ReconciliationNotification {
+  id: string;
+  rowId: string;
+  vehicleNo: string;
+  shift: string;
+  workingDate: string;
+  senderName: string;
+  targetDepartment: DepartmentTarget;
+  message: string;
+  createdAt: string;
+  isRead: boolean;
 }

@@ -26,8 +26,10 @@ import { useFormTabNavigation } from "@/hooks/useFormTabNavigation.ts";
 import { useMiningDraftStore } from "@/modules/dataentry/store/useMiningDraftStore.ts";
 import {
   buildExcavationReportRequest,
+  buildExcavationTripRequestItem,
   useCreateExcavationTripReportMutation,
   useUpdateExcavationTripReportMutation,
+  useUpdateExcavationTripMutation,
   useBulkCreateExcavationTripReportMutation,
   useBulkUpdateExcavationTripReportMutation,
   type ExcavationTripReportRequest,
@@ -45,26 +47,28 @@ import { useModalShortcuts } from "../hooks/useModalShortcuts.ts";
 export interface TripRow {
   _tempId: string;
   vehicleNo: string; // Số xe
+  vehicleManagementUnit: string; // Phân xưởng vận tải (auto-fill theo số xe)
+  vehicleType: string; // Chủng loại xe (auto-fill theo số xe)
   tripCount: number | ""; // Số chuyến
   material: string; // Loại hàng
   loadStatus: string; // Tải trọng (radio)
   loadStatusNote: string; // Ghi chú khi "Khác" (vd: "1/2")
-  vehicleManagementUnit: string; // Đơn vị quản lý thiết bị (auto-fill theo số xe)
-  vehicleType: string; // Chủng loại xe (auto-fill theo số xe)
 }
 
 // ─── 1 bản ghi = 1 ca + 1 máy xúc ──────────────────────────────────────
 export interface MiningSessionDraft {
   _tempId: string;
   reportId?: number; // ID bản ghi trên Backend (nếu đang ở chế độ Chỉnh sửa)
+  singleTripId?: number; // ID chuyến đơn lẻ khi chỉnh sửa trực tiếp 1 chuyến
 
   // === Header (nhập 1 lần / ca / máy xúc) ===
   workingDate: string; // Thời gian (YYYY-MM-DD)
   shift: string; // Ca: "1" | "2" | "3"
-  department: string; // Đơn vị
+  department?: string; // Đơn vị
   pickupLocation: string; // Nơi chất tải
   excavator: string; // Máy xúc
-  totalScoops: number | ""; // Tổng xúc
+  excavatorManagementUnit: string; // Đơn vị quản lý thiết bị (máy xúc)
+  totalScoops: number | ""; // Tầng xúc
 
   // === Danh sách chuyến ===
   trips: TripRow[];
@@ -97,13 +101,13 @@ export const MiningBatchEntryModal: React.FC<MiningBatchEntryModalProps> = ({
 }) => {
   const {
     shiftOptions,
-    departmentValues,
     locationValues,
     excavatorValues,
     vehicleValues,
     cargoTypeValues,
     operatorOptions,
     getVehicleDetails,
+    getExcavatorDetails,
     getOperatorDetails,
     rawShifts,
     rawLocations,
@@ -115,6 +119,7 @@ export const MiningBatchEntryModal: React.FC<MiningBatchEntryModalProps> = ({
 
   const createReportMutation = useCreateExcavationTripReportMutation();
   const updateReportMutation = useUpdateExcavationTripReportMutation();
+  const updateExcavationTripMutation = useUpdateExcavationTripMutation();
   const bulkCreateReportMutation = useBulkCreateExcavationTripReportMutation();
   const bulkUpdateReportMutation = useBulkUpdateExcavationTripReportMutation();
 
@@ -141,9 +146,9 @@ export const MiningBatchEntryModal: React.FC<MiningBatchEntryModalProps> = ({
   // ── Cập nhật session header ─────────────────────────────────────────────
   const handleUpdateSession = useCallback(
     (patch: Partial<MiningSessionDraft>) => {
-      updateActiveSession(patch, getOperatorDetails);
+      updateActiveSession(patch, getOperatorDetails, getExcavatorDetails);
     },
-    [updateActiveSession, getOperatorDetails],
+    [updateActiveSession, getOperatorDetails, getExcavatorDetails],
   );
 
   // ── Cập nhật 1 dòng chuyến ──────────────────────────────────────────────
@@ -177,6 +182,41 @@ export const MiningBatchEntryModal: React.FC<MiningBatchEntryModalProps> = ({
 
   // ── Lưu tất cả ─────────────────────────────────────────────────────────
   const handleSave = async (andAddNew: boolean) => {
+    // Trường hợp chỉnh sửa 1 chuyến đơn lẻ (Single-trip edit mode)
+    if (sessions.length === 1 && sessions[0].singleTripId) {
+      const sess = sessions[0];
+      const tripRow = sess.trips[0];
+      if (!tripRow) {
+        toast.error("Không tìm thấy dữ liệu chuyến để cập nhật!");
+        return;
+      }
+      try {
+        const tripPayload = buildExcavationTripRequestItem(tripRow, {
+          rawVehicles,
+          rawCargoTypes,
+        });
+        await updateExcavationTripMutation.mutateAsync({
+          tripId: sess.singleTripId!,
+          payload: tripPayload,
+        });
+        toast.success("Đã cập nhật chuyến thành công!");
+        onSuccess();
+        if (andAddNew) {
+          initDrafts();
+        } else {
+          onClose();
+        }
+      } catch (err: any) {
+        console.error("[API Update Trip Error] Lỗi khi cập nhật chuyến:", err);
+        const msg =
+          err.response?.data?.message ||
+          err.message ||
+          "Lỗi kết nối máy chủ API";
+        toast.error(`Cập nhật chuyến thất bại: ${msg}`);
+      }
+      return;
+    }
+
     const validation = validateAllSessions();
     if (!validation.isValid) {
       toast.error(validation.firstErrorMsg || "Thông tin bản ghi chưa đầy đủ!");
@@ -346,7 +386,11 @@ export const MiningBatchEntryModal: React.FC<MiningBatchEntryModalProps> = ({
             onSelect={setActiveIdx}
             onRemove={removeSession}
             onAdd={addSession}
-            renderExtraLabel={(s) => (s.excavator ? ` – ${s.excavator}` : "")}
+            renderExtraLabel={(s) =>
+              s.excavator
+                ? ` – ${[s.excavator, s.trips?.[0]?.vehicleNo ? `Xe ${s.trips[0].vehicleNo}` : ""].filter(Boolean).join(" / ")}`
+                : ""
+            }
           />
         </div>
 
@@ -355,8 +399,8 @@ export const MiningBatchEntryModal: React.FC<MiningBatchEntryModalProps> = ({
           className="flex-1 overflow-y-auto px-5 py-4 space-y-5"
           onKeyDown={handleKeyDown}
         >
-          {/* ── HÀNG 1: Thời gian · Ca ───────────────────────────── */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-4">
+          {/* ── HÀNG THÔNG TIN CHUNG: Thời gian · Ca · Nơi chất tải · Máy xúc · Đơn vị QLTB · Tầng xúc ── */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
             {/* Thời gian */}
             <div className="flex flex-col gap-1">
               <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">
@@ -398,22 +442,6 @@ export const MiningBatchEntryModal: React.FC<MiningBatchEntryModalProps> = ({
               </Select>
             </div>
 
-            {/* Đơn vị */}
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">
-                Đơn vị
-              </label>
-              <ComboboxInput
-                options={departmentValues}
-                value={sess.department}
-                onChange={(v) => handleUpdateSession({ department: v })}
-                placeholder="Chọn đơn vị"
-              />
-            </div>
-          </div>
-
-          {/* ── HÀNG 2: Nơi chất tải · Máy xúc · Tổng xúc ── */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {/* Nơi chất tải */}
             <div className="flex flex-col gap-1">
               <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">
@@ -423,7 +451,7 @@ export const MiningBatchEntryModal: React.FC<MiningBatchEntryModalProps> = ({
                 options={locationValues}
                 value={sess.pickupLocation}
                 onChange={(v) => handleUpdateSession({ pickupLocation: v })}
-                placeholder=""
+                placeholder="Chọn nơi chất tải"
               />
             </div>
 
@@ -436,7 +464,22 @@ export const MiningBatchEntryModal: React.FC<MiningBatchEntryModalProps> = ({
                 options={excavatorValues}
                 value={sess.excavator}
                 onChange={(v) => handleUpdateSession({ excavator: v })}
-                placeholder=""
+                placeholder="Chọn máy xúc"
+              />
+            </div>
+
+            {/* Đơn vị quản lý thiết bị (của máy xúc - tự động, readonly) */}
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+                Đơn vị quản lý thiết bị
+              </label>
+              <Input
+                type="text"
+                value={sess.excavatorManagementUnit || ""}
+                readOnly
+                disabled
+                title={sess.excavatorManagementUnit}
+                className="h-9 text-sm bg-gray-100 dark:bg-gray-800 cursor-not-allowed border-gray-200 dark:border-gray-700 truncate"
               />
             </div>
 
@@ -483,31 +526,29 @@ export const MiningBatchEntryModal: React.FC<MiningBatchEntryModalProps> = ({
 
             {/* Bảng */}
             <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-x-auto">
-              <table className="w-full text-xs border-collapse min-w-[1020px]">
+              <table className="w-full text-xs border-collapse min-w-[1000px]">
                 <thead>
                   <tr className="bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-100 text-sm font-bold border-b border-gray-200 dark:border-gray-700">
                     <th className="px-3 py-2.5 border-r border-b border-gray-200 dark:border-gray-700 text-center w-10">
                       STT
                     </th>
-                    <th className="px-3 py-2.5 border-r border-b border-gray-200 dark:border-gray-700 text-left min-w-[145px]">
+                    <th className="px-3 py-2.5 border-r border-b border-gray-200 dark:border-gray-700 text-left min-w-[130px]">
                       Số xe <span className="text-red-500">*</span>
                     </th>
-                    <th className="px-3 py-2.5 border-r border-b border-gray-200 dark:border-gray-700 text-center min-w-[110px]">
+                    <th className="px-3 py-2.5 border-r border-b border-gray-200 dark:border-gray-700 text-left min-w-[160px]">
+                      Phân xưởng vận tải
+                    </th>
+                    <th className="px-3 py-2.5 border-r border-b border-gray-200 dark:border-gray-700 text-left min-w-[130px]">
+                      Chủng loại xe
+                    </th>
+                    <th className="px-3 py-2.5 border-r border-b border-gray-200 dark:border-gray-700 text-center min-w-[100px]">
                       Số chuyến <span className="text-red-500">*</span>
                     </th>
-                    <th className="px-3 py-2.5 border-r border-b border-gray-200 dark:border-gray-700 text-left min-w-[170px]">
+                    <th className="px-3 py-2.5 border-r border-b border-gray-200 dark:border-gray-700 text-left min-w-[160px]">
                       Loại hàng <span className="text-red-500">*</span>
                     </th>
                     <th className="px-3 py-2.5 border-r border-b border-gray-200 dark:border-gray-700 text-center min-w-[300px]">
                       Tải trọng <span className="text-red-500">*</span>
-                    </th>
-                    <th className="px-3 py-2.5 border-r border-b border-gray-200 dark:border-gray-700 text-center min-w-[170px]">
-                      Đơn vị quản lý
-                      <br />
-                      thiết bị
-                    </th>
-                    <th className="px-3 py-2.5 border-r border-b border-gray-200 dark:border-gray-700 text-center min-w-[140px]">
-                      Chủng loại xe
                     </th>
                     <th className="px-2 py-2.5 border-b border-gray-200 dark:border-gray-700 text-center w-10" />
                   </tr>
@@ -528,7 +569,7 @@ export const MiningBatchEntryModal: React.FC<MiningBatchEntryModalProps> = ({
                         {tIdx + 1}
                       </td>
 
-                      {/* Số xe — ComboboxInput */}
+                      {/* Số xe */}
                       <td className="px-2 py-1.5 border-r border-b border-gray-200 dark:border-gray-700">
                         <ComboboxInput
                           options={vehicleValues}
@@ -536,7 +577,31 @@ export const MiningBatchEntryModal: React.FC<MiningBatchEntryModalProps> = ({
                           onChange={(v) =>
                             handleUpdateTrip(tIdx, { vehicleNo: v })
                           }
-                          placeholder=""
+                          placeholder="Chọn số xe"
+                        />
+                      </td>
+
+                      {/* Phân xưởng vận tải (tự động theo số xe) */}
+                      <td className="px-2 py-1.5 border-r border-b border-gray-200 dark:border-gray-700">
+                        <Input
+                          type="text"
+                          value={trip.vehicleManagementUnit || ""}
+                          readOnly
+                          disabled
+                          title={trip.vehicleManagementUnit}
+                          className="h-8 text-xs bg-gray-100 dark:bg-gray-800 cursor-not-allowed border-gray-200 dark:border-gray-700 truncate"
+                        />
+                      </td>
+
+                      {/* Chủng loại xe (tự động theo số xe) */}
+                      <td className="px-2 py-1.5 border-r border-b border-gray-200 dark:border-gray-700">
+                        <Input
+                          type="text"
+                          value={trip.vehicleType || ""}
+                          readOnly
+                          disabled
+                          title={trip.vehicleType}
+                          className="h-8 text-xs bg-gray-100 dark:bg-gray-800 cursor-not-allowed border-gray-200 dark:border-gray-700 truncate"
                         />
                       </td>
 
@@ -585,29 +650,6 @@ export const MiningBatchEntryModal: React.FC<MiningBatchEntryModalProps> = ({
                           onNoteChange={(loadStatusNote) =>
                             handleUpdateTrip(tIdx, { loadStatusNote })
                           }
-                        />
-                      </td>
-
-                      {/* Đơn vị QL thiết bị (auto-fill, readonly) */}
-                      <td className="px-2 py-1.5 border-r border-b border-gray-200 dark:border-gray-700 min-w-[150px]">
-                        <Input
-                          type="text"
-                          value={trip.vehicleManagementUnit}
-                          readOnly
-                          disabled
-                          title={trip.vehicleManagementUnit}
-                          className="h-auto min-h-[32px] text-xs bg-gray-100 dark:bg-gray-800 text-center cursor-not-allowed border-gray-200 dark:border-gray-700 py-1 px-1.5 whitespace-normal break-words leading-tight"
-                        />
-                      </td>
-
-                      {/* Chủng loại xe (auto-fill, readonly) */}
-                      <td className="px-2 py-1.5 border-r border-b border-gray-200 dark:border-gray-700">
-                        <Input
-                          type="text"
-                          value={trip.vehicleType}
-                          readOnly
-                          disabled
-                          className="h-8 text-xs bg-gray-100 dark:bg-gray-800 text-center cursor-not-allowed border-gray-200 dark:border-gray-700"
                         />
                       </td>
 

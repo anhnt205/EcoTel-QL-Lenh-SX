@@ -27,9 +27,11 @@ import { useTransportDraftStore } from "@/modules/dataentry/store/useTransportDr
 import {
   useCreateTransportReportMutation,
   useUpdateTransportReportMutation,
+  useUpdateTransportTripMutation,
   useBulkCreateTransportReportMutation,
   useBulkUpdateTransportReportMutation,
   buildTransportReportRequest,
+  buildTransportTripRequestItem,
   type TransportReportRequest,
   type TransportReportBulkUpdateItem,
 } from "@/modules/dataentry/services/transportTripReportService";
@@ -41,6 +43,7 @@ import { ModalFooterActions } from "./ModalFooterActions.tsx";
 import { useModalShortcuts } from "../hooks/useModalShortcuts.ts";
 
 // ─── 1 dòng chuyến xe trong bảng Danh sách chuyến ────────────────────────
+// ponytail: trip row contains only trip data, vehicle moved to session header
 export interface TransportTripRow {
   _tempId: string;
   excavationArea: string; // Khu vực xúc
@@ -56,25 +59,26 @@ export interface TransportTripRow {
   unloadLocationName: string; // Nơi dỡ tải
   cargoType: string; // Loại hàng
   cargoGroup: string; // Nhóm hàng (tự động)
-  vehicleNo: string; // Số xe
   tripCount: number | ""; // Số chuyến
   loadStatus: string; // Tải trọng (radio)
   loadStatusNote: string; // Ghi chú khi "Khác" (vd: "2/3", "1/2")
   isRainyDay: boolean; // Ngày mưa
   isTraineeVehicle: boolean; // Xe bổ túc
-  equipmentUnit: string; // Đơn vị quản lý thiết bị (tự động theo số xe)
-  vehicleType: string; // Chủng loại (tự động theo số xe)
 }
 
 // ─── 1 bản ghi = 1 ca phân xưởng vận tải ─────────────────────────────────
 export interface TransportSessionDraft {
   _tempId: string;
   reportId?: number; // ID báo cáo khi chỉnh sửa từ API Backend
+  singleTripId?: number; // ID chuyến đơn lẻ khi chỉnh sửa trực tiếp 1 chuyến
 
   // === Header (Thông tin chung) ===
   workingDate: string; // YYYY-MM-DD
   shift: string; // Ca: "1" | "2" | "3"
-  department: string; // Đơn vị
+  department?: string; // Đơn vị
+  vehicleNo: string; // Số xe
+  equipmentUnit: string; // Đơn vị quản lý thiết bị (tự động theo số xe)
+  vehicleType: string; // Chủng loại xe (tự động theo số xe)
 
   // === Danh sách chuyến ===
   trips: TransportTripRow[];
@@ -119,7 +123,6 @@ export const TransportHeaderDetailModal: React.FC<
   const masterData = useMasterData({ enabled: isOpen });
   const {
     shiftOptions,
-    departmentValues,
     locationValues,
     excavatorValues,
     vehicleValues,
@@ -140,6 +143,7 @@ export const TransportHeaderDetailModal: React.FC<
 
   const createReportMutation = useCreateTransportReportMutation();
   const updateReportMutation = useUpdateTransportReportMutation();
+  const updateTransportTripMutation = useUpdateTransportTripMutation();
   const bulkCreateReportMutation = useBulkCreateTransportReportMutation();
   const bulkUpdateReportMutation = useBulkUpdateTransportReportMutation();
 
@@ -179,14 +183,11 @@ export const TransportHeaderDetailModal: React.FC<
         unloadLocationName: "",
         cargoType: "",
         cargoGroup: "",
-        vehicleNo: "",
         tripCount: "",
         loadStatus: "Đủ tải",
         loadStatusNote: "",
         isRainyDay: false,
         isTraineeVehicle: false,
-        equipmentUnit: "",
-        vehicleType: "",
       };
     },
     [],
@@ -200,6 +201,9 @@ export const TransportHeaderDetailModal: React.FC<
       workingDate: todayStr(),
       shift: firstShift,
       department: "",
+      vehicleNo: "",
+      equipmentUnit: "",
+      vehicleType: "",
       trips: [createDefaultTripRow()],
       initialFuel: "",
       receivedFuel: "",
@@ -213,14 +217,9 @@ export const TransportHeaderDetailModal: React.FC<
   const tableBottomRef = useRef<HTMLDivElement>(null);
 
   // ── Khởi tạo dữ liệu khi mở modal ───────────────────────────────────────
-  // Nếu store đang rỗng (trường hợp "Thêm chuyến (F3)" mở modal mà không đi
-  // qua handleEditSelected để loadSessionsForEdit trước), tự động tạo 1 bản
-  // ghi mặc định để form hiển thị được (nếu không, sess sẽ là undefined và
-  // component return null → không thấy gì, không bấm được nút nào cả).
   const wasOpenRef = useRef(false);
   useEffect(() => {
     if (isOpen && !wasOpenRef.current) {
-      // Vừa chuyển từ đóng → mở
       if (mode === "add") {
         initDrafts(createDefaultSession());
       } else {
@@ -236,17 +235,17 @@ export const TransportHeaderDetailModal: React.FC<
   // ── Cập nhật session header ─────────────────────────────────────────────
   const handleUpdateSession = useCallback(
     (patch: Partial<TransportSessionDraft>) => {
-      updateActiveSession(patch, getOperatorDetails);
+      updateActiveSession(patch, getOperatorDetails, getVehicleDetails);
     },
-    [updateActiveSession, getOperatorDetails],
+    [updateActiveSession, getOperatorDetails, getVehicleDetails],
   );
 
   // ── Cập nhật 1 dòng chuyến ──────────────────────────────────────────────
   const handleUpdateTrip = useCallback(
     (tIdx: number, patch: Partial<TransportTripRow>) => {
-      updateTripRow(tIdx, patch, getVehicleDetails, getCargoGroupDetails);
+      updateTripRow(tIdx, patch, getCargoGroupDetails);
     },
-    [updateTripRow, getVehicleDetails, getCargoGroupDetails],
+    [updateTripRow, getCargoGroupDetails],
   );
 
   // ── Thêm / xóa dòng chuyến ─────────────────────────────────────────────
@@ -277,6 +276,43 @@ export const TransportHeaderDetailModal: React.FC<
 
   // ── Lưu tất cả ─────────────────────────────────────────────────────────
   const handleSave = async (andAddNew: boolean) => {
+    // Trường hợp chỉnh sửa 1 chuyến đơn lẻ (Single-trip edit mode)
+    if (sessions.length === 1 && sessions[0].singleTripId) {
+      const sess = sessions[0];
+      const tripRow = sess.trips[0];
+      if (!tripRow) {
+        toast.error("Không tìm thấy dữ liệu chuyến để cập nhật!");
+        return;
+      }
+      try {
+        const tripPayload = buildTransportTripRequestItem(tripRow, {
+          rawLocations,
+          rawExcavators,
+          rawCargoTypes,
+          rawDepartments,
+        });
+        await updateTransportTripMutation.mutateAsync({
+          tripId: sess.singleTripId!,
+          payload: tripPayload,
+        });
+        toast.success("Đã cập nhật chuyến thành công!");
+        onSuccess();
+        if (andAddNew) {
+          initDrafts(createDefaultSession());
+        } else {
+          onClose();
+        }
+      } catch (err: any) {
+        console.error("[API Update Trip Error] Lỗi khi cập nhật chuyến:", err);
+        const msg =
+          err.response?.data?.message ||
+          err.message ||
+          "Lỗi kết nối máy chủ API";
+        toast.error(`Cập nhật chuyến thất bại: ${msg}`);
+      }
+      return;
+    }
+
     const validation = validateAllSessions();
     if (!validation.isValid) {
       toast.error(validation.firstErrorMsg || "Thông tin bản ghi chưa đầy đủ!");
@@ -453,6 +489,7 @@ export const TransportHeaderDetailModal: React.FC<
             onSelect={setActiveIdx}
             onRemove={removeSession}
             onAdd={handleAddSessionAction}
+            renderExtraLabel={(s) => (s.vehicleNo ? ` – Xe ${s.vehicleNo}` : "")}
             progressLabel="Tiến độ nhập lô:"
           />
         </div>
@@ -462,8 +499,8 @@ export const TransportHeaderDetailModal: React.FC<
           className="flex-1 overflow-y-auto px-5 py-4 space-y-5"
           onKeyDown={handleKeyDown}
         >
-          {/* ── HÀNG THÔNG TIN CHUNG: Thời gian · Ca ─────────────────── */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-4">
+          {/* ── HÀNG THÔNG TIN CHUNG: Thời gian · Ca · Số xe · Đơn vị QLTB · Chủng loại ── */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
             {/* Thời gian */}
             <div className="flex flex-col gap-1">
               <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">
@@ -505,16 +542,45 @@ export const TransportHeaderDetailModal: React.FC<
               </Select>
             </div>
 
-            {/* Đơn vị */}
+            {/* Số xe */}
             <div className="flex flex-col gap-1">
               <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">
-                Đơn vị
+                Số xe <span className="text-red-500">*</span>
               </label>
               <ComboboxInput
-                options={departmentValues}
-                value={sess.department}
-                onChange={(v) => handleUpdateSession({ department: v })}
-                placeholder="Chọn đơn vị"
+                options={vehicleValues}
+                value={sess.vehicleNo}
+                onChange={(v) => handleUpdateSession({ vehicleNo: v })}
+                placeholder="Chọn số xe"
+              />
+            </div>
+
+            {/* Đơn vị quản lý thiết bị (tự động, readonly) */}
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+                Đơn vị quản lý thiết bị
+              </label>
+              <Input
+                type="text"
+                value={sess.equipmentUnit || ""}
+                readOnly
+                disabled
+                title={sess.equipmentUnit}
+                className="h-9 text-sm bg-gray-100 dark:bg-gray-800 cursor-not-allowed border-gray-200 dark:border-gray-700 truncate"
+              />
+            </div>
+
+            {/* Chủng loại (tự động, readonly) */}
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+                Chủng loại
+              </label>
+              <Input
+                type="text"
+                value={sess.vehicleType || ""}
+                readOnly
+                disabled
+                className="h-9 text-sm bg-gray-100 dark:bg-gray-800 cursor-not-allowed border-gray-200 dark:border-gray-700 truncate"
               />
             </div>
           </div>
@@ -542,7 +608,7 @@ export const TransportHeaderDetailModal: React.FC<
 
             {/* Bảng chuyến vận tải */}
             <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-x-auto">
-              <table className="w-full text-xs border-collapse min-w-[2180px]">
+              <table className="w-full text-xs border-collapse min-w-[1760px]">
                 <thead>
                   <tr className="bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-100 text-sm font-bold border-b border-gray-200 dark:border-gray-700">
                     <th className="px-2 py-2 border-r border-b border-gray-200 dark:border-gray-700 text-center w-10">
@@ -593,9 +659,6 @@ export const TransportHeaderDetailModal: React.FC<
                     <th className="px-2 py-2 border-r border-b border-gray-200 dark:border-gray-700 text-left min-w-[130px]">
                       Loại hàng
                     </th>
-                    <th className="px-2 py-2 border-r border-b border-gray-200 dark:border-gray-700 text-left min-w-[140px]">
-                      Số xe
-                    </th>
                     <th className="px-2 py-2 border-r border-b border-gray-200 dark:border-gray-700 text-center min-w-[105px]">
                       Số chuyến
                     </th>
@@ -607,14 +670,6 @@ export const TransportHeaderDetailModal: React.FC<
                     </th>
                     <th className="px-2 py-2 border-r border-b border-gray-200 dark:border-gray-700 text-center min-w-[80px]">
                       Xe bổ túc
-                    </th>
-                    <th className="px-2 py-2 border-r border-b border-gray-200 dark:border-gray-700 text-center min-w-[160px]">
-                      Đơn vị quản lý
-                      <br />
-                      thiết bị
-                    </th>
-                    <th className="px-2 py-2 border-r border-b border-gray-200 dark:border-gray-700 text-center min-w-[120px]">
-                      Chủng loại
                     </th>
                     <th className="px-2 py-2 border-b border-gray-200 dark:border-gray-700 text-center w-15" />
                   </tr>
@@ -830,18 +885,6 @@ export const TransportHeaderDetailModal: React.FC<
                           />
                         </td>
 
-                        {/* Số xe */}
-                        <td className="px-1.5 py-1.5 border-r border-b border-gray-200 dark:border-gray-700">
-                          <ComboboxInput
-                            options={vehicleValues}
-                            value={trip.vehicleNo}
-                            onChange={(v) =>
-                              handleUpdateTrip(tIdx, { vehicleNo: v })
-                            }
-                            placeholder=""
-                          />
-                        </td>
-
                         {/* Số chuyến */}
                         <td className="px-1 py-1.5 border-r border-b border-gray-200 dark:border-gray-700 min-w-[80px] ">
                           <div className="flex items-center justify-center h-full">
@@ -908,29 +951,6 @@ export const TransportHeaderDetailModal: React.FC<
                               }
                             />
                           </div>
-                        </td>
-
-                        {/* Đơn vị quản lý thiết bị (tự động, readonly) */}
-                        <td className="px-1.5 py-1.5 border-r border-b border-gray-200 dark:border-gray-700 min-w-[150px]">
-                          <Input
-                            type="text"
-                            value={trip.equipmentUnit}
-                            readOnly
-                            disabled
-                            title={trip.equipmentUnit}
-                            className="h-auto min-h-[32px] text-xs bg-gray-100 dark:bg-gray-800 text-center cursor-not-allowed border-gray-200 dark:border-gray-700 py-1 px-1.5 whitespace-normal break-words leading-tight"
-                          />
-                        </td>
-
-                        {/* Chủng loại (tự động, readonly) */}
-                        <td className="px-1.5 py-1.5 border-r border-b border-gray-200 dark:border-gray-700">
-                          <Input
-                            type="text"
-                            value={trip.vehicleType}
-                            readOnly
-                            disabled
-                            className="h-8 text-xs bg-gray-100 dark:bg-gray-800 text-center cursor-not-allowed border-gray-200 dark:border-gray-700"
-                          />
                         </td>
 
                         {/* Nút xóa dòng */}

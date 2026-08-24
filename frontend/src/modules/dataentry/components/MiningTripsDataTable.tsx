@@ -143,18 +143,18 @@ export const MiningTripsDataTable: React.FC<MiningTripsDataTableProps> = ({
               <col key={column.id} style={{ width: column.getSize() }} />
             ))}
           </colgroup>
-          <TableHeader>
+          <TableHeader className="bg-blue-500 dark:bg-blue-500">
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow
                 key={headerGroup.id}
-                className="bg-gray-50 dark:bg-gray-900/80 text-gray-800 dark:text-gray-100 text-sm font-bold border-b border-gray-200 dark:border-gray-800"
+                className="bg-blue-500 hover:bg-blue-500 dark:bg-blue-500 dark:hover:bg-blue-500 text-white text-sm font-bold border-b border-blue-600 dark:border-blue-600"
               >
                 {headerGroup.headers.map((header) => (
                   <TableHead
                     key={header.id}
                     colSpan={header.colSpan}
                     style={{ width: header.getSize() }}
-                    className="px-1.5 py-1.5 text-center border-r border-gray-200 dark:border-gray-800 whitespace-normal break-words leading-tight align-middle min-h-[36px] overflow-hidden"
+                    className="px-1.5 py-1.5 text-center border-r border-blue-400/60 dark:border-blue-400/60 text-white font-bold whitespace-normal break-words leading-tight align-middle min-h-[36px] overflow-hidden [&_button]:text-white [&_button]:hover:text-white [&_button]:hover:bg-blue-600/50"
                   >
                     {header.isPlaceholder
                       ? null

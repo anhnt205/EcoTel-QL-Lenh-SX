@@ -1,10 +1,13 @@
-import React, { useEffect, useState, useMemo, useRef } from "react";
+import React, { useState, useMemo } from "react";
 import type { TransportRecord } from "@/modules/dataentry/types/thong-ke";
 import {
   useTransportReportsQuery,
   fetchTransportReportById,
   mapReportResponseToDraft,
+  fetchTransportTripById,
+  mapTransportTripResponseToDraft,
   useBulkDeleteTransportReportMutation,
+  useBulkDeleteTransportTripsMutation,
   importTransportReports,
   exportTransportReports,
   type TransportReportResponse,
@@ -13,7 +16,10 @@ import { useTransportDraftStore } from "@/modules/dataentry/store/useTransportDr
 import { BatchEntryModal } from "@/modules/dataentry/components/BatchEntryModal.tsx";
 import { TransportTripsDataTable } from "@/modules/dataentry/components/TransportTripsDataTable";
 import { TransportFuelDataTable } from "@/modules/dataentry/components/TransportFuelDataTable";
-import { Button } from "@/components/ui/button";
+import { EntryPageHeader } from "@/modules/dataentry/components/EntryPageHeader";
+import { FilterResetButton } from "@/modules/dataentry/components/FilterResetButton";
+import { useEntryPageLogic } from "@/modules/dataentry/hooks/useEntryPageLogic";
+import { useMasterData } from "@/modules/dataentry/hooks/useMasterData";
 import { Input } from "@/components/ui/input";
 import {
   Combobox,
@@ -28,31 +34,13 @@ import {
   useComboboxAnchor,
 } from "@/components/ui/combobox";
 import { DatePickerString } from "@/components/common/DatePickerString";
-import {
-  Upload,
-  Download,
-  Plus,
-  Pencil,
-  Search,
-  RefreshCw,
-  Trash2,
-  FileSpreadsheet,
-  Truck,
-  Fuel,
-} from "lucide-react";
+import { Search, Truck, Fuel, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
-import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 
 export const TransportEntryPage: React.FC = () => {
   const role = "ROLE_TRANSPORT";
   const shiftAnchorRef = useComboboxAnchor();
   const vehicleAnchorRef = useComboboxAnchor();
-
-  const [isEntryModalOpen, setIsEntryModalOpen] = useState(false);
-  const [entryModalMode, setEntryModalMode] = useState<"add" | "edit">("add");
-  const [isImporting, setIsImporting] = useState(false);
-  const [isExporting, setIsExporting] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // ── Main Top Filters ─────────────────────────────────────────────────────
   const [startDate, setStartDate] = useState("2026-08-01");
@@ -60,6 +48,38 @@ export const TransportEntryPage: React.FC = () => {
   const [selectedShifts, setSelectedShifts] = useState<string[]>([]);
   const [selectedVehicles, setSelectedVehicles] = useState<string[]>([]);
   const [searchKeyword, setSearchKeyword] = useState("");
+
+  const masterData = useMasterData();
+  const { rawShifts = [], rawVehicles = [] } = masterData;
+
+  const shiftIds = useMemo(() => {
+    if (!selectedShifts.length) return;
+
+    return rawShifts
+        .filter(({ name, id }) => {
+          const rawName = String(name ?? "").trim();
+          const cleanNum = rawName.replace(/^ca\s+/i, "").trim();
+
+          return [rawName, cleanNum, `Ca ${cleanNum}`, String(id)]
+              .some((val) => selectedShifts.includes(val));
+        })
+        .map((s) => s.id);
+  }, [selectedShifts, rawShifts]);
+
+  const deviceIds = useMemo(() => {
+    if (!selectedVehicles.length) return;
+
+    const ids = rawVehicles
+        .filter(({ code, vehicleNumber, name }) =>
+            [code, vehicleNumber, name].some((val) =>
+                val ? selectedVehicles.includes(val) : false
+            )
+        )
+        .map((v) => v.id);
+
+    return ids.length ? ids : undefined;
+  }, [selectedVehicles, rawVehicles]);
+
 
   // ── Table 1 Inline Header Filters ─────────────────────────────────────────
   const [colArea, setColArea] = useState("ALL");
@@ -74,24 +94,16 @@ export const TransportEntryPage: React.FC = () => {
   const [colOperatorUnit, setColOperatorUnit] = useState("ALL");
   const [colCreatedBy, setColCreatedBy] = useState("ALL");
 
-  // ── Row selection states ──────────────────────────────────────────────────
-  const [selectedTripIds, setSelectedTripIds] = useState<Set<string>>(
-    new Set(),
-  );
-  const [selectedFuelIds, setSelectedFuelIds] = useState<Set<string>>(
-    new Set(),
-  );
-
   // ── Query Backend API ───────────────────────────────────────────────────
-  const {
-    data: apiResponse,
-    refetch,
-  } = useTransportReportsQuery({
+  const { data: apiResponse, refetch } = useTransportReportsQuery({
     fromDate: startDate,
     toDate: endDate,
+    shiftIds,
+    deviceIds,
   });
 
   const bulkDeleteReportMutation = useBulkDeleteTransportReportMutation();
+  const bulkDeleteTripsMutation = useBulkDeleteTransportTripsMutation();
   const { loadSessionsForEdit } = useTransportDraftStore();
 
   const reportsList = useMemo<TransportReportResponse[]>(() => {
@@ -108,20 +120,33 @@ export const TransportEntryPage: React.FC = () => {
 
     reportsList.forEach((report) => {
       const d = new Date(report.reportDate);
-      const month = d.getMonth() + 1;
-      const day = d.getDate();
+      const year = !isNaN(d.getTime()) ? d.getFullYear() : undefined;
+      const month = !isNaN(d.getTime()) ? d.getMonth() + 1 : undefined;
+      const day = !isNaN(d.getTime()) ? d.getDate() : undefined;
       const rawShift = String(report.shiftName || report.shiftId || "");
       const shiftStr = rawShift.replace(/^ca\s+/i, "").trim();
 
-      (report.trips || []).forEach((t) => {
+      (report.trips || []).forEach((t, tIdx) => {
         const record: TransportRecord = {
-          id: String(report.id),
+          id: t.id ? `trip_${t.id}` : `rep_${report.id}_trip_${tIdx}`,
+          reportId: report.id,
+          tripId: t.id,
+          status: t.status || "PENDING",
+          note: t.note,
+          year,
           month,
           day,
           shift: shiftStr,
-          vehicleNo: t.vehicleCode || t.vehicleName || "",
-          vehicleType: t.vehicleCategoryName || "",
-          equipmentUnit: t.vehicleDepartmentName || "",
+          vehicleNo:
+            report.vehicleCode ||
+            report.vehicleName ||
+            t.vehicleCode ||
+            t.vehicleName ||
+            "",
+          vehicleType:
+            report.vehicleCategoryName || t.vehicleCategoryName || "",
+          equipmentUnit:
+            report.vehicleDepartmentName || t.vehicleDepartmentName || "",
           operatorBadgeNo: report.employeeSalaryCode || "",
           operatorName: report.employeeFullName || "",
           operatorUnit: report.employeeDepartmentName || "",
@@ -159,9 +184,10 @@ export const TransportEntryPage: React.FC = () => {
             t.loadLevelType === "OTHER"
               ? `Khác${t.loadLevelCustomValue ? ` (${t.loadLevelCustomValue})` : ""}`
               : t.loadLevelType === "RODA_2_3"
-              ? "Roda (2/3)"
-              : "Đủ tải",
+                ? "Roda (2/3)"
+                : "Đủ tải",
           createdBy: report.employeeFullName || report.employeeSalaryCode || "",
+          createdAt: report.reportDate,
         };
         list.push(record);
       });
@@ -170,40 +196,15 @@ export const TransportEntryPage: React.FC = () => {
     return list;
   }, [reportsList]);
 
-  // F3 shortcut to open Add Trip modal
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "F3") {
-        e.preventDefault();
-        setEntryModalMode("add");
-        setIsEntryModalOpen(true);
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
-
   // ── Filtered Records ─────────────────────────────────────────────────────
   const filteredRecords = useMemo(() => {
     return records.filter((r) => {
       // Date range filter
       if (r.month && r.day) {
-        const rYear = 2026;
+        const rYear = r.year || new Date().getFullYear();
         const rDateStr = `${rYear}-${String(r.month).padStart(2, "0")}-${String(r.day).padStart(2, "0")}`;
         if (startDate && rDateStr < startDate) return false;
         if (endDate && rDateStr > endDate) return false;
-      }
-
-      // Shift filter (Multi-select)
-      if (selectedShifts.length > 0) {
-        const s = r.shift || "";
-        if (!selectedShifts.includes(s)) return false;
-      }
-
-      // Vehicle filter (Multi-select)
-      if (selectedVehicles.length > 0) {
-        const v = r.vehicleNo || "";
-        if (!selectedVehicles.includes(v)) return false;
       }
 
       // Inline column filters
@@ -248,8 +249,6 @@ export const TransportEntryPage: React.FC = () => {
     records,
     startDate,
     endDate,
-    selectedShifts,
-    selectedVehicles,
     colArea,
     colExcavator,
     colPickup,
@@ -263,19 +262,7 @@ export const TransportEntryPage: React.FC = () => {
     colCreatedBy,
     searchKeyword,
   ]);
-
-  // Unique values for filter dropdowns
-  const uniqueShifts = useMemo(() => {
-    const set = new Set(records.map((r) => r.shift).filter(Boolean));
-    return Array.from(set).map(String);
-  }, [records]);
-
-  const uniqueVehicles = useMemo(() => {
-    const set = new Set(records.map((r) => r.vehicleNo).filter(Boolean));
-    return Array.from(set).map(String);
-  }, [records]);
-
-  const handleResetFilters = () => {
+  const handleResetFilters = async () => {
     setStartDate("2026-08-01");
     setEndDate("2026-08-31");
     setSelectedShifts([]);
@@ -292,12 +279,17 @@ export const TransportEntryPage: React.FC = () => {
     setColOperatorUnit("ALL");
     setColCreatedBy("ALL");
     setSearchKeyword("");
-    refetch();
+    await refetch();
     toast.info("Đã làm mới các bộ lọc!");
   };
 
   // ── Table 1 Rows (Báo chuyến) ────────────────────────────────────────────
   const tripRows = filteredRecords;
+
+  // ── Số lượng bản ghi cần sửa ────────────────────────────────────────────
+  const changesRequestedCount = useMemo(() => {
+    return tripRows.filter((r) => r.status === "REVISION_REQUESTED").length;
+  }, [tripRows]);
 
   // ── Table 2 Rows (Báo nhiên liệu - deduplicated by date, shift, vehicleNo) ──
   const fuelRows = useMemo(() => {
@@ -305,313 +297,72 @@ export const TransportEntryPage: React.FC = () => {
     filteredRecords.forEach((r) => {
       const key = `${r.month}_${r.day}_${r.shift}_${r.vehicleNo}`;
       if (!map.has(key)) {
-        map.set(key, r);
+        map.set(key, {
+          ...r,
+          id: `fuel_${r.reportId || r.id}`,
+        });
       }
     });
     return Array.from(map.values());
   }, [filteredRecords]);
 
-  // Paginated Rows
-  // ── Selection Handlers ───────────────────────────────────────────────────
-  const toggleSelectAllTrips = (checked?: boolean) => {
-    if (
-      checked === false ||
-      (selectedTripIds.size === tripRows.length && tripRows.length > 0)
-    ) {
-      setSelectedTripIds(new Set());
-    } else {
-      setSelectedTripIds(new Set(tripRows.map((r) => r.id!).filter(Boolean)));
-    }
-  };
-
-  const toggleSelectTrip = (id: string) => {
-    setSelectedTripIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
-  const toggleSelectAllFuel = (checked?: boolean) => {
-    if (
-      checked === false ||
-      (selectedFuelIds.size === fuelRows.length && fuelRows.length > 0)
-    ) {
-      setSelectedFuelIds(new Set());
-    } else {
-      setSelectedFuelIds(new Set(fuelRows.map((r) => r.id!).filter(Boolean)));
-    }
-  };
-
-  const toggleSelectFuel = (id: string) => {
-    setSelectedFuelIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
-  // ── Edit Selected Record ───────────────────────────────────────────────
-  const handleEditSelected = async () => {
-    const selectedIdsArray = Array.from(
-      new Set([...selectedTripIds, ...selectedFuelIds]),
-    )
-      .map(Number)
-      .filter((id) => Boolean(id) && !isNaN(id));
-
-    if (selectedIdsArray.length === 0) {
-      toast.warning("Vui lòng chọn bản ghi để chỉnh sửa!");
-      return;
-    }
-
-    try {
-      toast.loading(
-        selectedIdsArray.length === 1
-          ? "Đang tải dữ liệu chi tiết báo cáo..."
-          : `Đang tải dữ liệu ${selectedIdsArray.length} báo cáo...`,
-        { id: "fetch-detail" },
-      );
-
-      const responses = await Promise.all(
-        selectedIdsArray.map((id) =>
-          fetchTransportReportById(id).catch((err) => {
-            console.error(`Lỗi tải báo cáo #${id}:`, err);
-            return null;
-          }),
-        ),
-      );
-
-      toast.dismiss("fetch-detail");
-
-      const drafts = responses
-        .filter((res) => Boolean(res?.success && res?.data))
-        .map((res) => mapReportResponseToDraft(res!.data!));
-
-      if (drafts.length === 0) {
-        toast.error("Không tải được thông tin chi tiết của bản ghi nào!");
-        return;
-      }
-
-      loadSessionsForEdit(drafts);
-      setEntryModalMode("edit");
-      setIsEntryModalOpen(true);
-    } catch (err: any) {
-      toast.dismiss("fetch-detail");
-      toast.error(
-        `Không thể tải chi tiết báo cáo: ${err.message || "Lỗi máy chủ"}`,
-      );
-    }
-  };
-
-  // ── Delete Selected Records ──────────────────────────────────────────────
-  const { confirm, ConfirmDialogComponent } = useConfirmDialog();
-
-  const handleDeleteSelected = async () => {
-    const selectedIdsArray = Array.from(
-      new Set([...selectedTripIds, ...selectedFuelIds]),
-    )
-      .map(Number)
-      .filter((id) => Boolean(id) && !isNaN(id));
-
-    if (selectedIdsArray.length === 0) {
-      toast.warning("Vui lòng chọn ít nhất 1 dòng để xóa!");
-      return;
-    }
-
-    const isConfirmed = await confirm({
-      title: "Xác nhận xóa báo cáo Vận tải",
-      description: `Bạn có chắc chắn muốn xóa ${selectedIdsArray.length} báo cáo đã chọn? Hành động này không thể hoàn tác trên CSDL.`,
-      confirmText: "Xóa báo cáo",
-      cancelText: "Hủy bỏ",
-      variant: "destructive",
-    });
-
-    if (isConfirmed) {
-      try {
-        const res = await bulkDeleteReportMutation.mutateAsync(selectedIdsArray);
-        setSelectedTripIds(new Set());
-        setSelectedFuelIds(new Set());
-        const deletedCount = res.data?.deletedCount ?? selectedIdsArray.length;
-        toast.success(`Đã xóa thành công ${deletedCount} báo cáo từ CSDL!`);
-        refetch();
-      } catch (err: any) {
-        console.error("[Delete Report Error]", err);
-        const msg =
-          err.response?.data?.message || err.message || "Lỗi khi xóa báo cáo";
-        toast.error(`Xóa thất bại: ${msg}`);
-      }
-    }
-  };
-
-  // ── Excel Import / Export ────────────────────────────────────────────────
-  const handleDirectFileUpload = async (
-    e: React.ChangeEvent<HTMLInputElement>,
-  ) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (!file.name.endsWith(".xlsx") && !file.name.endsWith(".xls")) {
-      toast.error("Vui lòng chọn file Excel (.xlsx hoặc .xls)");
-      e.target.value = "";
-      return;
-    }
-
-    setIsImporting(true);
-    const toastId = toast.loading("Đang nạp dữ liệu file Excel Vận tải lên máy chủ...");
-
-    try {
-      const response = await importTransportReports(file);
-      const data = response.data;
-
-      if (data) {
-        if (data.errorRowCount > 0 && data.errors && data.errors.length > 0) {
-          toast.warning(
-            `Nhập dữ liệu hoàn tất! Thành công: ${data.successReportCount}/${data.totalRows} báo cáo. Có ${data.errorRowCount} dòng lỗi:\n${data.errors.slice(0, 3).join("\n")}${data.errors.length > 3 ? "\n..." : ""}`,
-            { id: toastId, duration: 6000 }
-          );
-        } else {
-          toast.success(
-            `Đã nạp thành công ${data.successReportCount}/${data.totalRows} báo cáo từ file "${file.name}"!`,
-            { id: toastId }
-          );
-        }
-      } else {
-        toast.success(`Đã nạp dữ liệu từ file "${file.name}" thành công!`, { id: toastId });
-      }
-
-      refetch();
-    } catch (err: any) {
-      console.error("Lỗi import Excel Vận tải:", err);
-      toast.error(
-        `Lỗi khi nạp file Excel: ${err.response?.data?.message || err.message || "Lỗi máy chủ"}`,
-        { id: toastId }
-      );
-    } finally {
-      setIsImporting(false);
-      e.target.value = "";
-    }
-  };
-
-  const handleExportData = async () => {
-    if (!startDate || !endDate) {
-      toast.warning("Vui lòng chọn thời gian bắt đầu và kết thúc để xuất Excel!");
-      return;
-    }
-
-    setIsExporting(true);
-    const toastId = toast.loading("Đang xuất file Excel báo cáo Vận tải từ máy chủ...");
-
-    try {
-      const blob = await exportTransportReports({
-        fromDate: startDate,
-        toDate: endDate,
-      });
-
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `bao-cao-van-tai_${startDate}_${endDate}.xlsx`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-
-      toast.success("Đã xuất danh sách báo chuyến Vận tải ra file Excel!", { id: toastId });
-    } catch (err: any) {
-      console.error("Lỗi xuất Excel Vận tải:", err);
-      toast.error(
-        `Lỗi khi xuất file Excel: ${err.response?.data?.message || err.message || "Lỗi máy chủ"}`,
-        { id: toastId }
-      );
-    } finally {
-      setIsExporting(false);
-    }
-  };
+  // ── Common Entry Page Logic Hook ──────────────────────────────────────────
+  const {
+    isEntryModalOpen,
+    entryModalMode,
+    setIsEntryModalOpen,
+    handleAddNew,
+    handleEditSelected,
+    handleDeleteSelected,
+    tripSelection,
+    fuelSelection,
+    selectedCount,
+    excel,
+    ConfirmDialogComponent,
+  } = useEntryPageLogic({
+    title: "Vận tải",
+    filePrefix: "Bao-cao-van-tai",
+    startDate,
+    endDate,
+    tripRows,
+    fuelRows,
+    fetchReportById: fetchTransportReportById,
+    mapReportResponseToDraft,
+    fetchTripById: fetchTransportTripById,
+    mapTripResponseToDraft: mapTransportTripResponseToDraft,
+    bulkDeleteReport: bulkDeleteReportMutation.mutateAsync,
+    bulkDeleteTrips: bulkDeleteTripsMutation.mutateAsync,
+    refetch,
+    importReports: importTransportReports,
+    exportReports: (params) =>
+      exportTransportReports({
+        ...params,
+        shiftIds,
+        deviceIds,
+      }),
+    loadSessionsForEdit,
+    deleteDialogTitle: "Xác nhận xóa báo cáo Vận tải",
+    deleteDialogDescription: (count) =>
+      `Bạn có chắc chắn muốn xóa ${count} báo cáo đã chọn? Hành động này không thể hoàn tác trên CSDL.`,
+  });
 
   // ════════════════════════════════════════════════════════════════════════
   return (
     <div className="p-6 space-y-6 bg-slate-50/50 dark:bg-gray-950 min-h-screen">
       {/* ══ TOP HEADER BAR ═══════════════════════════════════════════════ */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 ">
-        {/* Title */}
-        <div className="flex items-center gap-3">
-          <div className="p-2.5 rounded-xl bg-blue-100 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400">
-            <FileSpreadsheet className="w-7 h-7" />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100 tracking-tight">
-              DANH SÁCH BÁO CHUYẾN PHÂN XƯỞNG VẬN TẢI
-            </h1>
-          </div>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex flex-wrap items-center gap-2.5">
-          {/* Upload Excel */}
-          <input
-            type="file"
-            ref={fileInputRef}
-            accept=".xlsx,.xls"
-            onChange={handleDirectFileUpload}
-            className="hidden"
-          />
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={isImporting}
-            className="h-9 text-xs gap-1.5 border-gray-300 text-gray-700 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-300"
-          >
-            <Upload className="w-3.5 h-3.5 text-gray-600 dark:text-gray-400" />
-            Tải lên (Excel)
-          </Button>
-
-          {/* Export Excel */}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleExportData}
-            disabled={isExporting}
-            className="h-9 text-xs gap-1.5 border-gray-300 text-gray-700 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-300"
-          >
-            <Download className="w-3.5 h-3.5 text-gray-600 dark:text-gray-400" />
-            Tải xuống (Excel)
-          </Button>
-
-          {/* Add Trip Modal Trigger */}
-          <Button
-            onClick={() => {
-              setEntryModalMode("add");
-              setIsEntryModalOpen(true);
-            }}
-            className="h-9 text-xs gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-sm"
-          >
-            <Plus className="w-4 h-4" />
-            Thêm chuyến (F3)
-          </Button>
-
-          {/* Edit Trip Button */}
-          <Button
-            onClick={handleEditSelected}
-            className="h-9 text-xs gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-sm"
-          >
-            <Pencil className="w-3.5 h-3.5" />
-            Chỉnh sửa
-          </Button>
-
-          {/* Delete Selected Rows */}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleDeleteSelected}
-            className="h-9 text-xs gap-1.5 border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 dark:border-red-950 dark:hover:bg-red-950/30 font-medium"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-            Xóa chuyến {selectedTripIds.size + selectedFuelIds.size > 0 ? `(${selectedTripIds.size + selectedFuelIds.size})` : ""}
-          </Button>
-        </div>
-      </div>
+      <EntryPageHeader
+        title="DANH SÁCH BÁO CHUYẾN PHÂN XƯỞNG VẬN TẢI"
+        fileInputRef={excel.fileInputRef}
+        onFileInputChange={excel.handleDirectFileUpload}
+        onUpload={excel.triggerUpload}
+        onExport={excel.handleExportData}
+        onAddNew={handleAddNew}
+        onEdit={handleEditSelected}
+        onDelete={handleDeleteSelected}
+        selectedCount={selectedCount}
+        isImporting={excel.isImporting}
+        isExporting={excel.isExporting}
+      />
 
       {/* ══ TOP FILTER BAR ═══════════════════════════════════════════════ */}
       <div className="bg-white dark:bg-gray-900 p-4 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm">
@@ -648,7 +399,7 @@ export const TransportEntryPage: React.FC = () => {
               Ca
             </span>
             <Combobox
-              items={uniqueShifts}
+              items={rawShifts.map((s) => s.name || String(s.id))}
               multiple
               value={selectedShifts}
               onValueChange={setSelectedShifts}
@@ -669,13 +420,21 @@ export const TransportEntryPage: React.FC = () => {
                   className="text-xs"
                 />
               </ComboboxChips>
-              <ComboboxContent anchor={shiftAnchorRef} sideOffset={4} align="start">
+              <ComboboxContent
+                anchor={shiftAnchorRef}
+                sideOffset={4}
+                align="start"
+              >
                 <ComboboxEmpty className="text-xs py-2 text-gray-400">
                   Không tìm thấy ca
                 </ComboboxEmpty>
                 <ComboboxList>
                   {(item) => (
-                    <ComboboxItem key={item} value={item} className="text-xs py-1.5">
+                    <ComboboxItem
+                      key={item}
+                      value={item}
+                      className="text-xs py-1.5"
+                    >
                       {item}
                     </ComboboxItem>
                   )}
@@ -690,7 +449,7 @@ export const TransportEntryPage: React.FC = () => {
               Số xe
             </span>
             <Combobox
-              items={uniqueVehicles}
+              items={rawVehicles.map((v) => v.name || String(v.id))}
               multiple
               value={selectedVehicles}
               onValueChange={setSelectedVehicles}
@@ -707,17 +466,27 @@ export const TransportEntryPage: React.FC = () => {
                   ))}
                 </ComboboxValue>
                 <ComboboxChipsInput
-                  placeholder={selectedVehicles.length === 0 ? "Chọn số xe..." : ""}
+                  placeholder={
+                    selectedVehicles.length === 0 ? "Chọn số xe..." : ""
+                  }
                   className="text-xs"
                 />
               </ComboboxChips>
-              <ComboboxContent anchor={vehicleAnchorRef} sideOffset={4} align="start">
+              <ComboboxContent
+                anchor={vehicleAnchorRef}
+                sideOffset={4}
+                align="start"
+              >
                 <ComboboxEmpty className="text-xs py-2 text-gray-400">
                   Không tìm thấy xe nào
                 </ComboboxEmpty>
                 <ComboboxList>
                   {(item) => (
-                    <ComboboxItem key={item} value={item} className="text-xs py-1.5">
+                    <ComboboxItem
+                      key={item}
+                      value={item}
+                      className="text-xs py-1.5"
+                    >
                       {item}
                     </ComboboxItem>
                   )}
@@ -728,7 +497,9 @@ export const TransportEntryPage: React.FC = () => {
 
           {/* Search Box */}
           <div className="flex-1 min-w-[220px] flex flex-col gap-1">
-            <span className="font-medium text-transparent">Tìm kiếm</span>
+            <span className="font-medium text-transparent select-none">
+              Tìm kiếm
+            </span>
             <div className="relative">
               <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-gray-400" />
               <Input
@@ -742,51 +513,49 @@ export const TransportEntryPage: React.FC = () => {
           </div>
 
           {/* Reset button */}
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleResetFilters}
-              title="Làm mới bộ lọc"
-              className="h-9 w-9 p-0 border-gray-300 dark:border-gray-700"
-            >
-              <RefreshCw className="w-3.5 h-3.5 text-gray-600 dark:text-gray-400" />
-            </Button>
-          </div>
+          <FilterResetButton onReset={handleResetFilters} />
         </div>
       </div>
 
-      {/* ══ BẢNG 1: BẢNG BÁO CHUYẾN ══════════════════════════════════════ */}
+      {/* ══ BẢNG: BẢNG BÁO CHUYẾN ══════════════════════════════════════ */}
       <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm overflow-hidden space-y-3 p-4">
         {/* Table Title */}
-        <div className="flex items-center gap-2 text-sm font-bold text-gray-900 dark:text-gray-100">
-          <Truck className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-          <span>1. BẢNG BÁO CHUYẾN</span>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2.5 text-sm font-bold text-gray-900 dark:text-gray-100">
+            <Truck className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+            <span>BẢNG BÁO CHUYẾN</span>
+            {changesRequestedCount > 0 && (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-300 dark:bg-rose-950/60 dark:text-rose-300 dark:border-rose-800 animate-pulse">
+                <AlertTriangle className="w-3 h-3 text-rose-600" />
+                <span>{changesRequestedCount} bản ghi cần sửa</span>
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Table 1 Content */}
         <TransportTripsDataTable
           data={tripRows}
-          selectedIds={selectedTripIds}
-          onToggleSelectAll={toggleSelectAllTrips}
-          onToggleSelectRow={toggleSelectTrip}
+          selectedIds={tripSelection.selectedIds}
+          onToggleSelectAll={tripSelection.toggleSelectAll}
+          onToggleSelectRow={tripSelection.toggleSelect}
         />
       </div>
 
-      {/* ══ BẢNG 2: BẢNG BÁO NHIÊN LIỆU ═════════════════════════════════ */}
+      {/* ══ BẢNG: BẢNG BÁO NHIÊN LIỆU ═════════════════════════════════ */}
       <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm overflow-hidden space-y-3 p-4">
         {/* Table Title */}
         <div className="flex items-center gap-2 text-sm font-bold text-gray-900 dark:text-gray-100">
           <Fuel className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-          <span>2. BẢNG BÁO NHIÊN LIỆU</span>
+          <span>BẢNG BÁO NHIÊN LIỆU</span>
         </div>
 
         {/* Table 2 Content */}
         <TransportFuelDataTable
           data={fuelRows}
-          selectedIds={selectedFuelIds}
-          onToggleSelectAll={toggleSelectAllFuel}
-          onToggleSelectRow={toggleSelectFuel}
+          selectedIds={fuelSelection.selectedIds}
+          onToggleSelectAll={fuelSelection.toggleSelectAll}
+          onToggleSelectRow={fuelSelection.toggleSelect}
         />
       </div>
 

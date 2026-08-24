@@ -13,21 +13,21 @@ const todayStr = (): string => {
 export const newTripRow = (defaultMaterial = ""): TripRow => ({
   _tempId: `trip_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
   vehicleNo: "",
+  vehicleManagementUnit: "",
+  vehicleType: "",
   tripCount: "",
   material: defaultMaterial,
   loadStatus: "Đủ tải",
   loadStatusNote: "",
-  vehicleManagementUnit: "",
-  vehicleType: "",
 });
 
 export const createDefaultSession = (): MiningSessionDraft => ({
   _tempId: `sess_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
   workingDate: todayStr(),
   shift: "",
-  department: "",
   pickupLocation: "",
   excavator: "",
+  excavatorManagementUnit: "",
   totalScoops: "",
   trips: [newTripRow("")],
   initialFuel: "",
@@ -48,7 +48,8 @@ interface MiningDraftStore {
   setActiveIdx: (idx: number) => void;
   updateActiveSession: (
     patch: Partial<MiningSessionDraft>,
-    getOperatorDetails?: (badgeNo: string) => { operatorName: string; operatorUnit: string }
+    getOperatorDetails?: (badgeNo: string) => { operatorName: string; operatorUnit: string },
+    getExcavatorDetails?: (excavatorCode: string) => { excavatorManagementUnit: string }
   ) => void;
   updateTripRow: (
     tIdx: number,
@@ -94,6 +95,9 @@ export const useMiningDraftStore = create<MiningDraftStore>((set, get) => ({
       newSess.workingDate = prev.workingDate;
       newSess.shift = prev.shift;
       newSess.pickupLocation = prev.pickupLocation;
+      newSess.excavator = prev.excavator;
+      newSess.excavatorManagementUnit = prev.excavatorManagementUnit;
+      newSess.totalScoops = prev.totalScoops;
     }
 
     set({
@@ -124,7 +128,7 @@ export const useMiningDraftStore = create<MiningDraftStore>((set, get) => ({
     set({ activeIdx: idx });
   },
 
-  updateActiveSession: (patch, getOperatorDetails) => {
+  updateActiveSession: (patch, getOperatorDetails, getExcavatorDetails) => {
     const { sessions, activeIdx } = get();
     if (!sessions[activeIdx]) return;
 
@@ -135,6 +139,11 @@ export const useMiningDraftStore = create<MiningDraftStore>((set, get) => ({
       const info = getOperatorDetails(patch.operatorBadgeNo);
       updated.operatorName = info.operatorName;
       updated.operatorUnit = info.operatorUnit;
+    }
+
+    if ("excavator" in patch && getExcavatorDetails && patch.excavator) {
+      const info = getExcavatorDetails(patch.excavator);
+      updated.excavatorManagementUnit = info.excavatorManagementUnit;
     }
 
     next[activeIdx] = updated;
@@ -150,6 +159,7 @@ export const useMiningDraftStore = create<MiningDraftStore>((set, get) => ({
     if (!trips[tIdx]) return;
 
     const updatedTrip = { ...trips[tIdx], ...patch };
+
     if ("vehicleNo" in patch && getVehicleDetails && patch.vehicleNo) {
       const info = getVehicleDetails(patch.vehicleNo);
       updatedTrip.vehicleManagementUnit = info.vehicleManagementUnit;
@@ -251,7 +261,7 @@ export const useMiningDraftStore = create<MiningDraftStore>((set, get) => ({
     const tripRatio =
       sess.trips.length > 0
         ? sess.trips.filter((t) => {
-            const hasVehicle = Boolean(String(t.vehicleNo ?? "").trim());
+            const hasVehicleNo = Boolean(String(t.vehicleNo ?? "").trim());
             const hasMaterial = Boolean(String(t.material ?? "").trim());
             const hasValidTripCount = Number(t.tripCount) >= 1;
             let hasValidNote = true;
@@ -259,7 +269,7 @@ export const useMiningDraftStore = create<MiningDraftStore>((set, get) => ({
               const note = String(t.loadStatusNote ?? "").trim().replace(/\s+/g, "");
               hasValidNote = Boolean(note) && /^\d+\/[1-9]\d*$/.test(note);
             }
-            return hasVehicle && hasMaterial && hasValidTripCount && hasValidNote;
+            return hasVehicleNo && hasMaterial && hasValidTripCount && hasValidNote;
           }).length / sess.trips.length
         : 0;
 

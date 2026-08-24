@@ -5,6 +5,7 @@ import type {
 } from "@/modules/dataentry/components/TransportHeaderDetailModal.tsx";
 import { validateTransportSession } from "@/modules/dataentry/schemas/thong-ke.schema.ts";
 
+// ponytail: vehicle info lives at session level, trip row stays minimal
 export const newTransportTripRow = (): TransportTripRow => ({
   _tempId: `trip_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
   excavationArea: "",
@@ -20,14 +21,11 @@ export const newTransportTripRow = (): TransportTripRow => ({
   unloadLocationName: "",
   cargoType: "",
   cargoGroup: "",
-  vehicleNo: "",
   tripCount: "",
   loadStatus: "Đủ tải",
   loadStatusNote: "",
   isRainyDay: false,
   isTraineeVehicle: false,
-  equipmentUnit: "",
-  vehicleType: "",
 });
 
 interface TransportDraftStore {
@@ -40,12 +38,12 @@ interface TransportDraftStore {
   setActiveIdx: (idx: number) => void;
   updateActiveSession: (
     patch: Partial<TransportSessionDraft>,
-    getOperatorDetails?: (badgeNo: string) => { operatorName: string; operatorUnit: string }
+    getOperatorDetails?: (badgeNo: string) => { operatorName: string; operatorUnit: string },
+    getVehicleDetails?: (vehicleNo: string) => { vehicleManagementUnit: string; vehicleType: string }
   ) => void;
   updateTripRow: (
     tIdx: number,
     patch: Partial<TransportTripRow>,
-    getVehicleDetails?: (vehicleNo: string) => { vehicleManagementUnit: string; vehicleType: string },
     getCargoGroupDetails?: (cargoType: string) => string
   ) => void;
   addTripRow: () => void;
@@ -84,6 +82,9 @@ export const useTransportDraftStore = create<TransportDraftStore>((set, get) => 
     if (prev) {
       newSess.workingDate = prev.workingDate;
       newSess.shift = prev.shift;
+      newSess.vehicleNo = prev.vehicleNo;
+      newSess.equipmentUnit = prev.equipmentUnit;
+      newSess.vehicleType = prev.vehicleType;
     }
 
     set({
@@ -108,7 +109,7 @@ export const useTransportDraftStore = create<TransportDraftStore>((set, get) => 
     set({ activeIdx: idx });
   },
 
-  updateActiveSession: (patch, getOperatorDetails) => {
+  updateActiveSession: (patch, getOperatorDetails, getVehicleDetails) => {
     const { sessions, activeIdx } = get();
     if (!sessions[activeIdx]) return;
 
@@ -121,11 +122,17 @@ export const useTransportDraftStore = create<TransportDraftStore>((set, get) => 
       updated.operatorUnit = info.operatorUnit;
     }
 
+    if ("vehicleNo" in patch && getVehicleDetails && patch.vehicleNo) {
+      const info = getVehicleDetails(patch.vehicleNo);
+      updated.equipmentUnit = info.vehicleManagementUnit;
+      updated.vehicleType = info.vehicleType;
+    }
+
     next[activeIdx] = updated;
     set({ sessions: next });
   },
 
-  updateTripRow: (tIdx, patch, getVehicleDetails, getCargoGroupDetails) => {
+  updateTripRow: (tIdx, patch, getCargoGroupDetails) => {
     const { sessions, activeIdx } = get();
     if (!sessions[activeIdx]) return;
 
@@ -140,12 +147,6 @@ export const useTransportDraftStore = create<TransportDraftStore>((set, get) => 
       if (groupName) {
         updatedTrip.cargoGroup = groupName;
       }
-    }
-
-    if ("vehicleNo" in patch && getVehicleDetails && patch.vehicleNo) {
-      const info = getVehicleDetails(patch.vehicleNo);
-      updatedTrip.equipmentUnit = info.vehicleManagementUnit;
-      updatedTrip.vehicleType = info.vehicleType;
     }
 
     trips[tIdx] = updatedTrip;
@@ -228,17 +229,17 @@ export const useTransportDraftStore = create<TransportDraftStore>((set, get) => 
     if (!sess) return 0;
 
     let points = 0;
-    const total = 3;
+    const total = 4;
 
     if (String(sess.workingDate ?? "").trim()) points++;
     if (String(sess.shift ?? "").trim()) points++;
+    if (String(sess.vehicleNo ?? "").trim()) points++;
     if (String(sess.operatorBadgeNo ?? "").trim()) points++;
 
     const tripRatio =
       sess.trips.length > 0
         ? sess.trips.filter(
             (t) =>
-              String(t.vehicleNo ?? "").trim() &&
               String(t.cargoType ?? "").trim() &&
               Number(t.tripCount) >= 1 &&
               String(t.excavationArea ?? "").trim() &&

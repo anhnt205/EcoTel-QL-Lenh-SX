@@ -1,8 +1,13 @@
+import React, { useState, useMemo } from "react";
+import type { MiningRecord } from "../types/thong-ke";
 import {
   useExcavationReportsQuery,
   fetchExcavationReportById,
   mapReportResponseToDraft,
+  fetchExcavationTripById,
+  mapExcavationTripResponseToDraft,
   useBulkDeleteExcavationTripReportMutation,
+  useBulkDeleteExcavationTripsMutation,
   importExcavationReports,
   exportExcavationReports,
   type ExcavationReportResponse,
@@ -11,7 +16,10 @@ import { useMiningDraftStore } from "@/modules/dataentry/store/useMiningDraftSto
 import { BatchEntryModal } from "@/modules/dataentry/components/BatchEntryModal.tsx";
 import { MiningTripsDataTable } from "@/modules/dataentry/components/MiningTripsDataTable";
 import { MiningFuelDataTable } from "@/modules/dataentry/components/MiningFuelDataTable";
-import { Button } from "@/components/ui/button";
+import { EntryPageHeader } from "@/modules/dataentry/components/EntryPageHeader";
+import { FilterResetButton } from "@/modules/dataentry/components/FilterResetButton";
+import { useEntryPageLogic } from "@/modules/dataentry/hooks/useEntryPageLogic";
+import { useMasterData } from "@/modules/dataentry/hooks/useMasterData";
 import { Input } from "@/components/ui/input";
 import {
   Combobox,
@@ -26,63 +34,66 @@ import {
   useComboboxAnchor,
 } from "@/components/ui/combobox";
 import { DatePickerString } from "@/components/common/DatePickerString";
-import {
-  Upload,
-  Download,
-  Plus,
-  Pencil,
-  Search,
-  RefreshCw,
-  Trash2,
-  FileSpreadsheet,
-  Truck,
-  Fuel,
-} from "lucide-react";
+import { Search, Truck, Fuel, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
-import { useConfirmDialog } from "@/components/ui/confirm-dialog";
-import { useEffect, useMemo, useRef, useState } from "react";
-import type { MiningRecord } from "../types/thong-ke";
 
 export const MiningEntryPage: React.FC = () => {
   const role = "ROLE_MINING";
   const shiftAnchorRef = useComboboxAnchor();
-  const pickupAnchorRef = useComboboxAnchor();
   const excavatorAnchorRef = useComboboxAnchor();
-  const scoopAnchorRef = useComboboxAnchor();
-
-  const [isEntryModalOpen, setIsEntryModalOpen] = useState(false);
-  const [entryModalMode, setEntryModalMode] = useState<"add" | "edit">("add");
-  const [isImporting, setIsImporting] = useState(false);
-  const [isExporting, setIsExporting] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // ── Filters state ────────────────────────────────────────────────────────
   const [startDate, setStartDate] = useState("2026-08-01");
   const [endDate, setEndDate] = useState("2026-08-31");
   const [selectedShifts, setSelectedShifts] = useState<string[]>([]);
-  const [selectedPickups, setSelectedPickups] = useState<string[]>([]);
   const [selectedExcavators, setSelectedExcavators] = useState<string[]>([]);
-  const [selectedScoops, setSelectedScoops] = useState<string[]>([]);
   const [searchKeyword, setSearchKeyword] = useState("");
 
-  // ── Row selection states ──────────────────────────────────────────────────
-  const [selectedTripIds, setSelectedTripIds] = useState<Set<string>>(
-    new Set(),
-  );
-  const [selectedFuelIds, setSelectedFuelIds] = useState<Set<string>>(
-    new Set(),
-  );
+  const masterData = useMasterData();
+  const { rawShifts = [], rawExcavators = [] } = masterData;
+
+  // Map selected Shift names to Shift IDs for Backend API
+  const shiftIds = useMemo(() => {
+    if (selectedShifts.length === 0) return undefined;
+    return rawShifts
+      .filter((s) => {
+        const rawName = String(s.name ?? "").trim();
+        const cleanNum = rawName.replace(/^ca\s+/i, "").trim();
+        return (
+          selectedShifts.includes(rawName) ||
+          selectedShifts.includes(cleanNum) ||
+          selectedShifts.includes(`Ca ${cleanNum}`) ||
+          selectedShifts.includes(String(s.id))
+        );
+      })
+      .map((s) => s.id);
+  }, [selectedShifts, rawShifts]);
+
+  // Map selected Excavator codes/names to Device IDs for Backend API
+  const excavatorIds = useMemo(() => {
+    if (selectedExcavators.length === 0) return undefined;
+    const ids: number[] = [];
+    rawExcavators.forEach((e) => {
+      if (
+        (e.code && selectedExcavators.includes(e.code)) ||
+        (e.name && selectedExcavators.includes(e.name))
+      ) {
+        ids.push(e.id);
+      }
+    });
+    return ids.length > 0 ? ids : undefined;
+  }, [selectedExcavators, rawExcavators]);
 
   // ── Query Backend API ───────────────────────────────────────────────────
-  const {
-    data: apiResponse,
-    refetch,
-  } = useExcavationReportsQuery({
+  const { data: apiResponse, refetch } = useExcavationReportsQuery({
     fromDate: startDate,
     toDate: endDate,
+    shiftIds,
+    excavatorIds,
   });
 
   const bulkDeleteReportMutation = useBulkDeleteExcavationTripReportMutation();
+  const bulkDeleteTripsMutation = useBulkDeleteExcavationTripsMutation();
   const { loadSessionsForEdit, initDrafts } = useMiningDraftStore();
 
   const reportsList = useMemo<ExcavationReportResponse[]>(() => {
@@ -98,11 +109,17 @@ export const MiningEntryPage: React.FC = () => {
     const list: MiningRecord[] = [];
     reportsList.forEach((report) => {
       const d = new Date(report.reportDate);
-      const m = isNaN(d.getTime()) ? undefined : d.getMonth() + 1;
-      const day = isNaN(d.getTime()) ? undefined : d.getDate();
-      (report.trips || []).forEach((t) => {
+      const year = !isNaN(d.getTime()) ? d.getFullYear() : undefined;
+      const m = !isNaN(d.getTime()) ? d.getMonth() + 1 : undefined;
+      const day = !isNaN(d.getTime()) ? d.getDate() : undefined;
+      (report.trips || []).forEach((t, tIdx) => {
         list.push({
-          id: String(report.id),
+          id: t.id ? `trip_${t.id}` : `rep_${report.id}_trip_${tIdx}`,
+          reportId: report.id,
+          tripId: t.id,
+          status: t.status || "PENDING",
+          note: t.note,
+          year,
           month: m,
           day: day,
           shift: report.shiftName || String(report.shiftId),
@@ -114,10 +131,23 @@ export const MiningEntryPage: React.FC = () => {
           pickupLocation:
             report.receivingLocationName || String(report.receivingLocationId),
           transportVehicleNo:
-            t.vehicleCode || t.vehicleName || String(t.vehicleId),
-          vehicleNo: t.vehicleCode || t.vehicleName || String(t.vehicleId),
-          vehicleType: t.vehicleCategoryName || "",
-          vehicleManagementUnit: t.vehicleDepartmentName || "",
+            t.vehicleCode ||
+            t.vehicleName ||
+            (t.vehicleId ? String(t.vehicleId) : "") ||
+            report.vehicleCode ||
+            report.vehicleName ||
+            "",
+          vehicleNo:
+            t.vehicleCode ||
+            t.vehicleName ||
+            (t.vehicleId ? String(t.vehicleId) : "") ||
+            report.vehicleCode ||
+            report.vehicleName ||
+            "",
+          vehicleType:
+            t.vehicleCategoryName || report.vehicleCategoryName || "",
+          vehicleManagementUnit:
+            t.vehicleDepartmentName || report.vehicleDepartmentName || "",
           tripCount: t.tripCount || 1,
           material: t.cargoTypeName || String(t.cargoTypeId),
           loadStatus:
@@ -145,52 +175,15 @@ export const MiningEntryPage: React.FC = () => {
     return list;
   }, [reportsList]);
 
-  // F3 keyboard shortcut to open Add Trip modal
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "F3") {
-        e.preventDefault();
-        setEntryModalMode("add");
-        handleAddNew();
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
-
   // ── Filtered Records ─────────────────────────────────────────────────────
   const filteredRecords = useMemo(() => {
     return records.filter((r) => {
       // Date filter
       if (r.month && r.day) {
-        const rYear = 2026;
+        const rYear = r.year || new Date().getFullYear();
         const rDateStr = `${rYear}-${String(r.month).padStart(2, "0")}-${String(r.day).padStart(2, "0")}`;
         if (startDate && rDateStr < startDate) return false;
         if (endDate && rDateStr > endDate) return false;
-      }
-
-      // Shift filter (Multi-select)
-      if (selectedShifts.length > 0) {
-        const s = r.shift || "";
-        if (!selectedShifts.includes(s)) return false;
-      }
-
-      // Pickup location filter (Multi-select)
-      if (selectedPickups.length > 0) {
-        const p = r.pickupLocation || "";
-        if (!selectedPickups.includes(p)) return false;
-      }
-
-      // Excavator filter (Multi-select)
-      if (selectedExcavators.length > 0) {
-        const m = r.mineCode || "";
-        if (!selectedExcavators.includes(m)) return false;
-      }
-
-      // Total scoops filter (Multi-select)
-      if (selectedScoops.length > 0) {
-        const s = String(r.excavationBench || "");
-        if (!selectedScoops.includes(s)) return false;
       }
 
       // Keyword search (vehicle, excavator, badge, operator name)
@@ -218,48 +211,26 @@ export const MiningEntryPage: React.FC = () => {
     records,
     startDate,
     endDate,
-    selectedShifts,
-    selectedPickups,
-    selectedExcavators,
-    selectedScoops,
     searchKeyword,
   ]);
-
-  // Unique lists for filter dropdowns
-  const uniqueShifts = useMemo(() => {
-    const set = new Set(records.map((r) => r.shift).filter(Boolean));
-    return Array.from(set).map(String);
-  }, [records]);
-
-  const uniquePickups = useMemo(() => {
-    const set = new Set(records.map((r) => r.pickupLocation).filter(Boolean));
-    return Array.from(set).map(String);
-  }, [records]);
-
-  const uniqueExcavators = useMemo(() => {
-    const set = new Set(records.map((r) => r.mineCode).filter(Boolean));
-    return Array.from(set).map(String);
-  }, [records]);
-
-  const uniqueScoops = useMemo(() => {
-    const set = new Set(records.map((r) => r.excavationBench).filter(Boolean));
-    return Array.from(set).map(String);
-  }, [records]);
-
   // Reset filters
-  const handleResetFilters = () => {
+  const handleResetFilters = async () => {
     setStartDate("2026-08-01");
     setEndDate("2026-08-31");
     setSelectedShifts([]);
-    setSelectedPickups([]);
     setSelectedExcavators([]);
-    setSelectedScoops([]);
     setSearchKeyword("");
+    await refetch();
     toast.info("Đã làm mới các bộ lọc!");
   };
 
   // ── Table 1 Data: Báo chuyến ──────────────────────────────────────────────
-  const tripRows = filteredRecords; // Each MiningRecord represents a trip
+  const tripRows = filteredRecords;
+
+  // ── Số lượng bản ghi cần sửa ────────────────────────────────────────────
+  const changesRequestedCount = useMemo(() => {
+    return tripRows.filter((r) => r.status === "REVISION_REQUESTED").length;
+  }, [tripRows]);
 
   // ── Table 2 Data: Báo nhiên liệu ──────────────────────────────────────────
   // Deduplicate records for Table 2 by (date, shift, pickupLocation, mineCode, operatorBadgeNo)
@@ -268,310 +239,73 @@ export const MiningEntryPage: React.FC = () => {
     filteredRecords.forEach((r) => {
       const key = `${r.month}_${r.day}_${r.shift}_${r.pickupLocation}_${r.mineCode}_${r.operatorBadgeNo}`;
       if (!map.has(key)) {
-        map.set(key, r);
+        map.set(key, {
+          ...r,
+          id: `fuel_${r.reportId || r.id}`,
+        });
       }
     });
     return Array.from(map.values());
   }, [filteredRecords]);
 
-  // ── Row Selection Handlers ────────────────────────────────────────────────
-  const toggleSelectAllTrips = (checked: boolean) => {
-    if (checked) {
-      setSelectedTripIds(new Set(tripRows.map((r) => r.id!).filter(Boolean)));
-    } else {
-      setSelectedTripIds(new Set());
-    }
-  };
-
-  const toggleSelectTrip = (id: string) => {
-    setSelectedTripIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
-  const toggleSelectAllFuel = (checked: boolean) => {
-    if (checked) {
-      setSelectedFuelIds(new Set(fuelRows.map((r) => r.id!).filter(Boolean)));
-    } else {
-      setSelectedFuelIds(new Set());
-    }
-  };
-
-  const toggleSelectFuel = (id: string) => {
-    setSelectedFuelIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
-  // ── Delete Selected Records ──────────────────────────────────────────────
-  const { confirm, ConfirmDialogComponent } = useConfirmDialog();
-
-  const handleAddNew = () => {
-    initDrafts();
-    setEntryModalMode("add");
-    setIsEntryModalOpen(true);
-  };
-
-  const handleEditSelected = async () => {
-    const selectedIdsArray = Array.from(
-      new Set([...selectedTripIds, ...selectedFuelIds]),
-    )
-      .map(Number)
-      .filter((id) => Boolean(id) && !isNaN(id));
-
-    if (selectedIdsArray.length === 0) {
-      toast.warning("Vui lòng chọn bản ghi để chỉnh sửa!");
-      return;
-    }
-
-    try {
-      toast.loading(
-        selectedIdsArray.length === 1
-          ? "Đang tải dữ liệu chi tiết báo cáo..."
-          : `Đang tải dữ liệu ${selectedIdsArray.length} báo cáo...`,
-        { id: "fetch-detail" },
-      );
-
-      const responses = await Promise.all(
-        selectedIdsArray.map((id) =>
-          fetchExcavationReportById(id).catch((err) => {
-            console.error(`Lỗi tải báo cáo #${id}:`, err);
-            return null;
-          }),
-        ),
-      );
-
-      toast.dismiss("fetch-detail");
-
-      const drafts = responses
-        .filter((res) => Boolean(res?.data))
-        .map((res) => mapReportResponseToDraft(res!.data!));
-
-      if (drafts.length === 0) {
-        toast.error("Không tải được thông tin chi tiết của bản ghi nào!");
-        return;
-      }
-
-      loadSessionsForEdit(drafts);
-      setEntryModalMode("edit");
-      setIsEntryModalOpen(true);
-    } catch (err: any) {
-      toast.dismiss("fetch-detail");
-      toast.error(
-        `Không thể tải chi tiết báo cáo: ${err.message || "Lỗi máy chủ"}`,
-      );
-    }
-  };
-
-  const handleDeleteSelected = async () => {
-    const selectedIdsArray = Array.from(
-      new Set([...selectedTripIds, ...selectedFuelIds]),
-    )
-      .map(Number)
-      .filter((id) => Boolean(id) && !isNaN(id));
-
-    if (selectedIdsArray.length === 0) {
-      toast.warning("Vui lòng chọn ít nhất 1 dòng để xóa!");
-      return;
-    }
-
-    const isConfirmed = await confirm({
-      title: "Xác nhận xóa bản ghi",
-      description: `Bạn có chắc chắn muốn xóa ${selectedIdsArray.length} báo cáo đã chọn? Hành động này không thể hoàn tác.`,
-      confirmText: "Xóa bản ghi",
-      cancelText: "Hủy bỏ",
-      variant: "destructive",
-    });
-
-    if (isConfirmed) {
-      try {
-        const res = await bulkDeleteReportMutation.mutateAsync(selectedIdsArray);
-        setSelectedTripIds(new Set());
-        setSelectedFuelIds(new Set());
-        const deletedCount = res.data?.deletedCount ?? selectedIdsArray.length;
-        toast.success(`Đã xóa thành công ${deletedCount} báo cáo!`);
-        refetch();
-      } catch (err: any) {
-        console.error("Lỗi xóa bản ghi bulk:", err);
-        toast.error(`Lỗi khi xóa bản ghi: ${err.response?.data?.message || err.message || "Lỗi máy chủ"}`);
-      }
-    }
-  };
-
-  // ── Excel Import / Export ────────────────────────────────────────────────
-  const handleDirectFileUpload = async (
-    e: React.ChangeEvent<HTMLInputElement>,
-  ) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (!file.name.endsWith(".xlsx") && !file.name.endsWith(".xls")) {
-      toast.error("Vui lòng chọn file Excel (.xlsx hoặc .xls)");
-      e.target.value = "";
-      return;
-    }
-
-    setIsImporting(true);
-    const toastId = toast.loading("Đang nạp dữ liệu file Excel lên máy chủ...");
-
-    try {
-      const response = await importExcavationReports(file);
-      const data = response.data;
-
-      if (data) {
-        if (data.errorRowCount > 0 && data.errors && data.errors.length > 0) {
-          toast.warning(
-            `Nhập dữ liệu hoàn tất! Thành công: ${data.successReportCount}/${data.totalRows} báo cáo. Có ${data.errorRowCount} dòng lỗi:\n${data.errors.slice(0, 3).join("\n")}${data.errors.length > 3 ? "\n..." : ""}`,
-            { id: toastId, duration: 6000 }
-          );
-        } else {
-          toast.success(
-            `Đã nạp thành công ${data.successReportCount}/${data.totalRows} báo cáo từ file "${file.name}"!`,
-            { id: toastId }
-          );
-        }
-      } else {
-        toast.success(`Đã nạp dữ liệu từ file "${file.name}" thành công!`, { id: toastId });
-      }
-
-      refetch();
-    } catch (err: any) {
-      console.error("Lỗi import Excel Khai thác:", err);
-      toast.error(
-        `Lỗi khi nạp file Excel: ${err.response?.data?.message || err.message || "Lỗi máy chủ"}`,
-        { id: toastId }
-      );
-    } finally {
-      setIsImporting(false);
-      e.target.value = "";
-    }
-  };
-
-  const handleExportData = async () => {
-    if (!startDate || !endDate) {
-      toast.warning("Vui lòng chọn thời gian bắt đầu và kết thúc để xuất Excel!");
-      return;
-    }
-
-    setIsExporting(true);
-    const toastId = toast.loading("Đang xuất file Excel báo cáo Khai thác từ máy chủ...");
-
-    try {
-      const blob = await exportExcavationReports({
-        fromDate: startDate,
-        toDate: endDate,
-      });
-
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `bao-cao-khai-thac_${startDate}_${endDate}.xlsx`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-
-      toast.success("Đã xuất danh sách báo chuyến Khai thác ra file Excel!", { id: toastId });
-    } catch (err: any) {
-      console.error("Lỗi xuất Excel Khai thác:", err);
-      toast.error(
-        `Lỗi khi xuất file Excel: ${err.response?.data?.message || err.message || "Lỗi máy chủ"}`,
-        { id: toastId }
-      );
-    } finally {
-      setIsExporting(false);
-    }
-  };
-
+  // ── Common Entry Page Logic Hook
+  const {
+    isEntryModalOpen,
+    entryModalMode,
+    setIsEntryModalOpen,
+    handleAddNew,
+    handleEditSelected,
+    handleDeleteSelected,
+    tripSelection,
+    fuelSelection,
+    selectedCount,
+    excel,
+    ConfirmDialogComponent,
+  } = useEntryPageLogic({
+    title: "Khai thác",
+    filePrefix: "bao-cao-khai-thac",
+    startDate,
+    endDate,
+    tripRows,
+    fuelRows,
+    fetchReportById: fetchExcavationReportById,
+    mapReportResponseToDraft,
+    fetchTripById: fetchExcavationTripById,
+    mapTripResponseToDraft: mapExcavationTripResponseToDraft,
+    bulkDeleteReport: bulkDeleteReportMutation.mutateAsync,
+    bulkDeleteTrips: bulkDeleteTripsMutation.mutateAsync,
+    refetch,
+    importReports: importExcavationReports,
+    exportReports: (params) =>
+      exportExcavationReports({
+        ...params,
+        shiftIds,
+        excavatorIds,
+      }),
+    loadSessionsForEdit,
+    initDrafts,
+    deleteDialogTitle: "Xác nhận xóa bản ghi",
+    deleteDialogDescription: (count) =>
+      `Bạn có chắc chắn muốn xóa ${count} báo cáo đã chọn? Hành động này không thể hoàn tác.`,
+  });
 
   // ════════════════════════════════════════════════════════════════════════
   return (
     <div className="p-6 space-y-6 bg-slate-50/50 dark:bg-gray-950 min-h-screen">
       {/* ══ TOP HEADER BAR ═══════════════════════════════════════════════ */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 dark:border-gray-800">
-        {/* Title */}
-        <div className="flex items-center gap-3">
-          <div className="p-2.5 rounded-xl bg-blue-100 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400">
-            <FileSpreadsheet className="w-7 h-7" />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100 tracking-tight">
-              DANH SÁCH BÁO CHUYẾN CÔNG TRƯỜNG KHAI THÁC
-            </h1>
-          </div>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex flex-wrap items-center gap-2.5">
-          {/* Upload Excel */}
-          <input
-            type="file"
-            ref={fileInputRef}
-            accept=".xlsx,.xls"
-            onChange={handleDirectFileUpload}
-            className="hidden"
-          />
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={isImporting}
-            className="h-9 text-xs gap-1.5 border-gray-300 text-gray-700 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-300"
-          >
-            <Upload className="w-3.5 h-3.5 text-gray-600 dark:text-gray-400" />
-            Tải lên (Excel)
-          </Button>
-
-          {/* Export Excel */}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleExportData}
-            disabled={isExporting}
-            className="h-9 text-xs gap-1.5 border-gray-300 text-gray-700 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-300"
-          >
-            <Download className="w-3.5 h-3.5 text-gray-600 dark:text-gray-400" />
-            Tải xuống (Excel)
-          </Button>
-
-          {/* Add Trip Modal Trigger */}
-          <Button
-            onClick={handleAddNew}
-            className="h-9 text-xs gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-sm"
-          >
-            <Plus className="w-4 h-4" />
-            Thêm chuyến (F3)
-          </Button>
-
-          {/* Edit Trip Button */}
-          <Button
-            onClick={handleEditSelected}
-            className="h-9 text-xs gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-sm"
-          >
-            <Pencil className="w-3.5 h-3.5" />
-            Chỉnh sửa
-          </Button>
-
-          {/* Delete Selected Rows */}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleDeleteSelected}
-            className="h-9 text-xs gap-1.5 border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 dark:border-red-950 dark:hover:bg-red-950/30 font-medium"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-            Xóa chuyến{" "}
-            {selectedTripIds.size + selectedFuelIds.size > 0
-              ? `(${selectedTripIds.size + selectedFuelIds.size})`
-              : ""}
-          </Button>
-        </div>
-      </div>
+      <EntryPageHeader
+        title="DANH SÁCH BÁO CHUYẾN CÔNG TRƯỜNG KHAI THÁC"
+        fileInputRef={excel.fileInputRef}
+        onFileInputChange={excel.handleDirectFileUpload}
+        onUpload={excel.triggerUpload}
+        onExport={excel.handleExportData}
+        onAddNew={handleAddNew}
+        onEdit={handleEditSelected}
+        onDelete={handleDeleteSelected}
+        selectedCount={selectedCount}
+        isImporting={excel.isImporting}
+        isExporting={excel.isExporting}
+      />
 
       {/* ══ FILTER BAR ═══════════════════════════════════════════════════ */}
       <div className="bg-white dark:bg-gray-900 p-4 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm">
@@ -608,7 +342,7 @@ export const MiningEntryPage: React.FC = () => {
               Ca
             </span>
             <Combobox
-              items={uniqueShifts}
+              items={rawShifts.map((s) => s.name || String(s.id))}
               multiple
               value={selectedShifts}
               onValueChange={setSelectedShifts}
@@ -652,65 +386,13 @@ export const MiningEntryPage: React.FC = () => {
             </Combobox>
           </div>
 
-          {/* Nơi chất tải (Combobox Chọn nhiều) */}
-          <div className="flex flex-col gap-1 min-w-[180px] max-w-[300px]">
-            <span className="font-medium text-gray-600 dark:text-gray-400">
-              Nơi chất tải
-            </span>
-            <Combobox
-              items={uniquePickups}
-              multiple
-              value={selectedPickups}
-              onValueChange={setSelectedPickups}
-            >
-              <ComboboxChips
-                ref={pickupAnchorRef}
-                className="min-h-9 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800 text-xs py-1"
-              >
-                <ComboboxValue placeholder="Tất cả nơi chất tải">
-                  {selectedPickups.map((item) => (
-                    <ComboboxChip key={item} className="text-xs py-0.5">
-                      {item}
-                    </ComboboxChip>
-                  ))}
-                </ComboboxValue>
-                <ComboboxChipsInput
-                  placeholder={
-                    selectedPickups.length === 0 ? "Chọn nơi chất tải..." : ""
-                  }
-                  className="text-xs"
-                />
-              </ComboboxChips>
-              <ComboboxContent
-                anchor={pickupAnchorRef}
-                sideOffset={4}
-                align="start"
-              >
-                <ComboboxEmpty className="text-xs py-2 text-gray-400">
-                  Không tìm thấy nơi chất tải
-                </ComboboxEmpty>
-                <ComboboxList>
-                  {(item) => (
-                    <ComboboxItem
-                      key={item}
-                      value={item}
-                      className="text-xs py-1.5"
-                    >
-                      {item}
-                    </ComboboxItem>
-                  )}
-                </ComboboxList>
-              </ComboboxContent>
-            </Combobox>
-          </div>
-
           {/* Máy xúc (Combobox Chọn nhiều) */}
           <div className="flex flex-col gap-1 min-w-[180px] max-w-[300px]">
             <span className="font-medium text-gray-600 dark:text-gray-400">
               Máy xúc
             </span>
             <Combobox
-              items={uniqueExcavators}
+              items={rawExcavators.map((e) => e.code || String(e.id))}
               multiple
               value={selectedExcavators}
               onValueChange={setSelectedExcavators}
@@ -756,124 +438,67 @@ export const MiningEntryPage: React.FC = () => {
             </Combobox>
           </div>
 
-          {/* Tầng xúc (Combobox Chọn nhiều) */}
-          <div className="flex flex-col gap-1 min-w-[170px] max-w-[280px]">
-            <span className="font-medium text-gray-600 dark:text-gray-400">
-              Tầng xúc
+          {/* Search Box */}
+          <div className="flex-1 min-w-[220px] flex flex-col gap-1">
+            <span className="font-medium text-transparent select-none">
+              Tìm kiếm
             </span>
-            <Combobox
-              items={uniqueScoops}
-              multiple
-              value={selectedScoops}
-              onValueChange={setSelectedScoops}
-            >
-              <ComboboxChips
-                ref={scoopAnchorRef}
-                className="min-h-9 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800 text-xs py-1"
-              >
-                <ComboboxValue placeholder="Tất cả tầng xúc">
-                  {selectedScoops.map((item) => (
-                    <ComboboxChip key={item} className="text-xs py-0.5">
-                      {item}
-                    </ComboboxChip>
-                  ))}
-                </ComboboxValue>
-                <ComboboxChipsInput
-                  placeholder={
-                    selectedScoops.length === 0 ? "Chọn tầng xúc..." : ""
-                  }
-                  className="text-xs"
-                />
-              </ComboboxChips>
-              <ComboboxContent
-                anchor={scoopAnchorRef}
-                sideOffset={4}
-                align="start"
-              >
-                <ComboboxEmpty className="text-xs py-2 text-gray-400">
-                  Không tìm thấy tầng xúc
-                </ComboboxEmpty>
-                <ComboboxList>
-                  {(item) => (
-                    <ComboboxItem
-                      key={item}
-                      value={item}
-                      className="text-xs py-1.5"
-                    >
-                      {item}
-                    </ComboboxItem>
-                  )}
-                </ComboboxList>
-              </ComboboxContent>
-            </Combobox>
-          </div>
-
-          {/* Right section: Search Box + Filter / Reset Buttons */}
-          <div className="ml-auto flex items-end gap-3">
-            {/* Search Box */}
-            <div className="w-[220px] flex flex-col gap-1">
-              <span className="font-medium text-transparent select-none">
-                Tìm kiếm
-              </span>
-              <div className="relative">
-                <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-gray-400" />
-                <Input
-                  type="text"
-                  placeholder="Tìm kiếm..."
-                  value={searchKeyword}
-                  onChange={(e) => setSearchKeyword(e.target.value)}
-                  className="h-9 text-xs pl-8 pr-3"
-                />
-              </div>
-            </div>
-
-            {/* Reset button */}
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleResetFilters}
-                title="Làm mới bộ lọc"
-                className="h-9 w-9 p-0 border-gray-300 dark:border-gray-700"
-              >
-                <RefreshCw className="w-3.5 h-3.5 text-gray-600 dark:text-gray-400" />
-              </Button>
+            <div className="relative">
+              <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-gray-400" />
+              <Input
+                type="text"
+                placeholder="Tìm kiếm máy xúc, số xe, người vận hành..."
+                value={searchKeyword}
+                onChange={(e) => setSearchKeyword(e.target.value)}
+                className="h-9 text-xs pl-8 pr-3"
+              />
             </div>
           </div>
+
+          {/* Reset button */}
+          <FilterResetButton onReset={handleResetFilters} />
         </div>
       </div>
 
-      {/* ══ BẢNG 1: BẢNG BÁO CHUYẾN ══════════════════════════════════════ */}
+      {/* ══ BẢNG: BẢNG BÁO CHUYẾN ══════════════════════════════════════ */}
       <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm overflow-hidden space-y-3 p-4">
         {/* Table Title */}
-        <div className="flex items-center gap-2 text-sm font-bold text-gray-900 dark:text-gray-100">
-          <Truck className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-          <span>1. BẢNG BÁO CHUYẾN</span>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2.5 text-sm font-bold text-gray-900 dark:text-gray-100">
+            <Truck className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+            <span>BẢNG BÁO CHUYẾN</span>
+            {changesRequestedCount > 0 && (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-300 dark:bg-rose-950/60 dark:text-rose-300 dark:border-rose-800 animate-pulse">
+                <AlertTriangle className="w-3 h-3 text-rose-600" />
+                <span>{changesRequestedCount} bản ghi cần sửa</span>
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Table 1 Content using TanStack DataTable */}
         <MiningTripsDataTable
           data={tripRows}
-          selectedIds={selectedTripIds}
-          onToggleSelectAll={toggleSelectAllTrips}
-          onToggleSelectRow={toggleSelectTrip}
+          selectedIds={tripSelection.selectedIds}
+          onToggleSelectAll={tripSelection.toggleSelectAll}
+          onToggleSelectRow={tripSelection.toggleSelect}
         />
       </div>
 
-      {/* ══ BẢNG 2: BẢNG BÁO NHIÊN LIỆU ═════════════════════════════════ */}
+      {/* ══ BẢNG: BẢNG BÁO NHIÊN LIỆU ═════════════════════════════════ */}
       <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm overflow-hidden space-y-3 p-4">
         {/* Table Title */}
         <div className="flex items-center gap-2 text-sm font-bold text-gray-900 dark:text-gray-100">
           <Fuel className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-          <span>2. BẢNG BÁO NHIÊN LIỆU</span>
+          <span>BẢNG BÁO NHIÊN LIỆU</span>
         </div>
 
         {/* Table 2 Content using TanStack DataTable */}
         <MiningFuelDataTable
           data={fuelRows}
-          selectedIds={selectedFuelIds}
-          onToggleSelectAll={toggleSelectAllFuel}
-          onToggleSelectRow={toggleSelectFuel}
+          selectedIds={fuelSelection.selectedIds}
+          onToggleSelectAll={fuelSelection.toggleSelectAll}
+          onToggleSelectRow={fuelSelection.toggleSelect}
         />
       </div>
 

@@ -1,11 +1,14 @@
 import { z } from "zod";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/config/api.config";
-import type { MiningSessionDraft } from "../components/MiningBatchEntryModal";
+import type {
+  MiningSessionDraft,
+  TripRow,
+} from "../components/MiningBatchEntryModal";
 
 export const excavationTripReportTripRequestSchema = z.object({
   vehicleId: z
-    .number({ message: "Số xe không hợp lệ" })
+    .number({ message: "Số xe là bắt buộc" })
     .min(1, "Số xe là bắt buộc"),
   tripCount: z.number().min(1, "Số chuyến phải >= 1"),
   cargoTypeId: z
@@ -39,7 +42,6 @@ export const excavationTripReportRequestSchema = z.object({
   employeeId: z
     .number({ message: "Số thẻ lương là bắt buộc" })
     .min(1, "Số thẻ lương là bắt buộc"),
-  departmentId: z.number().nullable().optional(),
   trips: z
     .array(excavationTripReportTripRequestSchema)
     .min(1, "Cần ít nhất 1 chuyến"),
@@ -62,9 +64,11 @@ export interface ApiResponse<T> {
 
 export interface ExcavationReportTripResponse {
   id: number;
-  vehicleId: number;
-  vehicleCode: string;
-  vehicleName: string;
+  status?: "PENDING" | "APPROVED" | "REVISION_REQUESTED";
+  note?: string;
+  vehicleId?: number;
+  vehicleCode?: string;
+  vehicleName?: string;
   vehicleDepartmentName?: string;
   vehicleCategoryName?: string;
   tripCount: number;
@@ -84,6 +88,12 @@ export interface ExcavationReportResponse {
   excavatorDeviceId: number;
   excavatorDeviceCode: string;
   excavatorDeviceName: string;
+  excavatorDeviceDepartmentName?: string;
+  vehicleId?: number;
+  vehicleCode?: string;
+  vehicleName?: string;
+  vehicleDepartmentName?: string;
+  vehicleCategoryName?: string;
   excavationFloor?: string | null;
   receivingLocationId: number;
   receivingLocationName: string;
@@ -97,6 +107,8 @@ export interface ExcavationReportResponse {
   employeeDepartmentName?: string;
   departmentId?: number;
   departmentName?: string;
+  status?: "PENDING" | "APPROVED" | "REVISION_REQUESTED";
+  note?: string;
   trips: ExcavationReportTripResponse[];
 }
 
@@ -123,6 +135,66 @@ export interface ExcelImportResultResponse {
   successReportCount: number;
   errorRowCount: number;
   errors: string[];
+}
+
+/**
+ * Hàm hỗ trợ map dữ liệu từ 1 MiningSessionDraft (màn hình UI) thành ExcavationTripReportRequest (API Backend)
+ */
+export function buildExcavationTripRequestItem(
+  t: TripRow,
+  masterData: {
+    rawVehicles: any[];
+    rawCargoTypes: any[];
+  },
+  idx: number = 0,
+): ExcavationTripReportTripRequest {
+  // Map vehicleId cho từng chuyến
+  const vehicleItem = masterData.rawVehicles?.find(
+    (v) =>
+      v.code === t.vehicleNo ||
+      v.vehicleNumber === t.vehicleNo ||
+      v.name === t.vehicleNo ||
+      String(v.id) === String(t.vehicleNo),
+  );
+  if (!vehicleItem) {
+    throw new Error(
+      `Chuyến #${idx + 1}: Số xe "${t.vehicleNo}" không tồn tại trong hệ thống`,
+    );
+  }
+  const vehicleId = Number(vehicleItem.id);
+
+  // Map cargoTypeId
+  const cargoTypeItem = masterData.rawCargoTypes.find(
+    (c) => c.name === t.material || String(c.id) === String(t.material),
+  );
+  if (!cargoTypeItem) {
+    throw new Error(
+      `Chuyến #${idx + 1}: Loại hàng "${t.material}" không tồn tại trong hệ thống`,
+    );
+  }
+  const cargoTypeId = Number(cargoTypeItem.id);
+
+  // Map loadLevelType & loadLevelCustomValue
+  let loadLevelType: "FULL_LOAD" | "RODA_2_3" | "OTHER" = "FULL_LOAD";
+  let loadLevelCustomValue: string | null = null;
+
+  if (t.loadStatus === "Roda (2/3)" || t.loadStatus === "RODA_2_3") {
+    loadLevelType = "RODA_2_3";
+  } else if (t.loadStatus === "Khác" || t.loadStatus === "OTHER") {
+    loadLevelType = "OTHER";
+    loadLevelCustomValue = t.loadStatusNote
+      ? t.loadStatusNote.trim().replace(/\s+/g, "")
+      : "1/2";
+  }
+
+  return {
+    vehicleId,
+    tripCount: Number(t.tripCount) || 1,
+    cargoTypeId,
+    loadLevelType,
+    loadLevelCustomValue:
+      loadLevelType === "OTHER" ? loadLevelCustomValue : null,
+  };
 }
 
 /**
@@ -192,63 +264,10 @@ export function buildExcavationReportRequest(
   }
   const employeeId = Number(userItem.id);
 
-  // 4. Map departmentId (Đơn vị)
-  let departmentId: number | undefined;
-  if (sess.department && masterData.rawDepartments) {
-    const dept = masterData.rawDepartments.find(
-      (d) => String(d.name).trim().toLowerCase() === String(sess.department).trim().toLowerCase()
-    );
-    if (dept) {
-      departmentId = Number(dept.id);
-    }
-  }
-
   // 5. Map danh sách chuyến (trips)
-  const trips: ExcavationTripReportTripRequest[] = sess.trips.map((t) => {
-    // Map vehicleId
-    const vehicleItem = masterData.rawVehicles.find(
-      (v) =>
-        v.code === t.vehicleNo ||
-        v.vehicleNumber === t.vehicleNo ||
-        v.name === t.vehicleNo ||
-        String(v.id) === String(t.vehicleNo),
-    );
-    if (!vehicleItem) {
-      throw new Error(`Xe số "${t.vehicleNo}" không tồn tại trong hệ thống`);
-    }
-    const vehicleId = Number(vehicleItem.id);
-
-    // Map cargoTypeId
-    const cargoTypeItem = masterData.rawCargoTypes.find(
-      (c) => c.name === t.material || String(c.id) === String(t.material),
-    );
-    if (!cargoTypeItem) {
-      throw new Error(`Loại hàng "${t.material}" không tồn tại trong hệ thống`);
-    }
-    const cargoTypeId = Number(cargoTypeItem.id);
-
-    // Map loadLevelType & loadLevelCustomValue
-    let loadLevelType: "FULL_LOAD" | "RODA_2_3" | "OTHER" = "FULL_LOAD";
-    let loadLevelCustomValue: string | null = null;
-
-    if (t.loadStatus === "Roda (2/3)" || t.loadStatus === "RODA_2_3") {
-      loadLevelType = "RODA_2_3";
-    } else if (t.loadStatus === "Khác" || t.loadStatus === "OTHER") {
-      loadLevelType = "OTHER";
-      loadLevelCustomValue = t.loadStatusNote
-        ? t.loadStatusNote.trim().replace(/\s+/g, "")
-        : "1/2";
-    }
-
-    return {
-      vehicleId,
-      tripCount: Number(t.tripCount) || 1,
-      cargoTypeId,
-      loadLevelType,
-      loadLevelCustomValue:
-        loadLevelType === "OTHER" ? loadLevelCustomValue : null,
-    };
-  });
+  const trips: ExcavationTripReportTripRequest[] = sess.trips.map((t, idx) =>
+    buildExcavationTripRequestItem(t, masterData, idx),
+  );
 
   return {
     reportDate: sess.workingDate,
@@ -260,7 +279,6 @@ export function buildExcavationReportRequest(
     fuelEnding: Number(sess.finalFuel),
     fuelReceived: Number(sess.receivedFuel),
     employeeId,
-    departmentId,
     trips,
   };
 }
@@ -271,14 +289,26 @@ export function buildExcavationReportRequest(
 export function mapReportResponseToDraft(
   report: ExcavationReportResponse,
 ): MiningSessionDraft {
+  const fallbackVehicleNo =
+    report.vehicleCode ||
+    report.vehicleName ||
+    "";
+  const fallbackVehicleManagementUnit =
+    report.vehicleDepartmentName ||
+    "";
+  const fallbackVehicleType =
+    report.vehicleCategoryName ||
+    "";
+
   return {
     _tempId: `sess_edit_${report.id}`,
     reportId: report.id,
     workingDate: report.reportDate || "",
     shift: report.shiftName || String(report.shiftId || ""),
-    department: report.departmentName || "",
+    department: "",
     pickupLocation: report.receivingLocationName || "",
     excavator: report.excavatorDeviceCode || report.excavatorDeviceName || "",
+    excavatorManagementUnit: report.excavatorDeviceDepartmentName || "",
     totalScoops: report.excavationFloor ? Number(report.excavationFloor) || "" : "",
     initialFuel: report.fuelBeginning ?? "",
     receivedFuel: report.fuelReceived ?? "",
@@ -288,7 +318,9 @@ export function mapReportResponseToDraft(
     operatorUnit: report.employeeDepartmentName || "",
     trips: (report.trips || []).map((t, idx) => ({
       _tempId: `trip_edit_${t.id || idx}`,
-      vehicleNo: t.vehicleCode || t.vehicleName || "",
+      vehicleNo: t.vehicleCode || t.vehicleName || fallbackVehicleNo,
+      vehicleManagementUnit: t.vehicleDepartmentName || fallbackVehicleManagementUnit,
+      vehicleType: t.vehicleCategoryName || fallbackVehicleType,
       tripCount: t.tripCount || 1,
       material: t.cargoTypeName || "",
       loadStatus:
@@ -298,10 +330,92 @@ export function mapReportResponseToDraft(
           ? "Roda (2/3)"
           : "Đủ tải",
       loadStatusNote: t.loadLevelCustomValue || "",
-      vehicleManagementUnit: t.vehicleDepartmentName || "",
-      vehicleType: t.vehicleCategoryName || "",
     })),
   };
+}
+
+/**
+ * Reverse Mapper: Chuyển dữ liệu 1 chuyến ExcavationReportTripResponse sang MiningSessionDraft chỉ gồm chuyến đó
+ */
+export function mapExcavationTripResponseToDraft(
+  tripRes: ExcavationReportTripResponse,
+  baseRecord?: any,
+): MiningSessionDraft {
+  let workingDate = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}-${String(new Date().getDate()).padStart(2, "0")}`;
+  if (baseRecord?.createdAt) {
+    workingDate = baseRecord.createdAt;
+  } else if (baseRecord?.year && baseRecord?.month && baseRecord?.day) {
+    workingDate = `${baseRecord.year}-${String(baseRecord.month).padStart(2, "0")}-${String(baseRecord.day).padStart(2, "0")}`;
+  }
+
+  const rawShift = String(baseRecord?.shift || "1");
+  const cleanShift = rawShift.replace(/^ca\s+/i, "").trim();
+
+  return {
+    _tempId: `sess_mining_trip_${tripRes.id}_${Date.now()}`,
+    reportId: baseRecord?.reportId,
+    singleTripId: tripRes.id,
+    workingDate,
+    shift: cleanShift || "1",
+    department: baseRecord?.departmentName || "",
+    pickupLocation: baseRecord?.pickupLocation || "",
+    excavator:
+      baseRecord?.excavator ||
+      baseRecord?.mineCode ||
+      "",
+    excavatorManagementUnit:
+      baseRecord?.excavatorManagementUnit ||
+      baseRecord?.miningUnit ||
+      "",
+    totalScoops:
+      baseRecord?.totalScoops !== undefined && baseRecord?.totalScoops !== ""
+        ? baseRecord.totalScoops
+        : (baseRecord?.excavationBench ? Number(baseRecord.excavationBench) || "" : ""),
+    initialFuel: baseRecord?.initialFuel ?? "",
+    receivedFuel: baseRecord?.receivedFuel ?? "",
+    finalFuel: baseRecord?.finalFuel ?? "",
+    operatorBadgeNo: baseRecord?.operatorBadgeNo || "",
+    operatorName: baseRecord?.operatorName || "",
+    operatorUnit: baseRecord?.operatorUnit || "",
+    trips: [
+      {
+        _tempId: `trip_${tripRes.id}_${Date.now()}`,
+        vehicleNo:
+          tripRes.vehicleCode ||
+          tripRes.vehicleName ||
+          baseRecord?.vehicleNo ||
+          baseRecord?.transportVehicleNo ||
+          "",
+        vehicleManagementUnit:
+          tripRes.vehicleDepartmentName ||
+          baseRecord?.vehicleManagementUnit ||
+          "",
+        vehicleType:
+          tripRes.vehicleCategoryName ||
+          baseRecord?.vehicleType ||
+          "",
+        tripCount: tripRes.tripCount || 1,
+        material: tripRes.cargoTypeName || "",
+        loadStatus:
+          tripRes.loadLevelType === "OTHER"
+            ? "Khác"
+            : tripRes.loadLevelType === "RODA_2_3"
+            ? "Roda (2/3)"
+            : "Đủ tải",
+        loadStatusNote: tripRes.loadLevelCustomValue || "",
+      },
+    ],
+  };
+}
+
+/**
+ * Gọi API GET /api/excavation-reports/trips/{tripId} (Lấy chi tiết 1 chuyến)
+ */
+export async function fetchExcavationTripById(
+  tripId: number,
+): Promise<ApiResponse<ExcavationReportTripResponse>> {
+  const res = await api.get(`/excavation-reports/trips/${tripId}`);
+  return res.data;
 }
 
 /**
@@ -389,8 +503,59 @@ export async function bulkUpdateExcavationTripReports(
   return res.data;
 }
 
+export interface ExcavationTripBulkUpdateItem {
+  id: number;
+  data: ExcavationTripReportTripRequest;
+}
+
 /**
- * Gọi API DELETE /api/excavation-reports/bulk
+ * Gọi API PUT /api/excavation-reports/trips/{tripId} (Sửa 1 chuyến)
+ */
+export async function updateExcavationTrip(
+  tripId: number,
+  payload: ExcavationTripReportTripRequest,
+): Promise<ApiResponse<ExcavationReportTripResponse>> {
+  const validatedPayload = excavationTripReportTripRequestSchema.parse(payload);
+  const res = await api.put(`/excavation-reports/trips/${tripId}`, validatedPayload);
+  return res.data;
+}
+
+/**
+ * Gọi API DELETE /api/excavation-reports/trips/{tripId} (Xóa 1 chuyến)
+ */
+export async function deleteExcavationTrip(
+  tripId: number,
+): Promise<ApiResponse<void>> {
+  const res = await api.delete(`/excavation-reports/trips/${tripId}`);
+  return res.data;
+}
+
+/**
+ * Gọi API PUT /api/excavation-reports/trips/bulk (Sửa nhiều chuyến)
+ */
+export async function bulkUpdateExcavationTrips(
+  items: ExcavationTripBulkUpdateItem[],
+): Promise<ApiResponse<ExcavationReportTripResponse[]>> {
+  const validatedItems = items.map((item) => ({
+    id: item.id,
+    data: excavationTripReportTripRequestSchema.parse(item.data),
+  }));
+  const res = await api.put("/excavation-reports/trips/bulk", validatedItems);
+  return res.data;
+}
+
+/**
+ * Gọi API DELETE /api/excavation-reports/trips/bulk (Xóa nhiều chuyến)
+ */
+export async function bulkDeleteExcavationTrips(
+  ids: number[],
+): Promise<ApiResponse<BulkDeleteResponse>> {
+  const res = await api.delete("/excavation-reports/trips/bulk", { data: { ids } });
+  return res.data;
+}
+
+/**
+ * Gọi API DELETE /api/excavation-reports/bulk (Xóa nhiều báo cáo ca)
  */
 export async function bulkDeleteExcavationTripReports(
   ids: number[],
@@ -555,3 +720,65 @@ export function useExcavationReportByIdQuery(
     enabled: Boolean(id) && enabled,
   });
 }
+
+// ─── Trip-level Mutation Hooks ───────────────────────────────────────────────
+
+export function useUpdateExcavationTripMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      tripId,
+      payload,
+    }: {
+      tripId: number;
+      payload: ExcavationTripReportTripRequest;
+    }) => updateExcavationTrip(tripId, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["excavationReports"] });
+      queryClient.invalidateQueries({ queryKey: ["reconciliation"] });
+      queryClient.invalidateQueries({ queryKey: ["statistics"] });
+    },
+  });
+}
+
+export function useDeleteExcavationTripMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (tripId: number) => deleteExcavationTrip(tripId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["excavationReports"] });
+      queryClient.invalidateQueries({ queryKey: ["reconciliation"] });
+      queryClient.invalidateQueries({ queryKey: ["statistics"] });
+    },
+  });
+}
+
+export function useBulkUpdateExcavationTripsMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (items: ExcavationTripBulkUpdateItem[]) =>
+      bulkUpdateExcavationTrips(items),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["excavationReports"] });
+      queryClient.invalidateQueries({ queryKey: ["reconciliation"] });
+      queryClient.invalidateQueries({ queryKey: ["statistics"] });
+    },
+  });
+}
+
+export function useBulkDeleteExcavationTripsMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (ids: number[]) => bulkDeleteExcavationTrips(ids),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["excavationReports"] });
+      queryClient.invalidateQueries({ queryKey: ["reconciliation"] });
+      queryClient.invalidateQueries({ queryKey: ["statistics"] });
+    },
+  });
+}
+

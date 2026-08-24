@@ -8,7 +8,7 @@ import type {
   ProductionFilters,
   ProductionReconciliationResponse,
 } from '@/modules/reconciliation/types/reconciliation.types';
-import type { ReconciliationItem } from '@/modules/dataentry/types/thong-ke';
+import type { ApprovalStatus, ReconciliationItem } from '@/modules/dataentry/types/thong-ke';
 
 // ─── Types cho API Đối chiếu Báo chuyến mới ──────────────────────────────────
 export interface ReconciliationSearchParams {
@@ -16,9 +16,11 @@ export interface ReconciliationSearchParams {
   toDate: string;   // YYYY-MM-DD
   shiftIds?: number[];
   deviceIds?: number[];
-  finalizedOnly?: boolean;
+  excavatorIds?: number[];
+  status?: 'PENDING' | 'APPROVED' | 'REVISION_REQUESTED' | ApprovalStatus;
   page?: number;
   size?: number;
+  sort?: string[];
 }
 
 export interface ReconciliationTripDataResponse {
@@ -27,19 +29,21 @@ export interface ReconciliationTripDataResponse {
   loadLevelType?: string;
   loadLevelCustomValue?: string;
   employeeSalaryCode?: string;
+  employeeFullName?: string;
+  status?: ApprovalStatus;
+  note?: string;
 }
 
 export interface ReconciliationDecisionResponse {
-  finalOption: 'TRANSPORT' | 'EXCAVATION' | 'OTHER';
-  customCargoTypeName?: string;
-  customTripCount?: number;
-  customLoadLevelType?: string;
-  customLoadLevelCustomValue?: string;
+  status: ApprovalStatus;
+  note?: string;
 }
 
 export interface ReconciliationRowResponse {
   transportReportTripId?: number;
   excavationReportTripId?: number;
+  transportReportId?: number;   // report-level ID
+  excavationReportId?: number;  // report-level ID
   reportDate: string;
   shiftName: number | string;
   vehicleCode: string;
@@ -59,21 +63,38 @@ export interface ReconciliationRowResponse {
   excavationData?: ReconciliationTripDataResponse;
   matched: boolean;
   decision?: ReconciliationDecisionResponse;
+  status?: ApprovalStatus;
   resolvedData?: ReconciliationTripDataResponse;
 }
 
 export interface ReconciliationDecisionRequest {
   transportReportTripId?: number;
   excavationReportTripId?: number;
-  finalOption: 'TRANSPORT' | 'EXCAVATION' | 'OTHER';
-  customCargoTypeId?: number;
-  customTripCount?: number;
-  customLoadLevelType?: 'FULL_LOAD' | 'RODA_2_3' | 'OTHER';
-  customLoadLevelCustomValue?: string;
+  status: ApprovalStatus;
+  note?: string;
 }
 
 export interface BulkReconciliationDecisionRequest {
   decisions: ReconciliationDecisionRequest[];
+}
+
+export interface ReconciliationTripUpdateRequest {
+  transportReportTripId?: number;
+  excavationReportTripId?: number;
+  cargoTypeId: number;
+  tripCount: number;
+  loadLevelType: 'FULL_LOAD' | 'RODA_2_3' | 'OTHER';
+  loadLevelCustomValue?: string;
+  newReportDate?: string;
+  newShiftId?: number;
+  newVehicleId?: number;
+}
+
+export interface ReportStatusUpdateRequest {
+  reportType: 'TRANSPORT' | 'EXCAVATION';
+  tripId: number;
+  status: ApprovalStatus;
+  note?: string;
 }
 
 export interface PageResponse<T> {
@@ -103,14 +124,20 @@ export const reconciliationService = {
       page: params.page ?? 0,
       size: params.size ?? 200,
     };
-    if (params.finalizedOnly !== undefined) {
-      queryParams.finalizedOnly = params.finalizedOnly;
+    if (params.status) {
+      queryParams.status = params.status;
     }
     if (params.shiftIds && params.shiftIds.length > 0) {
       queryParams.shiftIds = params.shiftIds.join(',');
     }
     if (params.deviceIds && params.deviceIds.length > 0) {
       queryParams.deviceIds = params.deviceIds.join(',');
+    }
+    if (params.excavatorIds && params.excavatorIds.length > 0) {
+      queryParams.excavatorIds = params.excavatorIds.join(',');
+    }
+    if (params.sort && params.sort.length > 0) {
+      queryParams.sort = params.sort;
     }
 
     const response = await axiosInstance.get(
@@ -121,7 +148,7 @@ export const reconciliationService = {
     return res?.data || res?.result || res;
   },
 
-  // POST /api/reconciliation/decisions
+  // POST /api/reconciliation/decisions (Yêu cầu sửa 1 chuyến đối chiếu)
   saveDecision: async (
     payload: ReconciliationDecisionRequest
   ): Promise<ReconciliationDecisionResponse> => {
@@ -133,7 +160,7 @@ export const reconciliationService = {
     return res?.data || res?.result || res;
   },
 
-  // POST /api/reconciliation/decisions/bulk
+  // POST /api/reconciliation/decisions/bulk (Yêu cầu sửa nhiều chuyến đối chiếu cùng lúc)
   saveDecisionsBulk: async (
     payload: BulkReconciliationDecisionRequest
   ): Promise<ReconciliationDecisionResponse[]> => {
@@ -143,6 +170,36 @@ export const reconciliationService = {
     );
     const res = response.data as any;
     return res?.data || res?.result || res;
+  },
+
+  // PUT /api/reconciliation/trips/bulk (Cập nhật dữ liệu chuyến)
+  updateTripsBulk: async (
+    payload: ReconciliationTripUpdateRequest[]
+  ): Promise<void> => {
+    await axiosInstance.put(
+      API.RECONCILIATION.TRIPS_BULK,
+      payload
+    );
+  },
+
+  // PUT /api/reconciliation/report-status (Duyệt 1 báo cáo ca)
+  updateReportStatus: async (
+    payload: ReportStatusUpdateRequest
+  ): Promise<void> => {
+    await axiosInstance.put(
+      API.RECONCILIATION.REPORT_STATUS,
+      payload
+    );
+  },
+
+  // PUT /api/reconciliation/report-status/batch (Duyệt hàng loạt nhiều báo cáo ca)
+  updateReportStatusBatch: async (
+    payload: ReportStatusUpdateRequest[]
+  ): Promise<void> => {
+    await axiosInstance.put(
+      API.RECONCILIATION.REPORT_STATUS_BATCH,
+      payload
+    );
   },
 
   // === Đối chiếu sản lượng cũ ===
@@ -202,6 +259,7 @@ export function useReconciliationSearchQuery(params: ReconciliationSearchParams,
   });
 }
 
+// Yêu cầu sửa 1 chuyến đối chiếu
 export function useSaveReconciliationDecisionMutation() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -212,10 +270,43 @@ export function useSaveReconciliationDecisionMutation() {
   });
 }
 
+// Yêu cầu sửa nhiều chuyến đối chiếu
 export function useSaveReconciliationDecisionsBulkMutation() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (payload: BulkReconciliationDecisionRequest) => reconciliationService.saveDecisionsBulk(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [RECONCILIATION_QUERY_KEY] });
+    },
+  });
+}
+
+export function useUpdateReconciliationTripsBulkMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: ReconciliationTripUpdateRequest[]) => reconciliationService.updateTripsBulk(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [RECONCILIATION_QUERY_KEY] });
+    },
+  });
+}
+
+// Duyệt 1 báo cáo ca (report level)
+export function useUpdateReportStatusMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: ReportStatusUpdateRequest) => reconciliationService.updateReportStatus(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [RECONCILIATION_QUERY_KEY] });
+    },
+  });
+}
+
+// Duyệt hàng loạt nhiều báo cáo ca (report level batch)
+export function useUpdateReportStatusBatchMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: ReportStatusUpdateRequest[]) => reconciliationService.updateReportStatusBatch(payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [RECONCILIATION_QUERY_KEY] });
     },
@@ -248,6 +339,7 @@ export function mapRowResponseToReconciliationItem(
           row.transportData.loadLevelCustomValue
         ),
         operatorBadgeNo: row.transportData.employeeSalaryCode || '',
+        employeeFullName: row.transportData.employeeFullName || '',
         excavationArea: row.excavationAreaName || '',
         excavatorEquipment: row.excavatorName || '',
         pickupLocation: row.loadingPointName || '',
@@ -272,6 +364,7 @@ export function mapRowResponseToReconciliationItem(
           row.excavationData.loadLevelCustomValue
         ),
         operatorBadgeNo: row.excavationData.employeeSalaryCode || '',
+        employeeFullName: row.excavationData.employeeFullName || '',
         mineCode: row.excavatorName || '',
         dumpLocation: row.unloadingPointName || '',
         pickupLocation: row.loadingPointName || '',
@@ -288,6 +381,13 @@ export function mapRowResponseToReconciliationItem(
       ? 'TRANSPORT_ONLY'
       : 'MINING_ONLY';
 
+  const reconciliationStatus: ApprovalStatus =
+    row.status ||
+    row.decision?.status ||
+    (row.transportData?.status === 'APPROVED' || row.excavationData?.status === 'APPROVED' ? 'APPROVED' : undefined) ||
+    'PENDING';
+  const requestNote: string | undefined = row.decision?.note || row.transportData?.note || row.excavationData?.note;
+
   return {
     id: rowId,
     commonKey: {
@@ -302,6 +402,8 @@ export function mapRowResponseToReconciliationItem(
     transportRecord,
     miningRecord,
     status,
+    reconciliationStatus,
+    requestNote,
     backendRow: row,
   };
 }
@@ -319,30 +421,35 @@ export function mapRowResponseToStandardTripReport(
     return 'Khác';
   };
 
-  const finalOpt = row.decision?.finalOption || 'TRANSPORT';
+  const status: ApprovalStatus =
+    row.status ||
+    row.decision?.status ||
+    (row.transportData?.status === 'APPROVED' || row.excavationData?.status === 'APPROVED' ? 'APPROVED' : undefined) ||
+    'PENDING';
   const finalOptionLabel =
-    finalOpt === 'TRANSPORT' ? 'Vận tải' : finalOpt === 'EXCAVATION' ? 'Khai thác' : 'Khác';
+    status === 'APPROVED'
+      ? 'Đã duyệt'
+      : status === 'REVISION_REQUESTED'
+        ? 'Cần sửa'
+        : 'Chờ đối soát';
 
   const resolved = row.resolvedData;
-  const decision = row.decision;
 
   const cargoType =
     resolved?.cargoTypeName ||
-    decision?.customCargoTypeName ||
     row.transportData?.cargoTypeName ||
     row.excavationData?.cargoTypeName ||
     'Than';
 
   const tripCount =
     resolved?.tripCount ??
-    decision?.customTripCount ??
     row.transportData?.tripCount ??
     row.excavationData?.tripCount ??
     0;
 
   const loadStatus = mapLoadLevel(
-    resolved?.loadLevelType || decision?.customLoadLevelType,
-    resolved?.loadLevelCustomValue || decision?.customLoadLevelCustomValue
+    resolved?.loadLevelType || row.transportData?.loadLevelType || row.excavationData?.loadLevelType,
+    resolved?.loadLevelCustomValue || row.transportData?.loadLevelCustomValue || row.excavationData?.loadLevelCustomValue
   );
 
   const rowId = row.transportReportTripId
@@ -369,12 +476,12 @@ export function mapRowResponseToStandardTripReport(
       '-',
     isRainyDay: row.rainyDay ?? false,
     isTraineeVehicle: row.supplementaryVehicle ?? false,
-    finalOption: finalOpt,
+    finalOption: 'TRANSPORT' as const,
     finalOptionLabel,
     cargoType,
     tripCount,
     loadStatus,
     approvedAt: row.reportDate,
-    status: 'Đã chốt' as const,
+    status,
   };
 }

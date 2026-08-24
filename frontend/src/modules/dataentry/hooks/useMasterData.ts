@@ -211,6 +211,33 @@ export function useMasterData(options: UseMasterDataOptions = {}) {
     return { vehicleManagementUnit: "", vehicleType: "" };
   };
 
+  const getExcavatorDetails = (
+    excavatorCode: string,
+  ): { excavatorManagementUnit: string } => {
+    if (!excavatorCode) return { excavatorManagementUnit: "" };
+    const trimmed = excavatorCode.trim().toLowerCase();
+    const found =
+      rawExcavators.find(
+        (d) =>
+          (d.code && d.code.toLowerCase() === trimmed) ||
+          (d.name && d.name.toLowerCase() === trimmed) ||
+          (d.name && d.name.toLowerCase().includes(trimmed)),
+      ) ||
+      rawDevices.find(
+        (d) =>
+          (d.code && d.code.toLowerCase() === trimmed) ||
+          (d.name && d.name.toLowerCase() === trimmed) ||
+          (d.name && d.name.toLowerCase().includes(trimmed)),
+      );
+
+    if (found) {
+      return {
+        excavatorManagementUnit: found.departmentName || "",
+      };
+    }
+    return { excavatorManagementUnit: "" };
+  };
+
   const getOperatorDetails = (
     badgeNo: string,
   ): { operatorName: string; operatorUnit: string } => {
@@ -320,6 +347,7 @@ export function useMasterData(options: UseMasterDataOptions = {}) {
 
     // Lookup functions
     getVehicleDetails,
+    getExcavatorDetails,
     getOperatorDetails,
     getCargoGroupDetails,
     getCargoTypesByGroup,

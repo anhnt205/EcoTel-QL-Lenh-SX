@@ -3,6 +3,7 @@ import type { TransportRecord } from "@/modules/dataentry/types/thong-ke";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { ArrowUpDown, Check } from "lucide-react";
+import { ApprovalStatusBadge } from "@/modules/dataentry/components/ApprovalStatusBadge";
 
 export const getTransportTripsColumns = (
   selectedIds: Set<string>,
@@ -28,6 +29,7 @@ export const getTransportTripsColumns = (
             }
             onCheckedChange={(v) => onToggleSelectAll(!!v)}
             aria-label="Select all"
+            className="border-white data-[state=checked]:bg-white data-[state=checked]:text-blue-600 dark:border-white"
           />
         </div>
       );
@@ -303,7 +305,7 @@ export const getTransportTripsColumns = (
   {
     accessorKey: "equipmentUnit",
     id: "equipmentUnit",
-    header: "Đơn vị quản lý thiết bị",
+    header: "QLTB",
     cell: ({ row }) => row.original.equipmentUnit || "VT7",
     size: 160,
   },
@@ -333,16 +335,9 @@ export const getTransportTripsColumns = (
     size: 140,
   },
   {
-    accessorKey: "departmentName",
-    id: "departmentName",
-    header: "Đơn vị (Báo cáo)",
-    cell: ({ row }) => row.original.departmentName || "-",
-    size: 160,
-  },
-  {
     accessorKey: "operatorUnit",
     id: "operatorUnit",
-    header: "Đơn vị công tác",
+    header: "PXVT",
     cell: ({ row }) => row.original.operatorUnit || "VT7",
     size: 160,
   },
@@ -356,5 +351,19 @@ export const getTransportTripsColumns = (
       </span>
     ),
     size: 130,
+  },
+  {
+    accessorKey: "status",
+    id: "status",
+    header: "Trạng thái",
+    cell: ({ row }) => (
+      <div className="flex justify-center">
+        <ApprovalStatusBadge
+          status={row.original.status}
+          note={row.original.changeRequestNote}
+        />
+      </div>
+    ),
+    size: 115,
   },
 ];

@@ -3,6 +3,7 @@ import type { MiningRecord } from "@/modules/dataentry/types/thong-ke";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { ArrowUpDown } from "lucide-react";
+import { ApprovalStatusBadge } from "@/modules/dataentry/components/ApprovalStatusBadge";
 
 export const getMiningFuelColumns = (
   selectedIds: Set<string>,
@@ -28,6 +29,7 @@ export const getMiningFuelColumns = (
             }
             onCheckedChange={(v) => onToggleSelectAll(!!v)}
             aria-label="Select all"
+            className="border-white data-[state=checked]:bg-white data-[state=checked]:text-blue-600 dark:border-white"
           />
         </div>
       );
@@ -54,7 +56,7 @@ export const getMiningFuelColumns = (
     cell: ({ row }) => (
       <span className="text-gray-500">{row.index + 1}</span>
     ),
-    size: 65,
+    size: 50,
     enableSorting: false,
   },
   {
@@ -134,7 +136,7 @@ export const getMiningFuelColumns = (
   {
     accessorKey: "vehicleManagementUnit",
     id: "vehicleManagementUnit",
-    header: "Đơn vị quản lý thiết bị",
+    header: "QLTB",
     cell: ({ row }) => row.original.vehicleManagementUnit || "VT7",
     size: 150,
   },
@@ -157,16 +159,9 @@ export const getMiningFuelColumns = (
     size: 190,
   },
   {
-    accessorKey: "departmentName",
-    id: "departmentName",
-    header: "Đơn vị (Báo cáo)",
-    cell: ({ row }) => row.original.departmentName || "-",
-    size: 160,
-  },
-  {
     accessorKey: "operatorUnit",
     id: "operatorUnit",
-    header: "Đơn vị công tác",
+    header: "PXVT",
     cell: ({ row }) => row.original.operatorUnit || "VT7",
     size: 160,
   },
@@ -227,5 +222,19 @@ export const getMiningFuelColumns = (
       </span>
     ),
     size: 150,
+  },
+  {
+    accessorKey: "status",
+    id: "status",
+    header: "Trạng thái",
+    cell: ({ row }) => (
+      <div className="flex justify-center">
+        <ApprovalStatusBadge
+          status={row.original.status}
+          note={row.original.changeRequestNote}
+        />
+      </div>
+    ),
+    size: 115,
   },
 ];

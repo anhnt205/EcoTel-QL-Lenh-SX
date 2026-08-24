@@ -1,12 +1,12 @@
 import { z } from "zod";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/config/api.config";
-import type { TransportSessionDraft } from "../components/TransportHeaderDetailModal";
+import type {
+  TransportSessionDraft,
+  TransportTripRow,
+} from "../components/TransportHeaderDetailModal";
 
 export const transportReportTripRequestSchema = z.object({
-  vehicleId: z
-    .number({ message: "Số xe không hợp lệ" })
-    .min(1, "Số xe là bắt buộc"),
   rainyDay: z.boolean().optional(),
   supplementaryVehicle: z.boolean().optional(),
   excavationAreaId: z
@@ -46,13 +46,15 @@ export const transportReportRequestSchema = z.object({
     .string({ message: "Thời gian là bắt buộc" })
     .min(1, "Thời gian là bắt buộc"),
   shiftId: z.number({ message: "Ca là bắt buộc" }).min(1, "Ca là bắt buộc"),
+  vehicleId: z
+    .number({ message: "Số xe là bắt buộc" })
+    .min(1, "Số xe là bắt buộc"),
   employeeId: z
     .number({ message: "Số thẻ lương là bắt buộc" })
     .min(1, "Số thẻ lương là bắt buộc"),
   fuelBeginning: z.number({ message: "Nhiên liệu tồn đầu là bắt buộc" }),
   fuelEnding: z.number({ message: "Nhiên liệu tồn cuối là bắt buộc" }),
   fuelReceived: z.number({ message: "Nhiên liệu lĩnh là bắt buộc" }),
-  departmentId: z.number().nullable().optional(),
   trips: z
     .array(transportReportTripRequestSchema)
     .min(1, "Cần ít nhất 1 chuyến"),
@@ -75,9 +77,11 @@ export interface ApiResponse<T> {
 
 export interface TransportReportTripResponse {
   id: number;
-  vehicleId: number;
-  vehicleCode: string;
-  vehicleName: string;
+  status?: "PENDING" | "APPROVED" | "REVISION_REQUESTED";
+  note?: string;
+  vehicleId?: number;
+  vehicleCode?: string;
+  vehicleName?: string;
   vehicleDepartmentName?: string;
   vehicleCategoryName?: string;
   rainyDay?: boolean;
@@ -111,6 +115,11 @@ export interface TransportReportResponse {
   reportDate: string;
   shiftId: number;
   shiftName: number | string;
+  vehicleId?: number;
+  vehicleCode?: string;
+  vehicleName?: string;
+  vehicleDepartmentName?: string;
+  vehicleCategoryName?: string;
   employeeId: number;
   employeeSalaryCode: string;
   employeeFullName: string;
@@ -121,6 +130,8 @@ export interface TransportReportResponse {
   fuelEnding: number;
   fuelReceived: number;
   fuelUsed?: number;
+  status?: "PENDING" | "APPROVED" | "REVISION_REQUESTED";
+  note?: string;
   trips: TransportReportTripResponse[];
 }
 
@@ -147,6 +158,135 @@ export interface ExcelImportResultResponse {
   successReportCount: number;
   errorRowCount: number;
   errors: string[];
+}
+
+export function buildTransportTripRequestItem(
+  t: TransportTripRow,
+  masterData: {
+    rawLocations: any[];
+    rawExcavators: any[];
+    rawCargoTypes: any[];
+    rawDepartments?: any[];
+  },
+  idx: number = 0,
+): TransportReportTripRequest {
+  // Map excavationAreaId (Khu vực xúc)
+  const areaItem =
+    masterData.rawLocations.find(
+      (l) =>
+        l.name === t.excavationArea ||
+        String(l.id) === String(t.excavationArea),
+    ) ||
+    (masterData.rawDepartments || []).find(
+      (d) =>
+        d.name === t.excavationArea ||
+        String(d.id) === String(t.excavationArea),
+    );
+  if (!areaItem) {
+    throw new Error(
+      `Chuyến #${idx + 1}: Khu vực xúc "${t.excavationArea}" không tồn tại trong hệ thống`,
+    );
+  }
+  const excavationAreaId = Number(areaItem.id);
+
+  // Map excavatorDeviceId (Máy xúc)
+  const excavatorItem = masterData.rawExcavators.find(
+    (d) =>
+      d.code === t.excavatorEquipment ||
+      d.name === t.excavatorEquipment ||
+      String(d.id) === String(t.excavatorEquipment),
+  );
+  if (!excavatorItem) {
+    throw new Error(
+      `Chuyến #${idx + 1}: Máy xúc "${t.excavatorEquipment}" không tồn tại trong hệ thống`,
+    );
+  }
+  const excavatorDeviceId = Number(excavatorItem.id);
+
+  // Map loadingPointId (Nơi nhận tải)
+  const loadingLocItem = masterData.rawLocations.find(
+    (l) =>
+      l.name === t.pickupLocation ||
+      String(l.id) === String(t.pickupLocation),
+  );
+  if (!loadingLocItem) {
+    throw new Error(
+      `Chuyến #${idx + 1}: Nơi nhận tải "${t.pickupLocation}" không tồn tại trong hệ thống`,
+    );
+  }
+  const loadingPointId = Number(loadingLocItem.id);
+
+  // Map unloadingPointId (Nơi dỡ tải)
+  const unloadingLocItem = masterData.rawLocations.find(
+    (l) =>
+      l.name === t.unloadLocationName ||
+      String(l.id) === String(t.unloadLocationName),
+  );
+  if (!unloadingLocItem) {
+    throw new Error(
+      `Chuyến #${idx + 1}: Nơi dỡ tải "${t.unloadLocationName}" không tồn tại trong hệ thống`,
+    );
+  }
+  const unloadingPointId = Number(unloadingLocItem.id);
+
+  // Map cargoTypeId
+  const cargoTypeItem = masterData.rawCargoTypes.find(
+    (c) => c.name === t.cargoType || String(c.id) === String(t.cargoType),
+  );
+  if (!cargoTypeItem) {
+    throw new Error(
+      `Chuyến #${idx + 1}: Loại hàng "${t.cargoType}" không tồn tại trong hệ thống`,
+    );
+  }
+  const cargoTypeId = Number(cargoTypeItem.id);
+
+  // Map loadLevelType & loadLevelCustomValue
+  let loadLevelType: "FULL_LOAD" | "RODA_2_3" | "OTHER" = "FULL_LOAD";
+  let loadLevelCustomValue: string | null = null;
+
+  if (t.loadStatus === "Roda (2/3)" || t.loadStatus === "RODA_2_3") {
+    loadLevelType = "RODA_2_3";
+  } else if (t.loadStatus === "Khác" || t.loadStatus === "OTHER") {
+    loadLevelType = "OTHER";
+    loadLevelCustomValue = t.loadStatusNote
+      ? t.loadStatusNote.trim().replace(/\s+/g, "")
+      : "1/2";
+  }
+
+  return {
+    rainyDay: Boolean(t.isRainyDay),
+    supplementaryVehicle: Boolean(t.isTraineeVehicle),
+    excavationAreaId,
+    excavatorDeviceId,
+    loadingPointId,
+    receivingFloor:
+      t.pickupBench !== "" && t.pickupBench !== undefined && t.pickupBench !== null
+        ? parseInt(String(t.pickupBench), 10) || null
+        : null,
+    unloadingFloor: t.unloadBench || null,
+    totalRouteDistanceKm:
+      t.fullRouteDistance !== "" && t.fullRouteDistance !== undefined
+        ? Number(t.fullRouteDistance) || null
+        : null,
+    totalRouteLiftM:
+      t.fullRouteElevate !== "" && t.fullRouteElevate !== undefined
+        ? Number(t.fullRouteElevate) || null
+        : null,
+    localSlopeDistanceKm:
+      t.localSlopeDist !== "" && t.localSlopeDist !== undefined
+        ? Number(t.localSlopeDist) || null
+        : null,
+    localSlopeM:
+      t.localSlopeDegree !== "" && t.localSlopeDegree !== undefined
+        ? Number(t.localSlopeDegree) || null
+        : null,
+    unloadingPointId,
+    cargoTypeId,
+    tripCount: Number(t.tripCount) || 1,
+    loadLevelType,
+    loadLevelCustomValue:
+      loadLevelType === "OTHER" ? loadLevelCustomValue : null,
+  };
 }
 
 /**
@@ -179,7 +319,22 @@ export function buildTransportReportRequest(
   }
   const shiftId = Number(shiftItem.id);
 
-  // 2. Map employeeId (Người vận hành theo số thẻ lương)
+  // 2. Map vehicleId (Header)
+  const vehicleItem = masterData.rawVehicles.find(
+    (v) =>
+      v.code === sess.vehicleNo ||
+      v.vehicleNumber === sess.vehicleNo ||
+      v.name === sess.vehicleNo ||
+      String(v.id) === String(sess.vehicleNo),
+  );
+  if (!vehicleItem) {
+    throw new Error(
+      `Số xe "${sess.vehicleNo}" không tồn tại trong hệ thống`,
+    );
+  }
+  const vehicleId = Number(vehicleItem.id);
+
+  // 3. Map employeeId (Người vận hành theo số thẻ lương)
   const userItem = masterData.rawUsers.find(
     (u) =>
       u.salaryCode === sess.operatorBadgeNo ||
@@ -193,159 +348,16 @@ export function buildTransportReportRequest(
   }
   const employeeId = Number(userItem.id);
 
-  // 3. Map departmentId (Đơn vị)
-  let departmentId: number | undefined;
-  if (sess.operatorUnit && masterData.rawDepartments) {
-    const dept = masterData.rawDepartments.find(
-      (d) => String(d.name).trim().toLowerCase() === String(sess.operatorUnit).trim().toLowerCase()
-    );
-    if (dept) {
-      departmentId = Number(dept.id);
-    }
-  }
-
   // 4. Map danh sách chuyến (trips)
-  const trips: TransportReportTripRequest[] = sess.trips.map((t, idx) => {
-    // Map vehicleId
-    const vehicleItem = masterData.rawVehicles.find(
-      (v) =>
-        v.code === t.vehicleNo ||
-        v.vehicleNumber === t.vehicleNo ||
-        v.name === t.vehicleNo ||
-        String(v.id) === String(t.vehicleNo),
-    );
-    if (!vehicleItem) {
-      throw new Error(
-        `Chuyến #${idx + 1}: Xe số "${t.vehicleNo}" không tồn tại trong hệ thống`,
-      );
-    }
-    const vehicleId = Number(vehicleItem.id);
-
-    // Map excavationAreaId (Khu vực xúc)
-    const areaItem =
-      masterData.rawLocations.find(
-        (l) =>
-          l.name === t.excavationArea ||
-          String(l.id) === String(t.excavationArea),
-      ) ||
-      (masterData.rawDepartments || []).find(
-        (d) =>
-          d.name === t.excavationArea ||
-          String(d.id) === String(t.excavationArea),
-      );
-    if (!areaItem) {
-      throw new Error(
-        `Chuyến #${idx + 1}: Khu vực xúc "${t.excavationArea}" không tồn tại trong hệ thống`,
-      );
-    }
-    const excavationAreaId = Number(areaItem.id);
-
-    // Map excavatorDeviceId (Máy xúc)
-    const excavatorItem = masterData.rawExcavators.find(
-      (d) =>
-        d.code === t.excavatorEquipment ||
-        d.name === t.excavatorEquipment ||
-        String(d.id) === String(t.excavatorEquipment),
-    );
-    if (!excavatorItem) {
-      throw new Error(
-        `Chuyến #${idx + 1}: Máy xúc "${t.excavatorEquipment}" không tồn tại trong hệ thống`,
-      );
-    }
-    const excavatorDeviceId = Number(excavatorItem.id);
-
-    // Map loadingPointId (Nơi nhận tải)
-    const loadingLocItem = masterData.rawLocations.find(
-      (l) =>
-        l.name === t.pickupLocation ||
-        String(l.id) === String(t.pickupLocation),
-    );
-    if (!loadingLocItem) {
-      throw new Error(
-        `Chuyến #${idx + 1}: Nơi nhận tải "${t.pickupLocation}" không tồn tại trong hệ thống`,
-      );
-    }
-    const loadingPointId = Number(loadingLocItem.id);
-
-    // Map unloadingPointId (Nơi dỡ tải)
-    const unloadingLocItem = masterData.rawLocations.find(
-      (l) =>
-        l.name === t.unloadLocationName ||
-        String(l.id) === String(t.unloadLocationName),
-    );
-    if (!unloadingLocItem) {
-      throw new Error(
-        `Chuyến #${idx + 1}: Nơi dỡ tải "${t.unloadLocationName}" không tồn tại trong hệ thống`,
-      );
-    }
-    const unloadingPointId = Number(unloadingLocItem.id);
-
-    // Map cargoTypeId
-    const cargoTypeItem = masterData.rawCargoTypes.find(
-      (c) => c.name === t.cargoType || String(c.id) === String(t.cargoType),
-    );
-    if (!cargoTypeItem) {
-      throw new Error(
-        `Chuyến #${idx + 1}: Loại hàng "${t.cargoType}" không tồn tại trong hệ thống`,
-      );
-    }
-    const cargoTypeId = Number(cargoTypeItem.id);
-
-    // Map loadLevelType & loadLevelCustomValue
-    let loadLevelType: "FULL_LOAD" | "RODA_2_3" | "OTHER" = "FULL_LOAD";
-    let loadLevelCustomValue: string | null = null;
-
-    if (t.loadStatus === "Roda (2/3)" || t.loadStatus === "RODA_2_3") {
-      loadLevelType = "RODA_2_3";
-    } else if (t.loadStatus === "Khác" || t.loadStatus === "OTHER") {
-      loadLevelType = "OTHER";
-      loadLevelCustomValue = t.loadStatusNote
-        ? t.loadStatusNote.trim().replace(/\s+/g, "")
-        : "1/2";
-    }
-
-    return {
-      vehicleId,
-      rainyDay: Boolean(t.isRainyDay),
-      supplementaryVehicle: Boolean(t.isTraineeVehicle),
-      excavationAreaId,
-      excavatorDeviceId,
-      loadingPointId,
-      receivingFloor:
-        t.pickupBench !== "" && t.pickupBench !== undefined && t.pickupBench !== null
-          ? parseInt(String(t.pickupBench), 10) || null
-          : null,
-      unloadingFloor: t.unloadBench || null,
-      totalRouteDistanceKm:
-        t.fullRouteDistance !== "" && t.fullRouteDistance !== undefined
-          ? Number(t.fullRouteDistance) || null
-          : null,
-      totalRouteLiftM:
-        t.fullRouteElevate !== "" && t.fullRouteElevate !== undefined
-          ? Number(t.fullRouteElevate) || null
-          : null,
-      localSlopeDistanceKm:
-        t.localSlopeDist !== "" && t.localSlopeDist !== undefined
-          ? Number(t.localSlopeDist) || null
-          : null,
-      localSlopeM:
-        t.localSlopeDegree !== "" && t.localSlopeDegree !== undefined
-          ? Number(t.localSlopeDegree) || null
-          : null,
-      unloadingPointId,
-      cargoTypeId,
-      tripCount: Number(t.tripCount) || 1,
-      loadLevelType,
-      loadLevelCustomValue:
-        loadLevelType === "OTHER" ? loadLevelCustomValue : null,
-    };
-  });
+  const trips: TransportReportTripRequest[] = sess.trips.map((t, idx) =>
+    buildTransportTripRequestItem(t, masterData, idx),
+  );
 
   return {
     reportDate: sess.workingDate,
     shiftId,
+    vehicleId,
     employeeId,
-    departmentId,
     fuelBeginning: Number(sess.initialFuel),
     fuelEnding: Number(sess.finalFuel),
     fuelReceived: Number(sess.receivedFuel),
@@ -362,12 +374,31 @@ export function mapReportResponseToDraft(
   const rawShift = String(report.shiftName || report.shiftId || "");
   const cleanShift = rawShift.replace(/^ca\s+/i, "").trim();
 
+  // ponytail: vehicle info at report level or fallback to first trip
+  const vehicleNo =
+    report.vehicleCode ||
+    report.vehicleName ||
+    report.trips?.[0]?.vehicleCode ||
+    report.trips?.[0]?.vehicleName ||
+    "";
+  const equipmentUnit =
+    report.vehicleDepartmentName ||
+    report.trips?.[0]?.vehicleDepartmentName ||
+    "";
+  const vehicleType =
+    report.vehicleCategoryName ||
+    report.trips?.[0]?.vehicleCategoryName ||
+    "";
+
   return {
     _tempId: `sess_edit_${report.id}`,
     reportId: report.id,
     workingDate: report.reportDate || "",
     shift: cleanShift,
-    department: report.departmentName || "",
+    department: "",
+    vehicleNo,
+    equipmentUnit,
+    vehicleType,
     initialFuel: report.fuelBeginning ?? "",
     receivedFuel: report.fuelReceived ?? "",
     finalFuel: report.fuelEnding ?? "",
@@ -389,7 +420,6 @@ export function mapReportResponseToDraft(
       unloadLocationName: t.unloadingPointName || "",
       cargoType: t.cargoTypeName || "",
       cargoGroup: t.cargoGroupName || "",
-      vehicleNo: t.vehicleCode || t.vehicleName || "",
       tripCount: t.tripCount || 1,
       loadStatus:
         t.loadLevelType === "OTHER"
@@ -400,9 +430,81 @@ export function mapReportResponseToDraft(
       loadStatusNote: t.loadLevelCustomValue || "",
       isRainyDay: Boolean(t.rainyDay),
       isTraineeVehicle: Boolean(t.supplementaryVehicle),
-      equipmentUnit: t.vehicleDepartmentName || "",
-      vehicleType: t.vehicleCategoryName || "",
     })),
+  };
+}
+
+/**
+ * Reverse Mapper: Chuyển dữ liệu 1 chuyến TransportReportTripResponse sang TransportSessionDraft chỉ gồm chuyến đó
+ */
+export function mapTransportTripResponseToDraft(
+  tripRes: TransportReportTripResponse,
+  baseRecord?: any,
+): TransportSessionDraft {
+  let workingDate = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}-${String(new Date().getDate()).padStart(2, "0")}`;
+  if (baseRecord?.createdAt) {
+    workingDate = baseRecord.createdAt;
+  } else if (baseRecord?.year && baseRecord?.month && baseRecord?.day) {
+    workingDate = `${baseRecord.year}-${String(baseRecord.month).padStart(2, "0")}-${String(baseRecord.day).padStart(2, "0")}`;
+  }
+
+  const rawShift = String(baseRecord?.shift || "1");
+  const cleanShift = rawShift.replace(/^ca\s+/i, "").trim();
+
+  return {
+    _tempId: `sess_trip_${tripRes.id}_${Date.now()}`,
+    reportId: baseRecord?.reportId,
+    singleTripId: tripRes.id,
+    workingDate,
+    shift: cleanShift || "1",
+    department: baseRecord?.departmentName || "",
+    vehicleNo:
+      tripRes.vehicleCode ||
+      tripRes.vehicleName ||
+      baseRecord?.vehicleNo ||
+      "",
+    equipmentUnit:
+      tripRes.vehicleDepartmentName || baseRecord?.equipmentUnit || "",
+    vehicleType:
+      tripRes.vehicleCategoryName || baseRecord?.vehicleType || "",
+    initialFuel: baseRecord?.initialFuel ?? "",
+    receivedFuel: baseRecord?.receivedFuel ?? "",
+    finalFuel: baseRecord?.finalFuel ?? "",
+    operatorBadgeNo: baseRecord?.operatorBadgeNo || "",
+    operatorName: baseRecord?.operatorName || "",
+    operatorUnit: baseRecord?.operatorUnit || "",
+    trips: [
+      {
+        _tempId: `trip_${tripRes.id}_${Date.now()}`,
+        excavationArea: tripRes.excavationAreaName || "",
+        excavatorEquipment: tripRes.excavatorDeviceName || "",
+        pickupLocation: tripRes.loadingPointName || "",
+        pickupBench:
+          tripRes.receivingFloor != null ? String(tripRes.receivingFloor) : "",
+        pickupBenchGroup:
+          tripRes.receivingFloorGroup != null
+            ? tripRes.receivingFloorGroup
+            : "",
+        unloadBench: tripRes.unloadingFloor || "",
+        fullRouteDistance: tripRes.totalRouteDistanceKm ?? "",
+        fullRouteElevate: tripRes.totalRouteLiftM ?? "",
+        localSlopeDist: tripRes.localSlopeDistanceKm ?? "",
+        localSlopeDegree: tripRes.localSlopeM ?? "",
+        unloadLocationName: tripRes.unloadingPointName || "",
+        cargoType: tripRes.cargoTypeName || "",
+        cargoGroup: tripRes.cargoGroupName || "",
+        tripCount: tripRes.tripCount || 1,
+        loadStatus:
+          tripRes.loadLevelType === "OTHER"
+            ? "Khác"
+            : tripRes.loadLevelType === "RODA_2_3"
+            ? "Roda (2/3)"
+            : "Đủ tải",
+        loadStatusNote: tripRes.loadLevelCustomValue || "",
+        isRainyDay: Boolean(tripRes.rainyDay),
+        isTraineeVehicle: Boolean(tripRes.supplementaryVehicle),
+      },
+    ],
   };
 }
 
@@ -428,7 +530,22 @@ export async function fetchTransportReports(params: {
   page?: number;
   size?: number;
 }): Promise<ApiResponse<PageResponse<TransportReportResponse> | TransportReportResponse[]>> {
-  const res = await api.get("/transport-reports", { params });
+  const queryParams: Record<string, any> = { ...params };
+  if (Array.isArray(params.shiftIds)) {
+    if (params.shiftIds.length > 0) {
+      queryParams.shiftIds = params.shiftIds.join(",");
+    } else {
+      delete queryParams.shiftIds;
+    }
+  }
+  if (Array.isArray(params.deviceIds)) {
+    if (params.deviceIds.length > 0) {
+      queryParams.deviceIds = params.deviceIds.join(",");
+    } else {
+      delete queryParams.deviceIds;
+    }
+  }
+  const res = await api.get("/transport-reports", { params: queryParams });
   return res.data;
 }
 
@@ -439,6 +556,16 @@ export async function fetchTransportReportById(
   id: number,
 ): Promise<ApiResponse<TransportReportResponse>> {
   const res = await api.get(`/transport-reports/${id}`);
+  return res.data;
+}
+
+/**
+ * Gọi API GET /api/transport-reports/trips/{tripId} (Lấy chi tiết 1 chuyến)
+ */
+export async function fetchTransportTripById(
+  tripId: number,
+): Promise<ApiResponse<TransportReportTripResponse>> {
+  const res = await api.get(`/transport-reports/trips/${tripId}`);
   return res.data;
 }
 
@@ -491,8 +618,59 @@ export async function bulkUpdateTransportReports(
   return res.data;
 }
 
+export interface TripBulkUpdateItem {
+  id: number;
+  data: TransportReportTripRequest;
+}
+
 /**
- * Gọi API DELETE /api/transport-reports/bulk
+ * Gọi API PUT /api/transport-reports/trips/{tripId} (Sửa 1 chuyến)
+ */
+export async function updateTransportTrip(
+  tripId: number,
+  payload: TransportReportTripRequest,
+): Promise<ApiResponse<TransportReportTripResponse>> {
+  const validatedPayload = transportReportTripRequestSchema.parse(payload);
+  const res = await api.put(`/transport-reports/trips/${tripId}`, validatedPayload);
+  return res.data;
+}
+
+/**
+ * Gọi API DELETE /api/transport-reports/trips/{tripId} (Xóa 1 chuyến)
+ */
+export async function deleteTransportTrip(
+  tripId: number,
+): Promise<ApiResponse<void>> {
+  const res = await api.delete(`/transport-reports/trips/${tripId}`);
+  return res.data;
+}
+
+/**
+ * Gọi API PUT /api/transport-reports/trips/bulk (Sửa nhiều chuyến)
+ */
+export async function bulkUpdateTransportTrips(
+  items: TripBulkUpdateItem[],
+): Promise<ApiResponse<TransportReportTripResponse[]>> {
+  const validatedItems = items.map((item) => ({
+    id: item.id,
+    data: transportReportTripRequestSchema.parse(item.data),
+  }));
+  const res = await api.put("/transport-reports/trips/bulk", validatedItems);
+  return res.data;
+}
+
+/**
+ * Gọi API DELETE /api/transport-reports/trips/bulk (Xóa nhiều chuyến)
+ */
+export async function bulkDeleteTransportTrips(
+  ids: number[],
+): Promise<ApiResponse<BulkDeleteResponse>> {
+  const res = await api.delete("/transport-reports/trips/bulk", { data: { ids } });
+  return res.data;
+}
+
+/**
+ * Gọi API DELETE /api/transport-reports/bulk (Xóa nhiều báo cáo ca)
  */
 export async function bulkDeleteTransportReports(
   ids: number[],
@@ -510,8 +688,23 @@ export async function exportTransportReports(params: {
   shiftIds?: number[];
   deviceIds?: number[];
 }): Promise<Blob> {
+  const queryParams: Record<string, any> = { ...params };
+  if (Array.isArray(params.shiftIds)) {
+    if (params.shiftIds.length > 0) {
+      queryParams.shiftIds = params.shiftIds.join(",");
+    } else {
+      delete queryParams.shiftIds;
+    }
+  }
+  if (Array.isArray(params.deviceIds)) {
+    if (params.deviceIds.length > 0) {
+      queryParams.deviceIds = params.deviceIds.join(",");
+    } else {
+      delete queryParams.deviceIds;
+    }
+  }
   const res = await api.get("/transport-reports/export", {
-    params,
+    params: queryParams,
     responseType: "blob",
   });
   return res.data;
@@ -657,3 +850,64 @@ export function useTransportReportByIdQuery(
     enabled: Boolean(id) && enabled,
   });
 }
+
+// ─── Trip-level Mutation Hooks ───────────────────────────────────────────────
+
+export function useUpdateTransportTripMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      tripId,
+      payload,
+    }: {
+      tripId: number;
+      payload: TransportReportTripRequest;
+    }) => updateTransportTrip(tripId, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["transportReports"] });
+      queryClient.invalidateQueries({ queryKey: ["reconciliation"] });
+      queryClient.invalidateQueries({ queryKey: ["statistics"] });
+    },
+  });
+}
+
+export function useDeleteTransportTripMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (tripId: number) => deleteTransportTrip(tripId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["transportReports"] });
+      queryClient.invalidateQueries({ queryKey: ["reconciliation"] });
+      queryClient.invalidateQueries({ queryKey: ["statistics"] });
+    },
+  });
+}
+
+export function useBulkUpdateTransportTripsMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (items: TripBulkUpdateItem[]) => bulkUpdateTransportTrips(items),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["transportReports"] });
+      queryClient.invalidateQueries({ queryKey: ["reconciliation"] });
+      queryClient.invalidateQueries({ queryKey: ["statistics"] });
+    },
+  });
+}
+
+export function useBulkDeleteTransportTripsMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (ids: number[]) => bulkDeleteTransportTrips(ids),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["transportReports"] });
+      queryClient.invalidateQueries({ queryKey: ["reconciliation"] });
+      queryClient.invalidateQueries({ queryKey: ["statistics"] });
+    },
+  });
+}
+

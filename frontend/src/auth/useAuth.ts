@@ -12,6 +12,7 @@ interface AppUser {
   username: string;
   fullName: string;
   companyId: number | null;
+  departmentId?: number | null; // ID đơn vị báo cáo của user
   app: string;
   permissions: Record<string, PermissionDto>;
 }
@@ -26,6 +27,7 @@ function decodeUser(): AppUser | null {
       username: payload.username,
       fullName: payload.fullName,
       companyId: payload.companyId ?? null,
+      departmentId: payload.departmentId ?? null,
       app: payload.app,
       permissions: payload.permissions ?? {},
     };
