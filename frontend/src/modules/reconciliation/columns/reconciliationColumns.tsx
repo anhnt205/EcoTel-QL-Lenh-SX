@@ -604,13 +604,9 @@ export function createReconciliationColumns(
             const dirtyItem = getDirtyRow(row.original);
             const val = dirtyItem.transportRecord?.employeeFullName ?? "";
             return (
-              <Input
-                type="text"
-                value={val}
-                readOnly
-                disabled
-                className="h-7 text-xs w-full px-1.5 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 cursor-not-allowed border-gray-200 dark:border-gray-700 font-medium"
-              />
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                {val}
+              </span>
             );
           },
           size: 130,
@@ -789,13 +785,9 @@ export function createReconciliationColumns(
             const dirtyItem = getDirtyRow(row.original);
             const val = dirtyItem.miningRecord?.employeeFullName ?? "";
             return (
-              <Input
-                type="text"
-                value={val}
-                readOnly
-                disabled
-                className="h-7 text-xs w-full px-1.5 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 cursor-not-allowed border-gray-200 dark:border-gray-700 font-medium"
-              />
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                {val}
+              </span>
             );
           },
           size: 130,
@@ -904,6 +896,7 @@ export function createReconciliationColumns(
               );
 
               if (status === "APPROVED") {
+                // ponytail: khi đã duyệt, ẩn nút yêu cầu chỉnh sửa, chỉ hiển thị biểu tượng đã duyệt và nút xóa
                 return (
                   <div className="flex items-center justify-center gap-1.5">
                     <span
@@ -912,7 +905,6 @@ export function createReconciliationColumns(
                     >
                       <Check className="w-4 h-4 stroke-[2.5]" />
                     </span>
-                    {editButtonWithTooltip}
                     <Button
                       size="sm"
                       variant="ghost"
@@ -935,7 +927,6 @@ export function createReconciliationColumns(
                     size="sm"
                     onClick={() => {
                       onApproveItem?.(item.id);
-                      toast.success("Đã duyệt bản ghi!");
                     }}
                     className="h-7 w-7 p-0 bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-2xs transition-all"
                     title="Duyệt bản ghi"

@@ -74,7 +74,7 @@ export function useConfirmDialog() {
       case "info":
         return <Info className="h-6 w-6 text-blue-500 shrink-0" />;
       case "success":
-        return <CheckCircle2 className="h-6 w-6 text-blue-600 shrink-0" />;
+        return <CheckCircle2 className="h-6 w-6 text-emerald-600 shrink-0" />;
       case "warning":
       default:
         return (
@@ -83,12 +83,19 @@ export function useConfirmDialog() {
     }
   };
 
+  const iconBgClass =
+    dialogState.icon === "info"
+      ? "bg-blue-50 dark:bg-blue-950/40 border-blue-200/50 dark:border-blue-900/50"
+      : dialogState.icon === "success"
+      ? "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200/50 dark:border-emerald-900/50"
+      : "bg-amber-50 dark:bg-amber-950/40 border-amber-200/50 dark:border-amber-900/50";
+
   const ConfirmDialogComponent = (
     <AlertDialog open={dialogState.isOpen} onOpenChange={handleOpenChange}>
       <AlertDialogContent className="max-w-[440px] rounded-2xl p-6 bg-background border border-border shadow-2xl">
         <AlertDialogHeader className="space-y-3">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200/50 dark:border-amber-900/50">
+            <div className={cn("p-2.5 rounded-xl border", iconBgClass)}>
               {renderIcon()}
             </div>
             <AlertDialogTitle className="text-lg font-semibold tracking-tight text-foreground">
@@ -104,7 +111,7 @@ export function useConfirmDialog() {
         <AlertDialogFooter className="mt-6 flex flex-row items-center justify-end gap-2 sm:gap-3">
           <AlertDialogCancel
             onClick={dialogState.onCancel}
-            className="rounded-xl px-4 py-2 text-sm"
+            className="rounded-xl px-4 py-2 text-sm cursor-pointer"
           >
             {dialogState.cancelText}
           </AlertDialogCancel>
@@ -113,7 +120,9 @@ export function useConfirmDialog() {
             className={cn(
               "rounded-xl px-4 py-2 text-sm font-medium transition-all shadow-xs cursor-pointer",
               dialogState.variant === "primary" &&
-                "bg-primary text-primary-foreground hover:bg-primary/90",
+                "bg-blue-600 text-white hover:bg-blue-700",
+              dialogState.variant === "destructive" &&
+                "bg-destructive text-destructive-foreground hover:bg-destructive/90",
               dialogState.variant === "warning" &&
                 "bg-amber-600 text-white hover:bg-amber-700",
             )}

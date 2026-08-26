@@ -34,6 +34,7 @@ import { ReconciliationComparisonTables } from "../components/ReconciliationComp
 import { RequestChangeModal } from "../components/RequestChangeModal";
 import { excelService } from "@/modules/report/utils/excel-exporter";
 import { toast } from "sonner";
+import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 
 import { useMasterData } from "@/modules/dataentry/hooks/useMasterData";
 import { useRoleStore } from "@/stores/useRoleStore";
@@ -44,7 +45,11 @@ import {
   useUpdateReconciliationTripsBulkMutation,
   mapRowResponseToReconciliationItem,
 } from "../services/reconciliation.service";
-import {type CardFilterType, KpiCard, type KpiCardConfig} from "@/modules/reconciliation/components/StaticCard.tsx";
+import {
+  type CardFilterType,
+  KpiCard,
+  type KpiCardConfig,
+} from "@/modules/reconciliation/components/StaticCard.tsx";
 
 const isMatchedItem = (item: ReconciliationItem) => {
   const t = item.transportRecord;
@@ -75,6 +80,9 @@ export const ReconciliationPage: React.FC = () => {
   const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({});
   const [isBulkRequestModalOpen, setIsBulkRequestModalOpen] = useState(false);
   const { currentRole, setRole } = useRoleStore();
+
+  // ponytail: confirm dialog for single & bulk approvals
+  const { confirm, ConfirmDialogComponent } = useConfirmDialog();
 
   const saveDecisionMutation = useSaveReconciliationDecisionMutation();
   const saveDecisionsBulkMutation =
@@ -378,6 +386,30 @@ export const ReconciliationPage: React.FC = () => {
 
   const handleApproveItem = async (rowId: string) => {
     const targetItem = rawItems.find((i) => i.id === rowId);
+    if (!targetItem) return;
+
+    if (targetItem.reconciliationStatus === "APPROVED") {
+      toast.info("Bản ghi này đã được phê duyệt!");
+      return;
+    }
+
+    const vehicleText = targetItem.commonKey?.vehicleNo
+      ? `xe ${targetItem.commonKey.vehicleNo}`
+      : "bản ghi này";
+
+    // ponytail: xác nhận trước khi duyệt bản ghi đơn lẻ
+    const isConfirmed = await confirm({
+      title: "Xác nhận duyệt bản ghi đối chiếu",
+      description: `Bạn có chắc chắn muốn phê duyệt kết quả đối chiếu cho ${vehicleText}?`,
+      confirmText: "Phê duyệt",
+      cancelText: "Hủy bỏ",
+      variant: "primary",
+      icon: "info",
+    });
+
+    if (!isConfirmed) return;
+
+    // Optimistic update
     setRawItems((prev) =>
       prev.map((item) =>
         item.id === rowId
@@ -389,7 +421,10 @@ export const ReconciliationPage: React.FC = () => {
     const bRow =
       (targetItem as any)?.backendRow ||
       rawItems.find((i) => i.id === rowId)?.backendRow;
-    if (!targetItem || !bRow) return;
+    if (!bRow) {
+      toast.success("Đã duyệt bản ghi thành công!");
+      return;
+    }
 
     try {
       await saveDecisionMutation.mutateAsync({
@@ -398,9 +433,18 @@ export const ReconciliationPage: React.FC = () => {
         status: "APPROVED",
         // note không bắt buộc khi duyệt
       });
+      toast.success("Đã duyệt bản ghi thành công!");
     } catch (err: any) {
       console.error("Lỗi khi duyệt chuyến:", err);
       toast.error("Duyệt thất bại!");
+      // Revert optimistic update
+      setRawItems((prev) =>
+        prev.map((item) =>
+          item.id === rowId
+            ? { ...item, reconciliationStatus: targetItem.reconciliationStatus }
+            : item,
+        ),
+      );
     }
   };
 
@@ -497,19 +541,41 @@ export const ReconciliationPage: React.FC = () => {
       return;
     }
 
-    const selectedItems = rawItems.filter((i) => selectedIds.includes(i.id));
+    const unapprovedItems = rawItems.filter(
+      (i) =>
+        selectedIds.includes(i.id) && i.reconciliationStatus !== "APPROVED",
+    );
+
+    if (unapprovedItems.length === 0) {
+      toast.info("Tất cả các dòng đã chọn đều đã được phê duyệt!");
+      return;
+    }
+
+    // ponytail: modal xác nhận khi duyệt nhiều bản ghi
+    const isConfirmed = await confirm({
+      title: "Xác nhận duyệt hàng loạt",
+      description: `Bạn có chắc chắn muốn phê duyệt ${unapprovedItems.length} bản ghi đối chiếu đã chọn`,
+      confirmText: `Duyệt (${unapprovedItems.length})`,
+      cancelText: "Hủy bỏ",
+      variant: "primary",
+      icon: "info",
+    });
+
+    if (!isConfirmed) return;
+
+    const unapprovedIds = unapprovedItems.map((i) => i.id);
 
     // Optimistic
     setRawItems((prev) =>
       prev.map((item) =>
-        selectedIds.includes(item.id)
+        unapprovedIds.includes(item.id)
           ? { ...item, reconciliationStatus: "APPROVED" }
           : item,
       ),
     );
     setRowSelection({});
 
-    const decisions = selectedItems
+    const decisions = unapprovedItems
       .filter((item) => (item as any).backendRow)
       .map((item) => {
         const bRow = (item as any).backendRow;
@@ -528,7 +594,7 @@ export const ReconciliationPage: React.FC = () => {
         return;
       }
     }
-    toast.success(`Đã duyệt thành công ${selectedIds.length} dòng!`);
+    toast.success(`Đã duyệt thành công ${unapprovedItems.length} dòng!`);
   };
 
   const handleBulkRequestChangeSubmit = async (
@@ -596,56 +662,94 @@ export const ReconciliationPage: React.FC = () => {
   };
   const kpiCards: KpiCardConfig[] = [
     {
-      key: "all", label: "TẤT CẢ", icon: Layers, value: totalAllCount,
+      key: "all",
+      label: "TẤT CẢ",
+      icon: Layers,
+      value: totalAllCount,
       colorClasses: {
-        active: "bg-slate-100/90 dark:bg-slate-800/80 border-slate-500 ring-2 ring-slate-500/40 shadow-md scale-[1.01]",
-        iconBg: "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300",
-        label: "text-slate-800 dark:text-slate-200", value: "text-slate-900 dark:text-slate-100",
+        active:
+          "bg-slate-100/90 dark:bg-slate-800/80 border-slate-500 ring-2 ring-slate-500/40 shadow-md scale-[1.01]",
+        iconBg:
+          "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300",
+        label: "text-slate-800 dark:text-slate-200",
+        value: "text-slate-900 dark:text-slate-100",
         hover: "hover:border-slate-400 hover:shadow-md",
       },
     },
     {
-      key: "pending", label: "CHỜ ĐỐI SOÁT", icon: Clock, value: pendingCount,
+      key: "pending",
+      label: "CHỜ ĐỐI SOÁT",
+      icon: Clock,
+      value: pendingCount,
       colorClasses: {
-        active: "bg-blue-50/90 dark:bg-blue-950/70 border-blue-500 ring-2 ring-blue-500/40 shadow-md scale-[1.01]",
-        iconBg: "bg-blue-100 dark:bg-blue-900/60 text-blue-600 dark:text-blue-400",
-        label: "text-blue-900 dark:text-blue-300", value: "text-blue-700 dark:text-blue-300",
+        active:
+          "bg-blue-50/90 dark:bg-blue-950/70 border-blue-500 ring-2 ring-blue-500/40 shadow-md scale-[1.01]",
+        iconBg:
+          "bg-blue-100 dark:bg-blue-900/60 text-blue-600 dark:text-blue-400",
+        label: "text-blue-900 dark:text-blue-300",
+        value: "text-blue-700 dark:text-blue-300",
         hover: "hover:border-blue-400 hover:shadow-md",
       },
     },
     {
-      key: "approved", label: "ĐÃ DUYỆT", icon: CheckCheck, value: approvedCount,
+      key: "approved",
+      label: "ĐÃ DUYỆT",
+      icon: CheckCheck,
+      value: approvedCount,
       colorClasses: {
-        active: "bg-emerald-50/90 dark:bg-emerald-950/70 border-emerald-500 ring-2 ring-emerald-500/40 shadow-md scale-[1.01]",
-        iconBg: "bg-emerald-100 dark:bg-emerald-900/60 text-emerald-600 dark:text-emerald-400",
-        label: "text-emerald-900 dark:text-emerald-300", value: "text-emerald-700 dark:text-emerald-300",
+        active:
+          "bg-emerald-50/90 dark:bg-emerald-950/70 border-emerald-500 ring-2 ring-emerald-500/40 shadow-md scale-[1.01]",
+        iconBg:
+          "bg-emerald-100 dark:bg-emerald-900/60 text-emerald-600 dark:text-emerald-400",
+        label: "text-emerald-900 dark:text-emerald-300",
+        value: "text-emerald-700 dark:text-emerald-300",
         hover: "hover:border-emerald-400 hover:shadow-md",
       },
     },
     {
-      key: "not_approved", label: "CHỜ CHỈNH SỬA", icon: XCircle, value: notApprovedCount,
+      key: "not_approved",
+      label: "CHỜ CHỈNH SỬA",
+      icon: XCircle,
+      value: notApprovedCount,
       colorClasses: {
-        active: "bg-rose-50/90 dark:bg-rose-950/70 border-rose-500 ring-2 ring-rose-500/40 shadow-md scale-[1.01]",
-        iconBg: "bg-rose-100 dark:bg-rose-900/60 text-rose-600 dark:text-rose-400",
-        label: "text-rose-900 dark:text-rose-300", value: "text-rose-700 dark:text-rose-300",
+        active:
+          "bg-rose-50/90 dark:bg-rose-950/70 border-rose-500 ring-2 ring-rose-500/40 shadow-md scale-[1.01]",
+        iconBg:
+          "bg-rose-100 dark:bg-rose-900/60 text-rose-600 dark:text-rose-400",
+        label: "text-rose-900 dark:text-rose-300",
+        value: "text-rose-700 dark:text-rose-300",
         hover: "hover:border-rose-400 hover:shadow-md",
       },
     },
     {
-      key: "matched", label: "KHỚP SỐ LIỆU", icon: CheckCircle2, value: matchedCount, suffix: `(${matchedPct}%)`,
+      key: "matched",
+      label: "KHỚP SỐ LIỆU",
+      icon: CheckCircle2,
+      value: matchedCount,
+      suffix: `(${matchedPct}%)`,
       colorClasses: {
-        active: "bg-teal-50/90 dark:bg-teal-950/70 border-teal-600 ring-2 ring-teal-600/40 shadow-md scale-[1.01]",
-        iconBg: "bg-teal-100 dark:bg-teal-900/60 text-teal-600 dark:text-teal-400",
-        label: "text-teal-900 dark:text-teal-300", value: "text-teal-700 dark:text-teal-300",
+        active:
+          "bg-teal-50/90 dark:bg-teal-950/70 border-teal-600 ring-2 ring-teal-600/40 shadow-md scale-[1.01]",
+        iconBg:
+          "bg-teal-100 dark:bg-teal-900/60 text-teal-600 dark:text-teal-400",
+        label: "text-teal-900 dark:text-teal-300",
+        value: "text-teal-700 dark:text-teal-300",
         hover: "hover:border-teal-400 hover:shadow-md",
       },
     },
     {
-      key: "mismatch", label: "SAI LỆCH", icon: AlertTriangle, value: mismatchCount, suffix: `(${mismatchPct}%)`,
+      key: "mismatch",
+      label: "SAI LỆCH",
+      icon: AlertTriangle,
+      value: mismatchCount,
+      suffix: `(${mismatchPct}%)`,
       colorClasses: {
-        active: "bg-amber-50/90 dark:bg-amber-950/70 border-amber-600 ring-2 ring-amber-600/40 shadow-md scale-[1.01]",
-        iconBg: "bg-amber-100 dark:bg-amber-900/60 text-amber-600 dark:text-amber-400",
-        label: "text-amber-900 dark:text-amber-300", value: "text-amber-600 dark:text-amber-400",
+        active:
+          "bg-amber-50/90 dark:bg-amber-950/70 border-amber-600 ring-2 ring-amber-600/40 shadow-md scale-[1.01]",
+        iconBg:
+          "bg-amber-100 dark:bg-amber-900/60 text-amber-600 dark:text-amber-400",
+        label: "text-amber-900 dark:text-amber-300",
+        value: "text-amber-600 dark:text-amber-400",
         hover: "hover:border-amber-400 hover:shadow-md",
       },
     },
@@ -856,12 +960,12 @@ export const ReconciliationPage: React.FC = () => {
 
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         {kpiCards.map((card) => (
-            <KpiCard
-                key={card.key}
-                config={card}
-                isActive={cardFilter === card.key}
-                onClick={() => handleCardClick(card.key)}
-            />
+          <KpiCard
+            key={card.key}
+            config={card}
+            isActive={cardFilter === card.key}
+            onClick={() => handleCardClick(card.key)}
+          />
         ))}
       </div>
 
@@ -889,11 +993,12 @@ export const ReconciliationPage: React.FC = () => {
                     const eligible = rawItems.filter(
                       (i) =>
                         rowSelection[i.id] &&
-                        i.reconciliationStatus !== "REVISION_REQUESTED",
+                        i.reconciliationStatus !== "REVISION_REQUESTED" &&
+                        i.reconciliationStatus !== "APPROVED",
                     );
                     if (eligible.length === 0) {
                       toast.warning(
-                        "Tất cả các dòng đã chọn đều đang chờ đơn vị chỉnh sửa lại!",
+                        "Tất cả các dòng đã chọn đều đã được duyệt hoặc đang chờ đơn vị chỉnh sửa lại!",
                       );
                       return;
                     }
@@ -929,17 +1034,19 @@ export const ReconciliationPage: React.FC = () => {
           onResubmitItem={handleResubmitItem}
         />
 
-        {/* Modal Yêu cầu sửa hàng loạt (chỉ áp dụng các dòng chưa ở trạng thái REVISION_REQUESTED) */}
+        {/* Modal Yêu cầu sửa hàng loạt (chỉ áp dụng các dòng chưa ở trạng thái REVISION_REQUESTED hoặc APPROVED) */}
         <RequestChangeModal
           isOpen={isBulkRequestModalOpen}
           onClose={() => setIsBulkRequestModalOpen(false)}
           items={rawItems.filter(
             (i) =>
               rowSelection[i.id] &&
-              i.reconciliationStatus !== "REVISION_REQUESTED",
+              i.reconciliationStatus !== "REVISION_REQUESTED" &&
+              i.reconciliationStatus !== "APPROVED",
           )}
           onSubmit={handleBulkRequestChangeSubmit}
         />
+        {ConfirmDialogComponent}
       </div>
     </div>
   );

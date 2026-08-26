@@ -396,7 +396,6 @@ export const ReconciliationComparisonTables: React.FC<
             {table.getRowModel().rows?.length ? (
               table.getRowModel().rows.map((row) => {
                 const item = row.original;
-                const matched = isMatched(item);
                 const isSelected = row.getIsSelected();
                 const isChangesRequested =
                   item.reconciliationStatus === "REVISION_REQUESTED" ||
@@ -407,15 +406,11 @@ export const ReconciliationComparisonTables: React.FC<
                 if (isSelected) {
                   rowBg = "bg-blue-100/80 hover:bg-blue-100 dark:bg-blue-900/50 dark:hover:bg-blue-900/60";
                 } else if (isChangesRequested) {
-                  // ponytail: amber/blue tint + viền nổi bật cho các dòng có yêu cầu chỉnh sửa
-                  rowBg = "bg-amber-50/90 hover:bg-amber-100/90 dark:bg-amber-950/40 dark:hover:bg-amber-900/50";
+                  // ponytail: viền nổi bật cho các dòng có yêu cầu chỉnh sửa
+                  rowBg = "bg-amber-50/60 hover:bg-amber-100/70 dark:bg-amber-950/40 dark:hover:bg-amber-900/50";
                   rowBorder = "border-l-4 border-l-amber-500 dark:border-l-amber-400";
-                } else if (matched) {
-                  // ponytail: light blue highlight for matched rows matching the check icon
-                  rowBg = "bg-blue-50/50 hover:bg-blue-100/50 dark:bg-blue-950/25 dark:hover:bg-blue-900/35";
                 } else {
-                  // ponytail: light amber highlight for mismatched rows matching the alert icon
-                  rowBg = "bg-amber-50/80 hover:bg-amber-100/70 dark:bg-amber-950/30 dark:hover:bg-amber-900/40";
+                  rowBg = "hover:bg-gray-50/70 dark:hover:bg-gray-800/40";
                 }
 
                 return (
@@ -426,12 +421,29 @@ export const ReconciliationComparisonTables: React.FC<
                     {row.getVisibleCells().map((cell) => {
                       const colId = cell.column.id;
                       const isCommonInfo = colId === "common_info_panel";
+                      const isGroupTransport =
+                        colId === "group_transport_data" ||
+                        cell.column.parent?.id === "group_transport_data" ||
+                        colId.startsWith("trans");
+                      const isGroupMining =
+                        colId === "group_mining_data" ||
+                        cell.column.parent?.id === "group_mining_data" ||
+                        colId.startsWith("mining");
+
                       let cellBg = "";
+
+                      if (isSelected) {
+                        cellBg = "bg-blue-100/80 dark:bg-blue-900/50";
+                      } else if (isGroupTransport) {
+                        cellBg = "bg-emerald-50/50 dark:bg-emerald-950/25";
+                      } else if (isGroupMining) {
+                        cellBg = "bg-sky-50/50 dark:bg-sky-950/25";
+                      }
 
                       return (
                         <TableCell
                           key={cell.id}
-                          className={`text-center border-r border-gray-100 dark:border-gray-800/80 last:border-r-0 ${cellBg} ${
+                          className={`text-center ${cellBg} ${
                             isCommonInfo ? "p-0 overflow-hidden" : "px-2 py-2"
                           }`}
                           style={{
