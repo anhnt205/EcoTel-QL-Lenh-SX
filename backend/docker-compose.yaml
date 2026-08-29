@@ -40,7 +40,10 @@ services:
     env_file:
       - .env
     ports:
-      - "8099:8090"
+      # App thật lắng nghe 8088 (server.port trong application-dev.yaml,
+      # EXPOSE 8088 trong Dockerfile) — trước đây map nhầm sang 8090, khiến
+      # publish host port không bao giờ khớp gì cả. Xem docs/TECHNICAL_DEBT.md.
+      - "8099:8088"
     depends_on:
       postgres:
         condition: service_healthy

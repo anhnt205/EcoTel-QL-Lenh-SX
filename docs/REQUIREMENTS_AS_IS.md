@@ -8,16 +8,21 @@ thuật, `docs/TECHNICAL_DEBT.md` cho các phát hiện cần xử lý.
 ## 1. Bối cảnh nghiệp vụ
 
 Hệ thống thống kê sản lượng khai thác than tại mỏ Cao Sơn (Cẩm Phả, Quảng
-Ninh) — tương tự nhóm ứng dụng "Lệnh sản xuất" khác trong factory (TK-HATU
-= Hà Tu, DIEU-PHOI-MM = điều phối máy móc), nhưng là một triển khai RIÊNG,
-tech stack khác hẳn (Spring Boot/Postgres/React thay vì Node/MongoDB), có
-thêm module đồng bộ dữ liệu MỘT CHIỀU từ hệ MongoDB cũ.
+Ninh) — tương tự về nghiệp vụ với nhóm ứng dụng "Lệnh sản xuất" khác trong
+factory (TK-HATU, DIEU-PHOI-MM), nhưng là một triển khai ĐỘC LẬP, tech
+stack khác hẳn (Spring Boot/Postgres/React), 100% PostgreSQL — KHÔNG còn
+phụ thuộc MongoDB (cơ chế đồng bộ cũ đã gỡ bỏ 2026-08-29). Sẽ tích hợp với
+DIEU-PHOI-MM trong tương lai qua cơ chế riêng (chưa thiết kế), không liên
+quan TK-HATU.
 
 ## 2. Chức năng đã có code + có route/API — hoạt động được về mặt kỹ thuật
 
-(Chưa verify qua UI/browser thật trong lượt onboarding này — chỉ xác nhận
-build PASS + tồn tại controller/route khớp nhau. Do bảo mật đang tắt hoàn
-toàn, "gọi được API" không đồng nghĩa "đã được duyệt về mặt nghiệp vụ".)
+(Lượt onboarding 1: chỉ xác nhận build PASS + route tồn tại, chưa verify UI
+thật. Lượt 2 (2026-08-29): ĐÃ verify sống qua preview Docker thật — health/
+swagger/auth public hoạt động đúng, API nghiệp vụ đúng là yêu cầu JWT thật
+(401 nếu thiếu/token giả) — xem `docs/ARCHITECTURE_CURRENT.md` mục 3. Chưa
+verify luồng nghiệp vụ CHI TIẾT bên trong từng API qua UI thật (ngoài phạm
+vi 2 lượt vừa qua).
 
 - **Đăng nhập qua Portal SSO**: exchange one-time-code lấy token, refresh
   token khi hết hạn (`AuthController`).
@@ -33,20 +38,16 @@ toàn, "gọi được API" không đồng nghĩa "đã được duyệt về m�
   `MiningEntryPage`): tương tự Vận tải nhưng cho hoạt động khai thác/máy
   xúc (`ExcavationReportTrip`). Cũng có import/export Excel.
 - **Đối chiếu (Reconciliation)**: `ReconciliationController` +
-  `ReconciliationDecision` — module MỚI NHẤT trong lịch sử Git (2 commit
-  cuối trước onboarding). UI có bảng so sánh + dialog xác nhận
-  (`ReconciliationPage`, `StandardTripReportPage`). Suy luận từ tên bảng/
-  entity: so sánh số liệu nhập tay với số liệu đồng bộ từ hệ Mongo cũ,
-  người dùng xác nhận giữ số nào — **chưa đọc sâu logic chi tiết** (ngoài
-  phạm vi đọc kiến trúc của onboarding này).
-- **Đồng bộ dữ liệu từ hệ cũ** (khi bật `sync.mongo.enabled=true`): tự
-  động đồng bộ danh mục (không phải báo cáo) từ MongoDB "Lệnh SX" qua
-  Change Streams — xem chi tiết kỹ thuật ở ARCHITECTURE_CURRENT mục 4.
+  `ReconciliationDecision` — module MỚI NHẤT trong lịch sử Git. UI có bảng
+  so sánh + dialog xác nhận (`ReconciliationPage`, `StandardTripReportPage`).
+  Trước đây đối chiếu với dữ liệu đồng bộ từ hệ Mongo cũ — cơ chế đó đã gỡ
+  bỏ (2026-08-29), nguồn dữ liệu đối chiếu tương lai cần thiết kế lại cùng
+  lúc tích hợp DIEU-PHOI-MM. **Chưa đọc sâu logic chi tiết**.
 - **Xuất/nhập Excel** cho cả 2 loại báo cáo (Vận tải, Khai thác).
 - **Swagger/OpenAPI**: `/swagger-ui.html`, `/v3/api-docs` — tự sinh từ
   annotation, công khai không cần đăng nhập ở mọi profile.
 
-## 3. Vai trò/quyền — theo thiết kế (chưa thực thi thật, xem mục 5)
+## 3. Vai trò/quyền — ĐANG THỰC THI THẬT (bật lại 2026-08-29)
 
 - `Role` enum ở backend (nội dung cụ thể chưa liệt kê chi tiết trong lượt
   đọc này — xem `enums/Role.java` nếu cần).
@@ -74,24 +75,33 @@ toàn, "gọi được API" không đồng nghĩa "đã được duyệt về m�
 
 ## 5. Chức năng có code nhưng KHÔNG hoạt động đúng / không truy cập được như thiết kế
 
-- **Xác thực/phân quyền API**: có code đầy đủ (`AppTokenFilter`,
-  `PermissionFilter`, OAuth2 resource server) nhưng bị VÔ HIỆU HOÁ hoàn
-  toàn trong `SecurityConfig` hiện tại — API thực tế PUBLIC 100%, không
-  khớp với thiết kế "phải có JWT + permission". Xem TECHNICAL_DEBT mục 🔴 1.
-- **WebSocket/`/socket.io/`** — có route ở tầng reverse-proxy nhưng backend
-  Java hiện không thấy dependency Socket.IO nào — nhiều khả năng route này
-  chết/copy nhầm từ project khác. Xem TECHNICAL_DEBT mục 6.
-- **Healthcheck backend qua Docker Compose local** — cấu hình port sai
-  (`8099:8090` trong khi app lắng nghe `8088`) nên container không bao giờ
-  báo "healthy" đúng cách qua cổng đó dù app có thể vẫn chạy tốt bên trong.
-  Xem TECHNICAL_DEBT mục 5.
+- ~~Xác thực/phân quyền API bị vô hiệu hoá~~ — **ĐÃ SỬA 2026-08-29**, xem
+  `docs/ARCHITECTURE_CURRENT.md` mục 3 (verify sống thật qua preview).
+- **WebSocket/`/socket.io/`** — vẫn còn ở `nginx_staging.conf` (không đụng
+  trong lượt sửa lần 2), backend Java vẫn không có dependency Socket.IO
+  nào. Xem TECHNICAL_DEBT.
+- ~~Healthcheck backend port sai~~ — **ĐÃ SỬA 2026-08-29**
+  (`backend/docker-compose.yaml`).
+- **`SignInPage` không có route nào dùng** (phát hiện mới lượt 2) — luồng
+  đăng nhập thật hiện chỉ hoạt động khi bắt đầu từ Portal (đọc `?code=`
+  trên URL), không có đường vào trực tiếp từ app này. Xem TECHNICAL_DEBT
+  mục 6.
 
-## 6. Chưa xác nhận (cần hỏi chủ dự án)
+## 6. Đồng bộ dữ liệu hệ cũ — ĐÃ GỠ BỎ (2026-08-29)
 
-1. MongoDB "Lệnh SX" nguồn đồng bộ có phải chính hệ mà TK-HATU/DIEU-PHOI-MM
-   đang dùng không?
-2. Mật khẩu gốc của tài khoản `admin` đã seed (chỉ có hash).
-3. `.anyRequest().permitAll() // test` — có đúng là quên revert cấu hình
-   debug hay là chủ đích tạm thời cho giai đoạn phát triển hiện tại?
-4. Logic nghiệp vụ chi tiết của module Đối chiếu (chưa đọc sâu trong lượt
-   onboarding này).
+Cơ chế đồng bộ MongoDB Change Streams từ hệ "Lệnh SX" cũ đã bị GỠ HOÀN
+TOÀN khỏi code theo yêu cầu người dùng — dự án này độc lập, sẽ tích hợp lại
+với DIEU-PHOI-MM trong tương lai qua cơ chế riêng (chưa thiết kế), không
+liên quan TK-HATU. Toàn bộ mục 2 + 5 (bản cũ) liên quan Mongo trong tài
+liệu này không còn áp dụng.
+
+## 7. Chưa xác nhận (cần hỏi chủ dự án)
+
+1. Mật khẩu gốc của tài khoản `admin` đã seed (chỉ có hash) — không tự đoán.
+2. Logic nghiệp vụ chi tiết của module Đối chiếu (chưa đọc sâu) — đặc biệt
+   nguồn dữ liệu đối chiếu MỚI sẽ là gì sau khi bỏ Mongo (trước đây đối
+   chiếu với dữ liệu sync từ hệ cũ).
+3. Cơ chế tích hợp cụ thể với DIEU-PHOI-MM trong tương lai (chưa thiết kế,
+   ngoài phạm vi lượt sửa này).
+4. `SignInPage` không route nào dùng — chủ đích (chỉ vào qua Portal) hay
+   code dở dang?

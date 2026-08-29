@@ -1,78 +1,89 @@
 # Context — THONGKE-CAOSON
 
-Cập nhật lần cuối: 2026-08-29 (onboarding lượt 1, hoàn chỉnh). Đọc file này
-TRƯỚC khi tiếp tục — tin file này hơn lịch sử chat đã bị nén.
+Cập nhật lần cuối: 2026-08-29 (lượt 2 — chuyển DB độc lập + bật lại bảo
+mật + dựng preview sống thật, theo yêu cầu trực tiếp của người dùng). Đọc
+file này TRƯỚC khi tiếp tục — tin file này hơn lịch sử chat đã bị nén.
 
 ## Tóm tắt trạng thái
 
-Dự án brownfield, đã onboarding xong lượt 1 (đọc + phân tích + tài liệu
-hoá + build/test baseline thật, **KHÔNG sửa chức năng nghiệp vụ** theo
-đúng yêu cầu). Đã tạo đủ file bắt buộc: `project.yaml`, `CLAUDE.md`,
-`Requirement.md`, `docs/CODEBASE_MAP.md`, `docs/ARCHITECTURE_CURRENT.md`,
-`docs/REQUIREMENTS_AS_IS.md`, `docs/TECHNICAL_DEBT.md`,
-`.factory/pipeline.json` + file này.
+Sau lượt onboarding 1 (chỉ đọc + tài liệu hoá), người dùng yêu cầu 3 việc
+cụ thể qua session tương tác (đã hỏi rõ phạm vi bằng AskUserQuestion trước
+khi làm, người dùng chọn phương án khuyến nghị cho cả 3):
 
-**Phát hiện quan trọng nhất**: toàn bộ xác thực/phân quyền API đang bị TẮT
-hoàn toàn (`SecurityConfig.java`: `.anyRequest().permitAll() // test`) —
-xem `docs/TECHNICAL_DEBT.md` mục 🔴 1. `automation.allow_apply_code` đã TẮT
-trong `project.yaml` vì lý do này.
+1. **Gỡ hẳn code sync MongoDB** — dự án độc lập, không liên quan TK-HATU,
+   sẽ tích hợp lại với DIEU-PHOI-MM sau này qua cơ chế riêng.
+2. **Dựng preview local chạy thật** qua Factory (không chỉ sửa code build
+   sạch).
+3. **Bật lại JWT + permission** (thay vì giữ nguyên lỗ hổng permitAll).
 
-## Đã làm — lượt 1 (onboarding, không sửa code nghiệp vụ)
+Cả 3 đã hoàn thành + verify sống thật. Chi tiết đầy đủ từng thay đổi + lý
+do: `docs/TECHNICAL_DEBT.md` phần "✅ Đã sửa trong lượt này".
 
-1. Clone thật từ `https://github.com/anhnt205/THONG_KE_CAO_SON.git`, giữ
-   nguyên lịch sử Git gốc (branches gốc: `main`, `auth`, `feature/backend`
-   trên remote). Checkout `main`, tạo nhánh `chore/factory-onboarding`.
-2. Đọc toàn bộ: công nghệ (Spring Boot 4.0.7/Java 21 + React 19/Vite 8),
-   cấu trúc thư mục, 12 module nghiệp vụ (danh mục + Vận tải + Khai thác +
-   Đối chiếu), schema DB (SQL thuần, không Flyway/Liquibase), toàn bộ 11
-   controller/21 model/17 repository, cơ chế đăng nhập qua Portal SSO
-   (one-time-code exchange), cơ chế đồng bộ MongoDB Change Streams (1
-   chiều, từ hệ "Lệnh SX" cũ), build/test/deploy (Docker + GitHub Actions
-   deploy-staging.yml), toàn bộ biến môi trường.
-3. Kiểm tra secret: grep sweep pattern (AWS key, private key, password/
-   secret/api-key hardcode) trên toàn repo — KHÔNG tìm thấy secret thật
-   nào bị commit. `.env`/`.env.*` không tồn tại (kể cả trên đĩa, ngoài git)
-   — đúng `.gitignore`. Chỉ có 2 default dev vô hại (`postgres`/`password`,
-   Mongo `root`/`example`) — đã ghi nhận, KHÔNG copy giá trị thật ra bất kỳ
-   đâu trong tài liệu.
-4. Xác định + verify THẬT lệnh build/test bằng cách chạy trong Docker
-   (2026-08-29):
-   - **Backend build**: `docker build -t thongkecs-backend-baseline
-     ./backend` — PASS (~26s, Maven multi-stage).
-   - **Backend test**: `docker build --target builder -t
-     thongkecs-backend-builder ./backend && docker run --rm
-     thongkecs-backend-builder mvn -B test` — **FAIL THẬT**
-     (`ThongKeCaoSonApplicationTests.contextLoads` không boot được
-     ApplicationContext vì thiếu JDBC datasource sống — không có H2/
-     Testcontainers). Xem `docs/TECHNICAL_DEBT.md` mục 3.
-   - **Frontend build**: `docker build -t thongkecs-frontend-baseline
-     ./frontend` — PASS (~30s, pnpm + vite build).
-   - **Frontend test**: không có script `test` trong `package.json`.
-5. Tạo 9 file bắt buộc (liệt kê ở trên) — nội dung dựa 100% trên code đọc
-   được, không suy đoán/bịa.
-6. Commit toàn bộ trên nhánh `chore/factory-onboarding` (KHÔNG đụng
-   `main`), CHƯA push lên remote.
+## Đã làm — lượt 2 (2026-08-29)
+
+1. **Gỡ MongoDB**: xoá `sync/` (toàn package), `MongoSyncConfig.java`,
+   `SyncCheckpoint.java`+repository, dependency `mongodb-driver-sync`,
+   block `mongo:`/`sync:` khỏi cả 3 `application*.yaml`. Verify: grep sạch,
+   build PASS, preview chạy không lỗi.
+2. **Bật lại security**: uncomment `oauth2ResourceServer`/`.anyRequest()
+   .authenticated()`/2 filter trong `SecurityConfig.java`. Phát hiện + sửa
+   thêm: (a) `/api/auth/**` thiếu trong `PUBLIC_ENDPOINT` (sẽ khoá luôn cả
+   đăng nhập nếu không thêm), (b) `jwk-uri` sai tên property trong
+   `application-prod.yaml` (phải là `jwk-set-uri`).
+3. **Dựng preview local chạy thật** — file MỚI:
+   `deployment/preview/preview-docker-compose.yaml` (postgres+redis+
+   backend+frontend+reverse-proxy, join `factory-preview`),
+   `reverse_proxy/nginx_preview.conf` (route `/`, `/api/` — không có
+   `/socket.io/`), thêm ARG/ENV `VITE_API_KONG_URL`/`VITE_PORTAL_URL` vào
+   `frontend/Dockerfile`. Phát hiện + sửa 1 bug thật lúc build: `proxy_pass`
+   dùng biến trong `location /api/` làm path bị double-prefix
+   `/api/api/...` — sửa bằng `proxy_pass` tĩnh.
+4. **Portal integration cho preview**: PORTAL-PM chưa chạy → đã tự khởi
+   động preview của nó (`docker compose -f docker-compose.local.yml
+   --env-file .env.local up -d --build`, dùng `.env.local` có sẵn từ
+   trước). JWKS thật của Portal chỉ reachable qua `reverse-proxy` (Kong),
+   KHÔNG qua `portal-service` trực tiếp (verify: gọi thẳng `portal-service`
+   trả `401`, qua `reverse-proxy:8888` trả `200` JWKS thật). Bridge bằng
+   `docker network connect thongke-caoson-preview_portal-link
+   portal-pm-local-reverse-proxy-1 --alias portal-gateway` (runtime, không
+   sửa compose PORTAL-PM).
+5. **Fix nhỏ khác**: port healthcheck sai trong `backend/docker-compose.yaml`
+   (`8099:8090`→`8099:8088`), thêm `backend/.env.example`.
+6. **Verify sống đầy đủ qua preview** (`http://thongke-caoson.preview.localhost:8080/`):
+   - Frontend load được (title đúng "Phần Mềm Thống Kê Cao Sơn"), `AuthGate`
+     hiện đúng màn "Xác thực thất bại — Không tìm thấy token" khi chưa có
+     `?code=` (đúng hành vi mong đợi, KHÔNG phải lỗi).
+   - `/actuator/health`, `/swagger-ui/index.html` → `200`.
+   - `/api/auth/exchange-code` (code giả) → `500` (public, reach được
+     controller, lỗi nghiệp vụ thật — KHÔNG bị chặn bởi security).
+   - `/api/users` không token → `401`; token giả → `401`.
+   - JWKS Portal thật qua bridge → `200`, trả đúng bộ khoá RSA.
+7. **Cập nhật toàn bộ tài liệu** phản ánh trạng thái mới: `project.yaml`,
+   `CLAUDE.md`, `docs/{CODEBASE_MAP,ARCHITECTURE_CURRENT,REQUIREMENTS_AS_IS,
+   TECHNICAL_DEBT}.md`.
 
 ## Việc cần làm tiếp (ưu tiên theo thứ tự)
 
-1. **Hỏi chủ dự án về phát hiện bảo mật 🔴 1** — bắt buộc trước khi làm
-   bất kỳ việc gì khác trên project này (kể cả bật `allow_apply_code`).
-2. Retrofit branch/worktree Claude/Codex chuẩn factory (`dev`/`claude-dev`/
-   `codex-dev` + `.factory/worktrees/`) — theo đúng pattern đã áp dụng cho
-   10 project khác trong factory (xem ghi chú bên dưới sau khi thực hiện).
-3. Xác nhận có push `chore/factory-onboarding` lên remote hay giữ cục bộ.
-4. Nếu cần preview sống: cần Postgres+Redis+Portal (PORTAL-PM) reachable +
-   `.env`/`.env_backend` thật (hiện không có) — xem `docs/TECHNICAL_DEBT.md`
-   mục "Điều kiện còn thiếu".
-5. Quyết định hướng viết test thật (Testcontainers/H2) trước khi coi
-   `allow_apply_code=true` là an toàn về mặt regression.
-6. Xác nhận MongoDB "Lệnh SX" nguồn đồng bộ có đúng là hệ TK-HATU/
-   DIEU-PHOI-MM không.
+1. Đăng ký THONGKE-CAOSON như 1 Application trong PORTAL-PM (qua
+   `ApplicationsPage`) để test vòng đăng nhập ĐẦY ĐỦ thật (Portal preview
+   hiện DB rỗng, chưa có admin nào) — việc này thuộc phía Portal, không
+   phải code THONGKE-CAOSON.
+2. Bridge network Portal (`docker network connect ...`) là thao tác TAY,
+   không tự động — cân nhắc script hoá nếu preview cần dựng lại nhiều lần.
+3. Test backend vẫn cần Postgres/Redis sống (chưa có Testcontainers/H2) —
+   ngoài phạm vi 2 lượt vừa qua.
+4. Thiết kế cơ chế tích hợp với DIEU-PHOI-MM (chưa bắt đầu, chỉ mới xác
+   nhận hướng "sẽ tích hợp sau này qua cơ chế riêng").
+5. `automation.allow_apply_code` vẫn TẮT — chủ dự án tự quyết định bật sau
+   khi review diff lượt sửa lớn này.
+6. Xác nhận `SignInPage` (orphan, không route nào dùng) là chủ đích hay dở
+   dang.
 
 ## Nếu phiên sau cần tiếp tục
 
-Đọc theo thứ tự: file này → `docs/TECHNICAL_DEBT.md` (đọc đủ, đặc biệt mục
-🔴 1) → `docs/ARCHITECTURE_CURRENT.md` → `docs/CODEBASE_MAP.md` →
-`docs/REQUIREMENTS_AS_IS.md`. KHÔNG giả định bảo mật đã được xử lý chỉ vì
-chưa thấy nhắc lại — luôn đọc trực tiếp `SecurityConfig.java` để xác nhận
-trạng thái hiện tại trước khi làm việc liên quan tới API.
+Đọc theo thứ tự: file này → `docs/TECHNICAL_DEBT.md` (đặc biệt phần "Đã
+sửa" để biết trạng thái MỚI NHẤT, đừng tưởng nhầm các mục cũ vẫn còn hiệu
+lực) → `docs/ARCHITECTURE_CURRENT.md` → `docs/CODEBASE_MAP.md`. KHÔNG giả
+định còn MongoDB hay bảo mật đang tắt — cả 2 đã thay đổi ở lượt này, luôn
+đọc trực tiếp `SecurityConfig.java`/`pom.xml` để xác nhận trạng thái hiện
+tại nếu nghi ngờ.

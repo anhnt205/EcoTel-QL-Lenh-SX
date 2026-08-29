@@ -14,6 +14,14 @@ RUN pnpm install --frozen-lockfile
 
 COPY . .
 
+# Vite bake các biến VITE_* vào bundle tại BUILD TIME (không phải runtime) —
+# nhận qua build-arg để mỗi môi trường (preview/staging/release) build image
+# riêng trỏ đúng URL public của môi trường đó.
+ARG VITE_API_KONG_URL
+ARG VITE_PORTAL_URL
+ENV VITE_API_KONG_URL=${VITE_API_KONG_URL}
+ENV VITE_PORTAL_URL=${VITE_PORTAL_URL}
+
 RUN pnpm run build
 
 # ================================

@@ -28,7 +28,7 @@ spring:
     oauth2:
       resourceserver:
         jwt:
-          jwk-uri: ${PORTAL_JWKS_URI}
+          jwk-set-uri: ${PORTAL_JWKS_URI}
 
 portal:
   internal-url: http://portal-service:8080
@@ -37,15 +37,6 @@ app:
 
 server:
   port: ${THONG_KE_PORT}
-
-mongo:
-  sync:
-    uri: ${MONGO_SYNC_URI}
-    database: Lenh_sx
-
-sync:
-  mongo:
-    enabled: true
 
 springdoc:
   swagger-ui:

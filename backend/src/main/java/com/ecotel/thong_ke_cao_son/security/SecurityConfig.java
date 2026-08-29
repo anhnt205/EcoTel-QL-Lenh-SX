@@ -23,7 +23,12 @@ public class SecurityConfig {
     private final String[] PUBLIC_ENDPOINT = {
             "/actuator/health",
             "/v3/api-docs/**",
-            "/swagger-ui/**"
+            "/swagger-ui/**",
+            // AuthController.exchangeCode()/refresh() phải public ở tầng Spring Security
+            // (không chỉ @PublicApi, vốn chỉ được PermissionFilter đọc SAU khi request
+            // đã qua được .anyRequest().authenticated() bên dưới) — nếu không, không ai
+            // đăng nhập lần đầu được vì lúc đó chưa hề có JWT để xác thực.
+            "/api/auth/**"
     };
 
 
@@ -36,14 +41,13 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                // .oauth2ResourceServer(oauth2 -> oauth2.jwt(Customizer.withDefaults()))
+                .oauth2ResourceServer(oauth2 -> oauth2.jwt(Customizer.withDefaults()))
                 .authorizeHttpRequests(authorize -> authorize
                                 .requestMatchers(PUBLIC_ENDPOINT).permitAll()
-//                        .anyRequest().authenticated()
-                                .anyRequest().permitAll() // test
+                                .anyRequest().authenticated()
                 )
-                // .addFilterAfter(appTokenFilter, BearerTokenAuthenticationFilter.class)  // ← sau khi Spring verify xong
-                // .addFilterAfter(permissionFilter, AppTokenFilter.class)
+                .addFilterAfter(appTokenFilter, BearerTokenAuthenticationFilter.class)  // ← sau khi Spring verify xong
+                .addFilterAfter(permissionFilter, AppTokenFilter.class)
                 .httpBasic(AbstractHttpConfigurer::disable) // Tat Login Swagger
                 .formLogin(AbstractHttpConfigurer::disable)
                 .build();

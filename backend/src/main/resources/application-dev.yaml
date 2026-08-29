@@ -36,16 +36,6 @@ app:
 server:
   port: 8088
 
-# application.yml
-mongo:
-  sync:
-    uri: ${MONGO_SYNC_URI:mongodb://root:example@ktv_mongo_db:27017/Lenh_sx?replicaSet=rs0&authSource=admin}
-    database: Lenh_sx
-
-sync:
-  mongo:
-    enabled: false
-
 springdoc:
   swagger-ui:
     path: /swagger-ui.html
