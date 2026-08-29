@@ -66,3 +66,21 @@ Trước đoạn này, file từng ghi CODE = PASSED (chỉ đúng ở bước o
 - `automation.allow_apply_code` đang **BẬT** trong `project.yaml` (từ 2026-08-24, sau khi có test baseline đầu tiên) — xem mục "CODE/TEST đã cập nhật" ở trên.
 - Không bao giờ push `main`/`develop` của repo `EcoTel-QL-Lenh-SX` — có CI/CD thật tự deploy VPS.
 - Bug `ROLES` trong `config.js`, thiếu auth ở `upload.routes.js`, 2 bug logic ở `device.routes.js` — cả 3 **đã sửa xong** (commit `623ab24`/`d7091e2`/`ca9b31e`, xem `docs/TECHNICAL_DEBT.md`).
+
+## Factory — Worktree Claude/Codex (retrofit 2026-08-29)
+
+Project onboard trước khi Factory có Project Registry + Worktree Manager
+(Phase 3-6) — bổ sung sau để dùng được luồng Claude Code / Codex Desktop
+Review chuẩn:
+
+- Tạo mới nhánh `dev` = alias trỏ đúng commit hiện tại của `dev-dieuphoi-mm`
+  (nhánh làm việc thật, KHÔNG đổi tên/không đụng `dev-dieuphoi-mm`). Từ `dev`
+  tạo tiếp `claude-dev`/`codex-dev` (worktree mới, không liên quan
+  `.claude/worktrees/default`+`claude/work` hay `.codex/worktrees/default`
+  +`codex/review` cũ — 2 worktree cũ đó vẫn còn, không xoá, không có commit
+  nào chưa merge nên an toàn để lại).
+- Worktree Claude: `.factory/worktrees/claude-dev`. Worktree Codex:
+  `.factory/worktrees/codex-dev`.
+- **Tuyệt đối không đụng `main`/`develop`** — 2 nhánh này có CI/CD thật tự
+  deploy VPS (đã ghi rõ ở trên và trong `CLAUDE.md`), không liên quan gì tới
+  việc tạo `dev`/`claude-dev`/`codex-dev` ở đây.
