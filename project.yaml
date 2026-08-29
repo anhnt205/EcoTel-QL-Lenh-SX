@@ -1,0 +1,59 @@
+project:
+  id: THONGKE-CAOSON
+  name: Phần mềm thống kê Cao Sơn
+  description: >-
+    Hệ thống thống kê sản lượng khai thác/vận tải than mỏ Cao Sơn (Cẩm Phả,
+    Quảng Ninh) — nhập liệu chuyến xe/máy xúc theo ca (Vận tải, Khai thác),
+    đối chiếu (Reconciliation) dữ liệu giữa hệ MongoDB "Lệnh SX" cũ (đồng bộ
+    real-time qua MongoDB Change Streams) và hệ Postgres mới, danh mục dùng
+    chung (phòng ban, vị trí, thiết bị/xe máy, vật tư, loại/nhóm hàng, ca
+    làm việc, người dùng). Xác thực qua Portal SSO (app code "tkcs", đăng
+    nhập bằng one-time-code exchange, JWT RS256 chứa claim quyền theo
+    resource). Source code + lịch sử Git đã có sẵn
+    (github.com/anhnt205/THONG_KE_CAO_SON), đưa vào factory bằng onboarding
+    (2026-08-29) trên nhánh chore/factory-onboarding — KHÔNG động vào main.
+
+stack:
+  frontend: react-vite-typescript
+  backend: spring-boot-4 (Java 21)
+  database: postgresql (+ MongoDB nguồn ngoài, chỉ đọc qua Change Streams để đồng bộ)
+
+# Đã xác minh THẬT bằng cách build/test trong Docker (2026-08-29, xem
+# docs/TECHNICAL_DEBT.md mục 1). Build PASS cả backend lẫn frontend. Test
+# backend FAIL THẬT — @SpringBootTest boot full context, không có
+# H2/Testcontainers, cần Postgres+Redis+Portal JWKS sống mới chạy được, xem
+# mục "Xác định chính xác lệnh build và test hiện tại" trong
+# docs/TECHNICAL_DEBT.md mục 3.
+commands:
+  build: docker build -t thongkecs-backend-baseline ./backend
+  # FAIL thật khi chạy độc lập (không có Postgres sống) — không phải "no
+  # tests found", mà lỗi thật: contextLoads() không boot được ApplicationContext
+  # (Hibernate không xác định được Dialect vì thiếu JDBC datasource). Khai rõ
+  # lệnh thật ở đây thay vì bịa lệnh "PASS giả" — xem TECHNICAL_DEBT mục 3.
+  test_backend: docker build --target builder -t thongkecs-backend-builder ./backend && docker run --rm thongkecs-backend-builder mvn -B test
+  test: docker build --target builder -t thongkecs-backend-builder ./backend && docker run --rm thongkecs-backend-builder mvn -B test
+  # Frontend: package.json không có script "test" (không cài vitest/jest) —
+  # cố tình không khai test_frontend thay vì bịa lệnh không tồn tại thật.
+  build_frontend: docker build -t thongkecs-frontend-baseline ./frontend
+  start: docker compose -f backend/docker-compose.yaml up -d --build
+
+# TẮT — phát hiện NGHIÊM TRỌNG khi onboarding: toàn bộ xác thực/phân quyền
+# API backend đang bị VÔ HIỆU HOÁ hoàn toàn (SecurityConfig.java:
+# ".anyRequest().permitAll() // test", AppTokenFilter/PermissionFilter bị
+# comment out, OAuth2 resource server bị tắt) — bất kỳ ai cũng gọi được MỌI
+# API không cần đăng nhập. Đây là lỗ hổng bảo mật thật cần chủ dự án quyết
+# định hướng xử lý trước khi cho phép AI tự sinh/ghi code nghiệp vụ. Xem
+# docs/TECHNICAL_DEBT.md mục 🔴 1.
+automation:
+  allow_apply_code: false
+
+pipeline:
+  - REQUIREMENT
+  - PROVISION
+  - ARCHITECTURE
+  - CODE
+  - BUILD
+  - TEST
+  - PREVIEW
+  - GIT_PUSH
+  - APPROVAL

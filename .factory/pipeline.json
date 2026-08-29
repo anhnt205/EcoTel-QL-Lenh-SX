@@ -1,0 +1,51 @@
+{
+  "project_id": "THONGKE-CAOSON",
+  "status": "ONBOARDING",
+  "current_step": "APPROVAL",
+  "steps": [
+    {
+      "name": "REQUIREMENT",
+      "status": "PASSED",
+      "message": "As-is, suy từ code có sẵn — xem docs/REQUIREMENTS_AS_IS.md. Chưa có tờ trình/spec nghiệp vụ chính thức."
+    },
+    {
+      "name": "PROVISION",
+      "status": "PASSED",
+      "message": "Source code + lịch sử Git clone thật từ https://github.com/anhnt205/THONG_KE_CAO_SON.git (2026-08-29), không init lại repository. Đăng ký vào control-api (provisioner tự nhận diện thư mục đã tồn tại, không copy đè)."
+    },
+    {
+      "name": "ARCHITECTURE",
+      "status": "PASSED",
+      "message": "Kiến trúc hiện trạng đã ghi lại từ code thật (không suy đoán): docs/CODEBASE_MAP.md, docs/ARCHITECTURE_CURRENT.md, docs/REQUIREMENTS_AS_IS.md, docs/TECHNICAL_DEBT.md. PHÁT HIỆN NGHIÊM TRỌNG cần chủ dự án quyết định trước khi phát triển tiếp: toàn bộ xác thực/phân quyền API (JWT + AppTokenFilter + PermissionFilter) đang bị VÔ HIỆU HOÁ trong SecurityConfig.java (.anyRequest().permitAll() // test) — mọi API public hoàn toàn. automation.allow_apply_code đã TẮT vì lý do này."
+    },
+    {
+      "name": "CODE",
+      "status": "PASSED",
+      "message": "Code có sẵn từ trước. Theo đúng yêu cầu không đổi chức năng nghiệp vụ trong bước onboarding — chưa sửa bất kỳ file source nào, chỉ thêm file cấu hình factory (project.yaml, CLAUDE.md, Requirement.md, docs/*, .factory/*)."
+    },
+    {
+      "name": "BUILD",
+      "status": "PASSED",
+      "message": "Build THẬT trong Docker (2026-08-29): backend (docker build -t thongkecs-backend-baseline ./backend — Maven multi-stage, BUILD SUCCESS, ~26s) và frontend (docker build -t thongkecs-frontend-baseline ./frontend — pnpm + vite build SUCCESS, ~30s, 1 cảnh báo INEFFECTIVE_DYNAMIC_IMPORT không ảnh hưởng chức năng) đều PASS."
+    },
+    {
+      "name": "TEST",
+      "status": "FAILED",
+      "message": "Test backend FAIL THẬT khi chạy độc lập (docker run ... mvn test, không có Postgres/Redis đi kèm): ThongKeCaoSonApplicationTests.contextLoads lỗi 'Unable to determine Dialect without JDBC metadata' — @SpringBootTest boot full context, không có H2/Testcontainers, cần hạ tầng sống. Không phải lỗi do onboarding gây ra — đây là hiện trạng thật của repo trước khi factory chạm vào. Frontend không có script test nào. Xem docs/TECHNICAL_DEBT.md mục 3."
+    },
+    {
+      "name": "PREVIEW",
+      "status": "PENDING",
+      "message": "Chưa dựng preview sống trong lượt onboarding này (ngoài phạm vi yêu cầu — chỉ đọc/phân tích + build/test baseline). Cần: Postgres+Redis thật, Portal (PORTAL-PM) reachable cho JWKS, .env/.env_backend (hiện không có file nào), và quyết định về bảo mật (mục 🔴 1 TECHNICAL_DEBT) trước khi public preview."
+    },
+    {
+      "name": "GIT_PUSH",
+      "status": "PENDING",
+      "message": "Đã commit cục bộ trên nhánh chore/factory-onboarding, CHƯA push lên remote — chờ xác nhận người dùng trước khi push (đúng nguyên tắc không tự ý đẩy code khi chưa được yêu cầu rõ)."
+    },
+    {
+      "name": "APPROVAL",
+      "status": "PENDING"
+    }
+  ]
+}
