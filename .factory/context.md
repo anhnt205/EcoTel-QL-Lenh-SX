@@ -1,8 +1,32 @@
 # Context — THONGKE-CAOSON
 
-Cập nhật lần cuối: 2026-08-29 (lượt 2 — chuyển DB độc lập + bật lại bảo
-mật + dựng preview sống thật, theo yêu cầu trực tiếp của người dùng). Đọc
-file này TRƯỚC khi tiếp tục — tin file này hơn lịch sử chat đã bị nén.
+Cập nhật lần cuối: 2026-08-29 (lượt 3 — đổi remote git + push). Đọc file
+này TRƯỚC khi tiếp tục — tin file này hơn lịch sử chat đã bị nén.
+
+## Git remote (lượt 3, 2026-08-29)
+
+Theo yêu cầu trực tiếp người dùng: đã đổi remote chính sang repo riêng của
+factory, giữ nguyên remote gốc để tham chiếu — đúng quy ước đã dùng cho
+các project brownfield khác (KHOAN-CHIPHI-HALAM, HOP-DONG...):
+
+- `origin` = `https://github.com/anhntecotel-git/PM_TK-CAOSON.git` (MỚI —
+  đích push chính từ giờ trở đi).
+- `upstream` = `https://github.com/anhnt205/THONG_KE_CAO_SON.git` (nguồn
+  gốc, giữ lại để tham chiếu, không push vào đây nữa).
+
+Đã push:
+- `main` → `origin/main` (nguyên bản, KHÔNG đổi gì — vẫn khớp `upstream/main`).
+- `dev` → `origin/dev` — fast-forward từ `chore/factory-onboarding` lên
+  đúng commit mới nhất của `claude-dev` (toàn bộ việc lượt 2: gỡ Mongo,
+  bật lại security, preview) TRƯỚC khi push, để `dev` trên remote phản
+  ánh đúng trạng thái làm việc thật, không phải bản onboarding cũ.
+
+Working directory chính (`projects/THONGKE-CAOSON`, không phải worktree
+Claude/Codex) đã checkout sang `dev` theo yêu cầu người dùng — không còn
+đứng ở `chore/factory-onboarding` nữa.
+
+`claude-dev`/`codex-dev` (2 worktree Claude/Codex) KHÔNG được push trong
+lượt này — chỉ `main`/`dev` theo đúng yêu cầu.
 
 ## Tóm tắt trạng thái
 
