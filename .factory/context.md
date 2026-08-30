@@ -182,10 +182,32 @@ do: `docs/TECHNICAL_DEBT.md` phần "✅ Đã sửa trong lượt này".
 
 ## Việc cần làm tiếp (ưu tiên theo thứ tự)
 
-0. **KHÔNG còn điểm chặn nào cho phần đặc tả sản lượng.** Toàn bộ quyết
-   định đã chốt (QĐ-01 → QĐ-07), 1 mục tạm gác (TG-01). Việc tiếp theo về
-   mặt nghiệp vụ là **thiết kế** (mô hình dữ liệu + kiến trúc tính toán),
-   chưa ai yêu cầu bắt đầu code.
+0. **ĐÃ CÓ THIẾT KẾ → `docs/DESIGN_SANLUONG.md`** (2026-08-30). Mô hình dữ
+   liệu + kiến trúc tính toán, **chưa code dòng nào**. Điểm chính:
+   - **Model báo công hiện có ĐÃ ĐÚNG, giữ nguyên** — `ExcavationReport(Trip)`
+     và `TransportReport(Trip)` đã là phiếu-đầu + n-dòng-chuyến, nhiên liệu
+     nằm ở cấp PHIẾU (đúng chỗ tôi lo sẽ bị nhân đôi). `LoadLevel`
+     (@Embeddable) khớp Mức tải; `receivingFloorGroup` đã có; `CargoType →
+     CargoGroup` đã có (docx nói "chưa có" là sai).
+   - **Bổ sung vào entity cũ**: `ExcavationReportTrip.unloadingPoint` (Vị trí
+     đổ — đang THIẾU, không có thì không đối soát được điểm đổ); `unit` trên
+     2 phiếu; cờ trên `Device`/`Location`/`CargoType` để thay hard-code.
+   - **`ReconciliationDecision` phải thiết kế lại**: hiện là 1-1 với MỘT dòng
+     chuyến, **không mô hình hoá được việc GHÉP CẶP** — mà ghép cặp mới là
+     bản chất đối soát (QĐ-01). Thêm `ReconciliationPair` bên cạnh, KHÔNG xoá
+     entity cũ.
+   - ~12 nhóm entity mới: tham số theo thời gian, bảng tra trắc địa, kỳ báo
+     cáo, trường Thống kê nhập bổ sung, kết quả tính + snapshot + audit.
+   - Engine tính là **hàm thuần, không đụng DB, không có quyền gọi
+     `now()`** (ép nguyên tắc tra tham số theo ngày sản xuất — QĐ-04).
+   - 25 bước tính xếp theo 6 lớp phụ thuộc; lỗi tra trượt thu thập rồi báo
+     gộp; **kỳ có lỗi chưa xử lý thì KHÔNG được chốt**.
+   - Máy trạng thái đối soát 2 cấp với `RETURNED_TO_MINING` /
+     `RETURNED_TO_TRANSPORT` tách riêng (trả đích danh bên sai).
+   - Lộ trình G1→G8; **G4/G5 đối chiếu số với dòng 1250 của Excel**.
+   - **5 điểm cần quyết định trước khi code** — mục 8 của file đó. Quan
+     trọng nhất: `Double` hay `BigDecimal` (entity hiện dùng `Double`, sẽ
+     tích luỹ sai số qua 25 bước có ROUND xen kẽ).
    Câu hỏi mở còn lại (KHÔNG chặn), ở `docs/REQUIREMENT_WORKFLOW.md` mục 9:
    ngưỡng sai lệch đối soát; mức tải lệch có tính sai lệch không; mẫu báo
    cáo sản lượng; Số xe bên VT là text hay danh mục; trả lại ở lần 2 có phải

@@ -10,8 +10,12 @@ thật, theo đúng quy ước bắt buộc của factory (mỗi project phải 
 hiện trạng (AS-IS), liệt kê chức năng đã hoạt động thật, chức năng còn là
 khung/mock, và chức năng có code nhưng không truy cập được.
 
+**Xem [docs/DESIGN_SANLUONG.md](docs/DESIGN_SANLUONG.md)** — thiết kế mô hình
+dữ liệu + kiến trúc tính toán (chưa code). Nêu rõ giữ gì của model hiện có,
+bổ sung gì, và 5 điểm cần quyết định trước khi code.
+
 **Xem [docs/DECISIONS.md](docs/DECISIONS.md) TRƯỚC TIÊN** — nhật ký các
-quyết định nghiệp vụ/thiết kế chủ dự án đã chốt trực tiếp (QĐ-01 → QĐ-06).
+quyết định nghiệp vụ/thiết kế chủ dự án đã chốt trực tiếp (QĐ-01 → QĐ-07) + mục tạm gác TG-01.
 Đây là nguồn sự thật cho những chỗ tài liệu gốc mâu thuẫn hoặc bỏ trống.
 Không hỏi lại, không tự đổi.
 
