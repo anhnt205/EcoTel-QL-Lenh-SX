@@ -10,6 +10,7 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.server.ResponseStatusException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,6 +34,26 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<Void>> handleEntityNotFound(EntityNotFoundException ex) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(ApiResponse.error(404, ex.getMessage()));
+    }
+
+    /**
+     * Giữ nguyên mã trạng thái do controller/service chủ động ném ra.
+     *
+     * <p>Thiếu handler này thì mọi {@code ResponseStatusException} rơi xuống
+     * handler {@code Exception} chung và bị trả về 500 — client không phân
+     * biệt được "sai mật khẩu" (401) với "lỗi máy chủ". Ảnh hưởng cả
+     * {@code /api/auth/login}, {@code /exchange-code} và {@code /refresh}.
+     */
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity<ApiResponse<Void>> handleResponseStatus(ResponseStatusException ex) {
+        int status = ex.getStatusCode().value();
+        String message = ex.getReason() != null ? ex.getReason() : ex.getMessage();
+        if (status >= 500) {
+            log.error("Lỗi phía máy chủ: {} - {}", status, message);
+        } else {
+            log.warn("Từ chối yêu cầu: {} - {}", status, message);
+        }
+        return ResponseEntity.status(status).body(ApiResponse.error(status, message));
     }
 
     @ExceptionHandler(BadRequestException.class)

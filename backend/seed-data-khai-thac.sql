@@ -85,10 +85,10 @@ ON CONFLICT (id) DO NOTHING;
 -- password = cùng hash BCrypt với user admin trong seed-data.sql; các tài
 -- khoản này chỉ dùng làm dữ liệu tham chiếu cho báo cáo, không để đăng nhập.
 INSERT INTO users (id, username, password, full_name, email, salary_code, role, active, department_id, position_id, created_at, updated_at) VALUES
-(11, 'nxbang',  '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVKIUi', 'Nguyễn Xuân Bằng', 'nxbang@thongke.local',  '8753', 'EMPLOYEE', true, 11, 4, NOW(), NOW()),
-(12, 'tvminh',  '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVKIUi', 'Trần Văn Minh',    'tvminh@thongke.local',  '8754', 'EMPLOYEE', true, 12, 4, NOW(), NOW()),
-(13, 'lqhung',  '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVKIUi', 'Lê Quốc Hùng',     'lqhung@thongke.local',  '8755', 'EMPLOYEE', true, 12, 4, NOW(), NOW()),
-(14, 'pvdung',  '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVKIUi', 'Phạm Văn Dũng',    'pvdung@thongke.local',  '8756', 'EMPLOYEE', true, 13, 4, NOW(), NOW())
+(11, 'nxbang',  '$2b$12$xTUDCRbU9WMwoLZ/E4q/Ve1mmiReVQ75gLBNhKqvwbPYkVghlzyzC', 'Nguyễn Xuân Bằng', 'nxbang@thongke.local',  '8753', 'EMPLOYEE', true, 11, 4, NOW(), NOW()),
+(12, 'tvminh',  '$2b$12$xTUDCRbU9WMwoLZ/E4q/Ve1mmiReVQ75gLBNhKqvwbPYkVghlzyzC', 'Trần Văn Minh',    'tvminh@thongke.local',  '8754', 'EMPLOYEE', true, 12, 4, NOW(), NOW()),
+(13, 'lqhung',  '$2b$12$xTUDCRbU9WMwoLZ/E4q/Ve1mmiReVQ75gLBNhKqvwbPYkVghlzyzC', 'Lê Quốc Hùng',     'lqhung@thongke.local',  '8755', 'EMPLOYEE', true, 12, 4, NOW(), NOW()),
+(14, 'pvdung',  '$2b$12$xTUDCRbU9WMwoLZ/E4q/Ve1mmiReVQ75gLBNhKqvwbPYkVghlzyzC', 'Phạm Văn Dũng',    'pvdung@thongke.local',  '8756', 'EMPLOYEE', true, 13, 4, NOW(), NOW())
 ON CONFLICT (username) DO NOTHING;
 
 -- ── Phiếu báo chuyến (header) ───────────────────────────────────────────

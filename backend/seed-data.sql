@@ -50,10 +50,12 @@ INSERT INTO locations (id, name, latitude, longitude, distance, created_at, upda
 ON CONFLICT (id) DO NOTHING;
 
 -- User admin mặc định
--- Password: admin123 (đã encode BCrypt) - nên tự verify lại hash trước khi dùng thật.
+-- Password: admin123 — hash BCrypt ĐÃ ĐƯỢC VERIFY THẬT (2026-08-30) bằng
+-- chính endpoint /api/auth/login. Hash CŨ trong file này KHÔNG khớp
+-- "admin123" (đã kiểm chứng: login trả 401), nên đã thay bằng hash mới.
 -- Đổi password ngay sau khi đăng nhập lần đầu.
 INSERT INTO users (id, username, password, full_name, email, salary_code, role, active, created_at, updated_at) VALUES
-(1, 'admin', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVKIUi', 'Administrator', 'admin@thongke.com', 'ADMIN001', 'ADMIN', true, NOW(), NOW())
+(1, 'admin', '$2b$12$xTUDCRbU9WMwoLZ/E4q/Ve1mmiReVQ75gLBNhKqvwbPYkVghlzyzC', 'Administrator', 'admin@thongke.com', 'ADMIN001', 'ADMIN', true, NOW(), NOW())
 ON CONFLICT (username) DO NOTHING;
 
 -- Cập nhật sequence value sau khi insert dữ liệu mẫu (tránh conflict khi insert mới)

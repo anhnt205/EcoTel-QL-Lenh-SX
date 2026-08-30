@@ -15,6 +15,9 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     Optional<User> findByMongoId(String mongoId);
 
+    /** Dùng cho đăng nhập cục bộ (chế độ chạy độc lập, không qua Portal). */
+    Optional<User> findByUsername(String username);
+
     @Query("""
         SELECT u FROM User u
         LEFT JOIN u.department dep

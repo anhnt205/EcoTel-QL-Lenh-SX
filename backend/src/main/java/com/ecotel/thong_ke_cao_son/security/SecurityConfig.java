@@ -1,6 +1,7 @@
 package com.ecotel.thong_ke_cao_son.security;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.Customizer;
@@ -14,6 +15,13 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
+import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.SecretKeySpec;
+import java.nio.charset.StandardCharsets;
 
 @Configuration
 @EnableWebSecurity
@@ -51,6 +59,50 @@ public class SecurityConfig {
                 .httpBasic(AbstractHttpConfigurer::disable) // Tat Login Swagger
                 .formLogin(AbstractHttpConfigurer::disable)
                 .build();
+    }
+
+    /**
+     * Bộ giải mã JWT — chọn theo {@code app.auth.mode}:
+     *
+     * <ul>
+     *   <li>{@code standalone} (mặc định): token do CHÍNH ứng dụng này cấp ở
+     *       {@code /api/auth/login}, ký đối xứng HS256 bằng
+     *       {@code app.auth.jwt-secret}. Không cần Portal.</li>
+     *   <li>{@code portal}: giữ nguyên hành vi cũ — verify RS256 qua JWKS của
+     *       Portal ({@code spring.security.oauth2.resourceserver.jwt.jwk-set-uri}).</li>
+     * </ul>
+     *
+     * <p>Khi ghép trở lại Portal chỉ cần đổi {@code app.auth.mode=portal},
+     * không phải sửa code. Đường đăng nhập qua Portal
+     * ({@code /api/auth/exchange-code}) vẫn giữ nguyên, không xoá.
+     */
+    @Bean
+    public JwtDecoder jwtDecoder(
+            @Value("${app.auth.mode:standalone}") String mode,
+            @Value("${app.auth.jwt-secret:}") String jwtSecret,
+            @Value("${spring.security.oauth2.resourceserver.jwt.jwk-set-uri:}") String jwkSetUri) {
+
+        if ("portal".equalsIgnoreCase(mode)) {
+            if (jwkSetUri.isBlank()) {
+                throw new IllegalStateException(
+                        "app.auth.mode=portal nhưng thiếu jwk-set-uri của Portal");
+            }
+            return NimbusJwtDecoder.withJwkSetUri(jwkSetUri).build();
+        }
+
+        if (jwtSecret.isBlank()) {
+            throw new IllegalStateException(
+                    "app.auth.mode=standalone nhưng thiếu app.auth.jwt-secret");
+        }
+        // HS256 yêu cầu khoá tối thiểu 256 bit — chặn ngay lúc khởi động thay
+        // vì để lỗi mơ hồ lúc có request đầu tiên.
+        if (jwtSecret.getBytes(StandardCharsets.UTF_8).length < 32) {
+            throw new IllegalStateException(
+                    "app.auth.jwt-secret phải dài ít nhất 32 ký tự (256 bit) cho HS256");
+        }
+        SecretKey key = new SecretKeySpec(
+                jwtSecret.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
+        return NimbusJwtDecoder.withSecretKey(key).macAlgorithm(MacAlgorithm.HS256).build();
     }
 
     @Bean

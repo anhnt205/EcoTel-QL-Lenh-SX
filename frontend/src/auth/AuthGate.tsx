@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import { initializeAppAuth } from "./initializeAuth";
+import { LoginForm } from "@/auth/LoginForm";
 import { useAuthStore } from "@/stores/authStore";
 
 export function AuthGate({ children }: { children: React.ReactNode }) {
   const { loading, isAuthenticated, initAuth } = useAuthStore();
   const [authError, setAuthError] = useState<string | null>(null);
+  const [needsLogin, setNeedsLogin] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -17,6 +19,8 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
       if (result.ok) {
         console.log("[AuthGate] Auth successful, calling initAuth...");
         initAuth();
+      } else if (result.needsLogin) {
+        setNeedsLogin(true);
       } else {
         console.error("[AuthGate] Auth failed, setting error:", result.error);
         setAuthError(result.error ?? "Xác thực thất bại");
@@ -29,6 +33,17 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Đang kiểm tra auth
+  if (needsLogin) {
+    return (
+      <LoginForm
+        onSuccess={() => {
+          setNeedsLogin(false);
+          initAuth();
+        }}
+      />
+    );
+  }
+
   if (loading && !authError) {
     return (
       <div className="flex h-screen items-center justify-center">
