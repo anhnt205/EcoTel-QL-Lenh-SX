@@ -21,6 +21,7 @@ riêng — cần kiểm lại khi implement.
 | QĐ-06 | Khoá ghép "Nhóm vỉa + Máy xúc" trở thành Danh mục để CHỌN |
 | QĐ-07 | Dòng chuẩn của bảng tính Excel |
 | QĐ-08 | Dùng `BigDecimal` cho mọi số liệu nghiệp vụ |
+| QĐ-09 | Hợp nhất `Material` vào `CargoType` |
 | **TG-01** | **TẠM GÁC — ngoại lệ `+15` và biến thể công thức Nhóm tầng** |
 
 ---
@@ -391,3 +392,32 @@ kiểu dữ liệu không vỡ, nhưng **số chữ số thập phân hiển th�
 
 `Coordinates.longitude/latitude`, `Device.capacity/power`, `Location.distance`
 — không tham gia chuỗi tính sản lượng. Để nguyên, tránh mở rộng phạm vi vô ích.
+
+---
+
+## QĐ-09 (2026-08-30) — Hợp nhất `Material` vào `CargoType`
+
+**Bối cảnh:** hệ thống có hai thực thể cùng mô tả "chủng loại hàng" —
+`CargoType` (có `cargoGroup`) và `Material` (có `acceptedProduct` +
+`MaterialValueHistory` chứa `density`/`dryDensity` theo khoảng thời gian).
+Xem `DESIGN_SANLUONG.md` mục 2.4.
+
+**Quyết định: HỢP NHẤT.** Chuyển `acceptedProduct` và lịch sử tỷ trọng về
+`CargoType`.
+
+**Hệ quả thiết kế:**
+- `CargoType` nhận thêm: `acceptanceProduct` (khoá ngoại tới danh mục Sản
+  phẩm nghiệm thu), `ttlClh`, và quan hệ tới `DensityParameter`.
+- `DensityParameter` (mục 3.3) chính là bản viết lại của
+  `MaterialValueHistory`, khắc phục 4 vấn đề đã nêu ở mục 2.4: có id riêng,
+  `LocalDate` thay `LocalDateTime`, **bỏ giá trị mặc định `now()` cho
+  `effectiveTo`**, và **thêm chiều Khu vực xúc**.
+- Cần **di trú dữ liệu** từ `material_value_history` sang bảng mới. Phải
+  kiểm tra dữ liệu thật trước: bao nhiêu bản ghi, có bản ghi nào `endTime`
+  đang dính bẫy `now()` không.
+- `Material`/`MaterialValueHistory` và các CRUD của nó **không xoá ngay** —
+  giữ tới khi di trú xong và xác nhận không còn nơi nào dùng (quy tắc dự án:
+  không tự ý xoá code nghiệp vụ).
+
+**Điểm cần lưu ý:** `Material` còn có `mongoId` — dấu vết của cơ chế đồng bộ
+MongoDB đã gỡ. Khi di trú thì bỏ trường này, không mang sang.

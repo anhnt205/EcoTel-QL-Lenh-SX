@@ -208,7 +208,7 @@ export const getMiningTripsColumns = (
   {
     accessorKey: "vehicleManagementUnit",
     id: "vehicleManagementUnit",
-    header: "QLTB",
+    header: "Đơn vị quản lý thiết bị",
     cell: ({ row }) => row.original.vehicleManagementUnit || "VT7",
     size: 160,
   },
@@ -240,7 +240,7 @@ export const getMiningTripsColumns = (
   {
     accessorKey: "operatorUnit",
     id: "operatorUnit",
-    header: "PXVT",
+    header: "Đơn vị",
     cell: ({ row }) => row.original.operatorUnit || "VT7",
     size: 160,
   },

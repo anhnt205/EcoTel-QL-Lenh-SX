@@ -41,16 +41,22 @@ export const MiningEntryPage: React.FC = () => {
   const role = "ROLE_MINING";
   const shiftAnchorRef = useComboboxAnchor();
   const excavatorAnchorRef = useComboboxAnchor();
+  const pickupAnchorRef = useComboboxAnchor();
+  const benchAnchorRef = useComboboxAnchor();
 
   // ── Filters state ────────────────────────────────────────────────────────
   const [startDate, setStartDate] = useState("2026-08-01");
   const [endDate, setEndDate] = useState("2026-08-31");
   const [selectedShifts, setSelectedShifts] = useState<string[]>([]);
   const [selectedExcavators, setSelectedExcavators] = useState<string[]>([]);
+  const [selectedPickupLocations, setSelectedPickupLocations] = useState<
+    string[]
+  >([]);
+  const [selectedBenches, setSelectedBenches] = useState<string[]>([]);
   const [searchKeyword, setSearchKeyword] = useState("");
 
   const masterData = useMasterData();
-  const { rawShifts = [], rawExcavators = [] } = masterData;
+  const { rawShifts = [], rawExcavators = [], rawLocations = [] } = masterData;
 
   // Map selected Shift names to Shift IDs for Backend API
   const shiftIds = useMemo(() => {
@@ -175,9 +181,47 @@ export const MiningEntryPage: React.FC = () => {
     return list;
   }, [reportsList]);
 
+  // Danh sách "Nơi chất tải" lấy từ danh mục Vị trí; "Tầng xúc" là giá trị tự
+  // do nên gom từ chính dữ liệu đang hiển thị.
+  const pickupLocationOptions = useMemo(() => {
+    const fromMaster = rawLocations
+      .map((l) => String(l.name ?? "").trim())
+      .filter(Boolean);
+    const fromData = records
+      .map((r) => String(r.pickupLocation ?? "").trim())
+      .filter(Boolean);
+    return Array.from(new Set([...fromMaster, ...fromData])).sort();
+  }, [rawLocations, records]);
+
+  const benchOptions = useMemo(() => {
+    return Array.from(
+      new Set(records.map((r) => String(r.excavationBench ?? "").trim())),
+    )
+      .filter(Boolean)
+      .sort((a, b) => Number(b) - Number(a) || a.localeCompare(b));
+  }, [records]);
+
   // ── Filtered Records ─────────────────────────────────────────────────────
   const filteredRecords = useMemo(() => {
     return records.filter((r) => {
+      // Nơi chất tải
+      if (
+        selectedPickupLocations.length > 0 &&
+        !selectedPickupLocations.includes(
+          String(r.pickupLocation ?? "").trim(),
+        )
+      ) {
+        return false;
+      }
+
+      // Tầng xúc
+      if (
+        selectedBenches.length > 0 &&
+        !selectedBenches.includes(String(r.excavationBench ?? "").trim())
+      ) {
+        return false;
+      }
+
       // Date filter
       if (r.month && r.day) {
         const rYear = r.year || new Date().getFullYear();
@@ -211,6 +255,8 @@ export const MiningEntryPage: React.FC = () => {
     records,
     startDate,
     endDate,
+    selectedPickupLocations,
+    selectedBenches,
     searchKeyword,
   ]);
   // Reset filters
@@ -219,6 +265,8 @@ export const MiningEntryPage: React.FC = () => {
     setEndDate("2026-08-31");
     setSelectedShifts([]);
     setSelectedExcavators([]);
+    setSelectedPickupLocations([]);
+    setSelectedBenches([]);
     setSearchKeyword("");
     await refetch();
     toast.info("Đã làm mới các bộ lọc!");
@@ -295,6 +343,7 @@ export const MiningEntryPage: React.FC = () => {
       {/* ══ TOP HEADER BAR ═══════════════════════════════════════════════ */}
       <EntryPageHeader
         title="DANH SÁCH BÁO CHUYẾN CÔNG TRƯỜNG KHAI THÁC"
+        subtitle="Quản lý và theo dõi danh sách chuyến xe xúc và nhiên liệu"
         fileInputRef={excel.fileInputRef}
         onFileInputChange={excel.handleDirectFileUpload}
         onUpload={excel.triggerUpload}
@@ -386,6 +435,60 @@ export const MiningEntryPage: React.FC = () => {
             </Combobox>
           </div>
 
+          {/* Nơi chất tải (Combobox Chọn nhiều) */}
+          <div className="flex flex-col gap-1 min-w-[180px] max-w-[300px]">
+            <span className="font-medium text-gray-600 dark:text-gray-400">
+              Nơi chất tải
+            </span>
+            <Combobox
+              items={pickupLocationOptions}
+              multiple
+              value={selectedPickupLocations}
+              onValueChange={setSelectedPickupLocations}
+            >
+              <ComboboxChips
+                ref={pickupAnchorRef}
+                className="min-h-9 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800 text-xs py-1"
+              >
+                <ComboboxValue placeholder="Tất cả nơi chất tải">
+                  {selectedPickupLocations.map((item) => (
+                    <ComboboxChip key={item} className="text-xs py-0.5">
+                      {item}
+                    </ComboboxChip>
+                  ))}
+                </ComboboxValue>
+                <ComboboxChipsInput
+                  placeholder={
+                    selectedPickupLocations.length === 0
+                      ? "Chọn nơi chất tải..."
+                      : ""
+                  }
+                  className="text-xs"
+                />
+              </ComboboxChips>
+              <ComboboxContent
+                anchor={pickupAnchorRef}
+                sideOffset={4}
+                align="start"
+              >
+                <ComboboxEmpty className="text-xs py-2 text-gray-400">
+                  Không tìm thấy nơi chất tải
+                </ComboboxEmpty>
+                <ComboboxList>
+                  {(item) => (
+                    <ComboboxItem
+                      key={item}
+                      value={item}
+                      className="text-xs py-1.5"
+                    >
+                      {item}
+                    </ComboboxItem>
+                  )}
+                </ComboboxList>
+              </ComboboxContent>
+            </Combobox>
+          </div>
+
           {/* Máy xúc (Combobox Chọn nhiều) */}
           <div className="flex flex-col gap-1 min-w-[180px] max-w-[300px]">
             <span className="font-medium text-gray-600 dark:text-gray-400">
@@ -422,6 +525,58 @@ export const MiningEntryPage: React.FC = () => {
               >
                 <ComboboxEmpty className="text-xs py-2 text-gray-400">
                   Không tìm thấy máy xúc
+                </ComboboxEmpty>
+                <ComboboxList>
+                  {(item) => (
+                    <ComboboxItem
+                      key={item}
+                      value={item}
+                      className="text-xs py-1.5"
+                    >
+                      {item}
+                    </ComboboxItem>
+                  )}
+                </ComboboxList>
+              </ComboboxContent>
+            </Combobox>
+          </div>
+
+          {/* Tầng xúc (Combobox Chọn nhiều) */}
+          <div className="flex flex-col gap-1 min-w-[150px] max-w-[240px]">
+            <span className="font-medium text-gray-600 dark:text-gray-400">
+              Tầng xúc
+            </span>
+            <Combobox
+              items={benchOptions}
+              multiple
+              value={selectedBenches}
+              onValueChange={setSelectedBenches}
+            >
+              <ComboboxChips
+                ref={benchAnchorRef}
+                className="min-h-9 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800 text-xs py-1"
+              >
+                <ComboboxValue placeholder="Tất cả tầng xúc">
+                  {selectedBenches.map((item) => (
+                    <ComboboxChip key={item} className="text-xs py-0.5">
+                      {item}
+                    </ComboboxChip>
+                  ))}
+                </ComboboxValue>
+                <ComboboxChipsInput
+                  placeholder={
+                    selectedBenches.length === 0 ? "Chọn tầng xúc..." : ""
+                  }
+                  className="text-xs"
+                />
+              </ComboboxChips>
+              <ComboboxContent
+                anchor={benchAnchorRef}
+                sideOffset={4}
+                align="start"
+              >
+                <ComboboxEmpty className="text-xs py-2 text-gray-400">
+                  Không tìm thấy tầng xúc
                 </ComboboxEmpty>
                 <ComboboxList>
                   {(item) => (

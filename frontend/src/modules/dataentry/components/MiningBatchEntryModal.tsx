@@ -18,7 +18,8 @@ import {
 } from "../../../components/ui/select.tsx";
 import { ComboboxInput } from "../../../components/ui/combobox-input.tsx";
 
-import { Plus, Trash2, Pickaxe, X } from "lucide-react";
+import { Plus, Trash2, Pickaxe, X, Upload, Download } from "lucide-react";
+import * as XLSX from "xlsx";
 
 import { toast } from "sonner";
 import { useMasterData } from "@/modules/dataentry/hooks/useMasterData.ts";
@@ -174,6 +175,104 @@ export const MiningBatchEntryModal: React.FC<MiningBatchEntryModalProps> = ({
       toast.error("Phải giữ ít nhất 1 chuyến xe!");
     }
   };
+
+  // ── Xuất / nhập danh sách chuyến của PHIẾU ĐANG MỞ ─────────────────────
+  // Khác với nút Excel ở trang danh sách (làm việc với nhiều báo cáo qua
+  // API): hai nút này chỉ thao tác trên bảng chuyến của phiếu hiện tại.
+  const tripFileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleExportTrips = useCallback(() => {
+    const rows = (sessions[activeIdx]?.trips ?? []).map((t, i) => ({
+      STT: i + 1,
+      "Số xe": t.vehicleNo ?? "",
+      "Số chuyến": t.tripCount ?? "",
+      "Loại hàng": t.material ?? "",
+      "Tải trọng":
+        t.loadStatus === "Khác"
+          ? `Khác (${t.loadStatusNote ?? ""})`
+          : (t.loadStatus ?? ""),
+      "Đơn vị quản lý thiết bị": t.vehicleManagementUnit ?? "",
+      "Chủng loại xe": t.vehicleType ?? "",
+    }));
+    if (rows.length === 0) {
+      toast.error("Chưa có chuyến nào để xuất!");
+      return;
+    }
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), "Chuyen");
+    const s = sessions[activeIdx];
+    const name = ["danh-sach-chuyen", s?.workingDate, s?.excavator]
+      .filter(Boolean)
+      .join("_");
+    XLSX.writeFile(wb, `${name}.xlsx`);
+    toast.success(`Đã xuất ${rows.length} chuyến.`);
+  }, [sessions, activeIdx]);
+
+  const handleImportTrips = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      e.target.value = ""; // cho phép chọn lại đúng file đó lần sau
+      if (!file) return;
+      try {
+        const wb = XLSX.read(await file.arrayBuffer(), { type: "array" });
+        const sheet = wb.Sheets[wb.SheetNames[0]];
+        const raw = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet);
+        const pick = (r: Record<string, unknown>, ...keys: string[]) => {
+          for (const k of keys) {
+            if (r[k] !== undefined && r[k] !== null && String(r[k]) !== "")
+              return String(r[k]).trim();
+          }
+          return "";
+        };
+        const parsed = raw
+          .map((r) => ({
+            vehicleNo: pick(r, "Số xe", "So xe", "vehicleNo"),
+            tripCount: pick(r, "Số chuyến", "So chuyen", "tripCount"),
+            material: pick(r, "Loại hàng", "Loai hang", "material"),
+            loadStatus: pick(r, "Tải trọng", "Tai trong", "loadStatus"),
+          }))
+          .filter((r) => r.vehicleNo || r.tripCount || r.material);
+
+        if (parsed.length === 0) {
+          toast.error(
+            "Không đọc được dòng nào. Cần các cột: Số xe, Số chuyến, Loại hàng, Tải trọng.",
+          );
+          return;
+        }
+
+        // Thêm đủ số dòng trước, rồi điền theo chỉ số — Zustand set là đồng
+        // bộ nên chỉ số tính trước vẫn đúng.
+        const startIdx = sessions[activeIdx]?.trips?.length ?? 0;
+        parsed.forEach(() => addTripRow());
+        parsed.forEach((r, i) => {
+          const isOther =
+            r.loadStatus && !/^(đủ tải|du tai|roda)/i.test(r.loadStatus);
+          updateTripRow(
+            startIdx + i,
+            {
+              vehicleNo: r.vehicleNo,
+              tripCount: r.tripCount === "" ? "" : Number(r.tripCount),
+              material: r.material,
+              loadStatus: /roda/i.test(r.loadStatus)
+                ? "Roda (2/3)"
+                : isOther
+                  ? "Khác"
+                  : "Đủ tải",
+              loadStatusNote: isOther
+                ? r.loadStatus.replace(/^khác\s*\(?|\)$/gi, "").trim()
+                : "",
+            },
+            getVehicleDetails,
+          );
+        });
+        toast.success(`Đã nhập ${parsed.length} chuyến vào phiếu.`);
+      } catch (err) {
+        console.error(err);
+        toast.error("Không đọc được file Excel. Kiểm tra lại định dạng.");
+      }
+    },
+    [sessions, activeIdx, addTripRow, updateTripRow, getVehicleDetails],
+  );
 
   // ── Keyboard Navigation (Tab / Enter) giữa các ô nhập liệu ────────────
   const { handleKeyDown } = useFormTabNavigation({
@@ -399,8 +498,11 @@ export const MiningBatchEntryModal: React.FC<MiningBatchEntryModalProps> = ({
           className="flex-1 overflow-y-auto px-5 py-4 space-y-5"
           onKeyDown={handleKeyDown}
         >
-          {/* ── HÀNG THÔNG TIN CHUNG: Thời gian · Ca · Nơi chất tải · Máy xúc · Đơn vị QLTB · Tầng xúc ── */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+          {/* ── HÀNG THÔNG TIN CHUNG: Thời gian · Ca · Nơi chất tải · Máy xúc · Tầng xúc ──
+              Bố cục theo mockup: hàng 1 = Thời gian + Ca, hàng 2 = Nơi chất
+              tải + Máy xúc + Tầng xúc. Dùng grid 6 cột, mỗi ô chiếm 3 hoặc 2
+              cột để tự xuống hàng đúng chỗ. */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 [&>div:nth-child(-n+2)]:lg:col-span-3 [&>div:nth-child(n+3)]:lg:col-span-2">
             {/* Thời gian */}
             <div className="flex flex-col gap-1">
               <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">
@@ -468,21 +570,6 @@ export const MiningBatchEntryModal: React.FC<MiningBatchEntryModalProps> = ({
               />
             </div>
 
-            {/* Đơn vị quản lý thiết bị (của máy xúc - tự động, readonly) */}
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">
-                Đơn vị quản lý thiết bị
-              </label>
-              <Input
-                type="text"
-                value={sess.excavatorManagementUnit || ""}
-                readOnly
-                disabled
-                title={sess.excavatorManagementUnit}
-                className="h-9 text-sm bg-gray-100 dark:bg-gray-800 cursor-not-allowed border-gray-200 dark:border-gray-700 truncate"
-              />
-            </div>
-
             {/* Tầng xúc */}
             <div className="flex flex-col gap-1">
               <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">
@@ -521,6 +608,33 @@ export const MiningBatchEntryModal: React.FC<MiningBatchEntryModalProps> = ({
                   <Plus className="w-3.5 h-3.5" />
                   Thêm chuyến (F3)
                 </Button>
+
+                {/* Nhập / xuất danh sách chuyến của phiếu đang mở */}
+                <input
+                  type="file"
+                  ref={tripFileInputRef}
+                  accept=".xlsx,.xls"
+                  onChange={handleImportTrips}
+                  className="hidden"
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => tripFileInputRef.current?.click()}
+                  className="h-8 text-xs gap-1.5 border-gray-300 text-gray-700 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-300"
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  Import (Excel)
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleExportTrips}
+                  className="h-8 text-xs gap-1.5 border-gray-300 text-gray-700 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-300"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  Export (Excel)
+                </Button>
               </div>
             </div>
 
@@ -535,12 +649,6 @@ export const MiningBatchEntryModal: React.FC<MiningBatchEntryModalProps> = ({
                     <th className="px-3 py-2.5 border-r border-b border-gray-200 dark:border-gray-700 text-left min-w-[130px]">
                       Số xe <span className="text-red-500">*</span>
                     </th>
-                    <th className="px-3 py-2.5 border-r border-b border-gray-200 dark:border-gray-700 text-left min-w-[160px]">
-                      Phân xưởng vận tải
-                    </th>
-                    <th className="px-3 py-2.5 border-r border-b border-gray-200 dark:border-gray-700 text-left min-w-[130px]">
-                      Chủng loại xe
-                    </th>
                     <th className="px-3 py-2.5 border-r border-b border-gray-200 dark:border-gray-700 text-center min-w-[100px]">
                       Số chuyến <span className="text-red-500">*</span>
                     </th>
@@ -549,6 +657,12 @@ export const MiningBatchEntryModal: React.FC<MiningBatchEntryModalProps> = ({
                     </th>
                     <th className="px-3 py-2.5 border-r border-b border-gray-200 dark:border-gray-700 text-center min-w-[300px]">
                       Tải trọng <span className="text-red-500">*</span>
+                    </th>
+                    <th className="px-3 py-2.5 border-r border-b border-gray-200 dark:border-gray-700 text-left min-w-[160px]">
+                      Đơn vị quản lý thiết bị
+                    </th>
+                    <th className="px-3 py-2.5 border-r border-b border-gray-200 dark:border-gray-700 text-left min-w-[130px]">
+                      Chủng loại xe
                     </th>
                     <th className="px-2 py-2.5 border-b border-gray-200 dark:border-gray-700 text-center w-10" />
                   </tr>
@@ -578,30 +692,6 @@ export const MiningBatchEntryModal: React.FC<MiningBatchEntryModalProps> = ({
                             handleUpdateTrip(tIdx, { vehicleNo: v })
                           }
                           placeholder="Chọn số xe"
-                        />
-                      </td>
-
-                      {/* Phân xưởng vận tải (tự động theo số xe) */}
-                      <td className="px-2 py-1.5 border-r border-b border-gray-200 dark:border-gray-700">
-                        <Input
-                          type="text"
-                          value={trip.vehicleManagementUnit || ""}
-                          readOnly
-                          disabled
-                          title={trip.vehicleManagementUnit}
-                          className="h-8 text-xs bg-gray-100 dark:bg-gray-800 cursor-not-allowed border-gray-200 dark:border-gray-700 truncate"
-                        />
-                      </td>
-
-                      {/* Chủng loại xe (tự động theo số xe) */}
-                      <td className="px-2 py-1.5 border-r border-b border-gray-200 dark:border-gray-700">
-                        <Input
-                          type="text"
-                          value={trip.vehicleType || ""}
-                          readOnly
-                          disabled
-                          title={trip.vehicleType}
-                          className="h-8 text-xs bg-gray-100 dark:bg-gray-800 cursor-not-allowed border-gray-200 dark:border-gray-700 truncate"
                         />
                       </td>
 
@@ -650,6 +740,30 @@ export const MiningBatchEntryModal: React.FC<MiningBatchEntryModalProps> = ({
                           onNoteChange={(loadStatusNote) =>
                             handleUpdateTrip(tIdx, { loadStatusNote })
                           }
+                        />
+                      </td>
+
+                      {/* Đơn vị quản lý thiết bị (tự động theo số xe) */}
+                      <td className="px-2 py-1.5 border-r border-b border-gray-200 dark:border-gray-700">
+                        <Input
+                          type="text"
+                          value={trip.vehicleManagementUnit || ""}
+                          readOnly
+                          disabled
+                          title={trip.vehicleManagementUnit}
+                          className="h-8 text-xs bg-gray-100 dark:bg-gray-800 cursor-not-allowed border-gray-200 dark:border-gray-700 truncate"
+                        />
+                      </td>
+
+                      {/* Chủng loại xe (tự động theo số xe) */}
+                      <td className="px-2 py-1.5 border-r border-b border-gray-200 dark:border-gray-700">
+                        <Input
+                          type="text"
+                          value={trip.vehicleType || ""}
+                          readOnly
+                          disabled
+                          title={trip.vehicleType}
+                          className="h-8 text-xs bg-gray-100 dark:bg-gray-800 cursor-not-allowed border-gray-200 dark:border-gray-700 truncate"
                         />
                       </td>
 
