@@ -31,5 +31,10 @@ export const ROUTES = {
     LOAI_HANG: '/danh-muc/loai-hang',
     CA_LAM_VIEC: '/danh-muc/ca-lam-viec',
     NGUOI_DUNG: '/danh-muc/nguoi-dung',
+    KHU_VUC_XUC: '/danh-muc/khu-vuc-xuc',
+    NOI_NHAN_TAI: '/danh-muc/noi-nhan-tai',
+    NOI_DO_TAI: '/danh-muc/noi-do-tai',
+    NOI_CHAT_TAI: '/danh-muc/noi-chat-tai',
+    CHUNG_LOAI_HANG: '/danh-muc/chung-loai-hang',
   },
 } as const;

@@ -187,6 +187,53 @@ export function Header() {
                 </NavLink>
               </DropdownMenuItem>
 
+              {/* 5 danh mục mới (2026-08-30) */}
+              <DropdownMenuItem asChild>
+                <NavLink
+                  to={ROUTES.DANH_MUC.KHU_VUC_XUC}
+                  className="flex items-center gap-2 px-2.5 py-2 text-sm rounded hover:bg-blue-50 cursor-pointer"
+                >
+                  <FolderTree className="h-4 w-4 text-blue-600" />
+                  Khu vực xúc
+                </NavLink>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <NavLink
+                  to={ROUTES.DANH_MUC.NOI_NHAN_TAI}
+                  className="flex items-center gap-2 px-2.5 py-2 text-sm rounded hover:bg-blue-50 cursor-pointer"
+                >
+                  <FolderTree className="h-4 w-4 text-blue-600" />
+                  Nơi nhận tải
+                </NavLink>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <NavLink
+                  to={ROUTES.DANH_MUC.NOI_DO_TAI}
+                  className="flex items-center gap-2 px-2.5 py-2 text-sm rounded hover:bg-blue-50 cursor-pointer"
+                >
+                  <FolderTree className="h-4 w-4 text-blue-600" />
+                  Nơi dỡ tải
+                </NavLink>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <NavLink
+                  to={ROUTES.DANH_MUC.NOI_CHAT_TAI}
+                  className="flex items-center gap-2 px-2.5 py-2 text-sm rounded hover:bg-blue-50 cursor-pointer"
+                >
+                  <FolderTree className="h-4 w-4 text-blue-600" />
+                  Nơi chất tải
+                </NavLink>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <NavLink
+                  to={ROUTES.DANH_MUC.CHUNG_LOAI_HANG}
+                  className="flex items-center gap-2 px-2.5 py-2 text-sm rounded hover:bg-blue-50 cursor-pointer"
+                >
+                  <Layers className="h-4 w-4 text-blue-600" />
+                  Chủng loại hàng
+                </NavLink>
+              </DropdownMenuItem>
+
               {/* Loại hàng */}
               <DropdownMenuItem asChild>
                 <NavLink

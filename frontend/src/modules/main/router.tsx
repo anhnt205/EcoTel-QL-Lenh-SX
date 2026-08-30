@@ -38,6 +38,13 @@ const CargoTypesPage = lazy(() => import("@/modules/cargoTypes/CargoTypes"));
 const ShiftsPage = lazy(() => import("@/modules/shifts/Shifts"));
 const UsersPage = lazy(() => import("@/modules/users/Users"));
 
+// 5 danh mục dùng chung CatalogPage (cấu hình trong modules/catalog/configs.ts)
+const ExcavationAreasPage = lazy(() => import("@/modules/catalog/pages/ExcavationAreas"));
+const ReceivingPointsPage = lazy(() => import("@/modules/catalog/pages/ReceivingPoints"));
+const UnloadingPointsPage = lazy(() => import("@/modules/catalog/pages/UnloadingPoints"));
+const PickupPointsPage = lazy(() => import("@/modules/catalog/pages/PickupPoints"));
+const CargoTypesCatalogPage = lazy(() => import("@/modules/catalog/pages/CargoTypesCatalog"));
+
 const PageLoader = () => (
   <div className="flex h-screen w-full items-center justify-center bg-background/50 backdrop-blur-xs">
     <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
@@ -162,6 +169,46 @@ export const mainRoutes = (
         element={
           <Suspense fallback={<PageLoader />}>
             <UsersPage />
+          </Suspense>
+        }
+      />
+      <Route
+        path={ROUTES.DANH_MUC.KHU_VUC_XUC}
+        element={
+          <Suspense fallback={<PageLoader />}>
+            <ExcavationAreasPage />
+          </Suspense>
+        }
+      />
+      <Route
+        path={ROUTES.DANH_MUC.NOI_NHAN_TAI}
+        element={
+          <Suspense fallback={<PageLoader />}>
+            <ReceivingPointsPage />
+          </Suspense>
+        }
+      />
+      <Route
+        path={ROUTES.DANH_MUC.NOI_DO_TAI}
+        element={
+          <Suspense fallback={<PageLoader />}>
+            <UnloadingPointsPage />
+          </Suspense>
+        }
+      />
+      <Route
+        path={ROUTES.DANH_MUC.NOI_CHAT_TAI}
+        element={
+          <Suspense fallback={<PageLoader />}>
+            <PickupPointsPage />
+          </Suspense>
+        }
+      />
+      <Route
+        path={ROUTES.DANH_MUC.CHUNG_LOAI_HANG}
+        element={
+          <Suspense fallback={<PageLoader />}>
+            <CargoTypesCatalogPage />
           </Suspense>
         }
       />
