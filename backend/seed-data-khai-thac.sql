@@ -139,3 +139,34 @@ SELECT setval('excavation_report_trip_seq', GREATEST((SELECT COALESCE(MAX(id),0)
 SELECT 'Seed khai thac OK: '
      || (SELECT COUNT(*) FROM excavation_reports) || ' phieu, '
      || (SELECT COUNT(*) FROM excavation_report_trips) || ' chuyen' AS status;
+
+-- ── Danh mục Khu vực xúc (mới) ──────────────────────────────────────────
+INSERT INTO excavation_areas (id, code, name, note, created_at, updated_at) VALUES
+(1, 'KVX001', 'Khu Bắc',      'Khu vực xúc phía Bắc mỏ',   NOW(), NOW()),
+(2, 'KVX002', 'Khu Nam',      'Khu vực xúc phía Nam mỏ',   NOW(), NOW()),
+(3, 'KVX003', 'Khu Đông',     'Khu vực xúc phía Đông mỏ',  NOW(), NOW()),
+(4, 'KVX004', 'Khu Tây',      'Khu vực xúc phía Tây mỏ',   NOW(), NOW()),
+(5, 'KVX005', 'Khu Trung tâm','Khu vực trung tâm khai thác', NOW(), NOW()),
+(6, 'KVX006', 'Khu 1',        'Khu vực khai thác số 1',    NOW(), NOW()),
+(7, 'KVX007', 'Khu 2',        'Khu vực khai thác số 2',    NOW(), NOW()),
+(8, 'KVX008', 'Bãi thải 1',   'Bãi thải phía Bắc',         NOW(), NOW()),
+(9, 'KVX009', 'Bãi thải 2',   'Bãi thải phía Nam',         NOW(), NOW()),
+(10,'KVX010', 'Khu phụ trợ',  'Khu vực phục vụ, phụ trợ',  NOW(), NOW())
+ON CONFLICT (code) DO NOTHING;
+
+-- ── Danh mục Nơi nhận tải (mới) ─────────────────────────────────────────
+INSERT INTO receiving_points (id, code, name, seam_group, note, created_at, updated_at) VALUES
+(1, 'NRT001', 'Kho số 1',          'Vỉa 11', 'Kho chứa than số 1',    NOW(), NOW()),
+(2, 'NRT002', 'Kho số 2',          'Vỉa 12', 'Kho chứa than số 2',    NOW(), NOW()),
+(3, 'NRT003', 'Kho số 3',          'Vỉa 13', 'Kho chứa than số 3',    NOW(), NOW()),
+(4, 'NRT004', 'Bãi nhận tải 1',    'Vỉa 14', 'Bãi nhận tải khu Bắc',  NOW(), NOW()),
+(5, 'NRT005', 'Bãi nhận tải 2',    'Vỉa 15', 'Bãi nhận tải khu Nam',  NOW(), NOW()),
+(6, 'NRT006', 'Cửa nhận tải Đông', 'Vỉa 11', 'Khu nhận tải phía Đông',NOW(), NOW()),
+(7, 'NRT007', 'Cửa nhận tải Tây',  'Vỉa 12', 'Khu nhận tải phía Tây', NOW(), NOW()),
+(8, 'NRT008', 'Kho trung chuyển 1','Vỉa 13', 'Kho trung chuyển số 1', NOW(), NOW()),
+(9, 'NRT009', 'Kho trung chuyển 2','Vỉa 14', 'Kho trung chuyển số 2', NOW(), NOW()),
+(10,'NRT010', 'Điểm nhận phụ trợ', 'Vỉa 15', 'Khu nhận tải phụ trợ',  NOW(), NOW())
+ON CONFLICT (code) DO NOTHING;
+
+SELECT setval('excavation_area_seq', GREATEST((SELECT COALESCE(MAX(id),0) FROM excavation_areas), 1));
+SELECT setval('receiving_point_seq', GREATEST((SELECT COALESCE(MAX(id),0) FROM receiving_points), 1));
