@@ -89,8 +89,11 @@ public class ExcavationReportService {
     @Transactional(readOnly = true)
     public PageResponse<ExcavationReportResponse> search(LocalDate fromDate, LocalDate toDate,
                                                              List<Long> shiftIds, List<Long> excavatorIds,
+                                                             List<Long> receivingLocationIds,
+                                                             List<String> excavationFloors,
                                                              Pageable pageable) {
-        return PageResponse.from(excavationReportRepository.search(fromDate, toDate, shiftIds, excavatorIds, pageable)
+        return PageResponse.from(excavationReportRepository
+                .search(fromDate, toDate, shiftIds, excavatorIds, receivingLocationIds, excavationFloors, pageable)
                 .map(excavationReportMapper::toResponse));
     }
 

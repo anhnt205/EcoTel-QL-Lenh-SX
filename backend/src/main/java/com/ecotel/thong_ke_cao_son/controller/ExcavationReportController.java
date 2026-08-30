@@ -54,9 +54,12 @@ public class ExcavationReportController {
             @RequestParam LocalDate toDate,
             @RequestParam(required = false) List<Long> shiftIds,
             @RequestParam(required = false) List<Long> excavatorIds,
+            @RequestParam(required = false) List<Long> receivingLocationIds,
+            @RequestParam(required = false) List<String> excavationFloors,
             Pageable pageable) {
         return ApiResponse.success(
-                excavationReportService.search(fromDate, toDate, shiftIds, excavatorIds, pageable));
+                excavationReportService.search(fromDate, toDate, shiftIds, excavatorIds,
+                        receivingLocationIds, excavationFloors, pageable));
     }
 
     @PutMapping("/{id}")
@@ -125,10 +128,13 @@ public class ExcavationReportController {
             @RequestParam LocalDate fromDate,
             @RequestParam LocalDate toDate,
             @RequestParam(required = false) List<Long> shiftIds,
-            @RequestParam(required = false) List<Long> excavatorIds) {
+            @RequestParam(required = false) List<Long> excavatorIds,
+            @RequestParam(required = false) List<Long> receivingLocationIds,
+            @RequestParam(required = false) List<String> excavationFloors) {
 
         List<ExcavationReport> reports = excavationReportRepository
-                .search(fromDate, toDate, shiftIds, excavatorIds, Pageable.unpaged())
+                .search(fromDate, toDate, shiftIds, excavatorIds,
+                        receivingLocationIds, excavationFloors, Pageable.unpaged())
                 .getContent();
 
         byte[] excelBytes = excelExporter.export(reports);

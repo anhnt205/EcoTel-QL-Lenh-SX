@@ -437,6 +437,8 @@ export async function fetchExcavationReports(params: {
   toDate?: string;
   shiftIds?: number[];
   excavatorIds?: number[];
+  receivingLocationIds?: number[];
+  excavationFloors?: string[];
   page?: number;
   size?: number;
 }): Promise<ApiResponse<PageResponse<ExcavationReportResponse> | ExcavationReportResponse[]>> {
@@ -572,6 +574,8 @@ export async function exportExcavationReports(params: {
   toDate: string;
   shiftIds?: number[];
   excavatorIds?: number[];
+  receivingLocationIds?: number[];
+  excavationFloors?: string[];
 }): Promise<Blob> {
   const res = await api.get("/excavation-reports/export", {
     params,
@@ -698,6 +702,8 @@ export function useExcavationReportsQuery(
     toDate?: string;
     shiftIds?: number[];
     excavatorIds?: number[];
+    receivingLocationIds?: number[];
+    excavationFloors?: string[];
     page?: number;
     size?: number;
   },

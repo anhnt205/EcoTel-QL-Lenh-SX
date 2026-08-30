@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import type { MiningRecord } from "../types/thong-ke";
 import {
   useExcavationReportsQuery,
@@ -90,12 +90,28 @@ export const MiningEntryPage: React.FC = () => {
     return ids.length > 0 ? ids : undefined;
   }, [selectedExcavators, rawExcavators]);
 
+  // Map tên "Nơi chất tải" đã chọn sang Location ID cho Backend API
+  const receivingLocationIds = useMemo(() => {
+    if (selectedPickupLocations.length === 0) return undefined;
+    const ids = rawLocations
+      .filter((l) => selectedPickupLocations.includes(String(l.name ?? "")))
+      .map((l) => l.id);
+    return ids.length > 0 ? ids : undefined;
+  }, [selectedPickupLocations, rawLocations]);
+
+  // "Tầng xúc" là chuỗi tự do -> gửi thẳng giá trị
+  const excavationFloors = useMemo(() => {
+    return selectedBenches.length > 0 ? selectedBenches : undefined;
+  }, [selectedBenches]);
+
   // ── Query Backend API ───────────────────────────────────────────────────
   const { data: apiResponse, refetch } = useExcavationReportsQuery({
     fromDate: startDate,
     toDate: endDate,
     shiftIds,
     excavatorIds,
+    receivingLocationIds,
+    excavationFloors,
   });
 
   const bulkDeleteReportMutation = useBulkDeleteExcavationTripReportMutation();
@@ -181,47 +197,49 @@ export const MiningEntryPage: React.FC = () => {
     return list;
   }, [reportsList]);
 
-  // Danh sách "Nơi chất tải" lấy từ danh mục Vị trí; "Tầng xúc" là giá trị tự
-  // do nên gom từ chính dữ liệu đang hiển thị.
+  // "Nơi chất tải" lấy thẳng từ danh mục Vị trí — độc lập với kết quả lọc nên
+  // không bị co lại khi người dùng đã chọn.
   const pickupLocationOptions = useMemo(() => {
-    const fromMaster = rawLocations
-      .map((l) => String(l.name ?? "").trim())
-      .filter(Boolean);
-    const fromData = records
-      .map((r) => String(r.pickupLocation ?? "").trim())
-      .filter(Boolean);
-    return Array.from(new Set([...fromMaster, ...fromData])).sort();
-  }, [rawLocations, records]);
-
-  const benchOptions = useMemo(() => {
     return Array.from(
-      new Set(records.map((r) => String(r.excavationBench ?? "").trim())),
-    )
-      .filter(Boolean)
-      .sort((a, b) => Number(b) - Number(a) || a.localeCompare(b));
+      new Set(
+        rawLocations.map((l) => String(l.name ?? "").trim()).filter(Boolean),
+      ),
+    ).sort();
+  }, [rawLocations]);
+
+  // "Tầng xúc" là chuỗi tự do, không có danh mục — phải gom từ dữ liệu trả về.
+  // Nhưng từ khi lọc chuyển xuống Backend, dữ liệu trả về ĐÃ bị lọc theo chính
+  // tầng xúc đang chọn: nếu lấy trực tiếp thì danh sách sẽ co lại còn đúng
+  // tầng vừa chọn và không chọn thêm được tầng khác. Vì vậy tích luỹ dần các
+  // giá trị đã thấy, chỉ xoá khi đổi khoảng thời gian.
+  const [knownBenches, setKnownBenches] = useState<string[]>([]);
+
+  useEffect(() => {
+    setKnownBenches([]);
+  }, [startDate, endDate]);
+
+  useEffect(() => {
+    const seen = records
+      .map((r) => String(r.excavationBench ?? "").trim())
+      .filter(Boolean);
+    if (seen.length === 0) return;
+    setKnownBenches((prev) => {
+      const merged = new Set([...prev, ...seen]);
+      return merged.size === prev.length
+        ? prev
+        : Array.from(merged).sort(
+            (a, b) => Number(b) - Number(a) || a.localeCompare(b),
+          );
+    });
   }, [records]);
+
+  const benchOptions = knownBenches;
 
   // ── Filtered Records ─────────────────────────────────────────────────────
   const filteredRecords = useMemo(() => {
+    // Ca, Máy xúc, Nơi chất tải, Tầng xúc đều đã lọc ở Backend — chỉ còn lọc
+    // theo khoảng ngày (an toàn) và tìm kiếm từ khoá ở client.
     return records.filter((r) => {
-      // Nơi chất tải
-      if (
-        selectedPickupLocations.length > 0 &&
-        !selectedPickupLocations.includes(
-          String(r.pickupLocation ?? "").trim(),
-        )
-      ) {
-        return false;
-      }
-
-      // Tầng xúc
-      if (
-        selectedBenches.length > 0 &&
-        !selectedBenches.includes(String(r.excavationBench ?? "").trim())
-      ) {
-        return false;
-      }
-
       // Date filter
       if (r.month && r.day) {
         const rYear = r.year || new Date().getFullYear();
@@ -255,8 +273,6 @@ export const MiningEntryPage: React.FC = () => {
     records,
     startDate,
     endDate,
-    selectedPickupLocations,
-    selectedBenches,
     searchKeyword,
   ]);
   // Reset filters
@@ -329,6 +345,8 @@ export const MiningEntryPage: React.FC = () => {
         ...params,
         shiftIds,
         excavatorIds,
+        receivingLocationIds,
+        excavationFloors,
       }),
     loadSessionsForEdit,
     initDrafts,
