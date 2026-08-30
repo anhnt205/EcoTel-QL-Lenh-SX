@@ -498,11 +498,15 @@ export const MiningBatchEntryModal: React.FC<MiningBatchEntryModalProps> = ({
           className="flex-1 overflow-y-auto px-5 py-4 space-y-5"
           onKeyDown={handleKeyDown}
         >
-          {/* ── HÀNG THÔNG TIN CHUNG: Thời gian · Ca · Nơi chất tải · Máy xúc · Tầng xúc ──
-              Bố cục theo mockup: hàng 1 = Thời gian + Ca, hàng 2 = Nơi chất
-              tải + Máy xúc + Tầng xúc. Dùng grid 6 cột, mỗi ô chiếm 3 hoặc 2
-              cột để tự xuống hàng đúng chỗ. */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 [&>div:nth-child(-n+2)]:lg:col-span-3 [&>div:nth-child(n+3)]:lg:col-span-2">
+          {/* ── HÀNG THÔNG TIN CHUNG ──────────────────────────────────────
+              Hàng 1: Thời gian · Ca          (cột 1-2, cột 3-5 để trống)
+              Hàng 2: Nơi chất tải · Máy xúc · Tầng xúc  (cột 1-3)
+
+              Dùng HAI grid rời nhau nhưng CÙNG `lg:grid-cols-5` + cùng gap
+              nên các cột thẳng hàng theo chiều dọc, mỗi ô rộng đúng 1/5.
+              (Trước đây gộp 1 grid rồi cho 2 ô đầu span 3/6 — ô bị kéo rộng
+              nửa hàng và cột 2 hàng lệch nhau.) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
             {/* Thời gian */}
             <div className="flex flex-col gap-1">
               <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">
@@ -544,6 +548,9 @@ export const MiningBatchEntryModal: React.FC<MiningBatchEntryModalProps> = ({
               </Select>
             </div>
 
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
             {/* Nơi chất tải */}
             <div className="flex flex-col gap-1">
               <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">
