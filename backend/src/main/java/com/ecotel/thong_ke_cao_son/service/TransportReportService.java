@@ -12,6 +12,8 @@ import com.ecotel.thong_ke_cao_son.exception.BadRequestException;
 import com.ecotel.thong_ke_cao_son.exception.ResourceNotFoundException;
 import com.ecotel.thong_ke_cao_son.model.ExcavationArea;
 import com.ecotel.thong_ke_cao_son.model.ReceivingPoint;
+import com.ecotel.thong_ke_cao_son.repository.UnloadingPointRepository;
+import com.ecotel.thong_ke_cao_son.model.UnloadingPoint;
 import com.ecotel.thong_ke_cao_son.repository.ExcavationAreaRepository;
 import com.ecotel.thong_ke_cao_son.repository.ReceivingPointRepository;
 import com.ecotel.thong_ke_cao_son.model.*;
@@ -45,6 +47,7 @@ public class TransportReportService {
     private final LocationRepository locationRepository;
     private final ExcavationAreaRepository excavationAreaRepository;
     private final ReceivingPointRepository receivingPointRepository;
+    private final UnloadingPointRepository unloadingPointRepository;
     private final CargoTypeRepository cargoTypeRepository;
     private final ReceivingFloorGroupCalculator floorGroupCalculator;
     private final TransportReportMapper transportReportMapper;
@@ -145,7 +148,7 @@ public class TransportReportService {
         trip.setExcavationArea(excavationArea);
         trip.setExcavator(getOrThrow(deviceRepository, tripReq.getExcavatorDeviceId(), "Máy xúc"));
         trip.setLoadingPoint(getOrThrow(receivingPointRepository, tripReq.getLoadingPointId(), "Nơi nhận tải"));
-        trip.setUnloadingPoint(getOrThrow(locationRepository, tripReq.getUnloadingPointId(), "Nơi dỡ tải"));
+        trip.setUnloadingPoint(getOrThrow(unloadingPointRepository, tripReq.getUnloadingPointId(), "Nơi dỡ tải"));
 
         CargoType cargoType = getOrThrow(cargoTypeRepository, tripReq.getCargoTypeId(), "Loại hàng");
         trip.setCargoType(cargoType);
@@ -306,7 +309,7 @@ public class TransportReportService {
         trip.setExcavationArea(getOrThrow(excavationAreaRepository, request.getExcavationAreaId(), "Khu vực xúc"));
         trip.setExcavator(getOrThrow(deviceRepository, request.getExcavatorDeviceId(), "Máy xúc"));
         trip.setLoadingPoint(getOrThrow(receivingPointRepository, request.getLoadingPointId(), "Nơi nhận tải"));
-        trip.setUnloadingPoint(getOrThrow(locationRepository, request.getUnloadingPointId(), "Nơi dỡ tải"));
+        trip.setUnloadingPoint(getOrThrow(unloadingPointRepository, request.getUnloadingPointId(), "Nơi dỡ tải"));
 
         trip.setReceivingFloor(request.getReceivingFloor());
         trip.setReceivingFloorGroup(floorGroupCalculator.calculate(trip.getExcavationArea().getName(), request.getReceivingFloor()));

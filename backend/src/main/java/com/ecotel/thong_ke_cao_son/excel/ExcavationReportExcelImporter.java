@@ -3,6 +3,8 @@ package com.ecotel.thong_ke_cao_son.excel;
 import com.ecotel.thong_ke_cao_son.dto.response.ExcelImportResultResponse;
 import com.ecotel.thong_ke_cao_son.model.*;
 import com.ecotel.thong_ke_cao_son.enums.LoadLevelType;
+import com.ecotel.thong_ke_cao_son.repository.PickupPointRepository;
+import com.ecotel.thong_ke_cao_son.model.PickupPoint;
 import com.ecotel.thong_ke_cao_son.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.apache.poi.ss.usermodel.*;
@@ -25,6 +27,7 @@ public class ExcavationReportExcelImporter {
     private final DeviceRepository deviceRepository;
     private final UserRepository userRepository;
     private final LocationRepository locationRepository;
+    private final PickupPointRepository pickupPointRepository;
     private final CargoTypeRepository cargoTypeRepository;
 
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
@@ -160,7 +163,7 @@ public class ExcavationReportExcelImporter {
         report.setShift(shift);
         report.setExcavatorDevice(excavatorDevice);
         report.setExcavationFloor(emptyToNull(firstRow.get("excavationFloor")));
-        report.setReceivingLocation(findOrThrow(locationRepository.findByName(firstRow.get("receivingLocationName")), "Nơi nhận tải", firstRow.get("receivingLocationName")));
+        report.setReceivingLocation(findOrThrow(pickupPointRepository.findByName(firstRow.get("receivingLocationName")), "Nơi chất tải", firstRow.get("receivingLocationName")));
         report.setEmployee(employee);
         report.setFuelBeginning(parseDouble(firstRow.get("fuelBeginning")));
         report.setFuelEnding(parseDouble(firstRow.get("fuelEnding")));

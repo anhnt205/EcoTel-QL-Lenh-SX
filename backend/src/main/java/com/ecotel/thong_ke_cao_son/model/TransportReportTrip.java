@@ -84,7 +84,7 @@ public class TransportReportTrip {
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "unloading_point_id", nullable = false)
-    private Location unloadingPoint;
+    private UnloadingPoint unloadingPoint;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "cargo_type_id", nullable = false)

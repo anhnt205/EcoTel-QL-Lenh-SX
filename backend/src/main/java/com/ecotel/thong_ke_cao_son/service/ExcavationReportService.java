@@ -16,6 +16,8 @@ import com.ecotel.thong_ke_cao_son.model.CargoType;
 import com.ecotel.thong_ke_cao_son.model.ExcavationReport;
 import com.ecotel.thong_ke_cao_son.model.ExcavationReportTrip;
 import com.ecotel.thong_ke_cao_son.model.LoadLevel;
+import com.ecotel.thong_ke_cao_son.repository.PickupPointRepository;
+import com.ecotel.thong_ke_cao_son.model.PickupPoint;
 import com.ecotel.thong_ke_cao_son.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Lazy;
@@ -41,6 +43,7 @@ public class ExcavationReportService {
     private final ShiftRepository shiftRepository;
     private final DeviceRepository deviceRepository;
     private final LocationRepository locationRepository;
+    private final PickupPointRepository pickupPointRepository;
     private final UserRepository userRepository;
     private final CargoTypeRepository cargoTypeRepository;
     private final ExcavationReportMapper excavationReportMapper;
@@ -107,7 +110,7 @@ public class ExcavationReportService {
     private void applyRelations(ExcavationReport report, ExcavationReportRequest request) {
         report.setShift(getOrThrow(shiftRepository, request.getShiftId(), "Ca"));
         report.setExcavatorDevice(getOrThrow(deviceRepository, request.getExcavatorDeviceId(), "Máy xúc"));
-        report.setReceivingLocation(getOrThrow(locationRepository, request.getReceivingLocationId(), "Nơi nhận tải"));
+        report.setReceivingLocation(getOrThrow(pickupPointRepository, request.getReceivingLocationId(), "Nơi chất tải"));
         report.setEmployee(getOrThrow(userRepository, request.getEmployeeId(), "Nhân viên"));
     }
 

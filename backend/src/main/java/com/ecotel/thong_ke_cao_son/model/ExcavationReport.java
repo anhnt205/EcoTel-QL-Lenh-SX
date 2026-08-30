@@ -56,7 +56,7 @@ public class ExcavationReport {
     // "Nơi nhận tải"
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "receiving_location_id", nullable = false)
-    private Location receivingLocation;
+    private PickupPoint receivingLocation;
 
     @Column(name = "fuel_beginning")
     private Double fuelBeginning;
