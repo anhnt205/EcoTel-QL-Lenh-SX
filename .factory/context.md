@@ -205,9 +205,27 @@ do: `docs/TECHNICAL_DEBT.md` phần "✅ Đã sửa trong lượt này".
    - Máy trạng thái đối soát 2 cấp với `RETURNED_TO_MINING` /
      `RETURNED_TO_TRANSPORT` tách riêng (trả đích danh bên sai).
    - Lộ trình G1→G8; **G4/G5 đối chiếu số với dòng 1250 của Excel**.
-   - **5 điểm cần quyết định trước khi code** — mục 8 của file đó. Quan
-     trọng nhất: `Double` hay `BigDecimal` (entity hiện dùng `Double`, sẽ
-     tích luỹ sai số qua 25 bước có ROUND xen kẽ).
+   - **QĐ-08 đã chốt: dùng `BigDecimal`.** Phạm vi đã rà thật: 19 trường
+     `Double` trong `model/`, **18 file backend + 10 file frontend** tham
+     chiếu → thay đổi diện rộng trên code đang chạy, **bắt buộc áp kỷ luật
+     chống hồi quy**. Ba bẫy đã ghi trong QĐ-08: `divide()` không khai scale
+     sẽ ném `ArithmeticException` (hệ số Roda `2/3` là số vô hạn tuần hoàn!);
+     so sánh phải dùng `compareTo` chứ không `equals`; cột DB phải đổi
+     `double precision` → `numeric(p,s)`.
+   - **5 điểm còn lại cần quyết định** — mục 8 của `DESIGN_SANLUONG.md`.
+     Mới phát sinh và đáng chú ý nhất là điểm 2 (xem mục 13 dưới).
+13. ⚠ **PHÁT HIỆN MỚI — `Material` và `CargoType` có thể trùng vai trò.**
+    Khi rà phạm vi QĐ-08 thấy `Material` + `MaterialValueHistory`
+    (`@Embeddable`: `density`, `dryDensity`, `startTime`, `endTime`) —
+    **đã gần đúng danh mục Tỷ trọng theo thời gian mà QĐ-04 yêu cầu**, và
+    `Material.acceptedProduct` chính là Sản phẩm nghiệm thu. Nhưng: không có
+    id riêng (không audit/snapshot được), `endTime` mặc định `now()` nên bản
+    ghi **hết hiệu lực ngay khi tạo**, dùng `LocalDateTime` thay vì
+    `LocalDate`, và **thiếu chiều Khu vực xúc** (Excel tra tỷ trọng theo
+    Chủng loại hàng × Khu vực xúc). Câu hỏi chưa trả lời: `CargoType` và
+    `Material` là **một khái niệm bị tách đôi** hay hai khái niệm khác nhau?
+    Chi tiết: `DESIGN_SANLUONG.md` mục 2.4. **Chưa tự quyết** — phải rõ
+    trước khi code G2.
    Câu hỏi mở còn lại (KHÔNG chặn), ở `docs/REQUIREMENT_WORKFLOW.md` mục 9:
    ngưỡng sai lệch đối soát; mức tải lệch có tính sai lệch không; mẫu báo
    cáo sản lượng; Số xe bên VT là text hay danh mục; trả lại ở lần 2 có phải

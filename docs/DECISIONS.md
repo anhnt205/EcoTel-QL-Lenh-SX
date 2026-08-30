@@ -20,6 +20,7 @@ riêng — cần kiểm lại khi implement.
 | QĐ-05 | Thêm Danh mục Kỳ báo cáo |
 | QĐ-06 | Khoá ghép "Nhóm vỉa + Máy xúc" trở thành Danh mục để CHỌN |
 | QĐ-07 | Dòng chuẩn của bảng tính Excel |
+| QĐ-08 | Dùng `BigDecimal` cho mọi số liệu nghiệp vụ |
 | **TG-01** | **TẠM GÁC — ngoại lệ `+15` và biến thể công thức Nhóm tầng** |
 
 ---
@@ -332,3 +333,61 @@ Nhóm tầng + Máy xúc + Ký hiệu bùn + Khu vực xúc + hậu tố`. Ngư�
   bảng định mức nhiên liệu), `CO`, `DP`, `DR`.
 
 Chi tiết: `REQUIREMENT_SANLUONG_EXCEL.md` mục 3.6 và 5.
+
+---
+
+## QĐ-08 (2026-08-30) — Dùng `BigDecimal` cho mọi số liệu nghiệp vụ
+
+**Bối cảnh:** entity hiện dùng `Double`. Chuỗi 25 bước tính có `ROUND(...,3)`
+và `ROUND(...,5)` xen kẽ → `Double` tích luỹ sai số. Chính bộ Excel đang cho
+thấy điều đó: `96.828999999999994`, `382.47460000000001`.
+
+**Quyết định:** dùng **`BigDecimal`**.
+
+### Hệ quả phải chấp nhận
+
+Số của hệ mới sẽ **lệch Excel ở khoảng 1e-13 trước khi làm tròn**. Sau khi
+làm tròn theo đúng scale thì trùng khớp. Khi nghiệm thu, **so sau khi làm
+tròn** — đừng so bit-for-bit với ô Excel.
+
+### Quy tắc bắt buộc khi code
+
+1. **Mọi phép chia PHẢI khai báo scale + `RoundingMode`.**
+   `BigDecimal.divide(x)` không có scale sẽ **ném `ArithmeticException`** khi
+   kết quả là số thập phân vô hạn tuần hoàn. Đây không phải rủi ro lý
+   thuyết — công thức Mô hình có `IF(Z="roda", 2/3, …)`, và **2/3 chính là
+   số vô hạn tuần hoàn**. Viết `divide(BD.valueOf(3), 10, HALF_UP)`.
+   Chỗ thứ hai: `Tổng m3 = Khối lượng qua cân / Tỷ trọng`.
+2. **So sánh bằng `compareTo(...) == 0`, KHÔNG dùng `equals`.**
+   `new BigDecimal("2.50").equals(new BigDecimal("2.5"))` là `false` vì khác
+   scale. Sai chỗ này là sai âm thầm, không có exception.
+3. **Chính sách scale:** giữ scale trung gian **10** cho các bước không có
+   `ROUND` trong Excel; **áp đúng scale của Excel tại đúng bước Excel làm
+   tròn** (3 hoặc 5 chữ số, xem `REQUIREMENT_SANLUONG_EXCEL.md` mục 3).
+   `RoundingMode.HALF_UP`.
+4. **Cột DB đổi `double precision` → `numeric(p,s)`**, cần migration. Chọn
+   `p`/`s` đủ rộng: khối lượng tới `numeric(18,5)`, hệ số `numeric(12,6)`.
+5. **`LoadLevel.customValue` đang là `String`** (nhập dạng phân số `1/2`,
+   `1/3`). Phải parse ra `BigDecimal` có kiểm tra, **không** `Double.parseDouble`.
+
+### Phạm vi thay đổi (đã rà thật)
+
+19 trường `Double` trong `model/`. Nhóm nghiệp vụ bắt buộc đổi: khối nhiên
+liệu của `ExcavationReport`/`TransportReport` (8 trường), các chỉ tiêu tuyến
+đường của `TransportReportTrip` (4 trường), `MaterialValueHistory.density`
+/`dryDensity` (2 trường).
+
+**18 file backend** tham chiếu trực tiếp các trường này (DTO request/response,
+mapper, 2 Excel importer, `ReconciliationService`) và **10 file frontend**.
+Đây là thay đổi chạm vào nhiều caller → **bắt buộc áp kỷ luật chống hồi quy**
+(`CLAUDE.md` root, mục "Regression discipline"): khai báo phạm vi trước, tìm
+hết caller trước khi sửa, đối chiếu diff với phạm vi đã khai sau khi sửa.
+
+Lưu ý phía frontend: Jackson serialize `BigDecimal` thành **số JSON** nên
+kiểu dữ liệu không vỡ, nhưng **số chữ số thập phân hiển thị sẽ đổi**
+(`2.5` → `2.50000`). Cần rà lại chỗ format hiển thị.
+
+### Không đổi (chưa cần)
+
+`Coordinates.longitude/latitude`, `Device.capacity/power`, `Location.distance`
+— không tham gia chuỗi tính sản lượng. Để nguyên, tránh mở rộng phạm vi vô ích.

@@ -74,6 +74,56 @@ quyết định gắn với **cặp**, không phải gắn với dòng chuyến 
 
 ---
 
+### 2.4. ⚠ Phát hiện khi rà phạm vi QĐ-08 — danh mục Tỷ trọng ĐÃ TỒN TẠI một phần
+
+Trong lúc đếm các trường `Double`, tìm thấy `Material` + `MaterialValueHistory`:
+
+```java
+Material                 code, name, acceptedProduct,   // ← Sản phẩm nghiệm thu!
+                         List<MaterialValueHistory> valueHistory
+
+MaterialValueHistory     density, dryDensity,           // ← tỷ trọng / tỷ trọng khô
+     (@Embeddable)       startTime, endTime             // ← khoảng hiệu lực!
+```
+
+Đây **đã gần đúng** danh mục Tỷ trọng theo thời gian mà QĐ-04 yêu cầu. Nhưng
+có bốn vấn đề khiến không dùng thẳng được:
+
+1. **`@ElementCollection`, không có id riêng** → không tham chiếu được từ
+   `parameterSnapshot`, không audit được, khó đặt ràng buộc chống chồng lấn ở
+   tầng DB.
+2. **`startTime`/`endTime` mặc định `LocalDateTime.now()`** — `endTime` mặc
+   định bằng "bây giờ" nghĩa là bản ghi **hết hiệu lực ngay khi tạo**. Đây là
+   bẫy thật sự, không phải chuyện thẩm mỹ.
+3. Dùng `LocalDateTime` trong khi đặc tả là `dd/mm/yy – dd/mm/yy` → nên là
+   `LocalDate`.
+4. **Thiếu chiều Khu vực xúc.** Excel tra tỷ trọng theo *Chủng loại hàng ×
+   Khu vực xúc* (`CS.TyTrong` / `KC.TyTrong`). Model hiện chỉ có một chiều.
+
+**⚠ Câu hỏi cần chủ dự án làm rõ:** hệ thống đang có **hai** thực thể trông
+như cùng mô tả "chủng loại hàng":
+
+| | `CargoType` | `Material` |
+|---|---|---|
+| Nghĩa | Chủng loại hàng | Vật tư |
+| Có | `cargoGroup` (nhóm hàng) | `acceptedProduct` (SPNT), lịch sử tỷ trọng |
+| Dùng ở | dòng chuyến KT và VT | (chưa thấy dùng trong báo công) |
+
+Hai cái này là **một khái niệm bị tách đôi**, hay là hai khái niệm khác nhau
+thật? Trả lời khác nhau dẫn tới hai thiết kế khác hẳn:
+
+- Nếu là một → **hợp nhất**, chuyển `acceptedProduct` + lịch sử tỷ trọng về
+  `CargoType`, `DensityParameter` ở mục 3.3 chính là bản viết lại của
+  `MaterialValueHistory`.
+- Nếu là hai → giữ cả hai, và phải làm rõ tỷ trọng dùng trong công thức lấy
+  theo `CargoType` hay theo `Material`.
+
+**Chưa tự quyết.** Thiết kế ở mục 3.3 tạm viết theo phương án "một khái
+niệm" vì công thức Excel tra tỷ trọng bằng **Chủng loại hàng**, nhưng phải
+xác nhận trước khi code G2.
+
+---
+
 ## 3. Mô hình dữ liệu
 
 ### 3.1. Nhóm A — Danh mục nền (mở rộng cái đã có)
@@ -350,26 +400,26 @@ Bước 20 (nội suy song tuyến) là bước phức tạp nhất về mặt t
 nơi bản docx sai nhiều nhất — bám công thức Excel ở
 `REQUIREMENT_SANLUONG_EXCEL.md` mục 3.4, **không bám bản văn xuôi**.
 
-### 4.5. ⚠ Số học và làm tròn — điểm cần quyết định
+### 4.5. Số học và làm tròn — ✅ ĐÃ CHỐT: `BigDecimal` (QĐ-08)
 
-Entity hiện tại dùng `Double`. Với chuỗi 25 bước có `ROUND(...,3)` và
-`ROUND(...,5)` xen kẽ, `Double` sẽ tích luỹ sai số — chính bộ Excel đang cho
-thấy điều đó (`96.828999999999994`, `382.47460000000001`).
+Chi tiết + quy tắc bắt buộc: [`DECISIONS.md`](DECISIONS.md) QĐ-08. Tóm tắt
+phần ảnh hưởng trực tiếp tới engine:
 
-**Khuyến nghị: `BigDecimal` với scale khai báo tường minh ở mỗi bước
-`ROUND`, `RoundingMode.HALF_UP`.**
+- **Scale trung gian 10**, `RoundingMode.HALF_UP`. Áp **đúng scale của Excel
+  tại đúng bước Excel làm tròn** (3 hoặc 5 chữ số).
+- **Mọi `divide()` phải khai báo scale** — nếu không sẽ ném
+  `ArithmeticException`. Hai chỗ chắc chắn vướng: hệ số Roda `2/3` (số vô
+  hạn tuần hoàn) ở bước 09, và `Tổng m3 = Khối lượng qua cân / Tỷ trọng` ở
+  bước 11.
+- **So sánh bằng `compareTo() == 0`**, không dùng `equals` (khác scale là
+  `false`). Sai chỗ này không ném lỗi — sai âm thầm.
+- Số sẽ lệch Excel ~1e-13 **trước** khi làm tròn; nghiệm thu thì **so sau
+  khi làm tròn**.
 
-Hệ quả cần biết trước, không phải phát hiện sau:
-- Số của hệ mới sẽ **lệch Excel ở khoảng 1e-13** trước khi làm tròn. Sau khi
-  làm tròn theo đúng scale thì trùng khớp.
-- Khi đối chiếu để nghiệm thu, **so sau khi làm tròn**, đừng so bit-for-bit
-  với ô Excel.
-- Việc đổi `Double → BigDecimal` chạm vào entity đang có → phải rà toàn bộ
-  caller (kỷ luật chống hồi quy, `CLAUDE.md` root mục 2).
-
-Nếu chủ dự án muốn **trùng khít tuyệt đối với Excel** thì phải giữ `double`
-và mô phỏng cả thứ tự phép toán của Excel — đổi lại là chấp nhận sai số tích
-luỹ. **Đây là đánh đổi thật, cần chọn trước khi code.**
+Phạm vi thay đổi đã rà thật: 19 trường `Double` trong `model/`, 18 file
+backend và 10 file frontend tham chiếu. Đây là thay đổi diện rộng trên code
+đang chạy → **áp kỷ luật chống hồi quy** (`CLAUDE.md` root): khai báo phạm
+vi trước, tìm hết caller trước khi sửa, đối chiếu diff sau khi sửa.
 
 ### 4.6. Hiệu năng
 
@@ -493,13 +543,14 @@ và đã có sẵn dữ liệu thật để đối chiếu (`_source/excel-tinht
 
 ## 8. Điểm cần quyết định trước khi code
 
-| # | Vấn đề | Khuyến nghị |
+| # | Vấn đề | Trạng thái |
 |---|---|---|
-| 1 | **`Double` hay `BigDecimal`** (4.5) | BigDecimal — đổi lại là lệch Excel ở 1e-13 trước làm tròn |
-| 2 | **Mẫu báo cáo sản lượng** (G8) | Chưa có tài liệu nào mô tả. Cần mẫu thật trước khi làm G8 |
-| 3 | Đổi `ReconciliationDecision` sang gắn với cặp (2.3) | Có, nhưng giữ entity cũ; cần biết dữ liệu cũ có cần di trú không |
-| 4 | Bổ sung `unloadingPoint` vào `ExcavationReportTrip` (2.2) | Có — thiếu thì không đối soát được điểm đổ |
-| 5 | Có cần **điều chỉnh sau chốt** (bút toán ngược) không | Câu hỏi cũ chưa trả lời, ảnh hưởng thiết kế `ProductionCalculationRun` |
+| 1 | ~~`Double` hay `BigDecimal`~~ | ✅ **ĐÃ CHỐT — `BigDecimal`** (QĐ-08) |
+| 2 | **`Material` và `CargoType` có trùng vai trò không?** (2.4) | ⚠ **MỚI — cần làm rõ trước khi thiết kế danh mục Tỷ trọng** |
+| 3 | **Mẫu báo cáo sản lượng** (G8) | Chưa có tài liệu nào mô tả. Cần mẫu thật trước khi làm G8 |
+| 4 | Đổi `ReconciliationDecision` sang gắn với cặp (2.3) | Có, nhưng giữ entity cũ; cần biết dữ liệu cũ có cần di trú không |
+| 5 | Bổ sung `unloadingPoint` vào `ExcavationReportTrip` (2.2) | Có — thiếu thì không đối soát được điểm đổ |
+| 6 | Có cần **điều chỉnh sau chốt** (bút toán ngược) không | Câu hỏi cũ chưa trả lời, ảnh hưởng thiết kế `ProductionCalculationRun` |
 
 Ngoài ra **TG-01 vẫn tạm gác** — bước 06 (Nhóm tầng) code theo bản chuẩn
 dòng 5, không cài ngoại lệ `+15`.

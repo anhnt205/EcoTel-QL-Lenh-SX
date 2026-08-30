@@ -10,7 +10,7 @@ CLAUDE.md gốc ở root repo factory — đọc cả hai trước khi làm vi�
    sự thật, tin hơn lịch sử chat). Phần "BÀN GIAO" ở cuối chỉ rõ đọc tiếp
    gì tuỳ loại việc.
 2. **`docs/DECISIONS.md`** — quyết định nghiệp vụ chủ dự án đã chốt
-   trực tiếp (QĐ-01…QĐ-07) và mục tạm gác (TG-01). **Không hỏi lại chủ dự
+   trực tiếp (QĐ-01…QĐ-08) và mục tạm gác (TG-01). **Không hỏi lại chủ dự
    án những gì đã có trong file này. Không tự đổi.**
 3. `docs/CODEBASE_MAP.md`, `docs/ARCHITECTURE_CURRENT.md` — bản đồ hệ
    thống, luồng auth qua Portal (đã bật lại).

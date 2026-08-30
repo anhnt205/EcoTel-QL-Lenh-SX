@@ -15,7 +15,7 @@ dữ liệu + kiến trúc tính toán (chưa code). Nêu rõ giữ gì của mo
 bổ sung gì, và 5 điểm cần quyết định trước khi code.
 
 **Xem [docs/DECISIONS.md](docs/DECISIONS.md) TRƯỚC TIÊN** — nhật ký các
-quyết định nghiệp vụ/thiết kế chủ dự án đã chốt trực tiếp (QĐ-01 → QĐ-07) + mục tạm gác TG-01.
+quyết định nghiệp vụ/thiết kế chủ dự án đã chốt trực tiếp (QĐ-01 → QĐ-08) + mục tạm gác TG-01.
 Đây là nguồn sự thật cho những chỗ tài liệu gốc mâu thuẫn hoặc bỏ trống.
 Không hỏi lại, không tự đổi.
 
