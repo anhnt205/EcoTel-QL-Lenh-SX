@@ -1,6 +1,10 @@
 package com.ecotel.thong_ke_cao_son.excel;
 
 import com.ecotel.thong_ke_cao_son.dto.response.ExcelImportResultResponse;
+import com.ecotel.thong_ke_cao_son.model.ExcavationArea;
+import com.ecotel.thong_ke_cao_son.model.ReceivingPoint;
+import com.ecotel.thong_ke_cao_son.repository.ExcavationAreaRepository;
+import com.ecotel.thong_ke_cao_son.repository.ReceivingPointRepository;
 import com.ecotel.thong_ke_cao_son.model.*;
 import com.ecotel.thong_ke_cao_son.enums.LoadLevelType;
 import com.ecotel.thong_ke_cao_son.repository.*;
@@ -25,6 +29,8 @@ public class TransportReportExcelImporter {
     private final DeviceRepository deviceRepository;
     private final UserRepository userRepository;
     private final LocationRepository locationRepository;
+    private final ExcavationAreaRepository excavationAreaRepository;
+    private final ReceivingPointRepository receivingPointRepository;
     private final CargoTypeRepository cargoTypeRepository;
     private final ReceivingFloorGroupCalculator floorGroupCalculator;
 
@@ -184,11 +190,11 @@ public class TransportReportExcelImporter {
         trip.setRainyDay("x".equalsIgnoreCase(row.get("rainyDay")));
         trip.setSupplementaryVehicle("x".equalsIgnoreCase(row.get("supplementaryVehicle")));
 
-        Location excavationArea = findOrThrow(
-                locationRepository.findByName(row.get("excavationAreaName")), "Khu vực xúc", row.get("excavationAreaName"));
+        ExcavationArea excavationArea = findOrThrow(
+                excavationAreaRepository.findByName(row.get("excavationAreaName")), "Khu vực xúc", row.get("excavationAreaName"));
         trip.setExcavationArea(excavationArea);
         trip.setExcavator(findOrThrow(deviceRepository.findByCode(row.get("excavatorCode")), "Máy xúc", row.get("excavatorCode")));
-        trip.setLoadingPoint(findOrThrow(locationRepository.findByName(row.get("loadingPointName")), "Nơi nhận tải", row.get("loadingPointName")));
+        trip.setLoadingPoint(findOrThrow(receivingPointRepository.findByName(row.get("loadingPointName")), "Nơi nhận tải", row.get("loadingPointName")));
         trip.setUnloadingPoint(findOrThrow(locationRepository.findByName(row.get("unloadingPointName")), "Nơi dỡ tải", row.get("unloadingPointName")));
 
         Integer receivingFloor = parseIntOrNull(row.get("receivingFloor"));

@@ -10,6 +10,10 @@ import com.ecotel.thong_ke_cao_son.dto.response.TransportReportTripResponse;
 import com.ecotel.thong_ke_cao_son.enums.ApprovalStatus;
 import com.ecotel.thong_ke_cao_son.exception.BadRequestException;
 import com.ecotel.thong_ke_cao_son.exception.ResourceNotFoundException;
+import com.ecotel.thong_ke_cao_son.model.ExcavationArea;
+import com.ecotel.thong_ke_cao_son.model.ReceivingPoint;
+import com.ecotel.thong_ke_cao_son.repository.ExcavationAreaRepository;
+import com.ecotel.thong_ke_cao_son.repository.ReceivingPointRepository;
 import com.ecotel.thong_ke_cao_son.model.*;
 import com.ecotel.thong_ke_cao_son.enums.LoadLevelType;
 import com.ecotel.thong_ke_cao_son.mapper.TransportReportMapper;
@@ -39,6 +43,8 @@ public class TransportReportService {
     private final DeviceRepository deviceRepository;
     private final UserRepository userRepository;
     private final LocationRepository locationRepository;
+    private final ExcavationAreaRepository excavationAreaRepository;
+    private final ReceivingPointRepository receivingPointRepository;
     private final CargoTypeRepository cargoTypeRepository;
     private final ReceivingFloorGroupCalculator floorGroupCalculator;
     private final TransportReportMapper transportReportMapper;
@@ -135,10 +141,10 @@ public class TransportReportService {
         trip.setRainyDay(tripReq.getRainyDay() != null ? tripReq.getRainyDay() : false);
         trip.setSupplementaryVehicle(tripReq.getSupplementaryVehicle() != null ? tripReq.getSupplementaryVehicle() : false);
 
-        Location excavationArea = getOrThrow(locationRepository, tripReq.getExcavationAreaId(), "Khu vực xúc");
+        ExcavationArea excavationArea = getOrThrow(excavationAreaRepository, tripReq.getExcavationAreaId(), "Khu vực xúc");
         trip.setExcavationArea(excavationArea);
         trip.setExcavator(getOrThrow(deviceRepository, tripReq.getExcavatorDeviceId(), "Máy xúc"));
-        trip.setLoadingPoint(getOrThrow(locationRepository, tripReq.getLoadingPointId(), "Nơi nhận tải"));
+        trip.setLoadingPoint(getOrThrow(receivingPointRepository, tripReq.getLoadingPointId(), "Nơi nhận tải"));
         trip.setUnloadingPoint(getOrThrow(locationRepository, tripReq.getUnloadingPointId(), "Nơi dỡ tải"));
 
         CargoType cargoType = getOrThrow(cargoTypeRepository, tripReq.getCargoTypeId(), "Loại hàng");
@@ -297,9 +303,9 @@ public class TransportReportService {
         trip.setRainyDay(request.getRainyDay() != null ? request.getRainyDay() : false);
         trip.setSupplementaryVehicle(request.getSupplementaryVehicle() != null ? request.getSupplementaryVehicle() : false);
 
-        trip.setExcavationArea(getOrThrow(locationRepository, request.getExcavationAreaId(), "Khu vực xúc"));
+        trip.setExcavationArea(getOrThrow(excavationAreaRepository, request.getExcavationAreaId(), "Khu vực xúc"));
         trip.setExcavator(getOrThrow(deviceRepository, request.getExcavatorDeviceId(), "Máy xúc"));
-        trip.setLoadingPoint(getOrThrow(locationRepository, request.getLoadingPointId(), "Nơi nhận tải"));
+        trip.setLoadingPoint(getOrThrow(receivingPointRepository, request.getLoadingPointId(), "Nơi nhận tải"));
         trip.setUnloadingPoint(getOrThrow(locationRepository, request.getUnloadingPointId(), "Nơi dỡ tải"));
 
         trip.setReceivingFloor(request.getReceivingFloor());

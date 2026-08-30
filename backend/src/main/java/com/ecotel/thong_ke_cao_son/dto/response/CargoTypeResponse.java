@@ -15,6 +15,10 @@ public class CargoTypeResponse {
     String name;
     String code;
     String description;
+    String acceptanceProduct;
+    String ttlClh;
+    Long cargoGroupId;
+    String cargoGroupName;
     LocalDateTime createdAt;
     LocalDateTime updatedAt;
 }

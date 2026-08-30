@@ -51,7 +51,7 @@ public class TransportReportTrip {
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "excavation_area_id", nullable = false)
-    private Location excavationArea;
+    private ExcavationArea excavationArea;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "excavator_device_id", nullable = false)
@@ -59,7 +59,7 @@ public class TransportReportTrip {
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "loading_point_id", nullable = false)
-    private Location loadingPoint;
+    private ReceivingPoint loadingPoint;
 
     @Column(name = "receiving_floor")
     private Integer receivingFloor;

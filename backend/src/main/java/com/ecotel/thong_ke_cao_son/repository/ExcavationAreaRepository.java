@@ -15,6 +15,9 @@ public interface ExcavationAreaRepository extends JpaRepository<ExcavationArea, 
 
     Optional<ExcavationArea> findByCode(String code);
 
+    /** Dùng khi nhập Excel — file chỉ có TÊN, không có id. */
+    Optional<ExcavationArea> findByName(String name);
+
     boolean existsByCodeAndIdNot(String code, Long id);
 
     @Query("""

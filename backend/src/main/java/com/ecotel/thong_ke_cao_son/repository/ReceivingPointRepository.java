@@ -16,6 +16,9 @@ public interface ReceivingPointRepository extends JpaRepository<ReceivingPoint, 
 
     Optional<ReceivingPoint> findByCode(String code);
 
+    /** Dùng khi nhập Excel — file chỉ có TÊN, không có id. */
+    Optional<ReceivingPoint> findByName(String name);
+
     boolean existsByCodeAndIdNot(String code, Long id);
 
     @Query("""

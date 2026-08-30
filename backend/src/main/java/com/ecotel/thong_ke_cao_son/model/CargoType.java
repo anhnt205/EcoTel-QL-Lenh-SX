@@ -41,6 +41,14 @@ public class CargoType {
     @Column(name = "description")
     private String description;
 
+    /** Sản phẩm nghiệm thu — QĐ-09 (hợp nhất Material vào CargoType). */
+    @Column(name = "acceptance_product")
+    private String acceptanceProduct;
+
+    /** TTL CLH — QĐ-09. */
+    @Column(name = "ttl_clh")
+    private String ttlClh;
+
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "cargo_group_id", nullable = false)
     private CargoGroup cargoGroup;
