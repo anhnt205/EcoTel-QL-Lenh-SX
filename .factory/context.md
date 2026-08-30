@@ -232,10 +232,25 @@ do: `docs/TECHNICAL_DEBT.md` phần "✅ Đã sửa trong lượt này".
    làm lại toàn bộ lần 1; có điều chỉnh sau chốt không; và **tên tài liệu
    gốc nhắc "Phần mềm Điều phối máy móc thiết bị Cao Sơn"** (ranh giới hệ
    thống — có thể mâu thuẫn với "THONGKE-CAOSON độc lập" trong CLAUDE.md).
-1. Đăng ký THONGKE-CAOSON như 1 Application trong PORTAL-PM (qua
-   `ApplicationsPage`) để test vòng đăng nhập ĐẦY ĐỦ thật (Portal preview
-   hiện DB rỗng, chưa có admin nào) — việc này thuộc phía Portal, không
-   phải code THONGKE-CAOSON.
+1. ~~Đăng ký THONGKE-CAOSON như 1 Application trong PORTAL-PM~~ → **ĐÃ CÓ
+   SẴN (kiểm tra 2026-08-30)**. Ghi chú cũ "Portal preview DB rỗng, chưa có
+   admin nào" là **SAI**. Thực tế trong `portal-pm-local-portal-db-1`
+   (MySQL, db `portal`): **application id 13, code `tkcs`, url
+   `http://thongke-caoson.preview.localhost:8080/`, `is_active=1`**, thuộc
+   company 3 "Công ty CP Than Cao Sơn"; có sẵn 1 user `admin`.
+   `VITE_PORTAL_URL=http://localhost:18090/` trong preview-compose trỏ đúng
+   reverse-proxy của Portal (trả HTTP 200). **Wiring đã đủ.**
+   - App `tkcs` **chưa có module nào** trong bảng `modules` — nhưng hiện
+     KHÔNG cần: **không controller nào của THONGKE-CAOSON dùng
+     `@RequirePermission`**, `PermissionFilter` bước 3 cho qua khi không có
+     annotation. Cổng duy nhất đang có hiệu lực là **xác thực**
+     (`.anyRequest().authenticated()`), không phải phân quyền. Khi bắt đầu
+     gắn `@RequirePermission` thì mới phải khai module + cấp quyền bên Portal.
+   - **Việc còn lại để xem được UI: phải ĐĂNG NHẬP Portal** — cần mật khẩu
+     của user `admin` bên Portal. Tôi không đoán/không nhập mật khẩu (quy tắc
+     dự án mục 8 + quy tắc an toàn). Chủ dự án tự đăng nhập tại
+     `http://localhost:18090/`, Portal sẽ redirect kèm `?code=` sang
+     `http://thongke-caoson.preview.localhost:8080/`.
 2. Bridge network Portal (`docker network connect ...`) là thao tác TAY,
    không tự động — cân nhắc script hoá nếu preview cần dựng lại nhiều lần.
 3. Test backend vẫn cần Postgres/Redis sống (chưa có Testcontainers/H2) —
@@ -297,3 +312,22 @@ Nhánh `claude-dev`. Lượt 3 **chỉ thêm/sửa TÀI LIỆU, không đụng c
 `Requirement.md`, `.factory/context.md`, và các file mới trong `docs/`
 (`DECISIONS.md`, `REQUIREMENT_WORKFLOW.md`, `REQUIREMENT_SANLUONG.md`,
 `REQUIREMENT_SANLUONG_EXCEL.md`, `_source/`). Chưa commit.
+
+## Dữ liệu mẫu preview (2026-08-30)
+
+`backend/seed-data-khai-thac.sql` — bổ sung cho `seed-data.sql` (file cũ chỉ
+seed departments/positions/shifts/locations/admin). File mới thêm: 3 phân
+xưởng VT7/VT8/VT9, ca 4, 4 nơi chất tải KX1..KX4, 4 chủng loại thiết bị,
+4 máy xúc P15..P18, 9 xe, 2 nhóm hàng + 3 chủng loại hàng, 4 công nhân
+(thẻ lương 8753..8756), **6 phiếu báo chuyến + 11 dòng chuyến**.
+
+Dữ liệu đặt theo đúng ảnh mockup để kiểm chứng giao diện được. Chạy lại
+nhiều lần được (mọi INSERT đều `ON CONFLICT DO NOTHING`).
+
+```bash
+docker exec -i thongke-caoson-preview-postgres-1 psql -U postgres -d thong_ke < backend/seed-data.sql
+docker exec -i thongke-caoson-preview-postgres-1 psql -U postgres -d thong_ke < backend/seed-data-khai-thac.sql
+```
+
+Phân bố: KX1/tầng 300/ca 1 = 2 phiếu 5 chuyến · KX2/250/ca 2 = 2 phiếu 4
+chuyến · KX3/200/ca 3 = 1 phiếu 1 chuyến · KX4/150/ca 4 = 1 phiếu 1 chuyến.
