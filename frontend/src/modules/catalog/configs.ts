@@ -182,3 +182,38 @@ export const reportPeriodConfig: CatalogConfig = {
     { key: "note", label: "Ghi chú", type: "text", width: "min-w-[180px]" },
   ],
 };
+
+/**
+ * Tỷ trọng — tham số khai báo theo thời gian (QĐ-04).
+ *
+ * Khoá là `Chủng loại hàng × Khu vực xúc × khoảng hiệu lực`, nên KHÔNG có
+ * cột mã duy nhất: cùng một chủng loại hàng xuất hiện nhiều lần ở các khoảng
+ * thời gian khác nhau là hoàn toàn hợp lệ.
+ *
+ * Ba cột Nhóm CLH / SPNT / TTL CLH là giá trị kéo theo Chủng loại hàng, để
+ * người nhập đối chiếu — chỉ đọc, không vào biểu mẫu và không vào file Excel.
+ *
+ * Khu vực xúc để trống nghĩa là áp cho mọi khu vực; khi tra, bản ghi có khu
+ * vực cụ thể được ưu tiên.
+ */
+export const densityParameterConfig: CatalogConfig = {
+  basePath: "/density-parameters",
+  title: "Tỷ trọng",
+  nounPhrase: "tỷ trọng",
+  breadcrumb: ["Danh mục", "Thống kê sản lượng"],
+  searchPlaceholder: "Tìm theo mã/tên chủng loại hàng, khu vực xúc",
+  uniqueCodeKey: null,
+  labelKey: "cargoTypeName",
+  fields: [
+    { key: "cargoTypeId", label: "Chủng loại hàng", required: true, type: "select", optionsPath: "/cargo-types", width: "min-w-[180px]" },
+    { key: "cargoGroupName", label: "Nhóm CLH", type: "text", readOnly: true, width: "min-w-[140px]" },
+    { key: "acceptanceProduct", label: "SPNT", type: "text", readOnly: true, width: "min-w-[120px]" },
+    { key: "ttlClh", label: "TTL CLH", type: "text", readOnly: true, width: "min-w-[120px]" },
+    { key: "excavationAreaId", label: "Khu vực xúc", type: "select", optionsPath: "/excavation-areas", placeholder: "Tất cả khu vực", width: "min-w-[160px]" },
+    { key: "effectiveFrom", label: "Từ ngày", required: true, type: "date", width: "min-w-[150px]" },
+    { key: "effectiveTo", label: "Đến ngày", required: true, type: "date", width: "min-w-[150px]" },
+    { key: "densityWet", label: "Tỷ trọng (quy ẩm)", required: true, type: "number", width: "min-w-[150px]" },
+    { key: "densityDry", label: "Tỷ trọng (không quy ẩm)", required: true, type: "number", width: "min-w-[170px]" },
+    { key: "note", label: "Ghi chú", type: "text", width: "min-w-[160px]" },
+  ],
+};

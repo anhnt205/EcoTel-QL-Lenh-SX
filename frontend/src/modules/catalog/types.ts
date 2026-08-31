@@ -16,6 +16,15 @@ export interface CatalogField {
   optionsFrom?: string;
   /** Với select tham chiếu danh mục khác: đường dẫn API, vd "/cargo-groups". */
   optionsPath?: string;
+  /**
+   * Cột CHỈ ĐỌC: hiện trong bảng nhưng không có trong biểu mẫu và không có
+   * trong file Excel.
+   *
+   * Dùng cho giá trị kéo theo từ danh mục khác (vd Nhóm CLH / SPNT / TTL CLH
+   * kéo theo Chủng loại hàng). Cho sửa ở đây chính là nhập trùng dữ liệu của
+   * danh mục gốc; đưa vào file Excel thì file nhập lại được sẽ sai.
+   */
+  readOnly?: boolean;
   placeholder?: string;
   /** Bề rộng cột trong bảng nhập nhiều dòng (tailwind class). */
   width?: string;

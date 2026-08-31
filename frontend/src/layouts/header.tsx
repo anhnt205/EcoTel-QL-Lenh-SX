@@ -344,6 +344,15 @@ export function Header() {
                   HS điều chỉnh NLĐM
                 </NavLink>
               </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <NavLink
+                  to={ROUTES.DANH_MUC.TY_TRONG}
+                  className="flex items-center gap-2 px-2.5 py-2 text-sm rounded hover:bg-blue-50 cursor-pointer"
+                >
+                  <Clock className="h-4 w-4 text-blue-600" />
+                  Tỷ trọng
+                </NavLink>
+              </DropdownMenuItem>
 
               {/* Loại hàng */}
               <DropdownMenuItem asChild>

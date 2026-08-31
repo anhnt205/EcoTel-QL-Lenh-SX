@@ -237,7 +237,7 @@ cột trái, xuất Excel. Cùng loại với AP Tdia.
 |---|---|---|
 | **B1** | S1+S2+S3 (sửa 3 chỗ đã dựng) + 6 danh mục phẳng lớp 1 | không chặn |
 | ~~B2~~ | ✅ **XONG** — `MatrixCatalogPage` + 3 bảng lưới + 4 lưới đã khai báo | — |
-| **B3** | 4 lưới 2 chiều + Tỷ trọng | cần B1, B2 |
+| ~~B3~~ | ✅ **XONG** — Tỷ trọng (QĐ-04); 4 lưới đã dùng được từ B2 | — |
 | **B4** | STD ×2 (phiếu-đầu + dòng) | cần B2 |
 | **B5** | Engine 2 lượt + sinh AP Tdia / Ap Tkm / AP BBNT / DuKien HS | cần B1–B4 |
 | **B6** | Màn Báo cáo thống kê + xuất Excel | cần B5 |

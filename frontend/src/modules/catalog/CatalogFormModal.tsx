@@ -48,7 +48,14 @@ export function CatalogFormModal({
   );
   const isEdit = editing !== null;
 
-  const [rows, setRows] = useState<Row[]>([emptyRow(config.fields)]);
+  // Cột chỉ đọc (giá trị kéo theo danh mục khác) không xuất hiện trong biểu
+  // mẫu — cho sửa ở đây là nhập trùng dữ liệu của danh mục gốc.
+  const fields = useMemo(
+    () => config.fields.filter((f) => !f.readOnly),
+    [config.fields],
+  );
+
+  const [rows, setRows] = useState<Row[]>([emptyRow(fields)]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   /** Lựa chọn cho các trường select: key trường -> danh sách {value,label}. */
@@ -63,18 +70,18 @@ export function CatalogFormModal({
     if (editing) {
       setRows([
         Object.fromEntries(
-          config.fields.map((f) => [f.key, String(editing[f.key] ?? "")]),
+          fields.map((f) => [f.key, String(editing[f.key] ?? "")]),
         ) as Row,
       ]);
     } else {
-      setRows([emptyRow(config.fields)]);
+      setRows([emptyRow(fields)]);
     }
-  }, [open, editing, config.fields]);
+  }, [open, editing, fields]);
 
   // Nạp nguồn cho các combobox
   useEffect(() => {
     if (!open) return;
-    config.fields
+    fields
       .filter((f) => f.type === "select")
       .forEach(async (f) => {
         try {
@@ -104,7 +111,7 @@ export function CatalogFormModal({
           setOptions((p) => ({ ...p, [f.key]: [] }));
         }
       });
-  }, [open, config.fields, service]);
+  }, [open, fields, service]);
 
   if (!open) return null;
 
@@ -113,7 +120,7 @@ export function CatalogFormModal({
       prev.map((r, i) => (i === idx ? { ...r, [key]: value } : r)),
     );
 
-  const addRow = () => setRows((prev) => [...prev, emptyRow(config.fields)]);
+  const addRow = () => setRows((prev) => [...prev, emptyRow(fields)]);
 
   const removeRow = (idx: number) =>
     setRows((prev) =>
@@ -123,7 +130,7 @@ export function CatalogFormModal({
   /** Chuyển 1 dòng biểu mẫu thành payload gửi backend. */
   const toPayload = (row: Row) => {
     const out: Record<string, unknown> = {};
-    config.fields.forEach((f) => {
+    fields.forEach((f) => {
       const raw = (row[f.key] ?? "").trim();
       if (f.optionsPath) {
         // Trường select tham chiếu danh mục khác gửi lên dạng SỐ (id)
@@ -140,7 +147,7 @@ export function CatalogFormModal({
 
   const validate = (): string | null => {
     for (let i = 0; i < rows.length; i++) {
-      for (const f of config.fields) {
+      for (const f of fields) {
         if (f.required && !(rows[i][f.key] ?? "").trim()) {
           return `Dòng ${i + 1}: "${f.label}" là bắt buộc.`;
         }
@@ -148,7 +155,14 @@ export function CatalogFormModal({
     }
     // Chặn trùng mã ngay trong danh sách — backend cũng chặn, nhưng báo sớm
     // ở client thì người dùng sửa được ngay thay vì mất cả lần lưu.
-    const codeField = config.fields[0]?.key;
+    //
+    // Phải tôn trọng `uniqueCodeKey`: có danh mục KHÔNG có mã duy nhất (Kỳ
+    // báo cáo, Tỷ trọng), ở đó nhiều dòng trùng cột đầu là hợp lệ — cùng một
+    // chủng loại hàng ở hai khoảng thời gian khác nhau chẳng hạn.
+    const codeField =
+      config.uniqueCodeKey === null
+        ? undefined
+        : (config.uniqueCodeKey ?? fields[0]?.key);
     if (codeField && !isEdit) {
       const codes = rows.map((r) => (r[codeField] ?? "").trim());
       const dup = codes.find((c, i) => c && codes.indexOf(c) !== i);
@@ -259,7 +273,7 @@ export function CatalogFormModal({
                   <th className="w-12 border-b border-r border-gray-200 dark:border-gray-700 px-3 py-2.5 text-center">
                     #
                   </th>
-                  {config.fields.map((f) => (
+                  {fields.map((f) => (
                     <th
                       key={f.key}
                       className={`border-b border-r border-gray-200 dark:border-gray-700 px-3 py-2.5 ${f.width ?? ""}`}
@@ -286,7 +300,7 @@ export function CatalogFormModal({
                     <td className="border-b border-r border-gray-200 dark:border-gray-700 px-3 py-2 text-center font-semibold text-gray-500">
                       {idx + 1}
                     </td>
-                    {config.fields.map((f) => (
+                    {fields.map((f) => (
                       <td
                         key={f.key}
                         className="border-b border-r border-gray-200 dark:border-gray-700 px-2 py-1.5"

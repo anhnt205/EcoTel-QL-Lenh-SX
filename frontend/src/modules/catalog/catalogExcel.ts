@@ -62,10 +62,13 @@ function buildWorkbook(
   config: CatalogConfig,
   rows: Record<string, unknown>[],
 ): XLSX.WorkBook {
-  const headers = config.fields.map(headerOf);
+  // Bỏ cột chỉ đọc: chúng là giá trị kéo theo danh mục khác. Xuất ra thì
+  // file tải xuống không nhập lại được, vì khi nhập không có gì để ghi vào.
+  const fields = config.fields.filter((f) => !f.readOnly);
+  const headers = fields.map(headerOf);
 
   const body = rows.map((r) =>
-    Object.fromEntries(config.fields.map((f) => [headerOf(f), cellOf(r, f)])),
+    Object.fromEntries(fields.map((f) => [headerOf(f), cellOf(r, f)])),
   );
 
   // Không có dữ liệu -> tạo sheet chỉ với dòng tiêu đề (đúng nghĩa "template")
@@ -75,7 +78,7 @@ function buildWorkbook(
       : XLSX.utils.aoa_to_sheet([headers]);
 
   // Đặt bề rộng cột cho dễ đọc
-  sheet["!cols"] = config.fields.map((f) => ({
+  sheet["!cols"] = fields.map((f) => ({
     wch: Math.max(headerOf(f).length + 4, 18),
   }));
 
@@ -83,7 +86,7 @@ function buildWorkbook(
     [`HƯỚNG DẪN NHẬP ${config.title.toUpperCase()}`],
     [],
     ["Cột", "Bắt buộc", "Ghi chú"],
-    ...config.fields.map((f) => [
+    ...fields.map((f) => [
       headerOf(f),
       f.required ? "Có" : "Không",
       f.optionsPath
@@ -98,7 +101,7 @@ function buildWorkbook(
     ...(config.uniqueCodeKey === null
       ? []
       : [["- Cột đầu tiên là MÃ, không được trùng nhau và không trùng dữ liệu đã có."]]),
-    ...(config.fields.some((f) => f.type === "date")
+    ...(fields.some((f) => f.type === "date")
       ? [["- Cột ngày nhập dạng dd/MM/yyyy hoặc yyyy-MM-dd."]]
       : []),
     ["- Xoá hết các dòng ví dụ trước khi nhập dữ liệu thật."],
@@ -160,6 +163,8 @@ export async function parseCatalogExcel(
 
   const payloads: Record<string, unknown>[] = [];
   const errors: string[] = [];
+  // Cột chỉ đọc không có trong file nên cũng không được đọc ra payload.
+  const fields = config.fields.filter((f) => !f.readOnly);
   const seenCodes = new Set<string>();
   // `uniqueCodeKey === null` nghĩa là danh mục KHÔNG có mã duy nhất — bỏ hẳn
   // bước chặn trùng thay vì mặc định lấy cột đầu.
@@ -167,15 +172,15 @@ export async function parseCatalogExcel(
     config.uniqueCodeKey === null
       ? undefined
       : config.uniqueCodeKey
-        ? config.fields.find((f) => f.key === config.uniqueCodeKey)
-        : config.fields[0];
+        ? fields.find((f) => f.key === config.uniqueCodeKey)
+        : fields[0];
 
   raw.forEach((r, i) => {
     const lineNo = i + 2; // +1 vì 0-based, +1 vì dòng tiêu đề
     const payload: Record<string, unknown> = {};
     let rowHasError = false;
 
-    for (const f of config.fields) {
+    for (const f of fields) {
       const value = String(r[headerOf(f)] ?? "").trim();
 
       if (f.required && !value) {
