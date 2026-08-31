@@ -13,8 +13,10 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
+import api from "@/config/api.config";
 import { createCatalogService } from "./catalogService";
 import { CatalogFormModal } from "./CatalogFormModal";
+import { downloadCatalogExcel, parseCatalogExcel } from "./catalogExcel";
 import type { CatalogConfig } from "./types";
 
 type Rec = Record<string, unknown> & { id?: number };
@@ -70,8 +72,101 @@ export function CatalogPage({ config }: { config: CatalogConfig }) {
     }
   };
 
+  // ── Excel ───────────────────────────────────────────────────────────────
+  const [isImporting, setIsImporting] = useState(false);
+
+  const handleExport = (selectedRows: Rec[]) => {
+    const { isTemplate, count } = downloadCatalogExcel(config, selectedRows);
+    toast.success(
+      isTemplate
+        ? "Đã tải file mẫu (chỉ có dòng tiêu đề). Chọn dòng trong bảng nếu muốn tải kèm dữ liệu."
+        : `Đã tải ${count} dòng đã chọn.`,
+    );
+  };
+
+  /**
+   * File Excel dùng TÊN cho các cột tham chiếu danh mục khác (người nhập
+   * không biết id). Nên trước khi nhập phải nạp bảng tra tên → id.
+   */
+  const buildLookups = async () => {
+    const lookups: Record<string, Map<string, number>> = {};
+    for (const f of config.fields.filter((x) => x.optionsPath)) {
+      const res = await api.get(f.optionsPath!, { params: { size: 500 } });
+      const list = (res.data?.data?.content ?? res.data?.data ?? []) as {
+        id: number;
+        name: string;
+      }[];
+      lookups[f.key] = new Map(
+        list.map((it) => [String(it.name).trim().toLowerCase(), it.id]),
+      );
+    }
+    return lookups;
+  };
+
+  const handleImport = async (file: File) => {
+    setIsImporting(true);
+    try {
+      const lookups = await buildLookups();
+      const { payloads, errors } = await parseCatalogExcel(
+        config,
+        file,
+        lookups,
+      );
+
+      if (errors.length > 0) {
+        // Báo tối đa 5 lỗi đầu để không tràn màn hình, kèm tổng số.
+        toast.error(
+          `File có ${errors.length} lỗi:\n${errors.slice(0, 5).join("\n")}${
+            errors.length > 5 ? `\n… và ${errors.length - 5} lỗi khác` : ""
+          }`,
+          { duration: 10000 },
+        );
+        // Vẫn dừng hẳn nếu KHÔNG có dòng nào hợp lệ.
+        if (payloads.length === 0) return;
+      }
+
+      await service.bulkCreate(payloads);
+      toast.success(`Đã nhập ${payloads.length} ${config.nounPhrase}.`);
+      refetch();
+    } catch (e: unknown) {
+      const res = (e as { response?: { data?: { message?: string } } }).response;
+      toast.error(res?.data?.message ?? "Nhập file thất bại.");
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
   const columns = useMemo<ColumnDef<Rec, unknown>[]>(() => {
     const cols: ColumnDef<Rec, unknown>[] = [
+      {
+        id: "select",
+        size: 44,
+        enableSorting: false,
+        enableHiding: false,
+        header: ({ table }) => (
+          <input
+            type="checkbox"
+            aria-label="Chọn tất cả"
+            className="h-4 w-4 cursor-pointer accent-blue-600"
+            checked={table.getIsAllPageRowsSelected()}
+            ref={(el) => {
+              if (el) el.indeterminate = table.getIsSomePageRowsSelected();
+            }}
+            onChange={(e) =>
+              table.toggleAllPageRowsSelected(e.currentTarget.checked)
+            }
+          />
+        ),
+        cell: ({ row }) => (
+          <input
+            type="checkbox"
+            aria-label="Chọn dòng"
+            className="h-4 w-4 cursor-pointer accent-blue-600"
+            checked={row.getIsSelected()}
+            onChange={(e) => row.toggleSelected(e.currentTarget.checked)}
+          />
+        ),
+      },
       {
         id: "stt",
         header: "STT",
@@ -163,6 +258,12 @@ export function CatalogPage({ config }: { config: CatalogConfig }) {
             setPage(0);
           }}
           onRefresh={refetch}
+          onImportExcel={handleImport}
+          importExcelAccept=".xlsx,.xls"
+          isImporting={isImporting}
+          showExport
+          onExportCsv={handleExport}
+          exportCsvLabel="Tải xuống (Excel)"
           showColumnToggle
           stickyHeader
           manualPagination
