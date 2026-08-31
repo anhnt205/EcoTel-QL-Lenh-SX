@@ -33,18 +33,6 @@ public class CargoTypeController {
         return ApiResponse.success(service.getAll(keyword, pageable));
     }
 
-    /** Nguồn cho combobox "Sản phẩm nghiệm thu". */
-    @GetMapping("/acceptance-products")
-    public ApiResponse<List<String>> getAcceptanceProducts() {
-        return ApiResponse.success(service.getAcceptanceProducts());
-    }
-
-    /** Nguồn cho combobox "TTL CLH". */
-    @GetMapping("/ttl-clh")
-    public ApiResponse<List<String>> getTtlClhOptions() {
-        return ApiResponse.success(service.getTtlClhOptions());
-    }
-
     @GetMapping("/{id}")
     public ApiResponse<CargoTypeResponse> getById(@PathVariable Long id) {
         return ApiResponse.success(service.getById(id));

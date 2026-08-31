@@ -23,18 +23,11 @@ public interface ReceivingPointRepository extends JpaRepository<ReceivingPoint, 
 
     @Query("""
         SELECT p FROM ReceivingPoint p
+        LEFT JOIN p.seamGroup sg
         WHERE :keyword IS NULL OR :keyword = ''
            OR LOWER(p.code) LIKE LOWER(CONCAT('%', :keyword, '%'))
            OR LOWER(p.name) LIKE LOWER(CONCAT('%', :keyword, '%'))
-           OR LOWER(p.seamGroup) LIKE LOWER(CONCAT('%', :keyword, '%'))
+           OR LOWER(COALESCE(sg.name, '')) LIKE LOWER(CONCAT('%', :keyword, '%'))
         """)
     Page<ReceivingPoint> search(@Param("keyword") String keyword, Pageable pageable);
-
-    /** Nguồn dữ liệu cho combobox "Nhóm vỉa" — lấy các giá trị đã dùng. */
-    @Query("""
-        SELECT DISTINCT p.seamGroup FROM ReceivingPoint p
-        WHERE p.seamGroup IS NOT NULL AND p.seamGroup <> ''
-        ORDER BY p.seamGroup
-        """)
-    List<String> findDistinctSeamGroups();
 }

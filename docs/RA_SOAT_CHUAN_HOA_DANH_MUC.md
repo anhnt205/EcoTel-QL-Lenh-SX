@@ -124,8 +124,8 @@ Lấy từ named range `DSXE`/`DSMAY`:
 
 | # | Việc | Vì sao |
 |---|---|---|
-| S1 | `CargoType.acceptanceProduct` / `.ttlClh`: chuỗi → **khoá ngoại** + di trú | Đã có danh mục thật |
-| S2 | `ReceivingPoint.seamGroup`: chuỗi → **khoá ngoại** tới danh mục Nhóm vỉa | Nhóm vỉa là thành phần khoá ghép (QĐ-06) |
+| ~~S1~~ | ✅ **XONG** — `CargoType` SPNT + TTL CLH sang khoá ngoại, đã di trú |
+| ~~S2~~ | ✅ **XONG** — `ReceivingPoint.seamGroup` sang khoá ngoại; khoá ghép nay dùng MÃ |
 | ~~S3~~ | ✅ **XONG** — `Device` + 6 thuộc tính, kèm màn khai báo riêng | — |
 
 **Ghi chú thực thi S3 (2026-08-31).** Khi làm mới lộ ra: `Device` trong hệ
@@ -146,6 +146,27 @@ thức vẫn không chạy được. Nên S3 gồm cả:
 - Ghi hàng loạt có ngữ nghĩa **THAY THẾ**, không phải bổ sung — file tự chế
   thiếu cột sẽ xoá trắng các cột còn lại. Cảnh báo này được ghi thẳng vào
   sheet "HuongDan" của file mẫu.
+
+**Ghi chú thực thi S1 + S2 (2026-08-31).**
+
+Ba trường này là **đầu vào của công thức**, không phải nhãn hiển thị:
+`acceptance_product` được so với các hằng `Dat_SX` / `Than_SX` / `Dat_CN` để
+chọn nhánh tính; `seam_group` là thành phần ĐẦU của khoá ghép tra STD. Ở
+dạng chuỗi tự do, sai một ký tự là công thức đi nhầm nhánh hoặc dòng STD
+không khớp — mà triệu chứng chỉ là "thiếu dữ liệu".
+
+Quyết định quan trọng nhất của lượt di trú: **`code` của nhóm vỉa tạo mới =
+đúng chuỗi cũ**, không sinh mã mới. Khoá ghép nay dựng từ MÃ, nên giữ nguyên
+chuỗi cũ làm mã thì mọi khoá đã sinh và mọi dòng STD đã khai theo khoá đó
+vẫn khớp nguyên vẹn. Đã kiểm chứng: chạy lại engine sau di trú cho khoá
+giống hệt từng ký tự và mọi con số không đổi.
+
+Kết quả di trú: 12 + 11 + 10 bản ghi được nối, **5 nhóm vỉa tự tạo**, truy
+vấn kiểm tra trả về **0 dòng sót**. Ba cột chuỗi cũ vẫn nằm trong CSDL vì
+Hibernate `ddl-auto: update` không bao giờ xoá cột — lệnh `DROP COLUMN` để
+sẵn (đã chú thích) ở cuối
+`backend/migration-2026-08-31-s1-s2-khoa-ngoai.sql`, **chạy tay sau khi
+kiểm tra**.
 
 ### 3.3. Còn thiếu — 12 danh mục người dùng nhập
 
@@ -284,7 +305,7 @@ cột trái, xuất Excel. Cùng loại với AP Tdia.
 
 | Việc | Ghi chú |
 |---|---|
-| S1, S2 | Chuẩn hoá `CargoType.acceptanceProduct`/`.ttlClh` và `ReceivingPoint.seamGroup` từ chuỗi sang khoá ngoại. **Đáng làm sớm**: khoá ghép Nhóm vỉa + Máy xúc dựng từ `seamGroup` dạng chuỗi tự do, sai một ký tự là dòng STD không khớp. |
+| ~~S1, S2~~ | ✅ **XONG** (2026-08-31) — xem ghi chú dưới. |
 | Nhánh nhiên liệu & năng suất | `BQ` (NLĐM hiện hành), `BR` (định mức năng suất), `EF`, `EQ`. Là một họ công thức riêng, cần lưới DMNL / Năng suất xe / HS điều chỉnh có dữ liệu thật. |
 | `AP BBNT xe-SP`, `DuKien HS theo -2%` | Hai bảng tự sinh còn lại, chưa dựng. |
 | Đối soát → chốt kỳ | Engine hiện lấy **mọi** chuyến trong khoảng ngày. Khi có quy trình chốt kỳ thì lọc theo trạng thái đã chốt. |

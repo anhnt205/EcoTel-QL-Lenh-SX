@@ -33,12 +33,6 @@ public class ReceivingPointController {
         return ApiResponse.success(service.getAll(keyword, pageable));
     }
 
-    /** Danh sách "Nhóm vỉa" cho combobox. */
-    @GetMapping("/seam-groups")
-    public ApiResponse<List<String>> getSeamGroups() {
-        return ApiResponse.success(service.getSeamGroups());
-    }
-
     @GetMapping("/{id}")
     public ApiResponse<ReceivingPointResponse> getById(@PathVariable Long id) {
         return ApiResponse.success(service.getById(id));

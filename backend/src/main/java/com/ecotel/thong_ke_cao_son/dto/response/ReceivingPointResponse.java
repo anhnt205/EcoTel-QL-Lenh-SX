@@ -14,7 +14,9 @@ public class ReceivingPointResponse {
     Long id;
     String code;
     String name;
-    String seamGroup;
+    Long seamGroupId;
+    /** Tên — bảng danh mục hiển thị theo quy ước "<khoá bỏ Id>Name". */
+    String seamGroupName;
     String note;
     LocalDateTime createdAt;
     LocalDateTime updatedAt;

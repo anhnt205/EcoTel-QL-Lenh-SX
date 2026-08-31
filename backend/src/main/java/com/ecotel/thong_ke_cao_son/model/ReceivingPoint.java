@@ -44,9 +44,17 @@ public class ReceivingPoint {
     @Column(name = "name", nullable = false)
     private String name;
 
-    /** Nhóm vỉa — chọn từ danh sách các giá trị đã có (combobox). */
-    @Column(name = "seam_group")
-    private String seamGroup;
+    /**
+     * Nhóm vỉa — khoá ngoại tới danh mục Nhóm vỉa (mục S2).
+     *
+     * <p>Trước đây là chuỗi tự do, mà đây lại là THÀNH PHẦN ĐẦU của khoá ghép
+     * "Nhóm vỉa + Máy xúc" dùng để tra danh mục STD. Sai một ký tự hoặc lệch
+     * bảng mã là dòng STD không khớp, và triệu chứng chỉ là "thiếu dữ liệu"
+     * chứ không phải một lỗi chỉ đúng chỗ sai.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "seam_group_id")
+    private SeamGroup seamGroup;
 
     @Column(name = "note", columnDefinition = "TEXT")
     private String note;

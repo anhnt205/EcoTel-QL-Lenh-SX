@@ -222,7 +222,12 @@ public class TripBaseCalculator {
 
     /** Khoá ghép Nhóm vỉa + Máy xúc, hậu tố do hệ TỰ SUY từ dữ liệu chuyến. */
     private String buildKey(TransportReportTrip trip, CargoType cargoType, BigDecimal density) {
-        String seamGroup = trip.getLoadingPoint() != null ? trip.getLoadingPoint().getSeamGroup() : null;
+        // Dùng MÃ nhóm vỉa, đồng bộ với máy xúc và khu vực xúc phía sau cũng
+        // dùng mã. Mã ổn định khi đổi tên hiển thị, nên khoá đã sinh không bị
+        // hỏng — điều mà chuỗi tự do trước đây không bảo đảm được.
+        SeamGroup seamGroupRef = trip.getLoadingPoint() != null
+                ? trip.getLoadingPoint().getSeamGroup() : null;
+        String seamGroup = seamGroupRef != null ? seamGroupRef.getCode() : null;
         String excavator = trip.getExcavator() != null ? trip.getExcavator().getCode() : null;
         String area = trip.getExcavationArea() != null ? trip.getExcavationArea().getCode() : null;
         String benchGroup = trip.getReceivingFloorGroup() != null
@@ -250,12 +255,15 @@ public class TripBaseCalculator {
         if ("CS".equalsIgnoreCase(area) && "DaXit.NK".equalsIgnoreCase(cargoType.getName())) {
             return "Dat_SX";
         }
-        String product = cargoType.getAcceptanceProduct();
-        if (product == null || product.isBlank()) {
+        AcceptanceProduct product = cargoType.getAcceptanceProduct();
+        if (product == null) {
             throw missing(trip, "chủng loại hàng \"" + cargoType.getName()
                     + "\" chưa khai Sản phẩm nghiệm thu");
         }
-        return product;
+        // Dùng TÊN chứ không dùng mã: công thức so giá trị này với các hằng
+        // nghiệp vụ (Dat_SX, Than_SX, Dat_CN…), mà những hằng đó chính là TÊN
+        // trong danh mục Sản phẩm nghiệm thu, không phải mã SPNT001…
+        return product.getName();
     }
 
     /**

@@ -18,7 +18,7 @@ public class ReceivingPointRequest {
     String name;
 
     /** Nhóm vỉa — chọn từ combobox, có thể để trống. */
-    String seamGroup;
+    Long seamGroupId;
 
     String note;
 }

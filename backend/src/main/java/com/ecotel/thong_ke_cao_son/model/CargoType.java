@@ -41,13 +41,21 @@ public class CargoType {
     @Column(name = "description")
     private String description;
 
-    /** Sản phẩm nghiệm thu — QĐ-09 (hợp nhất Material vào CargoType). */
-    @Column(name = "acceptance_product")
-    private String acceptanceProduct;
+    /**
+     * Sản phẩm nghiệm thu — QĐ-09 (hợp nhất Material vào CargoType).
+     *
+     * <p>Trước đây là chuỗi tự do. Đổi sang khoá ngoại (mục S1) vì công thức
+     * so giá trị này với các hằng { Dat_SX} / { Than_SX} / …; chuỗi
+     * tự do thì sai một ký tự là công thức đi nhầm nhánh mà không báo gì.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "acceptance_product_id")
+    private AcceptanceProduct acceptanceProduct;
 
-    /** TTL CLH — QĐ-09. */
-    @Column(name = "ttl_clh")
-    private String ttlClh;
+    /** TTL CLH — QĐ-09. Cũng đổi sang khoá ngoại theo mục S1. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "ttl_clh_id")
+    private TtlClh ttlClh;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "cargo_group_id", nullable = false)

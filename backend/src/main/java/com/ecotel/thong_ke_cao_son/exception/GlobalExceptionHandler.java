@@ -11,6 +11,7 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.server.ResponseStatusException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -108,6 +109,23 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(ApiResponse.error(400,
                         "Dữ liệu gửi lên không đọc được (JSON sai định dạng hoặc sai bảng mã UTF-8)."));
+    }
+
+    /**
+     * Tham số trên đường dẫn hoặc query sai kiểu.
+     *
+     * <p>Điển hình: gọi {@code /api/cargo-types/acceptance-products} trong khi
+     * chỉ còn {@code /api/cargo-types/{id}} — "acceptance-products" không đọc
+     * được thành số. Đó là lỗi của phía GỌI, phải trả 400; trước đây nó rơi
+     * xuống handler chung thành 500 và trông như hệ thống hỏng.
+     */
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ApiResponse<Void>> handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
+        String expected = ex.getRequiredType() != null ? ex.getRequiredType().getSimpleName() : "hợp lệ";
+        log.warn("Tham số sai kiểu: {} = {}", ex.getName(), ex.getValue());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.error(400, "Tham số \"" + ex.getName() + "\" không hợp lệ: \""
+                        + ex.getValue() + "\" (cần kiểu " + expected + ")."));
     }
 
     @ExceptionHandler(Exception.class)

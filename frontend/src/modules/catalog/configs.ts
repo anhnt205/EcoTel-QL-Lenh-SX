@@ -25,7 +25,7 @@ export const receivingPointConfig: CatalogConfig = {
   fields: [
     { key: "code", label: "Mã nơi nhận tải", required: true, type: "text", width: "min-w-[160px]" },
     { key: "name", label: "Nơi nhận tải", required: true, type: "text", width: "min-w-[160px]" },
-    { key: "seamGroup", label: "Nhóm vỉa", required: true, type: "select", optionsFrom: "seam-groups", width: "min-w-[140px]" },
+    { key: "seamGroupId", label: "Nhóm vỉa", type: "select", optionsPath: "/seam-groups", width: "min-w-[140px]" },
     { key: "note", label: "Ghi chú", type: "text", width: "min-w-[180px]" },
   ],
 };
@@ -58,8 +58,8 @@ export const cargoTypeConfig: CatalogConfig = {
     { key: "code", label: "Mã chủng loại hàng", required: true, type: "text", width: "min-w-[150px]" },
     { key: "name", label: "Chủng loại hàng", required: true, type: "text", width: "min-w-[150px]" },
     { key: "cargoGroupId", label: "Nhóm chủng loại hàng", required: true, type: "select", optionsPath: "/cargo-groups", width: "min-w-[170px]" },
-    { key: "acceptanceProduct", label: "Sản phẩm nghiệm thu", type: "select", optionsFrom: "acceptance-products", width: "min-w-[160px]" },
-    { key: "ttlClh", label: "TTL CLH", type: "select", optionsFrom: "ttl-clh", width: "min-w-[120px]" },
+    { key: "acceptanceProductId", label: "Sản phẩm nghiệm thu", type: "select", optionsPath: "/acceptance-products", width: "min-w-[160px]" },
+    { key: "ttlClhId", label: "TTL CLH", type: "select", optionsPath: "/ttl-clh-items", width: "min-w-[120px]" },
     { key: "description", label: "Ghi chú", type: "text", width: "min-w-[150px]" },
   ],
 };

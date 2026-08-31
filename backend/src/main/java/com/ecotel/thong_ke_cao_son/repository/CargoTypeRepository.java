@@ -30,12 +30,4 @@ public interface CargoTypeRepository extends JpaRepository<CargoType, Long> {
 
     boolean existsByCodeAndIdNot(String code, Long id);
 
-    /** Nguồn cho combobox "Sản phẩm nghiệm thu". */
-    @Query("SELECT DISTINCT c.acceptanceProduct FROM CargoType c WHERE c.acceptanceProduct IS NOT NULL AND c.acceptanceProduct <> '' ORDER BY c.acceptanceProduct")
-    java.util.List<String> findDistinctAcceptanceProducts();
-
-    /** Nguồn cho combobox "TTL CLH". */
-    @Query("SELECT DISTINCT c.ttlClh FROM CargoType c WHERE c.ttlClh IS NOT NULL AND c.ttlClh <> '' ORDER BY c.ttlClh")
-    java.util.List<String> findDistinctTtlClh();
-
 }

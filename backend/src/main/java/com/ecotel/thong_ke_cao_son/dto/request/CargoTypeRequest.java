@@ -22,9 +22,9 @@ public class CargoTypeRequest {
     @NotNull(message = "Nhóm chủng loại hàng là bắt buộc")
     Long cargoGroupId;
 
-    String acceptanceProduct;
+    Long acceptanceProductId;
 
-    String ttlClh;
+    Long ttlClhId;
 
     /** Ghi chú. */
     String description;

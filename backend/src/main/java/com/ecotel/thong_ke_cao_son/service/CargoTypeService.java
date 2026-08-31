@@ -10,7 +10,9 @@ import com.ecotel.thong_ke_cao_son.mapper.CargoTypeMapper;
 import com.ecotel.thong_ke_cao_son.model.CargoGroup;
 import com.ecotel.thong_ke_cao_son.model.CargoType;
 import com.ecotel.thong_ke_cao_son.repository.CargoGroupRepository;
+import com.ecotel.thong_ke_cao_son.repository.AcceptanceProductRepository;
 import com.ecotel.thong_ke_cao_son.repository.CargoTypeRepository;
+import com.ecotel.thong_ke_cao_son.repository.TtlClhRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -27,6 +29,8 @@ public class CargoTypeService {
     private final CargoTypeRepository cargoTypeRepository;
     private final CargoGroupRepository cargoGroupRepository;
     private final CargoTypeMapper cargoTypeMapper;
+    private final AcceptanceProductRepository acceptanceProductRepository;
+    private final TtlClhRepository ttlClhRepository;
 
     @Transactional(readOnly = true)
     public PageResponse<CargoTypeResponse> getAll(String keyword, Pageable pageable) {
@@ -40,23 +44,11 @@ public class CargoTypeService {
         return cargoTypeMapper.toResponse(find(id));
     }
 
-    /** Nguồn cho combobox "Sản phẩm nghiệm thu". */
-    @Transactional(readOnly = true)
-    public List<String> getAcceptanceProducts() {
-        return cargoTypeRepository.findDistinctAcceptanceProducts();
-    }
-
-    /** Nguồn cho combobox "TTL CLH". */
-    @Transactional(readOnly = true)
-    public List<String> getTtlClhOptions() {
-        return cargoTypeRepository.findDistinctTtlClh();
-    }
-
     @Transactional
     public CargoTypeResponse create(CargoTypeRequest request) {
         ensureCodeAvailable(request.getCode(), null);
         CargoType entity = cargoTypeMapper.toEntity(request);
-        entity.setCargoGroup(findGroup(request.getCargoGroupId()));
+        applyRelations(entity, request);
         return cargoTypeMapper.toResponse(cargoTypeRepository.save(entity));
     }
 
@@ -71,7 +63,7 @@ public class CargoTypeService {
         requests.forEach(r -> ensureCodeAvailable(r.getCode(), null));
         List<CargoType> entities = requests.stream().map(r -> {
             CargoType e = cargoTypeMapper.toEntity(r);
-            e.setCargoGroup(findGroup(r.getCargoGroupId()));
+            applyRelations(e, r);
             return e;
         }).toList();
         return cargoTypeRepository.saveAll(entities).stream()
@@ -83,7 +75,7 @@ public class CargoTypeService {
         CargoType entity = find(id);
         ensureCodeAvailable(request.getCode(), id);
         cargoTypeMapper.updateEntity(entity, request);
-        entity.setCargoGroup(findGroup(request.getCargoGroupId()));
+        applyRelations(entity, request);
         return cargoTypeMapper.toResponse(cargoTypeRepository.save(entity));
     }
 
@@ -110,6 +102,27 @@ public class CargoTypeService {
     private CargoGroup findGroup(Long id) {
         return cargoGroupRepository.findById(id).orElseThrow(
                 () -> new ResourceNotFoundException("Không tìm thấy nhóm chủng loại hàng với id: " + id));
+    }
+
+    /**
+     * Gắn ba quan hệ từ id — MapStruct cố tình bỏ qua chúng.
+     *
+     * <p>Sản phẩm nghiệm thu và TTL CLH cho phép để trống (mục S1): dữ liệu
+     * chủng loại hàng có sẵn từ trước, không thể bắt khai đủ ngay. Nhưng nếu
+     * gửi id thì id đó phải tồn tại, không im lặng bỏ qua.
+     */
+    private void applyRelations(CargoType entity, CargoTypeRequest request) {
+        entity.setCargoGroup(findGroup(request.getCargoGroupId()));
+
+        entity.setAcceptanceProduct(request.getAcceptanceProductId() == null ? null
+                : acceptanceProductRepository.findById(request.getAcceptanceProductId()).orElseThrow(
+                        () -> new ResourceNotFoundException("Không tìm thấy sản phẩm nghiệm thu với id: "
+                                + request.getAcceptanceProductId())));
+
+        entity.setTtlClh(request.getTtlClhId() == null ? null
+                : ttlClhRepository.findById(request.getTtlClhId()).orElseThrow(
+                        () -> new ResourceNotFoundException("Không tìm thấy TTL CLH với id: "
+                                + request.getTtlClhId())));
     }
 
     private void ensureCodeAvailable(String code, Long selfId) {
