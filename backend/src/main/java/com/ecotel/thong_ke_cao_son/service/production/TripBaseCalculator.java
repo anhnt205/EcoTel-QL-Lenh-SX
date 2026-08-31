@@ -123,7 +123,13 @@ public class TripBaseCalculator {
             throw missing(trip, "xe \"" + vehicle.getCode()
                     + "\" chưa khai Chủng loại xe + DMNL (màn Thuộc tính sản lượng — Xe)");
         }
-        return matrixService.requireCell(MATRIX_MO_HINH, cargoType.getCode(), fuelClass.getCode());
+        // Khoá cột KHÔNG phải mã trần của chủng loại xe: bảng tính ghép thêm
+        // hậu tố khu vực (DA5 = mã & IF(D5="CS",".CS",".KC")), nên cột lưới
+        // là "CAT777E.CS" / "CAT777E.KC". Tra bằng mã trần sẽ không khớp ô nào.
+        String areaCode = trip.getExcavationArea() != null
+                ? trip.getExcavationArea().getCode() : null;
+        String columnKey = ProductionKeys.vehicleFuelClassKey(fuelClass.getCode(), areaCode);
+        return matrixService.requireCell(MATRIX_MO_HINH, cargoType.getCode(), columnKey);
     }
 
     /** Z5 — hệ số mức tải: Roda = 2/3, đủ tải = 1, khác = phân số tự nhập. */
@@ -267,20 +273,21 @@ public class TripBaseCalculator {
     }
 
     /**
-     * Phân loại Đất/Than suy từ tiền tố của Sản phẩm nghiệm thu.
+     * Phân loại Đất/Than — nay theo đúng công thức {@code AD5} của bảng tính.
      *
-     * <p>Docx nói "Phân loại (Đất/Than) (theo Loại hàng)" nhưng danh mục Chủng
-     * loại hàng hiện KHÔNG có trường phân loại. Tiền tố {@code Dat_}/
-     * {@code Than_} của Sản phẩm nghiệm thu là tín hiệu trực tiếp nhất đang
-     * có — cần chủ dự án xác nhận, xem mục "Điểm cần xác nhận" trong
-     * {@code docs/RA_SOAT_CHUAN_HOA_DANH_MUC.md}.
+     * <p>Trước đây suy từ tiền tố {@code Dat_}/{@code Than_} và được ghi là
+     * "giả định chờ xác nhận". Đọc kỹ bảng tính thì công thức đã có sẵn:
+     * xét <b>chữ cái đầu</b> của Sản phẩm nghiệm thu, {@code S} hoặc {@code D}
+     * là ĐẤT, còn lại là THAN. Khác biệt là thật — {@code SP than sạch} bắt
+     * đầu bằng {@code S} nên là ĐẤT, dù trong tên có chữ "than"; cách suy cũ
+     * thì không xếp nó vào đâu cả. Xem {@link ProductionKeys#classify}.
      */
     private static boolean isCoal(String acceptanceProduct) {
-        return acceptanceProduct != null && acceptanceProduct.toLowerCase().startsWith("than");
+        return ProductionKeys.isCoal(acceptanceProduct);
     }
 
     private static boolean isEarth(String acceptanceProduct) {
-        return acceptanceProduct != null && acceptanceProduct.toLowerCase().startsWith("dat");
+        return ProductionKeys.isEarth(acceptanceProduct);
     }
 
     private static LocalDate productionDateOf(TransportReportTrip trip) {

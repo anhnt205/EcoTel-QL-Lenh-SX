@@ -310,6 +310,40 @@ cột trái, xuất Excel. Cùng loại với AP Tdia.
 | `AP BBNT xe-SP`, `DuKien HS theo -2%` | Hai bảng tự sinh còn lại, chưa dựng. |
 | Đối soát → chốt kỳ | Engine hiện lấy **mọi** chuyến trong khoảng ngày. Khi có quy trình chốt kỳ thì lọc theo trạng thái đã chốt. |
 
+### ⚠ Hai khoá dẫn xuất — đã sửa 2026-08-31, ghi lại để không sai lại
+
+Cả hai chỉ lộ ra khi đọc kỹ bảng tính lúc chuẩn bị làm nhánh nhiên liệu; cả
+hai đều là **lỗi trong phần đã chạy**, nay đã sửa và gom vào
+`ProductionKeys`.
+
+**1. Khoá cột lưới Mô hình / DMNL có HẬU TỐ KHU VỰC.**
+
+```excel
+DA5 = INDEX(DSXE, …) & IF(D5="CS", ".CS", ".KC")
+AJ5 = … MATCH($DA5, 'Mohinh_TheTrong'!$C$3:$AX$3, 0)
+```
+
+Cột lưới là `CAT777E.CS` / `CAT777E.KC`, **không phải** mã trần `CAT777E`.
+Hậu tố là nhị phân: đúng khu vực `CS` thì `.CS`, mọi khu vực khác đều `.KC`.
+Khoá dòng lưới Năng suất xe cũng dẫn xuất tương tự:
+`LEFT(DA5, len−3) & "." & phân loại` → `CAT777E.DAT`.
+
+Kèm theo đó: khoá dòng Năng suất xe **dẫn xuất** từ chủng loại xe + DMNL,
+không đọc từ thuộc tính `Device.categoryClass` mà mục S3 đã thêm. Danh mục
+"Chủng loại xe + Phân loại" vẫn cần — để làm nhãn dòng của lưới — nhưng
+trường trên thiết bị hiện chưa có chỗ dùng.
+
+**2. Phân loại Đất/Than — bảng tính đã có công thức sẵn.**
+
+```excel
+AD5 = IF(OR(LEFT(AG5,1)="S", LEFT(AG5,1)="D"), "DAT", "Than")
+```
+
+Xét **chữ cái đầu** của Sản phẩm nghiệm thu, không phải tiền tố
+`Dat_`/`Than_` như tôi từng suy. Khác biệt là thật: `SP than sạch` bắt đầu
+bằng `S` nên là **ĐẤT**, dù trong tên có chữ "than"; cách suy cũ không xếp
+nó vào đâu cả. **Không còn là giả định chờ chủ dự án xác nhận.**
+
 ### Ghi chú thực thi B2 (2026-08-31)
 
 Hạ tầng lưới là **một** bộ dùng chung cho cả 4 danh mục: 3 bảng
