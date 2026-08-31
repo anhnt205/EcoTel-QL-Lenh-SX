@@ -57,6 +57,23 @@ public class TripBaseResult {
     /** BV — Vỉa KPMB; rỗng nếu nhóm vỉa không kết thúc bằng KPMB. */
     private final String seamKpmb;
 
+    // ── Nhóm TKE "ban đầu" / "không quy ẩm" (cột CC…CG) ─────────────────────
+
+    /** CF — Tỷ trọng ban đầu: LUÔN lấy từ danh mục, bỏ qua giá trị tạm tính. */
+    private final BigDecimal densityOriginal;
+
+    /** CC — Tỷ trọng không quy ẩm. */
+    private final BigDecimal densityNoMoisture;
+
+    /** CG — Tổng KLVC TKE (m3) ban đầu (QĐ-02). */
+    private final BigDecimal totalM3Original;
+
+    /** CD — Tổng KLVC TKE (tấn, không quy ẩm). */
+    private final BigDecimal totalTonNoMoisture;
+
+    /** CE — Tổng TKE (tkm, không quy ẩm). */
+    private final BigDecimal totalTkmNoMoisture;
+
     /** Đá thải (tấn) đã dùng. */
     private final BigDecimal wasteRockTon;
 }

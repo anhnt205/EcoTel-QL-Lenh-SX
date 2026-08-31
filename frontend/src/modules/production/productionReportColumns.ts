@@ -95,6 +95,17 @@ export const REPORT_COLUMN_GROUPS: ReportColumnGroup[] = [
     ],
   },
   {
+    title: "TKE ban đầu / không quy ẩm",
+    tone: "bg-teal-100 dark:bg-teal-950/40",
+    columns: [
+      { key: "totalM3Original", label: "Tổng KLVC TKE (m3) ban đầu", numeric: true, scale: 3, width: "min-w-[200px]" },
+      { key: "densityNoMoisture", label: "Tỷ trọng (không quy ẩm)", numeric: true, scale: 3, width: "min-w-[180px]" },
+      { key: "totalTonNoMoisture", label: "Tổng KLVC TKE (tấn, koQA)", numeric: true, scale: 5, width: "min-w-[200px]" },
+      { key: "totalTkmNoMoisture", label: "Tổng TKE (tkm, koQA)", numeric: true, scale: 3, width: "min-w-[180px]" },
+      { key: "densityOriginal", label: "Tỷ trọng ban đầu", numeric: true, scale: 3, width: "min-w-[150px]" },
+    ],
+  },
+  {
     title: "Nhiên liệu & năng suất",
     tone: "bg-violet-100 dark:bg-violet-950/40",
     columns: [

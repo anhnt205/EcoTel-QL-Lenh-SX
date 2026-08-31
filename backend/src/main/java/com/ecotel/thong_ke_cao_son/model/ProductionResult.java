@@ -120,6 +120,28 @@ public class ProductionResult {
     @Column(name = "hs_tkm", precision = 19, scale = 10)
     private BigDecimal hsTkm;
 
+    // ── Nhóm TKE "ban đầu" / "không quy ẩm" (cột CC…CG) ─────────────────────
+
+    /** CF — Tỷ trọng ban đầu (luôn từ danh mục, bỏ qua tạm tính). */
+    @Column(name = "density_original", precision = 19, scale = 6)
+    private BigDecimal densityOriginal;
+
+    /** CC — Tỷ trọng không quy ẩm. */
+    @Column(name = "density_no_moisture", precision = 19, scale = 6)
+    private BigDecimal densityNoMoisture;
+
+    /** CG — Tổng KLVC TKE (m3) ban đầu — cột mà QĐ-02 nói tới. */
+    @Column(name = "total_m3_original", precision = 19, scale = 6)
+    private BigDecimal totalM3Original;
+
+    /** CD — Tổng KLVC TKE (tấn, không quy ẩm). */
+    @Column(name = "total_ton_no_moisture", precision = 19, scale = 6)
+    private BigDecimal totalTonNoMoisture;
+
+    /** CE — Tổng TKE (tkm, không quy ẩm). */
+    @Column(name = "total_tkm_no_moisture", precision = 19, scale = 6)
+    private BigDecimal totalTkmNoMoisture;
+
     // ── Mã hoá hàng (cột BT/BU/BV) ──────────────────────────────────────────
 
     /** BT — Mã hoá hàng. */

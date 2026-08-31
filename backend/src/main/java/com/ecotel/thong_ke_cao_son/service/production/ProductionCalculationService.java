@@ -382,6 +382,11 @@ public class ProductionCalculationService {
         out.setProductionDate(r.getProductionDate());
         out.setSeamGroupExcavatorKey(r.getSeamGroupExcavatorKey());
         out.setAcceptanceProduct(r.getAcceptanceProduct());
+        out.setDensityOriginal(r.getDensityOriginal());
+        out.setDensityNoMoisture(r.getDensityNoMoisture());
+        out.setTotalM3Original(r.getTotalM3Original());
+        out.setTotalTonNoMoisture(r.getTotalTonNoMoisture());
+        out.setTotalTkmNoMoisture(r.getTotalTkmNoMoisture());
         out.setCargoCode(r.getCargoCode());
         out.setCargoTtlCode(r.getCargoTtlCode());
         out.setSeamKpmb(r.getSeamKpmb());

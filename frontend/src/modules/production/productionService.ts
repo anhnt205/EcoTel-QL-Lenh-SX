@@ -31,6 +31,11 @@ export interface ProductionReportRow {
   hsTon: number | null;
   hsTkm: number | null;
   tkeMode: boolean;
+  densityOriginal: number | null;
+  densityNoMoisture: number | null;
+  totalM3Original: number | null;
+  totalTonNoMoisture: number | null;
+  totalTkmNoMoisture: number | null;
   cargoCode: string | null;
   cargoTtlCode: string | null;
   seamKpmb: string | null;

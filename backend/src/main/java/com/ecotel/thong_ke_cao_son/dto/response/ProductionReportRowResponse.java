@@ -69,6 +69,13 @@ public class ProductionReportRowResponse {
     BigDecimal hsTkm;
     boolean tkeMode;
 
+    // ── Nhóm TKE ban đầu / không quy ẩm ─────────────────────────────────────
+    BigDecimal densityOriginal;
+    BigDecimal densityNoMoisture;
+    BigDecimal totalM3Original;
+    BigDecimal totalTonNoMoisture;
+    BigDecimal totalTkmNoMoisture;
+
     // ── Mã hoá hàng ─────────────────────────────────────────────────────────
     String cargoCode;
     String cargoTtlCode;

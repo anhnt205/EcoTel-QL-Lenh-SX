@@ -13,6 +13,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * LƯỢT 1 — tính các chỉ tiêu của từng chuyến, chưa áp hệ số trắc địa.
@@ -65,7 +66,16 @@ public class TripBaseCalculator {
         boolean coal = isCoal(acceptanceProduct);
         boolean earth = isEarth(acceptanceProduct);
 
-        BigDecimal density = resolveDensity(trip, cargoType, date);
+        // Dòng danh mục Tỷ trọng, tra MỘT lần và dùng cho cả ba mục đích:
+        // tỷ trọng đang dùng (AI), tỷ trọng ban đầu (CF), không quy ẩm (CC).
+        Long areaId = trip.getExcavationArea() != null ? trip.getExcavationArea().getId() : null;
+        Optional<DensityParameter> catalogDensity =
+                densityService.findEffective(cargoType.getId(), areaId, date);
+
+        BigDecimal density = resolveDensity(trip, catalogDensity, cargoType, areaId, date);
+        BigDecimal densityOriginal = catalogDensity.map(DensityParameter::getDensityWet).orElse(null);
+        BigDecimal densityNoMoisture = catalogDensity.map(DensityParameter::getDensityDry).orElse(null);
+
         BigDecimal model = resolveModel(trip, cargoType);
 
         BigDecimal tripCount = BigDecimal.valueOf(
@@ -77,6 +87,17 @@ public class TripBaseCalculator {
         BigDecimal totalM3 = computeTotalM3(trip, cargoType, model, tripCount, deduction, weighed, density, earth);
         BigDecimal totalTon = computeTotalTon(totalM3, density, wasteRock, deduction, coal, acceptanceProduct);
         BigDecimal totalTkm = computeTotalTkm(trip, weighed, totalTon);
+
+        // ── Nhóm TKE "ban đầu" / "không quy ẩm" (CC…CG) ─────────────────────
+        BigDecimal totalM3Original =
+                computeTotalM3Original(model, tripCount, deduction, densityOriginal, earth);
+        // CD5 = ROUND(CC5 * CG5, 5); CE5 = ROUND(CD5 * L5, 3)
+        BigDecimal totalTonNoMoisture = densityNoMoisture == null ? null
+                : densityNoMoisture.multiply(totalM3Original).setScale(5, RoundingMode.HALF_UP);
+        BigDecimal distance = trip.getTotalRouteDistanceKm() != null
+                ? BigDecimal.valueOf(trip.getTotalRouteDistanceKm()) : BigDecimal.ZERO;
+        BigDecimal totalTkmNoMoisture = totalTonNoMoisture == null ? null
+                : totalTonNoMoisture.multiply(distance).setScale(3, RoundingMode.HALF_UP);
 
         // Ba cột mã hoá hàng (BT/BU/BV) — suy hoàn toàn từ dữ liệu đã có.
         String cargoCode = CargoCoding.cargoCode(
@@ -98,6 +119,11 @@ public class TripBaseCalculator {
                 .totalM3(totalM3)
                 .totalTon(totalTon)
                 .totalTkm(totalTkm)
+                .densityOriginal(densityOriginal)
+                .densityNoMoisture(densityNoMoisture)
+                .totalM3Original(totalM3Original)
+                .totalTonNoMoisture(totalTonNoMoisture)
+                .totalTkmNoMoisture(totalTkmNoMoisture)
                 .cargoCode(cargoCode)
                 .cargoTtlCode(CargoCoding.cargoTtlCode(cargoCode, receivingPointName, seamGroupCode))
                 .seamKpmb(CargoCoding.seamKpmb(seamGroupCode))
@@ -173,12 +199,46 @@ public class TripBaseCalculator {
     }
 
     /** AI5 — Tỷ trọng: giá trị tạm tính thắng, không thì tra danh mục (QĐ-04). */
-    private BigDecimal resolveDensity(TransportReportTrip trip, CargoType cargoType, LocalDate date) {
+    private BigDecimal resolveDensity(TransportReportTrip trip, Optional<DensityParameter> catalog,
+                                      CargoType cargoType, Long areaId, LocalDate date) {
         if (isPositive(trip.getProvisionalDensity())) {
             return trip.getProvisionalDensity();
         }
-        Long areaId = trip.getExcavationArea() != null ? trip.getExcavationArea().getId() : null;
-        return densityService.resolve(cargoType.getId(), areaId, date).getDensityWet();
+        // Không có tạm tính mà cũng không có danh mục thì đây LÀ lỗi chặn —
+        // giữ nguyên thông báo cũ của QĐ-04 thay vì trả 0.
+        return catalog.map(DensityParameter::getDensityWet)
+                .orElseGet(() -> densityService.resolve(cargoType.getId(), areaId, date).getDensityWet());
+    }
+
+    /**
+     * CG5 — Tổng KLVC TKE (m3) ban đầu. <b>Đây là cột mà QĐ-02 nói tới.</b>
+     *
+     * <pre>
+     * CG5 = ROUND( ROUND(AJ5,3)*R5 − IF(AD5="DAT", AH5, AH5/CF5), 3)
+     * </pre>
+     *
+     * <p>Trừ vơi chia cho Tỷ trọng ban đầu — đúng như QĐ-02 đã chốt — nhưng
+     * <b>chỉ khi phân loại KHÁC {@code DAT}</b>. Phân loại là ĐẤT thì trừ
+     * thẳng. Chi tiết này không có trong QĐ-02, chỉ lộ ra ở công thức thật.
+     *
+     * <p>Khác {@code AL5} (Tổng m3): ở đó Trừ vơi luôn trừ thẳng và chỉ trừ
+     * khi phân loại là ĐẤT. Hai cột khác nhau, đừng gộp.
+     */
+    private BigDecimal computeTotalM3Original(BigDecimal model, BigDecimal tripCount,
+                                              BigDecimal deduction, BigDecimal densityOriginal,
+                                              boolean earth) {
+        BigDecimal base = model.setScale(3, RoundingMode.HALF_UP).multiply(tripCount);
+        BigDecimal subtracted;
+        if (earth) {
+            subtracted = deduction;
+        } else if (densityOriginal == null || densityOriginal.signum() == 0) {
+            // Thiếu tỷ trọng ban đầu thì không chia được. Trừ thẳng còn hơn
+            // ném lỗi cho một cột phụ, nhưng phải nói rõ trong tài liệu.
+            subtracted = deduction;
+        } else {
+            subtracted = deduction.divide(densityOriginal, 10, RoundingMode.HALF_UP);
+        }
+        return base.subtract(subtracted).setScale(3, RoundingMode.HALF_UP);
     }
 
     /** AL5 — Tổng m3. */

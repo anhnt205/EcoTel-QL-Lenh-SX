@@ -20,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Optional;
 
 /** Danh mục Tỷ trọng — tham số theo thời gian (QĐ-04). */
 @Service
@@ -101,15 +102,26 @@ public class DensityParameterService {
      */
     @Transactional(readOnly = true)
     public DensityParameter resolve(Long cargoTypeId, Long excavationAreaId, LocalDate date) {
-        List<DensityParameter> candidates =
-                repository.findEffective(cargoTypeId, excavationAreaId, date);
-        return candidates.stream()
-                // Bản có khu vực cụ thể xếp trước bản "mọi khu vực".
-                .min(Comparator.comparing(d -> d.getExcavationArea() == null))
+        return findEffective(cargoTypeId, excavationAreaId, date)
                 .orElseThrow(() -> new BadRequestException(
                         "Chưa khai báo Tỷ trọng có hiệu lực ngày " + date
                                 + " cho chủng loại hàng id=" + cargoTypeId
                                 + (excavationAreaId != null ? ", khu vực id=" + excavationAreaId : "")));
+    }
+
+    /**
+     * Bản KHÔNG ném lỗi của {@link #resolve}.
+     *
+     * <p>Có chỗ cần dòng danh mục nhưng thiếu nó không phải lỗi chặn: cột
+     * "Tỷ trọng ban đầu" và "Tỷ trọng không quy ẩm" luôn lấy từ danh mục kể
+     * cả khi chuyến đã có tỷ trọng tạm tính. Nếu dùng {@code resolve} ở đó,
+     * một chuyến vốn chạy được nhờ giá trị tạm tính sẽ bỗng nhiên hỏng.
+     */
+    @Transactional(readOnly = true)
+    public Optional<DensityParameter> findEffective(Long cargoTypeId, Long excavationAreaId, LocalDate date) {
+        return repository.findEffective(cargoTypeId, excavationAreaId, date).stream()
+                // Bản có khu vực cụ thể xếp trước bản "mọi khu vực".
+                .min(Comparator.comparing(d -> d.getExcavationArea() == null));
     }
 
     @Transactional(readOnly = true)

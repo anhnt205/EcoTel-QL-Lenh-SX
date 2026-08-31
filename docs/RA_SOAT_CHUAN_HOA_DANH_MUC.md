@@ -342,7 +342,7 @@ HSDML hay "-2%", các cột tiêu thụ nó (`EE`, `EG`, `EI`) cũng không có 
 docx, và sheet còn giữ nhiều kịch bản song song (`KC gốc`, `CS gốc`,
 `kc-tháng 2`) mà không rõ cơ chế chọn.
 
-### ⚠ QĐ-02 áp cho cột `CG`, hiện CHƯA dựng
+### ✅ QĐ-02 áp cho cột `CG` — ĐÃ DỰNG (2026-08-31)
 
 Tra ra cột thật mà QĐ-02 nói tới:
 
@@ -353,7 +353,18 @@ CG5 = ROUND( ROUND($AJ5,3)*$R5 − IF($AD5="DAT", $AH5, AH5/CF5), 3)
 
 Đúng như QĐ-02 đã chốt — Trừ vơi chia cho Tỷ trọng ban đầu, **nhưng chỉ khi
 phân loại KHÁC `DAT`**. Kèm theo là `CC`/`CD`/`CE`/`CF` (Tỷ trọng không quy
-ẩm và các tổng TKE), đều có công thức đầy đủ. Cả nhóm này chưa dựng.
+ẩm và các tổng TKE), đều có công thức đầy đủ.
+
+**Đã dựng cả nhóm `CC`…`CG`.** Hai điểm đáng ghi:
+
+- Chi tiết "chỉ chia khi phân loại KHÁC `DAT`" **không có trong QĐ-02**, chỉ
+  lộ ra ở công thức thật. Kiểm chứng sống: Trừ vơi = 10, tỷ trọng 1,45 →
+  `Than_SX` cho `CG = 73,5 − 10/1,45 = 66,603`; đổi sang `Dat_SX` thì
+  `CG = 73,5 − 10 = 63,500`.
+- `CF` (Tỷ trọng ban đầu) và `CC` (không quy ẩm) **luôn** lấy từ danh mục,
+  kể cả khi chuyến có tỷ trọng tạm tính — khác `AI` (tỷ trọng đang dùng).
+  Vì thế phải thêm `DensityParameterService.findEffective` không ném lỗi:
+  dùng `resolve` ở đây sẽ làm hỏng chuyến vốn chạy được nhờ giá trị tạm tính.
 
 ### ⚠ Hai khoá dẫn xuất — đã sửa 2026-08-31, ghi lại để không sai lại
 
