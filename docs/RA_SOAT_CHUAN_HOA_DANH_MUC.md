@@ -187,7 +187,26 @@ Excel. Xem mục 4.
 
 ---
 
-## 4. ⚠ Phát hiện kiến trúc: phép tính có HAI LƯỢT, không phải một
+## 4. ⚠ Phát hiện kiến trúc: phép tính có BA LƯỢT, không phải một
+
+> **Đính chính (2026-08-31, khi thực thi B5):** mục này ban đầu ghi "hai
+> lượt". Đọc kỹ chuỗi công thức cuối (`DS → DW → DX → DT → DU`) cho thấy
+> thực ra có **ba lượt trên chuyến, xen giữa là hai rào chắn tổng hợp**:
+>
+> ```
+> Lượt 1   AL, AM, AN                          (từng chuyến)
+>   ├─ gộp theo (khoá, SPNT) → sinh AP Tdia;  S = STD_m3 ÷ ΣAL
+> Lượt 2   DS = AL × S ; DW = DS × Thể trọng (TĐ) ; DX = DW × Cung độ
+>   ├─ gộp LẦN HAI        → sinh Ap Tkm;  DY = STD_tấn ÷ ΣDW, DZ = STD_tkm ÷ ΣDX
+> Lượt 3   DT = DW × DY ; DU = DX × DZ         (từng chuyến)
+> ```
+>
+> Điểm mấu chốt bị bỏ sót lúc đầu: `Ap Tkm` **không** gộp từ `AM` của lượt 1,
+> mà gộp từ `DW` — tức từ kết quả đã áp hệ số của lượt 2. Vì thế nó là một
+> rào chắn riêng, không gộp chung với `AP Tdia` được.
+>
+> Đã kiểm chứng sống: hệ số kéo tổng của các chuyến về đúng khít số trắc địa
+> (70 m3 → 100 tấn → 350 tkm), đúng mục đích của phép áp hệ số.
 
 Đây là hệ quả trực tiếp của việc `AP Tdia` là bảng tự sinh. Docx dòng
 253–261:

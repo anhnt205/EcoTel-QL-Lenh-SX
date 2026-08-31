@@ -44,4 +44,12 @@ public class TransportReportTripResponse {
 
     private LoadLevelType loadLevelType;
     private String loadLevelCustomValue;
+
+    // Sáu trường "(Báo chuyến)" phục vụ tính sản lượng (B5)
+    private java.math.BigDecimal weighedWeightTon;
+    private java.math.BigDecimal provisionalModel;
+    private java.math.BigDecimal provisionalDensity;
+    private java.math.BigDecimal ctnbDeviationCoefficient;
+    private java.math.BigDecimal deductionAmount;
+    private java.math.BigDecimal wasteRockTon;
 }

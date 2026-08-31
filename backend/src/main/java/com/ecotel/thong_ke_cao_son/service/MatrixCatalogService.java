@@ -66,6 +66,21 @@ public class MatrixCatalogService {
     }
 
     /**
+     * Tra giá trị một ô của lưới — điểm vào cho engine tính sản lượng.
+     *
+     * <p>Ô chưa khai báo thì ném lỗi nghiệp vụ rõ ràng, KHÔNG trả 0: trả 0 sẽ
+     * cho ra sản lượng bằng 0 mà không ai biết là do thiếu khai báo lưới.
+     */
+    @Transactional(readOnly = true)
+    public BigDecimal requireCell(String code, String rowKey, String colKey) {
+        MatrixDefinition def = findDefinition(code);
+        return cellRepository.findByDefinitionIdAndRowKeyAndColKey(def.getId(), rowKey, colKey)
+                .map(MatrixCell::getValue)
+                .orElseThrow(() -> new BadRequestException("Lưới " + def.getName()
+                        + " chưa khai báo ô [" + rowKey + " × " + colKey + "]"));
+    }
+
+    /**
      * Ghi nhiều ô một lần.
      *
      * <p>Màn lưới gửi lên đúng những ô người dùng vừa sửa, nên phải là thao

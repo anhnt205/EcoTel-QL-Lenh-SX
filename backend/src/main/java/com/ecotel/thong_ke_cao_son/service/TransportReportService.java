@@ -325,6 +325,16 @@ public class TransportReportService {
 
         trip.setTripCount(request.getTripCount());
 
+        // Sáu trường "(Báo chuyến)" phục vụ tính sản lượng (B5). Ở nhánh TẠO
+        // mới chúng được MapStruct tự ánh xạ; nhánh SỬA này viết tay nên phải
+        // gán tường minh, nếu không sửa phiếu sẽ âm thầm xoá mất chúng.
+        trip.setWeighedWeightTon(request.getWeighedWeightTon());
+        trip.setProvisionalModel(request.getProvisionalModel());
+        trip.setProvisionalDensity(request.getProvisionalDensity());
+        trip.setCtnbDeviationCoefficient(request.getCtnbDeviationCoefficient());
+        trip.setDeductionAmount(request.getDeductionAmount());
+        trip.setWasteRockTon(request.getWasteRockTon());
+
         LoadLevel loadLevel = new LoadLevel();
         loadLevel.setType(request.getLoadLevelType());
         loadLevel.setCustomValue(
