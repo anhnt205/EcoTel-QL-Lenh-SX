@@ -51,7 +51,7 @@ export function CatalogFormModal({
   // Cột chỉ đọc (giá trị kéo theo danh mục khác) không xuất hiện trong biểu
   // mẫu — cho sửa ở đây là nhập trùng dữ liệu của danh mục gốc.
   const fields = useMemo(
-    () => config.fields.filter((f) => !f.readOnly),
+    () => config.fields.filter((f) => !f.readOnly && !f.formHidden),
     [config.fields],
   );
 

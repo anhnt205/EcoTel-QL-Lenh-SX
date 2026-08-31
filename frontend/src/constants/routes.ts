@@ -51,5 +51,7 @@ export const ROUTES = {
     TY_TRONG: '/danh-muc/ty-trong',
     STD_DAT_CN: '/danh-muc/std-dat-cn',
     STD_DAT_SX: '/danh-muc/std-dat-sx-than-sx',
+    TTSL_XE: '/danh-muc/thuoc-tinh-san-luong-xe',
+    TTSL_MAY: '/danh-muc/thuoc-tinh-san-luong-may',
   },
 } as const;

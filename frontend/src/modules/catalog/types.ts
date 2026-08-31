@@ -25,6 +25,15 @@ export interface CatalogField {
    * danh mục gốc; đưa vào file Excel thì file nhập lại được sẽ sai.
    */
   readOnly?: boolean;
+  /**
+   * Cột ĐỊNH DANH: có trong bảng và trong file Excel, nhưng không sửa được
+   * trong biểu mẫu.
+   *
+   * Khác {@link readOnly} ở chỗ vẫn nằm trong file. Dùng cho mã thiết bị ở
+   * màn thuộc tính sản lượng: file nhập cần mã để biết ghi vào thiết bị nào,
+   * nhưng bản thân mã thì không được sửa ở màn đó.
+   */
+  formHidden?: boolean;
   placeholder?: string;
   /** Bề rộng cột trong bảng nhập nhiều dòng (tailwind class). */
   width?: string;
@@ -60,6 +69,29 @@ export interface CatalogConfig {
    * phải chọn lại giá trị đó ở mỗi dòng, và cũng không thể chọn nhầm.
    */
   fixedValues?: Record<string, unknown>;
+  /**
+   * Cho phép THÊM MỚI. Mặc định `true`.
+   *
+   * Đặt `false` cho màn chỉ bổ sung thuộc tính cho bản ghi đã có — vd thuộc
+   * tính sản lượng của thiết bị: thiết bị đến từ nơi khác, màn này không tạo
+   * ra thiết bị mới.
+   */
+  canCreate?: boolean;
+  /**
+   * Cho phép XOÁ. Mặc định `true`.
+   *
+   * Đặt `false` ở màn chỉ bổ sung thuộc tính: xoá ở đó sẽ có nghĩa là xoá cả
+   * bản ghi gốc — không phải điều người dùng định làm khi đang khai báo
+   * thuộc tính sản lượng cho một chiếc xe.
+   */
+  canDelete?: boolean;
+  /**
+   * Dòng lưu ý bổ sung ghi vào sheet "HuongDan" của file Excel.
+   *
+   * Dùng cho những cảnh báo chỉ đúng với riêng một danh mục — chỗ duy nhất
+   * người dùng thực sự đọc được lúc họ sắp nhập file.
+   */
+  guideNotes?: string[];
   /**
    * Trường hiển thị trong câu hỏi xác nhận xoá. Mặc định là trường thứ hai.
    */

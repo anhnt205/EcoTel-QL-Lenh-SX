@@ -371,6 +371,24 @@ export function Header() {
                   STD (Đất SX/Than SX)
                 </NavLink>
               </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <NavLink
+                  to={ROUTES.DANH_MUC.TTSL_XE}
+                  className="flex items-center gap-2 px-2.5 py-2 text-sm rounded hover:bg-blue-50 cursor-pointer"
+                >
+                  <Cog className="h-4 w-4 text-blue-600" />
+                  Thuộc tính SL — Xe
+                </NavLink>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <NavLink
+                  to={ROUTES.DANH_MUC.TTSL_MAY}
+                  className="flex items-center gap-2 px-2.5 py-2 text-sm rounded hover:bg-blue-50 cursor-pointer"
+                >
+                  <Cog className="h-4 w-4 text-blue-600" />
+                  Thuộc tính SL — Máy xúc
+                </NavLink>
+              </DropdownMenuItem>
 
               {/* Loại hàng */}
               <DropdownMenuItem asChild>

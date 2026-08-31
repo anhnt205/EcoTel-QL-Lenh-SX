@@ -105,6 +105,7 @@ function buildWorkbook(
       ? [["- Cột ngày nhập dạng dd/MM/yyyy hoặc yyyy-MM-dd."]]
       : []),
     ["- Xoá hết các dòng ví dụ trước khi nhập dữ liệu thật."],
+    ...(config.guideNotes ?? []).map((n) => [n]),
   ];
   const guideSheet = XLSX.utils.aoa_to_sheet(guide);
   guideSheet["!cols"] = [{ wch: 28 }, { wch: 12 }, { wch: 52 }];

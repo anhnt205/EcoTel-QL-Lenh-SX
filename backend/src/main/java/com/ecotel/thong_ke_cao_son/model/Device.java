@@ -76,6 +76,48 @@ public class Device {
     @Embedded
     private Coordinates coordinates = new Coordinates();
 
+    // ── Thuộc tính phục vụ TÍNH SẢN LƯỢNG (mục S3) ──────────────────────────
+    //
+    // Công thức lấy các giá trị này từ named range `DSXE` (danh sách xe) và
+    // `DSMAY` (danh sách máy) của workbook gốc. Tất cả đều cho phép để trống:
+    // dữ liệu thiết bị đã có sẵn từ trước, không thể bắt khai đủ ngay.
+    //
+    // Lưu ý: "Đơn vị quản lý thiết bị" (QLTB) KHÔNG thêm mới ở đây — nó chính
+    // là `department` đã có. Thêm nữa sẽ thành hai chỗ cho một khái niệm.
+
+    /** `CaiTaoToa` (cột CX) — xe đã cải tạo toa hay chưa. */
+    @Column(name = "car_renovation")
+    private String carRenovation;
+
+    /** Hạng xe (cột DB): A, B, C1, hoặc khác. Thành phần khoá tra HS điều chỉnh NLĐM. */
+    @Column(name = "vehicle_class")
+    private String vehicleClass;
+
+    /** Chất lượng xe — thành phần còn lại của khoá tra HS điều chỉnh NLĐM. */
+    @Column(name = "quality_level")
+    private String qualityLevel;
+
+    /**
+     * Chủng loại xe + DMNL (cột DA/DQ) — là CỘT của lưới Mô hình và của lưới
+     * Định mức nhiên liệu.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "fuel_class_id")
+    private VehicleFuelClass fuelClass;
+
+    /**
+     * Chủng loại xe + Phân loại — là DÒNG của lưới Năng suất xe (996).
+     * Cách phân nhóm này ĐỘC LẬP với {@link #fuelClass}; cùng một chiếc xe có
+     * thể thuộc nhóm khác nhau ở hai lưới.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "category_class_id")
+    private VehicleCategoryClass categoryClass;
+
+    /** Gầu xúc (cột DG) — chỉ có nghĩa với máy xúc, lấy từ `DSMAY`. */
+    @Column(name = "bucket_capacity", precision = 19, scale = 6)
+    private java.math.BigDecimal bucketCapacity;
+
     @Column(name = "note", columnDefinition = "TEXT")
     private String note;
 

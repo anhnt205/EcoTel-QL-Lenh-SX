@@ -209,13 +209,15 @@ export function CatalogPage({
             >
               <Pencil className="h-4 w-4" />
             </button>
-            <button
-              title="Xoá"
-              onClick={() => handleDelete(row.original)}
-              className="rounded p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30"
-            >
-              <Trash2 className="h-4 w-4" />
-            </button>
+            {config.canDelete !== false && (
+              <button
+                title="Xoá"
+                onClick={() => handleDelete(row.original)}
+                className="rounded p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            )}
           </div>
         ),
       },
@@ -248,16 +250,18 @@ export function CatalogPage({
         </h1>
         <div className="flex items-center gap-2">
         {extraActions}
-        <Button
-          onClick={() => {
-            setEditing(null);
-            setModalOpen(true);
-          }}
-          className="h-9 gap-1.5 bg-blue-600 text-xs font-bold text-white hover:bg-blue-700"
-        >
-          <Plus className="h-4 w-4" />
-          Thêm mới
-        </Button>
+        {config.canCreate !== false && (
+          <Button
+            onClick={() => {
+              setEditing(null);
+              setModalOpen(true);
+            }}
+            className="h-9 gap-1.5 bg-blue-600 text-xs font-bold text-white hover:bg-blue-700"
+          >
+            <Plus className="h-4 w-4" />
+            Thêm mới
+          </Button>
+        )}
         </div>
       </div>
 

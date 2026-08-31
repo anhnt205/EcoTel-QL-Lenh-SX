@@ -59,6 +59,8 @@ const FuelAdjustMatrixPage = lazy(() => import("@/modules/catalog/pages/FuelAdju
 const DensityParametersPage = lazy(() => import("@/modules/catalog/pages/DensityParameters"));
 const SurveyStandardDatCnPage = lazy(() => import("@/modules/catalog/pages/SurveyStandardDatCn"));
 const SurveyStandardDatSxPage = lazy(() => import("@/modules/catalog/pages/SurveyStandardDatSx"));
+const VehicleProductionAttrsPage = lazy(() => import("@/modules/catalog/pages/VehicleProductionAttrs"));
+const MachineProductionAttrsPage = lazy(() => import("@/modules/catalog/pages/MachineProductionAttrs"));
 
 const PageLoader = () => (
   <div className="flex h-screen w-full items-center justify-center bg-background/50 backdrop-blur-xs">
@@ -346,6 +348,22 @@ export const mainRoutes = (
         element={
           <Suspense fallback={<PageLoader />}>
             <SurveyStandardDatSxPage />
+          </Suspense>
+        }
+      />
+      <Route
+        path={ROUTES.DANH_MUC.TTSL_XE}
+        element={
+          <Suspense fallback={<PageLoader />}>
+            <VehicleProductionAttrsPage />
+          </Suspense>
+        }
+      />
+      <Route
+        path={ROUTES.DANH_MUC.TTSL_MAY}
+        element={
+          <Suspense fallback={<PageLoader />}>
+            <MachineProductionAttrsPage />
           </Suspense>
         }
       />

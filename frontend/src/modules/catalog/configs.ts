@@ -281,3 +281,68 @@ export const surveyStandardDatSxConfig: CatalogConfig = {
     { key: "note", label: "Ghi chú", type: "text", width: "min-w-[160px]" },
   ],
 };
+
+// ── Thuộc tính sản lượng của thiết bị (mục S3) ─────────────────────────────
+//
+// Thiết bị vốn CHỈ ĐỌC trong hệ (dữ liệu có sẵn, không có màn thêm/sửa).
+// Nhưng công thức sản lượng cần hạng xe, chất lượng, hai cách phân nhóm
+// chủng loại xe và gầu xúc — nên có màn riêng chỉ để bổ sung những trường đó.
+// `canCreate: false` vì màn này không tạo ra thiết bị mới.
+//
+// Cột "Mã thiết bị" dùng `formHidden`: có trong bảng và trong file Excel (file
+// nhập cần mã để biết ghi vào thiết bị nào) nhưng không sửa được ở đây.
+
+const deviceIdentityFields: CatalogField[] = [
+  { key: "code", label: "Mã thiết bị", type: "text", formHidden: true, width: "min-w-[140px]" },
+  { key: "name", label: "Tên thiết bị", type: "text", readOnly: true, width: "min-w-[160px]" },
+  { key: "departmentName", label: "Đơn vị quản lý", type: "text", readOnly: true, width: "min-w-[160px]" },
+];
+
+export const vehicleProductionAttrConfig: CatalogConfig = {
+  basePath: "/device-production-attributes",
+  title: "Thuộc tính sản lượng — Xe",
+  nounPhrase: "thuộc tính sản lượng của xe",
+  breadcrumb: ["Danh mục", "Thống kê sản lượng"],
+  searchPlaceholder: "Tìm theo mã xe, tên, số xe",
+  uniqueCodeKey: null,
+  labelKey: "code",
+  canCreate: false,
+  canDelete: false,
+  fixedValues: { categoryGroup: "XE" },
+  guideNotes: [
+    "- File nhập THAY THẾ toàn bộ thuộc tính sản lượng của thiết bị, không phải bổ sung.",
+    "- Vì vậy phải giữ ĐỦ các cột: cột nào bị xoá khỏi file thì giá trị cũ của cột đó sẽ bị xoá theo.",
+    "- Cách an toàn: chọn dòng trong bảng rồi Tải xuống, sửa trên chính file đó, rồi Tải lên.",
+  ],
+  fields: [
+    ...deviceIdentityFields,
+    { key: "vehicleNumber", label: "Số xe", type: "text", readOnly: true, width: "min-w-[120px]" },
+    { key: "fuelClassId", label: "Chủng loại xe + DMNL", type: "select", optionsPath: "/vehicle-fuel-classes", width: "min-w-[190px]" },
+    { key: "categoryClassId", label: "Chủng loại xe + Phân loại", type: "select", optionsPath: "/vehicle-category-classes", width: "min-w-[200px]" },
+    { key: "vehicleClass", label: "Hạng xe", type: "text", placeholder: "A / B / C1 / khác", width: "min-w-[130px]" },
+    { key: "qualityLevel", label: "Chất lượng", type: "text", width: "min-w-[140px]" },
+    { key: "carRenovation", label: "Cải tạo toa", type: "text", width: "min-w-[140px]" },
+  ],
+};
+
+export const machineProductionAttrConfig: CatalogConfig = {
+  basePath: "/device-production-attributes",
+  title: "Thuộc tính sản lượng — Máy xúc",
+  nounPhrase: "thuộc tính sản lượng của máy xúc",
+  breadcrumb: ["Danh mục", "Thống kê sản lượng"],
+  searchPlaceholder: "Tìm theo mã máy, tên máy",
+  uniqueCodeKey: null,
+  labelKey: "code",
+  canCreate: false,
+  canDelete: false,
+  fixedValues: { categoryGroup: "MAY" },
+  guideNotes: [
+    "- File nhập THAY THẾ toàn bộ thuộc tính sản lượng của thiết bị, không phải bổ sung.",
+    "- Cách an toàn: chọn dòng trong bảng rồi Tải xuống, sửa trên chính file đó, rồi Tải lên.",
+  ],
+  fields: [
+    ...deviceIdentityFields,
+    // Máy xúc chỉ cần gầu xúc; hạng xe / chủng loại xe là chuyện của xe tải.
+    { key: "bucketCapacity", label: "Gầu xúc", type: "number", width: "min-w-[130px]" },
+  ],
+};

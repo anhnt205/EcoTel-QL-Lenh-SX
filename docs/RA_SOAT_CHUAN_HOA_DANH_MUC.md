@@ -126,7 +126,26 @@ Lấy từ named range `DSXE`/`DSMAY`:
 |---|---|---|
 | S1 | `CargoType.acceptanceProduct` / `.ttlClh`: chuỗi → **khoá ngoại** + di trú | Đã có danh mục thật |
 | S2 | `ReceivingPoint.seamGroup`: chuỗi → **khoá ngoại** tới danh mục Nhóm vỉa | Nhóm vỉa là thành phần khoá ghép (QĐ-06) |
-| S3 | `Device`: thêm 4–6 thuộc tính ở mục 2.4 | Công thức nhiên liệu + năng suất cần |
+| ~~S3~~ | ✅ **XONG** — `Device` + 6 thuộc tính, kèm màn khai báo riêng | — |
+
+**Ghi chú thực thi S3 (2026-08-31).** Khi làm mới lộ ra: `Device` trong hệ
+này **chỉ có endpoint đọc**, không hề có tạo/sửa — dữ liệu thiết bị đến từ
+seed. Thêm 6 cột mà không có đường nhập thì chúng sẽ nằm trống mãi và công
+thức vẫn không chạy được. Nên S3 gồm cả:
+
+- 6 thuộc tính: `carRenovation`, `vehicleClass`, `qualityLevel`,
+  `fuelClass` (FK), `categoryClass` (FK), `bucketCapacity`.
+- **Không** thêm QLTB: nó chính là `department` đã có. Thêm nữa sẽ thành hai
+  chỗ cho một khái niệm — đúng cái bẫy đã gặp với `Material`/`CargoType`.
+- Endpoint riêng `/api/device-production-attributes` (danh sách + sửa + ghi
+  hàng loạt theo mã). Tách khỏi `/api/devices` để màn này **không** âm thầm
+  trở thành màn sửa thiết bị: chỉ ghi được đúng phần sản lượng.
+- Hai màn "Thuộc tính SL — Xe" và "— Máy xúc", `canCreate: false` và
+  `canDelete: false` (thiết bị đến từ nơi khác; xoá ở đây sẽ có nghĩa là xoá
+  cả thiết bị).
+- Ghi hàng loạt có ngữ nghĩa **THAY THẾ**, không phải bổ sung — file tự chế
+  thiếu cột sẽ xoá trắng các cột còn lại. Cảnh báo này được ghi thẳng vào
+  sheet "HuongDan" của file mẫu.
 
 ### 3.3. Còn thiếu — 12 danh mục người dùng nhập
 
