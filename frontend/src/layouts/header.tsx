@@ -13,6 +13,7 @@ import {
   Cog,
   Layers,
   Grid3x3,
+  Calculator,
   MapPin,
   Building2,
   Clock,
@@ -483,6 +484,18 @@ export function Header() {
           >
             <FileCheck className="h-4 w-4 mr-0.5 text-blue-200" />
             Báo chuyến
+          </NavLink>
+
+          {/* Báo cáo thống kê — đầu ra cuối cùng, để ở cấp cao nhất chứ không
+              nằm trong nhóm Danh mục */}
+          <NavLink
+            to={ROUTES.BAO_CAO.THONG_KE}
+            className={({ isActive }) =>
+              navItemClass(isActive || pathname.startsWith(ROUTES.BAO_CAO.THONG_KE))
+            }
+          >
+            <Calculator className="h-4 w-4 mr-0.5 text-blue-200" />
+            Báo cáo thống kê
           </NavLink>
         </nav>
 

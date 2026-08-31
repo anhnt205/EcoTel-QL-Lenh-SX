@@ -9,6 +9,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
+
 @Repository
 public interface ProductionResultRepository extends JpaRepository<ProductionResult, Long> {
 
@@ -22,6 +24,29 @@ public interface ProductionResultRepository extends JpaRepository<ProductionResu
     Page<ProductionResult> search(@Param("periodId") Long periodId,
                                   @Param("keyword") String keyword,
                                   Pageable pageable);
+
+    /**
+     * Toàn bộ dòng của một kỳ, nạp sẵn ngữ cảnh chuyến.
+     *
+     * <p>Màn báo cáo hiện tên xe / máy xúc / khu vực chứ không hiện id, nên
+     * không JOIN FETCH thì mỗi dòng sinh thêm cả chục truy vấn con.
+     */
+    @Query("""
+        SELECT r FROM ProductionResult r
+        JOIN FETCH r.transportTrip t
+        JOIN FETCH t.transportReport rep
+        LEFT JOIN FETCH rep.shift
+        LEFT JOIN FETCH rep.vehicle
+        LEFT JOIN FETCH t.excavator
+        LEFT JOIN FETCH t.excavationArea
+        LEFT JOIN FETCH t.loadingPoint
+        LEFT JOIN FETCH t.unloadingPoint
+        LEFT JOIN FETCH t.cargoType
+        LEFT JOIN FETCH t.cargoGroup
+        WHERE r.reportPeriod.id = :periodId
+        ORDER BY r.productionDate, r.id
+        """)
+    List<ProductionResult> findAllByPeriod(@Param("periodId") Long periodId);
 
     @Modifying
     @Query("DELETE FROM ProductionResult r WHERE r.reportPeriod.id = :periodId")

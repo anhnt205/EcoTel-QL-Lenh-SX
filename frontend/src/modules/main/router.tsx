@@ -62,6 +62,8 @@ const SurveyStandardDatSxPage = lazy(() => import("@/modules/catalog/pages/Surve
 const VehicleProductionAttrsPage = lazy(() => import("@/modules/catalog/pages/VehicleProductionAttrs"));
 const MachineProductionAttrsPage = lazy(() => import("@/modules/catalog/pages/MachineProductionAttrs"));
 
+const ProductionReportPage = lazy(() => import("@/modules/production/ProductionReportPage"));
+
 const PageLoader = () => (
   <div className="flex h-screen w-full items-center justify-center bg-background/50 backdrop-blur-xs">
     <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
@@ -364,6 +366,16 @@ export const mainRoutes = (
         element={
           <Suspense fallback={<PageLoader />}>
             <MachineProductionAttrsPage />
+          </Suspense>
+        }
+      />
+
+      {/* Đầu ra cuối cùng — tương ứng sheet `tinh toan` của bảng tính gốc */}
+      <Route
+        path={ROUTES.BAO_CAO.THONG_KE}
+        element={
+          <Suspense fallback={<PageLoader />}>
+            <ProductionReportPage />
           </Suspense>
         }
       />

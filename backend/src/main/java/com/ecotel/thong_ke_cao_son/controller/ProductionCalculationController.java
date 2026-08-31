@@ -1,31 +1,31 @@
 package com.ecotel.thong_ke_cao_son.controller;
 
-import com.ecotel.thong_ke_cao_son.dto.response.ApiResponse;
-import com.ecotel.thong_ke_cao_son.model.ProductionResult;
+import com.ecotel.thong_ke_cao_son.dto.response.*;
 import com.ecotel.thong_ke_cao_son.model.SurveyCoefficient;
-import com.ecotel.thong_ke_cao_son.repository.ProductionResultRepository;
 import com.ecotel.thong_ke_cao_son.repository.SurveyCoefficientRepository;
 import com.ecotel.thong_ke_cao_son.service.production.ProductionCalculationService;
+import com.ecotel.thong_ke_cao_son.service.production.ProductionReportService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
+import org.springdoc.core.annotations.ParameterObject;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 /**
- * Tính sản lượng và xem kết quả.
+ * Tính sản lượng và màn "Báo cáo thống kê".
  *
  * <p>Tính theo KỲ, không theo chuyến: hệ số trắc địa phụ thuộc tổng của cả
- * kỳ nên kết quả một chuyến thay đổi khi chuyến khác cùng kỳ thay đổi.
+ * kỳ, nên kết quả một chuyến thay đổi khi chuyến khác cùng kỳ thay đổi.
  */
 @RestController
 @RequestMapping("/api/production")
 @RequiredArgsConstructor
 public class ProductionCalculationController {
 
-    private final ProductionCalculationService service;
-    private final ProductionResultRepository resultRepository;
+    private final ProductionCalculationService calculationService;
+    private final ProductionReportService reportService;
     private final SurveyCoefficientRepository coefficientRepository;
 
     /**
@@ -37,18 +37,28 @@ public class ProductionCalculationController {
     public ApiResponse<ProductionCalculationService.CalculationSummary> calculate(
             @RequestParam Long periodId,
             @RequestParam(defaultValue = "false") boolean tkeMode) {
-        return ApiResponse.success(service.calculatePeriod(periodId, tkeMode));
+        return ApiResponse.success(calculationService.calculatePeriod(periodId, tkeMode));
     }
 
-    /** Kết quả theo từng chuyến — nguồn của màn Báo cáo thống kê. */
+    /** Phần đầu màn báo cáo: kỳ, thời điểm tính, và các tổng cộng của cả kỳ. */
+    @GetMapping("/summary")
+    public ApiResponse<ProductionReportSummaryResponse> summary(@RequestParam Long periodId) {
+        return ApiResponse.success(reportService.getSummary(periodId));
+    }
+
+    /** Bảng kết quả theo từng chuyến — thân của màn Báo cáo thống kê. */
     @GetMapping("/results")
-    public ApiResponse<Page<ProductionResult>> results(
+    public ApiResponse<PageResponse<ProductionReportRowResponse>> results(
             @RequestParam Long periodId,
             @RequestParam(required = false, defaultValue = "") String keyword,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
-        return ApiResponse.success(
-                resultRepository.search(periodId, keyword, PageRequest.of(page, size)));
+            @ParameterObject @PageableDefault(size = 20) Pageable pageable) {
+        return ApiResponse.success(reportService.getRows(periodId, keyword, pageable));
+    }
+
+    /** Toàn bộ dòng của kỳ, không phân trang — dùng khi xuất Excel. */
+    @GetMapping("/results/all")
+    public ApiResponse<List<ProductionReportRowResponse>> allResults(@RequestParam Long periodId) {
+        return ApiResponse.success(reportService.getAllRows(periodId));
     }
 
     /** Bảng hệ số trắc địa hệ tự sinh (AP Tdia và Ap Tkm) của kỳ. */

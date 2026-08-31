@@ -54,4 +54,7 @@ export const ROUTES = {
     TTSL_XE: '/danh-muc/thuoc-tinh-san-luong-xe',
     TTSL_MAY: '/danh-muc/thuoc-tinh-san-luong-may',
   },
+  BAO_CAO: {
+    THONG_KE: '/bao-cao/thong-ke',
+  },
 } as const;

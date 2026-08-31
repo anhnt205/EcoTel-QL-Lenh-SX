@@ -277,8 +277,17 @@ cột trái, xuất Excel. Cùng loại với AP Tdia.
 | ~~B2~~ | ✅ **XONG** — `MatrixCatalogPage` + 3 bảng lưới + 4 lưới đã khai báo | — |
 | ~~B3~~ | ✅ **XONG** — Tỷ trọng (QĐ-04); 4 lưới đã dùng được từ B2 | — |
 | ~~B4~~ | ✅ **XONG** — STD ×2 + bộ dựng khoá Nhóm vỉa + Máy xúc | — |
-| **B5** | Engine 2 lượt + sinh AP Tdia / Ap Tkm / AP BBNT / DuKien HS | cần B1–B4 |
-| **B6** | Màn Báo cáo thống kê + xuất Excel | cần B5 |
+| ~~B5~~ | ✅ **XONG** — engine **3 lượt** + sinh AP Tdia / Ap Tkm | — |
+| ~~B6~~ | ✅ **XONG** — màn Báo cáo thống kê, cột lồng 6 nhóm, xuất Excel | — |
+
+### Còn lại sau B6
+
+| Việc | Ghi chú |
+|---|---|
+| S1, S2 | Chuẩn hoá `CargoType.acceptanceProduct`/`.ttlClh` và `ReceivingPoint.seamGroup` từ chuỗi sang khoá ngoại. **Đáng làm sớm**: khoá ghép Nhóm vỉa + Máy xúc dựng từ `seamGroup` dạng chuỗi tự do, sai một ký tự là dòng STD không khớp. |
+| Nhánh nhiên liệu & năng suất | `BQ` (NLĐM hiện hành), `BR` (định mức năng suất), `EF`, `EQ`. Là một họ công thức riêng, cần lưới DMNL / Năng suất xe / HS điều chỉnh có dữ liệu thật. |
+| `AP BBNT xe-SP`, `DuKien HS theo -2%` | Hai bảng tự sinh còn lại, chưa dựng. |
+| Đối soát → chốt kỳ | Engine hiện lấy **mọi** chuyến trong khoảng ngày. Khi có quy trình chốt kỳ thì lọc theo trạng thái đã chốt. |
 
 ### Ghi chú thực thi B2 (2026-08-31)
 
