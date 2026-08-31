@@ -233,6 +233,33 @@ export function Header() {
                   Chủng loại hàng
                 </NavLink>
               </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <NavLink
+                  to={ROUTES.DANH_MUC.NHOM_CHUNG_LOAI_HANG}
+                  className="flex items-center gap-2 px-2.5 py-2 text-sm rounded hover:bg-blue-50 cursor-pointer"
+                >
+                  <Layers className="h-4 w-4 text-blue-600" />
+                  Nhóm chủng loại hàng
+                </NavLink>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <NavLink
+                  to={ROUTES.DANH_MUC.SAN_PHAM_NGHIEM_THU}
+                  className="flex items-center gap-2 px-2.5 py-2 text-sm rounded hover:bg-blue-50 cursor-pointer"
+                >
+                  <Layers className="h-4 w-4 text-blue-600" />
+                  Sản phẩm nghiệm thu
+                </NavLink>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <NavLink
+                  to={ROUTES.DANH_MUC.TTL_CLH}
+                  className="flex items-center gap-2 px-2.5 py-2 text-sm rounded hover:bg-blue-50 cursor-pointer"
+                >
+                  <Layers className="h-4 w-4 text-blue-600" />
+                  TTL CLH
+                </NavLink>
+              </DropdownMenuItem>
 
               {/* Loại hàng */}
               <DropdownMenuItem asChild>

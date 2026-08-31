@@ -63,3 +63,46 @@ export const cargoTypeConfig: CatalogConfig = {
     { key: "description", label: "Ghi chú", type: "text", width: "min-w-[150px]" },
   ],
 };
+
+// ── Nhóm A: 3 danh mục đơn giản của phần Thống kê sản lượng ─────────────
+// "Nhóm chủng loại hàng" dùng lại bảng cargo_groups ĐÃ CÓ (đừng tạo bảng
+// mới — xem DESIGN_DANH_MUC_SANLUONG.md mục 1.1).
+
+export const cargoGroupConfig: CatalogConfig = {
+  basePath: "/cargo-groups",
+  title: "Nhóm chủng loại hàng",
+  nounPhrase: "nhóm chủng loại hàng",
+  breadcrumb: ["Danh mục", "Thống kê sản lượng"],
+  searchPlaceholder: "Tìm kiếm theo mã nhóm, tên nhóm chủng loại hàng",
+  fields: [
+    { key: "code", label: "Mã nhóm chủng loại hàng", required: true, type: "text", width: "min-w-[190px]" },
+    { key: "name", label: "Nhóm chủng loại hàng", required: true, type: "text", width: "min-w-[180px]" },
+    { key: "description", label: "Ghi chú", type: "text", width: "min-w-[200px]" },
+  ],
+};
+
+export const acceptanceProductConfig: CatalogConfig = {
+  basePath: "/acceptance-products",
+  title: "Sản phẩm nghiệm thu",
+  nounPhrase: "sản phẩm nghiệm thu",
+  breadcrumb: ["Danh mục", "Thống kê sản lượng"],
+  searchPlaceholder: "Tìm kiếm theo mã, tên sản phẩm nghiệm thu",
+  fields: [
+    { key: "code", label: "Mã sản phẩm nghiệm thu", required: true, type: "text", width: "min-w-[190px]" },
+    { key: "name", label: "Sản phẩm nghiệm thu", required: true, type: "text", width: "min-w-[180px]" },
+    { key: "note", label: "Ghi chú", type: "text", width: "min-w-[200px]" },
+  ],
+};
+
+export const ttlClhConfig: CatalogConfig = {
+  basePath: "/ttl-clh-items",
+  title: "TTL CLH",
+  nounPhrase: "TTL CLH",
+  breadcrumb: ["Danh mục", "Thống kê sản lượng"],
+  searchPlaceholder: "Tìm kiếm theo TTL CLH",
+  fields: [
+    { key: "code", label: "Mã TTL CLH", required: true, type: "text", width: "min-w-[170px]" },
+    { key: "name", label: "TTL CLH", required: true, type: "text", width: "min-w-[160px]" },
+    { key: "note", label: "Ghi chú", type: "text", width: "min-w-[200px]" },
+  ],
+};

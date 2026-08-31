@@ -44,6 +44,9 @@ const ReceivingPointsPage = lazy(() => import("@/modules/catalog/pages/Receiving
 const UnloadingPointsPage = lazy(() => import("@/modules/catalog/pages/UnloadingPoints"));
 const PickupPointsPage = lazy(() => import("@/modules/catalog/pages/PickupPoints"));
 const CargoTypesCatalogPage = lazy(() => import("@/modules/catalog/pages/CargoTypesCatalog"));
+const CargoGroupsCatalogPage = lazy(() => import("@/modules/catalog/pages/CargoGroupsCatalog"));
+const AcceptanceProductsPage = lazy(() => import("@/modules/catalog/pages/AcceptanceProducts"));
+const TtlClhItemsPage = lazy(() => import("@/modules/catalog/pages/TtlClhItems"));
 
 const PageLoader = () => (
   <div className="flex h-screen w-full items-center justify-center bg-background/50 backdrop-blur-xs">
@@ -209,6 +212,30 @@ export const mainRoutes = (
         element={
           <Suspense fallback={<PageLoader />}>
             <CargoTypesCatalogPage />
+          </Suspense>
+        }
+      />
+      <Route
+        path={ROUTES.DANH_MUC.NHOM_CHUNG_LOAI_HANG}
+        element={
+          <Suspense fallback={<PageLoader />}>
+            <CargoGroupsCatalogPage />
+          </Suspense>
+        }
+      />
+      <Route
+        path={ROUTES.DANH_MUC.SAN_PHAM_NGHIEM_THU}
+        element={
+          <Suspense fallback={<PageLoader />}>
+            <AcceptanceProductsPage />
+          </Suspense>
+        }
+      />
+      <Route
+        path={ROUTES.DANH_MUC.TTL_CLH}
+        element={
+          <Suspense fallback={<PageLoader />}>
+            <TtlClhItemsPage />
           </Suspense>
         }
       />

@@ -11,6 +11,10 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface CargoGroupRepository extends JpaRepository<CargoGroup, Long> {
 
+    java.util.Optional<CargoGroup> findByCode(String code);
+
+    boolean existsByCodeAndIdNot(String code, Long id);
+
     @Query("""
         SELECT cg FROM CargoGroup cg
         WHERE :keyword IS NULL OR :keyword = ''
