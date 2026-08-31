@@ -52,6 +52,10 @@ const VehicleFuelClassesPage = lazy(() => import("@/modules/catalog/pages/Vehicl
 const VehicleCategoryClassesPage = lazy(() => import("@/modules/catalog/pages/VehicleCategoryClasses"));
 const CoefficientsPage = lazy(() => import("@/modules/catalog/pages/Coefficients"));
 const ReportPeriodsPage = lazy(() => import("@/modules/catalog/pages/ReportPeriods"));
+const ModelMatrixPage = lazy(() => import("@/modules/catalog/pages/ModelMatrix"));
+const FuelNormMatrixPage = lazy(() => import("@/modules/catalog/pages/FuelNormMatrix"));
+const VehicleOutputMatrixPage = lazy(() => import("@/modules/catalog/pages/VehicleOutputMatrix"));
+const FuelAdjustMatrixPage = lazy(() => import("@/modules/catalog/pages/FuelAdjustMatrix"));
 
 const PageLoader = () => (
   <div className="flex h-screen w-full items-center justify-center bg-background/50 backdrop-blur-xs">
@@ -281,6 +285,40 @@ export const mainRoutes = (
         element={
           <Suspense fallback={<PageLoader />}>
             <ReportPeriodsPage />
+          </Suspense>
+        }
+      />
+
+      {/* 4 danh mục dạng LƯỚI (bảng tra hai chiều) */}
+      <Route
+        path={ROUTES.DANH_MUC.MO_HINH}
+        element={
+          <Suspense fallback={<PageLoader />}>
+            <ModelMatrixPage />
+          </Suspense>
+        }
+      />
+      <Route
+        path={ROUTES.DANH_MUC.DINH_MUC_NHIEN_LIEU}
+        element={
+          <Suspense fallback={<PageLoader />}>
+            <FuelNormMatrixPage />
+          </Suspense>
+        }
+      />
+      <Route
+        path={ROUTES.DANH_MUC.NANG_SUAT_XE}
+        element={
+          <Suspense fallback={<PageLoader />}>
+            <VehicleOutputMatrixPage />
+          </Suspense>
+        }
+      />
+      <Route
+        path={ROUTES.DANH_MUC.HS_DIEU_CHINH_NLDM}
+        element={
+          <Suspense fallback={<PageLoader />}>
+            <FuelAdjustMatrixPage />
           </Suspense>
         }
       />

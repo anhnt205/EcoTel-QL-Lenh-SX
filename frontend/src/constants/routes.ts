@@ -44,5 +44,9 @@ export const ROUTES = {
     CHUNG_LOAI_XE_PHAN_LOAI: '/danh-muc/chung-loai-xe-phan-loai',
     HE_SO: '/danh-muc/he-so',
     KY_BAO_CAO: '/danh-muc/ky-bao-cao',
+    MO_HINH: '/danh-muc/mo-hinh',
+    DINH_MUC_NHIEN_LIEU: '/danh-muc/dinh-muc-nhien-lieu',
+    NANG_SUAT_XE: '/danh-muc/nang-suat-xe',
+    HS_DIEU_CHINH_NLDM: '/danh-muc/hs-dieu-chinh-nldm',
   },
 } as const;

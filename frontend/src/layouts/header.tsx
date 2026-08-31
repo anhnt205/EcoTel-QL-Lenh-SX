@@ -12,6 +12,7 @@ import {
   FolderTree,
   Cog,
   Layers,
+  Grid3x3,
   MapPin,
   Building2,
   Clock,
@@ -303,6 +304,44 @@ export function Header() {
                 >
                   <Layers className="h-4 w-4 text-blue-600" />
                   Kỳ báo cáo
+                </NavLink>
+              </DropdownMenuItem>
+
+              {/* Danh mục dạng lưới (bảng tra hai chiều) */}
+              <DropdownMenuItem asChild>
+                <NavLink
+                  to={ROUTES.DANH_MUC.MO_HINH}
+                  className="flex items-center gap-2 px-2.5 py-2 text-sm rounded hover:bg-blue-50 cursor-pointer"
+                >
+                  <Grid3x3 className="h-4 w-4 text-blue-600" />
+                  Mô hình (m3/chuyến)
+                </NavLink>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <NavLink
+                  to={ROUTES.DANH_MUC.DINH_MUC_NHIEN_LIEU}
+                  className="flex items-center gap-2 px-2.5 py-2 text-sm rounded hover:bg-blue-50 cursor-pointer"
+                >
+                  <Grid3x3 className="h-4 w-4 text-blue-600" />
+                  Định mức nhiên liệu
+                </NavLink>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <NavLink
+                  to={ROUTES.DANH_MUC.NANG_SUAT_XE}
+                  className="flex items-center gap-2 px-2.5 py-2 text-sm rounded hover:bg-blue-50 cursor-pointer"
+                >
+                  <Grid3x3 className="h-4 w-4 text-blue-600" />
+                  Năng suất xe (996)
+                </NavLink>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <NavLink
+                  to={ROUTES.DANH_MUC.HS_DIEU_CHINH_NLDM}
+                  className="flex items-center gap-2 px-2.5 py-2 text-sm rounded hover:bg-blue-50 cursor-pointer"
+                >
+                  <Grid3x3 className="h-4 w-4 text-blue-600" />
+                  HS điều chỉnh NLĐM
                 </NavLink>
               </DropdownMenuItem>
 

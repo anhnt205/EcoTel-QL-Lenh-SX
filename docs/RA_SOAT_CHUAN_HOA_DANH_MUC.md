@@ -236,11 +236,40 @@ cột trái, xuất Excel. Cùng loại với AP Tdia.
 | Bước | Nội dung | Điều kiện |
 |---|---|---|
 | **B1** | S1+S2+S3 (sửa 3 chỗ đã dựng) + 6 danh mục phẳng lớp 1 | không chặn |
-| **B2** | `MatrixCatalogPage` + `SeamGroupKeyBuilder` | hạ tầng cho B3 |
+| ~~B2~~ | ✅ **XONG** — `MatrixCatalogPage` + 3 bảng lưới + 4 lưới đã khai báo | — |
 | **B3** | 4 lưới 2 chiều + Tỷ trọng | cần B1, B2 |
 | **B4** | STD ×2 (phiếu-đầu + dòng) | cần B2 |
 | **B5** | Engine 2 lượt + sinh AP Tdia / Ap Tkm / AP BBNT / DuKien HS | cần B1–B4 |
 | **B6** | Màn Báo cáo thống kê + xuất Excel | cần B5 |
+
+### Ghi chú thực thi B2 (2026-08-31)
+
+Hạ tầng lưới là **một** bộ dùng chung cho cả 4 danh mục: 3 bảng
+(`matrix_definitions` / `matrix_axis_entries` / `matrix_cells`), một
+controller `/api/matrix-catalogs/{code}`, một trang `MatrixCatalogPage`.
+Bốn lưới chỉ khác nhau ở nhãn và nguồn khoá nên được **seed** bằng
+`backend/seed-matrix-catalogs.sql`, không phải do người dùng tạo.
+
+Bốn quyết định đáng ghi lại, đều xuất phát từ đặc điểm thật của công thức:
+
+1. **Trục lưu tường minh, không suy ra từ ô.** Suy ra thì một dòng chưa nhập
+   giá trị nào sẽ biến mất khi tải lại — mà lúc nhập liệu, dòng trống là
+   trạng thái bình thường.
+2. **Trục số tách riêng `numericValue`.** `DMNL` dùng `MATCH(…,1)` +
+   `SMALL(…)` để lấy hai dải kề nhau rồi nội suy, nên thứ tự SỐ là một phần
+   của phép tính. Sắp theo chuỗi cho `"0.5" < "1" < "10" < "2" < "9"` và
+   chọn nhầm dải. Đã kiểm chứng sống: nhập lộn xộn `10, 9, 2, 0.5, 1` trả về
+   đúng `0.5, 1, 2, 9, 10`.
+3. **Ô trống ≠ ô bằng 0.** Trống là *chưa khai báo* (công thức phải báo thiếu
+   dữ liệu); 0 là *đã khai báo và bằng không*. Vì thế ô lưu THƯA, và
+   `value: null` nghĩa là xoá ô chứ không phải ghi 0.
+4. **Khoá ô là MÃ danh mục, không phải nhãn.** Đổi tên hiển thị không được
+   làm hỏng lưới. File Excel thì ngược lại — dùng nhãn, vì người nhập chỉ
+   biết tên.
+
+Chặn ô mồ côi: chỉ ghi được vào dòng/cột đã có trên trục. Không có chốt này
+thì gõ sai một mã sẽ lặng lẽ tạo ô mà lưới không hiện và công thức không bao
+giờ tra thấy.
 
 ---
 
