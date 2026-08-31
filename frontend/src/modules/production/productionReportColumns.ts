@@ -40,7 +40,7 @@ export const REPORT_COLUMN_GROUPS: ReportColumnGroup[] = [
       { key: "loadingPointName", label: "Nơi nhận tải", width: "min-w-[130px]" },
       { key: "unloadingPointName", label: "Nơi dỡ tải", width: "min-w-[130px]" },
       { key: "cargoTypeName", label: "Chủng loại hàng", width: "min-w-[140px]" },
-      { key: "cargoGroupName", label: "Nhóm CLH", width: "min-w-[120px]" },
+      { key: "cargoGroupName", label: "Nhóm hàng", width: "min-w-[120px]" },
       { key: "tripCount", label: "Số chuyến", numeric: true, scale: 0, width: "min-w-[100px]" },
       { key: "routeDistanceKm", label: "Cung độ (km)", numeric: true, scale: 3, width: "min-w-[120px]" },
     ],
