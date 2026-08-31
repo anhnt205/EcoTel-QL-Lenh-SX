@@ -51,6 +51,9 @@ export const REPORT_COLUMN_GROUPS: ReportColumnGroup[] = [
     columns: [
       { key: "seamGroupExcavatorKey", label: "Nhóm vỉa + Máy xúc", width: "min-w-[240px]" },
       { key: "acceptanceProduct", label: "Sản phẩm nghiệm thu", width: "min-w-[160px]" },
+      { key: "cargoCode", label: "Mã hoá hàng", width: "min-w-[130px]" },
+      { key: "cargoTtlCode", label: "Mã hàng TTL", width: "min-w-[130px]" },
+      { key: "seamKpmb", label: "Vỉa KPMB", width: "min-w-[110px]" },
     ],
   },
   {

@@ -306,9 +306,54 @@ cột trái, xuất Excel. Cùng loại với AP Tdia.
 | Việc | Ghi chú |
 |---|---|
 | ~~S1, S2~~ | ✅ **XONG** (2026-08-31) — xem ghi chú dưới. |
-| Nhánh nhiên liệu & năng suất | `BQ` (NLĐM hiện hành), `BR` (định mức năng suất), `EF`, `EQ`. Là một họ công thức riêng, cần lưới DMNL / Năng suất xe / HS điều chỉnh có dữ liệu thật. |
-| `AP BBNT xe-SP`, `DuKien HS theo -2%` | Hai bảng tự sinh còn lại, chưa dựng. |
+| ~~Nhánh nhiên liệu & năng suất~~ | ✅ **XONG** — `AZ`…`BR`, trừ cột `BO` (xem dưới). |
+| ~~Mã hoá hàng~~ | ✅ **XONG** — `BT` (Mã hoá hàng), `BU` (Mã hàng TTL), `BV` (Vỉa KPMB). |
 | Đối soát → chốt kỳ | Engine hiện lấy **mọi** chuyến trong khoảng ngày. Khi có quy trình chốt kỳ thì lọc theo trạng thái đã chốt. |
+
+### ⛔ Ba chỗ CHẶN vì không có luật ở bất kỳ nguồn nào
+
+Đã tra cả docx lẫn công thức thật của dòng master. Không đoán, không tự chế.
+
+| Cột | Tình trạng |
+|---|---|
+| `BO` — *BSNL_Spnt__CN (xe)* | Có tiêu đề trong cả docx lẫn Excel, **không có công thức**, ô bảng tính để trống. Là khoản bù thứ tám và **nằm trong tổng `BP`**, nên hiện `BP` thiếu đúng khoản đó. Đang để 0. |
+| `BX` — *Thể trọng bùn* | Như trên: chỉ có tiêu đề. |
+| `BY`, `BZ`, `CA`, `CB` — nhóm *Tổng … (trừ bùn)* + *Tổng bùn (tấn)* | Như trên: bốn tiêu đề, không công thức, docx cũng chỉ liệt kê tên. |
+
+### Hai bảng tự sinh còn lại — đã tra rõ bản chất
+
+**`AP BBNT xe-SP`** — cấu trúc rõ hoàn toàn:
+
+```excel
+CO5 = AG5 & "_" & K5 & "_" & G5 & "_" & I5   ← SPNT_CLH_NơiNhậnTải_NơiDỡTải
+CN5 = INDEX('AP BBNT xe-SP'!B12:E1000, MATCH(CO5, A12:A1000, 0), 4)
+```
+
+Khoá suy được 100%, nhưng nó trả về **Tên Nghiệm thu** (cột `CN4`) — thứ
+**không suy được từ khoá**, và docx không nhắc một chữ nào. Nên "hệ tự sinh"
+chỉ đúng với **danh sách khoá**; **tên** phải do người dùng khai. Chờ chủ dự
+án xác nhận trước khi dựng.
+
+**`DuKien HS theo -2%`** — KHÔNG phải bảng riêng. `EQ5` là một ô của bảng
+HSDML nhúng ở vùng `EO:EQ`, và bảng đó có **đúng hình dạng** với lưới
+`HS_DIEU_CHINH_NLDM` đã dựng (khoá dòng `Xe_Hạng_Phânloại`, cột = khu vực).
+Dựng chỉ là thêm một khai báo lưới. Nhưng **chưa nên làm**: docx không nhắc
+HSDML hay "-2%", các cột tiêu thụ nó (`EE`, `EG`, `EI`) cũng không có trong
+docx, và sheet còn giữ nhiều kịch bản song song (`KC gốc`, `CS gốc`,
+`kc-tháng 2`) mà không rõ cơ chế chọn.
+
+### ⚠ QĐ-02 áp cho cột `CG`, hiện CHƯA dựng
+
+Tra ra cột thật mà QĐ-02 nói tới:
+
+```excel
+CG5 = ROUND( ROUND($AJ5,3)*$R5 − IF($AD5="DAT", $AH5, AH5/CF5), 3)
+      Tổng KLVC TKE (m3)_BanDau
+```
+
+Đúng như QĐ-02 đã chốt — Trừ vơi chia cho Tỷ trọng ban đầu, **nhưng chỉ khi
+phân loại KHÁC `DAT`**. Kèm theo là `CC`/`CD`/`CE`/`CF` (Tỷ trọng không quy
+ẩm và các tổng TKE), đều có công thức đầy đủ. Cả nhóm này chưa dựng.
 
 ### ⚠ Hai khoá dẫn xuất — đã sửa 2026-08-31, ghi lại để không sai lại
 

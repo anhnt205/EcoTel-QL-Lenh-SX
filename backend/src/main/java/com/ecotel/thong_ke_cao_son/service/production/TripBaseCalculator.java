@@ -78,6 +78,15 @@ public class TripBaseCalculator {
         BigDecimal totalTon = computeTotalTon(totalM3, density, wasteRock, deduction, coal, acceptanceProduct);
         BigDecimal totalTkm = computeTotalTkm(trip, weighed, totalTon);
 
+        // Ba cột mã hoá hàng (BT/BU/BV) — suy hoàn toàn từ dữ liệu đã có.
+        String cargoCode = CargoCoding.cargoCode(
+                cargoType.getTtlClh() != null ? cargoType.getTtlClh().getName() : null);
+        String receivingPointName = trip.getLoadingPoint() != null
+                ? trip.getLoadingPoint().getName() : null;
+        String seamGroupCode = trip.getLoadingPoint() != null
+                && trip.getLoadingPoint().getSeamGroup() != null
+                ? trip.getLoadingPoint().getSeamGroup().getCode() : null;
+
         return TripBaseResult.builder()
                 .trip(trip)
                 .productionDate(date)
@@ -89,6 +98,9 @@ public class TripBaseCalculator {
                 .totalM3(totalM3)
                 .totalTon(totalTon)
                 .totalTkm(totalTkm)
+                .cargoCode(cargoCode)
+                .cargoTtlCode(CargoCoding.cargoTtlCode(cargoCode, receivingPointName, seamGroupCode))
+                .seamKpmb(CargoCoding.seamKpmb(seamGroupCode))
                 .wasteRockTon(wasteRock)
                 .build();
     }

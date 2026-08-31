@@ -48,6 +48,15 @@ public class TripBaseResult {
     /** AN — Tổng Tkm. */
     private final BigDecimal totalTkm;
 
+    /** BT — Mã hoá hàng (chính là TTL CLH của chủng loại hàng). */
+    private final String cargoCode;
+
+    /** BU — Mã hàng TTL. */
+    private final String cargoTtlCode;
+
+    /** BV — Vỉa KPMB; rỗng nếu nhóm vỉa không kết thúc bằng KPMB. */
+    private final String seamKpmb;
+
     /** Đá thải (tấn) đã dùng. */
     private final BigDecimal wasteRockTon;
 }

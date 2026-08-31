@@ -120,6 +120,20 @@ public class ProductionResult {
     @Column(name = "hs_tkm", precision = 19, scale = 10)
     private BigDecimal hsTkm;
 
+    // ── Mã hoá hàng (cột BT/BU/BV) ──────────────────────────────────────────
+
+    /** BT — Mã hoá hàng. */
+    @Column(name = "cargo_code")
+    private String cargoCode;
+
+    /** BU — Mã hàng TTL. */
+    @Column(name = "cargo_ttl_code")
+    private String cargoTtlCode;
+
+    /** BV — Vỉa KPMB. */
+    @Column(name = "seam_kpmb")
+    private String seamKpmb;
+
     // ── Nhánh nhiên liệu và năng suất (cột AZ…BR) ───────────────────────────
 
     /** BF — ĐMNL xe sau mọi hệ số điều chỉnh tháng. */

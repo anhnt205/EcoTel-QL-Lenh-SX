@@ -69,6 +69,11 @@ public class ProductionReportRowResponse {
     BigDecimal hsTkm;
     boolean tkeMode;
 
+    // ── Mã hoá hàng ─────────────────────────────────────────────────────────
+    String cargoCode;
+    String cargoTtlCode;
+    String seamKpmb;
+
     // ── Nhóm 7: nhiên liệu và năng suất ─────────────────────────────────────
     BigDecimal fuelNorm;
     BigDecimal fuelBaseConsumption;

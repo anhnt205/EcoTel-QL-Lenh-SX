@@ -31,6 +31,9 @@ export interface ProductionReportRow {
   hsTon: number | null;
   hsTkm: number | null;
   tkeMode: boolean;
+  cargoCode: string | null;
+  cargoTtlCode: string | null;
+  seamKpmb: string | null;
   fuelNorm: number | null;
   fuelBaseConsumption: number | null;
   fuelTotalBeforeAdjustment: number | null;
