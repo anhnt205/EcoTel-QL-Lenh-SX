@@ -1,9 +1,10 @@
 # Context — THONGKE-CAOSON
 
-Cập nhật lần cuối: 2026-08-30 (lượt 3 — ghi nhận luồng nghiệp vụ TO-BE từ
-sơ đồ workflow của chủ dự án; KHÔNG sửa code). Lượt 2 (2026-08-29) —
-chuyển DB độc lập + bật lại bảo mật + dựng preview sống thật. Đọc file này
-TRƯỚC khi tiếp tục — tin file này hơn lịch sử chat đã bị nén.
+Cập nhật lần cuối: 2026-08-31 (lượt 4 — dựng engine tính sản lượng + danh
+mục dạng lưới có phiên bản theo thời gian; CÓ sửa code, đã verify sống).
+Lượt 3 (2026-08-30) chỉ tài liệu. Lượt 2 (2026-08-29) — chuyển DB độc lập
++ bật lại bảo mật + dựng preview sống thật. Đọc file này TRƯỚC khi tiếp
+tục — tin file này hơn lịch sử chat đã bị nén.
 
 ## Tóm tắt trạng thái
 
@@ -180,6 +181,78 @@ do: `docs/TECHNICAL_DEBT.md` phần "✅ Đã sửa trong lượt này".
     hướng xử lý tạm: `docs/DECISIONS.md` mục **TG-01**. **Code theo bản
     chuẩn dòng 5, KHÔNG cài ngoại lệ `+15`.**
 
+## Đã làm — lượt 4 (2026-08-31, CÓ SỬA CODE — dựng engine tính sản lượng)
+
+Lượt này chuyển từ tài liệu sang code thật. Chủ dự án yêu cầu làm tuần tự:
+rà soát chuẩn hoá danh mục → dựng danh mục → gom nhóm → công thức → bảng
+tính cuối dưới menu **"Báo cáo thống kê"** dựng theo sheet `tinh toan`.
+
+Báo cáo rà soát sống ở `docs/RA_SOAT_CHUAN_HOA_DANH_MUC.md` — đọc file đó
+trước khi đụng vào phần sản lượng, nó ghi cả những chỗ CÒN VƯỚNG.
+
+### Kiến trúc tính toán — BA lượt, hai chốt chặn (KHÔNG phải hai lượt)
+
+Bản thiết kế cũ ghi "hai lượt" là SAI. `Ap Tkm` gom từ cột `DW` chứ không
+phải `AM`, nên phải:
+
+1. **Lượt 1** `TripBaseCalculator` — trị số theo từng chuyến (AL/AM/AN,
+   nhóm mã hoá hàng CC–CG, BT/BU/BV).
+2. *Chốt chặn 1* — gom nhóm, tính hệ số trắc địa.
+3. **Lượt 2** — áp hệ số.
+4. *Chốt chặn 2* — gom `Ap Tkm` từ `DW`.
+5. **Lượt 3** `FuelCalculator` — chuỗi 11 bước BA→BQ + BR.
+
+### Danh mục dạng LƯỚI có PHIÊN BẢN theo thời gian
+
+Bốn lưới (`MO_HINH`, `DMNL`, `NANG_SUAT_XE`, `HSDML`) dùng chung một
+controller/service/màn hình, phân biệt bằng `code`.
+
+**Định mức KHÔNG phải hằng số** — nhân viên thống kê khai lại theo kỳ, tên
+sheet gốc nói thẳng điều đó (`DMNL T2-2025`). Mỗi lưới giữ NHIỀU phiên bản
+có khoảng hiệu lực; engine tra theo **ngày sản xuất của chuyến**, không lấy
+bản mới nhất. Nhờ vậy khai định mức tháng sau không làm đổi báo cáo tháng
+trước.
+
+- Tạo phiên bản mới mặc định **sao chép toàn bộ ô** (lưới có hàng nghìn ô,
+  bắt nhập lại từ đầu mỗi kỳ là không dùng được) và **đóng** phiên bản
+  nguồn ở ngày liền trước.
+- Xoá phiên bản thì **mở lại phiên bản liền trước** — phép nghịch, để
+  không thủng khoảng thời gian nào. Không cho xoá phiên bản cuối cùng.
+- Mọi thao tác sửa gửi kèm `versionId`: mở phiên bản tháng trước để đối
+  chiếu rồi lỡ sửa một ô thì phải ghi vào ĐÚNG phiên bản đó.
+
+⚠ **Bắt buộc chạy `backend/migration-2026-08-31-matrix-phien-ban.sql`** khi
+deploy — xem mục "Bẫy đã vấp".
+
+### Lỗi thật đã tìm ra trong code ĐÃ PHÁT HÀNH (đều đã sửa)
+
+Đối chiếu lại với Excel gốc, không phải suy đoán:
+
+1. **Khoá cột lưới Mô hình thiếu hậu tố khu vực.** Excel:
+   `DA5 = INDEX(DSXE,…) & IF(D5="CS",".CS",".KC")`. Code dùng `CAT777E`
+   trần. Sửa qua `ProductionKeys.vehicleFuelClassKey`.
+2. **Phân loại Đất/Than suy sai.** Excel:
+   `AD5 = IF(OR(LEFT(AG5,1)="S", LEFT(AG5,1)="D"), "DAT", "Than")` — lấy
+   CHỮ CÁI ĐẦU, không phải tiền tố `Dat_`/`Than_`.
+3. **Thiếu `Ký hiệu bùn` trong khoá ghép.** `BW5` là một thành phần khoá,
+   code truyền `null`. Đã verify đủ 6 nhánh.
+4. **`CatalogFormModal` kiểm trùng mã bỏ qua `uniqueCodeKey`** — sẽ từ
+   chối nhầm hai kỳ trong cùng một năm.
+5. **Màn thuộc tính thiết bị hiện nút xoá** — bấm vào là xoá cả cái XE.
+6. **Dòng tiêu đề nhóm 0 của báo cáo bị `sticky left-0`** — che hết các
+   tiêu đề nhóm khác khi cuộn ngang.
+
+### Ba cột CÒN VƯỚNG, chưa có quy tắc
+
+- `BO` (BSNL_Spnt_CN) — để 0, có ghi chú trong `FuelCalculator`.
+- `BX` (Thể trọng bùn).
+- `BY`/`BZ`/`CA`/`CB` (nhóm Tổng … trừ bùn).
+
+Hai bảng trung gian còn treo: `AP BBNT xe-SP` (chờ chủ dự án xác nhận *Tên
+nghiệm thu* do người nhập, khoá hệ tự sinh) và `DuKien HS theo -2%`
+(khuyến nghị GÁC — nó chỉ là nguồn cho lưới HSDML, mà ba nơi tiêu thụ
+`EE`/`EG`/`EI` chưa có tài liệu).
+
 ## Việc cần làm tiếp (ưu tiên theo thứ tự)
 
 0. **ĐÃ CÓ THIẾT KẾ → `docs/DESIGN_SANLUONG.md`** (2026-08-30). Mô hình dữ
@@ -305,14 +378,32 @@ nằm ở `D:\EcoTel\3. Dự án\TKV Công ty than Cao sơn\Phần mềm thống
   783 MB, treo quá 2 phút. Dùng script trong `docs/_source/tools/`.
 - **KHÔNG đoán công thức** khi tài liệu docx mơ hồ — tra Excel thật. Bản
   docx thiếu ngoặc/sai tên ở ~15 chỗ, đã đối chiếu xong 14/15.
+- **Hibernate `ddl-auto: update` KHÔNG BAO GIỜ XOÁ ràng buộc cũ.** Nó chỉ
+  tạo thêm. Đổi ràng buộc duy nhất `(code)` thành `(code, effective_from)`
+  của `matrix_definitions` mà không chạy migration thì ràng buộc cũ còn
+  nguyên và chặn mọi phiên bản thứ hai với lỗi `duplicate key … uk_matrix_
+  definition_code`. Xem `backend/migration-2026-08-31-matrix-phien-ban.sql`.
+- **`awk -v` DIỄN GIẢI escape trong giá trị truyền vào** — `\"` thành `"`,
+  `\n` thành xuống dòng thật. Chèn khối mã Java/TS bằng `awk -v blk=…` đã
+  làm hỏng chuỗi có dấu ngoặc thoát và build fail. Dùng công cụ Edit cho
+  khối có escape.
+- **Git Bash làm hỏng tiếng Việt trong `curl -d`** → lỗi "Invalid UTF-8"
+  500 là do bộ test, không phải do ứng dụng. Dùng dữ liệu ASCII, hoặc
+  `--data-binary @file` với file ghi bằng công cụ Write.
+- **Tên CSDL preview là `thong_ke`**, không phải `thongke_caoson`. Bảng kỳ
+  báo cáo là `report_periods`; cột khoá ngoại ở `production_results` là
+  `report_period_id`. Endpoint tính lại là
+  `POST /api/production/calculate?periodId=…`.
 
 ### Trạng thái Git
 
-Nhánh `claude-dev`. Lượt 3 **chỉ thêm/sửa TÀI LIỆU, không đụng code**:
-`Requirement.md`, `.factory/context.md`, và các file mới trong `docs/`
-(`DECISIONS.md`, `REQUIREMENT_WORKFLOW.md`, `REQUIREMENT_SANLUONG.md`,
-`REQUIREMENT_SANLUONG_EXCEL.md`, `_source/`). Chưa commit.
+Nhánh `claude-dev`. Lượt 4 đã commit theo từng phần (danh mục → gom nhóm →
+công thức → báo cáo → phiên bản định mức); commit cuối `dae0006`
+*"feat(danh-muc): dinh muc dang luoi co phien ban theo thoi gian"*. Tài
+liệu lượt 3 đã commit cùng.
 
+`.codex/` và `AGENTS.md` ở thư mục gốc **không phải của phiên này** — để
+nguyên chưa commit, đừng gom vào.
 ## Dữ liệu mẫu preview (2026-08-30)
 
 `backend/seed-data-khai-thac.sql` — bổ sung cho `seed-data.sql` (file cũ chỉ
