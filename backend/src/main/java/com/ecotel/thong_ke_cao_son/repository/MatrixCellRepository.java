@@ -15,6 +15,11 @@ public interface MatrixCellRepository extends JpaRepository<MatrixCell, Long> {
 
     List<MatrixCell> findByDefinitionId(Long definitionId);
 
+    /** Xoá toàn bộ ô của một phiên bản — dùng khi xoá cả phiên bản. */
+    @Modifying
+    @Query("DELETE FROM MatrixCell c WHERE c.definition.id = :definitionId")
+    int deleteByDefinitionId(@Param("definitionId") Long definitionId);
+
     Optional<MatrixCell> findByDefinitionIdAndRowKeyAndColKey(
             Long definitionId, String rowKey, String colKey);
 

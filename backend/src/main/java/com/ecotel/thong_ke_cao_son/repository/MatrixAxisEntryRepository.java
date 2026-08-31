@@ -15,6 +15,11 @@ public interface MatrixAxisEntryRepository extends JpaRepository<MatrixAxisEntry
 
     List<MatrixAxisEntry> findByDefinitionId(Long definitionId);
 
+    /** Xoá toàn bộ trục của một phiên bản — dùng khi xoá cả phiên bản. */
+    @Modifying
+    @Query("DELETE FROM MatrixAxisEntry e WHERE e.definition.id = :definitionId")
+    int deleteByDefinitionId(@Param("definitionId") Long definitionId);
+
     Optional<MatrixAxisEntry> findByDefinitionIdAndAxisAndKey(
             Long definitionId, MatrixAxisEntry.Axis axis, String key);
 

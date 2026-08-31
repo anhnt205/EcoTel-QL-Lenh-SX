@@ -9,6 +9,11 @@ export interface MatrixAxisEntry {
 }
 
 export interface MatrixGrid {
+  /** Id của PHIÊN BẢN đang xem — phải gửi kèm khi sửa. */
+  versionId: number;
+  effectiveFrom: string | null;
+  effectiveTo: string | null;
+  versionLabel: string | null;
   code: string;
   name: string;
   rowAxisLabel: string;
@@ -53,23 +58,41 @@ const unwrap = <T,>(res: { data?: { data?: T } }): T => res.data?.data as T;
 export const matrixService = {
   list: async (): Promise<MatrixGrid[]> => unwrap(await api.get(BASE)) ?? [],
 
-  getGrid: async (code: string): Promise<MatrixGrid> =>
-    unwrap(await api.get(`${BASE}/${code}`)),
+  /** Bỏ trống `versionId` thì lấy phiên bản mới nhất. */
+  getGrid: async (code: string, versionId?: number): Promise<MatrixGrid> =>
+    unwrap(await api.get(`${BASE}/${code}`, { params: versionId ? { versionId } : undefined })),
 
-  saveCells: async (code: string, cells: MatrixCellUpsert[]): Promise<number> => {
-    const res = await api.put(`${BASE}/${code}/cells`, cells);
+  versions: async (code: string): Promise<MatrixGrid[]> =>
+    unwrap(await api.get(`${BASE}/${code}/versions`)) ?? [],
+
+  createVersion: async (code: string, body: {
+    sourceId?: number; effectiveFrom: string; effectiveTo?: string | null;
+    versionLabel?: string; copyCells: boolean;
+  }): Promise<MatrixGrid> =>
+    unwrap(await api.post(`${BASE}/${code}/versions`, body)),
+
+  /** Xoá phiên bản; phiên bản cuối cùng của lưới thì máy chủ từ chối. */
+  deleteVersion: async (code: string, versionId: number): Promise<void> => {
+    await api.delete(`${BASE}/${code}/versions/${versionId}`);
+  },
+
+  // Mọi thao tác SỬA đều gửi kèm versionId: mở phiên bản tháng trước để đối
+  // chiếu rồi lỡ sửa một ô thì phải ghi vào ĐÚNG phiên bản đó, không phải
+  // phiên bản hiện hành.
+  saveCells: async (code: string, versionId: number, cells: MatrixCellUpsert[]): Promise<number> => {
+    const res = await api.put(`${BASE}/${code}/cells`, cells, { params: { versionId } });
     return unwrap<{ affected: number }>(res)?.affected ?? 0;
   },
 
-  addRows: async (code: string, rows: MatrixAxisEntryInput[]): Promise<MatrixGrid> =>
-    unwrap(await api.post(`${BASE}/${code}/rows`, rows)),
+  addRows: async (code: string, versionId: number, rows: MatrixAxisEntryInput[]): Promise<MatrixGrid> =>
+    unwrap(await api.post(`${BASE}/${code}/rows`, rows, { params: { versionId } })),
 
-  addCols: async (code: string, cols: MatrixAxisEntryInput[]): Promise<MatrixGrid> =>
-    unwrap(await api.post(`${BASE}/${code}/cols`, cols)),
+  addCols: async (code: string, versionId: number, cols: MatrixAxisEntryInput[]): Promise<MatrixGrid> =>
+    unwrap(await api.post(`${BASE}/${code}/cols`, cols, { params: { versionId } })),
 
-  removeRow: async (code: string, key: string): Promise<MatrixGrid> =>
-    unwrap(await api.delete(`${BASE}/${code}/rows`, { params: { key } })),
+  removeRow: async (code: string, versionId: number, key: string): Promise<MatrixGrid> =>
+    unwrap(await api.delete(`${BASE}/${code}/rows`, { params: { key, versionId } })),
 
-  removeCol: async (code: string, key: string): Promise<MatrixGrid> =>
-    unwrap(await api.delete(`${BASE}/${code}/cols`, { params: { key } })),
+  removeCol: async (code: string, versionId: number, key: string): Promise<MatrixGrid> =>
+    unwrap(await api.delete(`${BASE}/${code}/cols`, { params: { key, versionId } })),
 };

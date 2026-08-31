@@ -167,7 +167,8 @@ public class TripBaseCalculator {
         String areaCode = trip.getExcavationArea() != null
                 ? trip.getExcavationArea().getCode() : null;
         String columnKey = ProductionKeys.vehicleFuelClassKey(fuelClass.getCode(), areaCode);
-        return matrixService.requireCell(MATRIX_MO_HINH, cargoType.getCode(), columnKey);
+        return matrixService.requireCell(MATRIX_MO_HINH, cargoType.getCode(), columnKey,
+                productionDateOf(trip));
     }
 
     /** Z5 — hệ số mức tải: Roda = 2/3, đủ tải = 1, khác = phân số tự nhập. */

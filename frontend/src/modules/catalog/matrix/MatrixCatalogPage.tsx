@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils";
 import { downloadMatrixExcel, parseMatrixExcel } from "./matrixExcel";
 import { matrixService, type MatrixCellUpsert, type MatrixGrid } from "./matrixService";
 import { MatrixAxisAddModal } from "./MatrixAxisAddModal";
+import { MatrixVersionBar } from "./MatrixVersionBar";
 
 /** Ô đang sửa nhưng chưa lưu: rowKey -> colKey -> văn bản trong ô nhập. */
 type DirtyMap = Record<string, Record<string, string>>;
@@ -38,11 +39,13 @@ export function MatrixCatalogPage({
   const queryClient = useQueryClient();
   const [dirty, setDirty] = useState<DirtyMap>({});
   const [addAxis, setAddAxis] = useState<"ROW" | "COL" | null>(null);
+  /** null = phiên bản mới nhất; số = xem đúng phiên bản đó. */
+  const [versionId, setVersionId] = useState<number | null>(null);
   const importRef = useRef<HTMLInputElement>(null);
 
-  const { data: grid, isLoading } = useQuery({
-    queryKey: ["matrix", code],
-    queryFn: () => matrixService.getGrid(code),
+  const { data: grid, isLoading, refetch } = useQuery({
+    queryKey: ["matrix", code, versionId],
+    queryFn: () => matrixService.getGrid(code, versionId ?? undefined),
   });
 
   const dirtyCount = useMemo(
@@ -91,7 +94,7 @@ export function MatrixCatalogPage({
           `Có ${bad.length} ô không phải số:\n${bad.slice(0, 5).join("\n")}`,
         );
       }
-      return matrixService.saveCells(g.code, payload);
+      return matrixService.saveCells(g.code, g.versionId, payload);
     },
     onSuccess: (affected) => {
       setDirty({});
@@ -109,8 +112,8 @@ export function MatrixCatalogPage({
     if (!window.confirm(`Xoá ${what} "${label}" và toàn bộ giá trị của nó?`)) return;
     try {
       await (axis === "ROW"
-        ? matrixService.removeRow(code, key)
-        : matrixService.removeCol(code, key));
+        ? matrixService.removeRow(code, grid!.versionId, key)
+        : matrixService.removeCol(code, grid!.versionId, key));
       queryClient.invalidateQueries({ queryKey: ["matrix", code] });
       toast.success(`Đã xoá ${what} "${label}".`);
     } catch (e: unknown) {
@@ -132,7 +135,7 @@ export function MatrixCatalogPage({
         );
         if (cells.length === 0) return;
       }
-      const affected = await matrixService.saveCells(code, cells);
+      const affected = await matrixService.saveCells(code, grid.versionId, cells);
       queryClient.invalidateQueries({ queryKey: ["matrix", code] });
       setDirty({});
       toast.success(`Đã nhập ${affected} ô.`);
@@ -222,6 +225,20 @@ export function MatrixCatalogPage({
           </Button>
         </div>
       </div>
+
+      <MatrixVersionBar
+        grid={grid}
+        onChangeVersion={(id) => { setVersionId(id); setDirty({}); }}
+        onCreated={(id) => { setVersionId(id); setDirty({}); }}
+        onDeleted={() => {
+          // Về phiên bản mới nhất. Nếu đang ở sẵn đó (versionId null) thì đổi
+          // state không kích hoạt tải lại, nên gọi refetch tường minh —
+          // không thì màn hình còn hiển thị phiên bản vừa xoá.
+          setVersionId(null);
+          setDirty({});
+          refetch();
+        }}
+      />
 
       {grid.note && (
         <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-200">

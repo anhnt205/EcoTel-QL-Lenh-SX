@@ -7,6 +7,7 @@ import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 /**
@@ -33,7 +34,11 @@ import java.time.LocalDateTime;
 @Entity
 @Table(
         name = "matrix_definitions",
-        uniqueConstraints = @UniqueConstraint(name = "uk_matrix_definition_code", columnNames = "code")
+        // Một mã có NHIỀU phiên bản theo thời gian, nên khoá duy nhất là
+        // (mã, ngày bắt đầu) chứ không phải riêng mã.
+        uniqueConstraints = @UniqueConstraint(
+                name = "uk_matrix_definition_code_from",
+                columnNames = {"code", "effective_from"})
 )
 @Getter
 @Setter
@@ -47,10 +52,37 @@ public class MatrixDefinition {
     @SequenceGenerator(name = "matrix_definition_seq", sequenceName = "matrix_definition_seq", allocationSize = 50)
     private Long id;
 
-    /** Mã lưới, dùng làm đường dẫn API. Vd {@code MO_HINH}. */
+    /**
+     * Mã lưới, dùng làm đường dẫn API. Vd {@code MO_HINH}.
+     *
+     * <p><b>KHÔNG duy nhất</b>: mỗi mã có nhiều phiên bản theo thời gian.
+     */
     @NotBlank
     @Column(name = "code", nullable = false)
     private String code;
+
+    /**
+     * Khoảng hiệu lực của PHIÊN BẢN này.
+     *
+     * <p>Định mức là thứ nhân viên thống kê khai lại theo thời gian — bảng
+     * tính gốc thể hiện điều đó ngay ở tên sheet ({@code DMNL T2-2025}). Nếu
+     * chỉ có một bộ giá trị thì mỗi lần khai kỳ mới sẽ ĐÈ MẤT số của kỳ cũ,
+     * và chạy lại báo cáo tháng trước sẽ ra con số khác — trái nguyên tắc
+     * "tra theo ngày sản xuất" của QĐ-04.
+     *
+     * <p>Để trống nghĩa là không giới hạn: {@code effectiveFrom} trống là
+     * "từ đầu", {@code effectiveTo} trống là "còn hiệu lực". Nhờ vậy các
+     * phiên bản đã tạo trước khi có tính năng này vẫn chạy nguyên vẹn.
+     */
+    @Column(name = "effective_from")
+    private LocalDate effectiveFrom;
+
+    @Column(name = "effective_to")
+    private LocalDate effectiveTo;
+
+    /** Nhãn ngắn của phiên bản, vd "T2-2025". Để trống thì hiện theo ngày. */
+    @Column(name = "version_label")
+    private String versionLabel;
 
     @NotBlank
     @Column(name = "name", nullable = false)

@@ -146,7 +146,9 @@ public class ProductionCalculationService {
         // ── Nhánh nhiên liệu: nạp ba lưới MỘT LẦN cho cả kỳ ─────────────────
         // Nạp trong vòng lặp thì mỗi chuyến một lần đọc cả lưới — kỳ vài nghìn
         // chuyến sẽ đọc lại cùng dữ liệu vài nghìn lần.
-        Map<String, MatrixGridResponse> grids = loadFuelGrids(warnings);
+        // Kỳ nằm gọn trong một tháng (QĐ-05) và định mức đổi theo tháng, nên
+        // một kỳ chỉ ứng với một phiên bản — nạp theo ngày đầu kỳ là đủ.
+        Map<String, MatrixGridResponse> grids = loadFuelGrids(period.getFromDate(), warnings);
 
         // ── LƯỢT 3 + lưu kết quả ────────────────────────────────────────────
         List<ProductionResult> results = new ArrayList<>();
@@ -177,11 +179,13 @@ public class ProductionCalculationService {
      * tính được mà không cần nhiên liệu, nên chặn cả kỳ vì thiếu một lưới phụ
      * là làm hỏng luôn phần vốn chạy đúng.
      */
-    private Map<String, MatrixGridResponse> loadFuelGrids(List<String> warnings) {
+    private Map<String, MatrixGridResponse> loadFuelGrids(java.time.LocalDate date, List<String> warnings) {
         Map<String, MatrixGridResponse> grids = new LinkedHashMap<>();
         for (String code : List.of("DMNL", "NANG_SUAT_XE", "HS_DIEU_CHINH_NLDM")) {
             try {
-                grids.put(code, matrixService.getGrid(code));
+                // Tra theo NGÀY SẢN XUẤT, không phải phiên bản mới nhất: định
+                // mức đổi theo tháng, chạy lại báo cáo cũ phải ra số cũ.
+                grids.put(code, matrixService.getGridAt(code, date));
             } catch (RuntimeException e) {
                 warnings.add("Chưa dùng được lưới " + code + " — nhánh nhiên liệu bỏ trống.");
             }

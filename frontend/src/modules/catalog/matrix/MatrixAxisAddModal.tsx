@@ -94,8 +94,8 @@ export function MatrixAxisAddModal({
     setSubmitting(true);
     try {
       await (isRow
-        ? matrixService.addRows(grid.code, entries)
-        : matrixService.addCols(grid.code, entries));
+        ? matrixService.addRows(grid.code, grid.versionId, entries)
+        : matrixService.addCols(grid.code, grid.versionId, entries));
       toast.success(`Đã thêm ${entries.length} ${isRow ? "dòng" : "cột"}.`);
       onSaved();
     } catch (e: unknown) {

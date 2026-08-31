@@ -21,6 +21,12 @@ import java.util.Map;
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class MatrixGridResponse {
 
+    /** Id của PHIÊN BẢN đang xem — cần khi sửa để không ghi nhầm phiên bản. */
+    Long versionId;
+    java.time.LocalDate effectiveFrom;
+    java.time.LocalDate effectiveTo;
+    String versionLabel;
+
     String code;
     String name;
     String rowAxisLabel;
