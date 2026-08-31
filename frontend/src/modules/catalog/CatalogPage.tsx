@@ -28,7 +28,14 @@ type Rec = Record<string, unknown> & { id?: number };
  * sửa/xoá), nên gom về một trang cấu hình bằng `CatalogConfig` thay vì chép
  * 5 lần — sửa một chỗ là cả 5 màn cùng đổi.
  */
-export function CatalogPage({ config }: { config: CatalogConfig }) {
+export function CatalogPage({
+  config,
+  extraActions,
+}: {
+  config: CatalogConfig;
+  /** Nút phụ cạnh "Thêm mới" — vd bộ dựng khoá của màn STD. */
+  extraActions?: React.ReactNode;
+}) {
   const service = useMemo(
     () => createCatalogService<Rec>(config.basePath),
     [config.basePath],
@@ -41,13 +48,16 @@ export function CatalogPage({ config }: { config: CatalogConfig }) {
   const [editing, setEditing] = useState<Rec | null>(null);
 
   const { data, isLoading, refetch } = useQuery({
-    queryKey: [config.basePath, page, pageSize, searchValue],
+    queryKey: [config.basePath, page, pageSize, searchValue, config.fixedValues],
     queryFn: () =>
       service.getAll({
         page,
         size: pageSize,
         sort: "id,DESC",
         keyword: searchValue,
+        // Màn dùng chung một bảng backend thì phải lọc, nếu không sẽ thấy
+        // cả dữ liệu của màn kia.
+        ...(config.fixedValues ?? {}),
       }),
     placeholderData: keepPreviousData,
   });
@@ -236,6 +246,8 @@ export function CatalogPage({ config }: { config: CatalogConfig }) {
         <h1 className="text-xl font-bold text-blue-700 dark:text-blue-400">
           {config.title}
         </h1>
+        <div className="flex items-center gap-2">
+        {extraActions}
         <Button
           onClick={() => {
             setEditing(null);
@@ -246,6 +258,7 @@ export function CatalogPage({ config }: { config: CatalogConfig }) {
           <Plus className="h-4 w-4" />
           Thêm mới
         </Button>
+        </div>
       </div>
 
       <div className="min-h-0 flex-1">

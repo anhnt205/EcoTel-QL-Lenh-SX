@@ -49,5 +49,7 @@ export const ROUTES = {
     NANG_SUAT_XE: '/danh-muc/nang-suat-xe',
     HS_DIEU_CHINH_NLDM: '/danh-muc/hs-dieu-chinh-nldm',
     TY_TRONG: '/danh-muc/ty-trong',
+    STD_DAT_CN: '/danh-muc/std-dat-cn',
+    STD_DAT_SX: '/danh-muc/std-dat-sx-than-sx',
   },
 } as const;

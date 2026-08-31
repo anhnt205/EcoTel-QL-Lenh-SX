@@ -52,6 +52,15 @@ export interface CatalogConfig {
    */
   uniqueCodeKey?: string | null;
   /**
+   * Giá trị CỐ ĐỊNH của màn này: vừa dùng làm bộ lọc khi tải danh sách, vừa
+   * được ghép vào payload khi lưu.
+   *
+   * Dùng khi một bảng backend phục vụ nhiều màn. Vd hai màn STD dùng chung
+   * bảng `survey_standards`, phân biệt bằng `catalogType`; người dùng không
+   * phải chọn lại giá trị đó ở mỗi dòng, và cũng không thể chọn nhầm.
+   */
+  fixedValues?: Record<string, unknown>;
+  /**
    * Trường hiển thị trong câu hỏi xác nhận xoá. Mặc định là trường thứ hai.
    */
   labelKey?: string;

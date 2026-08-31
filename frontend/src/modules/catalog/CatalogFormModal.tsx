@@ -142,7 +142,9 @@ export function CatalogFormModal({
         out[f.key] = raw;
       }
     });
-    return out;
+    // Giá trị cố định của màn ghi ĐÈ: người dùng không chọn được chúng, nên
+    // không có lý do gì để giá trị trong biểu mẫu thắng.
+    return { ...out, ...(config.fixedValues ?? {}) };
   };
 
   const validate = (): string | null => {

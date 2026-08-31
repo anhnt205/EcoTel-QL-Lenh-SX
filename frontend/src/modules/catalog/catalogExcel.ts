@@ -243,7 +243,7 @@ export async function parseCatalogExcel(
       }
     }
 
-    if (!rowHasError) payloads.push(payload);
+    if (!rowHasError) payloads.push({ ...payload, ...(config.fixedValues ?? {}) });
   });
 
   if (raw.length === 0) {

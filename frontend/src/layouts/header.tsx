@@ -353,6 +353,24 @@ export function Header() {
                   Tỷ trọng
                 </NavLink>
               </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <NavLink
+                  to={ROUTES.DANH_MUC.STD_DAT_CN}
+                  className="flex items-center gap-2 px-2.5 py-2 text-sm rounded hover:bg-blue-50 cursor-pointer"
+                >
+                  <Clock className="h-4 w-4 text-blue-600" />
+                  STD (Đất CN)
+                </NavLink>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <NavLink
+                  to={ROUTES.DANH_MUC.STD_DAT_SX}
+                  className="flex items-center gap-2 px-2.5 py-2 text-sm rounded hover:bg-blue-50 cursor-pointer"
+                >
+                  <Clock className="h-4 w-4 text-blue-600" />
+                  STD (Đất SX/Than SX)
+                </NavLink>
+              </DropdownMenuItem>
 
               {/* Loại hàng */}
               <DropdownMenuItem asChild>

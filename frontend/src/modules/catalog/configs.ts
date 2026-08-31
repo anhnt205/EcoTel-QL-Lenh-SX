@@ -1,4 +1,4 @@
-import type { CatalogConfig } from "./types";
+import type { CatalogConfig, CatalogField } from "./types";
 
 /** Ba trường dùng chung của các danh mục địa điểm. */
 const placeFields = (label: string) => [
@@ -214,6 +214,70 @@ export const densityParameterConfig: CatalogConfig = {
     { key: "effectiveTo", label: "Đến ngày", required: true, type: "date", width: "min-w-[150px]" },
     { key: "densityWet", label: "Tỷ trọng (quy ẩm)", required: true, type: "number", width: "min-w-[150px]" },
     { key: "densityDry", label: "Tỷ trọng (không quy ẩm)", required: true, type: "number", width: "min-w-[170px]" },
+    { key: "note", label: "Ghi chú", type: "text", width: "min-w-[160px]" },
+  ],
+};
+
+// ── Hai màn STD (số liệu Trắc địa) ─────────────────────────────────────────
+// Dùng chung bảng `survey_standards`, phân biệt bằng `catalogType` qua
+// `fixedValues` — người dùng không phải chọn, và không thể chọn nhầm.
+
+/** Các cột của khối ĐẤT, dùng chung cho cả hai màn (chỉ khác nhãn). */
+const earthFields = (label: string): CatalogField[] => [
+  { key: "earthAcceptanceProduct", label: `${label} (SPNT)`, type: "text", width: "min-w-[150px]" },
+  { key: "earthM3", label: `${label} (m3)`, type: "number", width: "min-w-[130px]" },
+  { key: "earthDesignVolume", label: "V Tke", type: "number", width: "min-w-[110px]" },
+  { key: "earthDeviation", label: "Clech (đất)", type: "number", width: "min-w-[120px]" },
+  { key: "earthTon", label: `${label} (tấn)`, type: "number", width: "min-w-[130px]" },
+  { key: "earthHaulDistance", label: "CD đất", type: "number", width: "min-w-[110px]" },
+  { key: "earthBulkDensity", label: "Thể trọng đất (TĐ)", type: "number", width: "min-w-[160px]" },
+  { key: "earthTkm", label: `${label} (tkm)`, type: "number", width: "min-w-[130px]" },
+];
+
+const stdCommonFields: CatalogField[] = [
+  { key: "seamGroupExcavatorKey", label: "Nhóm vỉa + Máy xúc", required: true, type: "text", width: "min-w-[240px]" },
+  { key: "effectiveFrom", label: "Từ ngày", required: true, type: "date", width: "min-w-[150px]" },
+  { key: "effectiveTo", label: "Đến ngày", required: true, type: "date", width: "min-w-[150px]" },
+];
+
+export const surveyStandardDatCnConfig: CatalogConfig = {
+  basePath: "/survey-standards",
+  title: "STD (Đất CN)",
+  nounPhrase: "dòng STD (Đất CN)",
+  breadcrumb: ["Danh mục", "Thống kê sản lượng"],
+  searchPlaceholder: "Tìm theo khoá Nhóm vỉa + Máy xúc",
+  uniqueCodeKey: null,
+  labelKey: "seamGroupExcavatorKey",
+  fixedValues: { catalogType: "DAT_CN" },
+  fields: [
+    ...stdCommonFields,
+    ...earthFields("Đất CN"),
+    { key: "note", label: "Ghi chú", type: "text", width: "min-w-[160px]" },
+  ],
+};
+
+export const surveyStandardDatSxConfig: CatalogConfig = {
+  basePath: "/survey-standards",
+  title: "STD (Đất SX/Than SX)",
+  nounPhrase: "dòng STD (Đất SX/Than SX)",
+  breadcrumb: ["Danh mục", "Thống kê sản lượng"],
+  searchPlaceholder: "Tìm theo khoá Nhóm vỉa + Máy xúc",
+  uniqueCodeKey: null,
+  labelKey: "seamGroupExcavatorKey",
+  fixedValues: { catalogType: "DAT_SX_THAN_SX" },
+  fields: [
+    ...stdCommonFields,
+    ...earthFields("Đất SX"),
+    // Khối THAN — chỉ màn này có. Thứ tự cột giữ đúng như đặc tả docx dòng
+    // 228–235 để đối chiếu với bảng gốc cho nhanh.
+    { key: "coalAcceptanceProduct", label: "Than SX (SPNT)", type: "text", width: "min-w-[150px]" },
+    { key: "coalM3", label: "Than SX (m3)", type: "number", width: "min-w-[130px]" },
+    { key: "coalBulkDensity", label: "Thể trọng than (TĐ)", type: "number", width: "min-w-[170px]" },
+    { key: "coalTon", label: "Than SX (tấn)", type: "number", width: "min-w-[130px]" },
+    { key: "coalDesignVolume", label: "Q Tke", type: "number", width: "min-w-[110px]" },
+    { key: "coalDeviation", label: "Clech (than)", type: "number", width: "min-w-[130px]" },
+    { key: "coalHaulDistance", label: "CD than", type: "number", width: "min-w-[110px]" },
+    { key: "coalTkm", label: "Than SX (Tkm)", type: "number", width: "min-w-[140px]" },
     { key: "note", label: "Ghi chú", type: "text", width: "min-w-[160px]" },
   ],
 };
