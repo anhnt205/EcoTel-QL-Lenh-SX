@@ -39,5 +39,10 @@ export const ROUTES = {
     NHOM_CHUNG_LOAI_HANG: '/danh-muc/nhom-chung-loai-hang',
     SAN_PHAM_NGHIEM_THU: '/danh-muc/san-pham-nghiem-thu',
     TTL_CLH: '/danh-muc/ttl-clh',
+    NHOM_VIA: '/danh-muc/nhom-via',
+    CHUNG_LOAI_XE_DMNL: '/danh-muc/chung-loai-xe-dmnl',
+    CHUNG_LOAI_XE_PHAN_LOAI: '/danh-muc/chung-loai-xe-phan-loai',
+    HE_SO: '/danh-muc/he-so',
+    KY_BAO_CAO: '/danh-muc/ky-bao-cao',
   },
 } as const;

@@ -135,7 +135,6 @@ Xếp theo **thứ tự phụ thuộc**, đúng yêu cầu "tuần tự từ dan
 | Lớp | Danh mục | Khoá | Kiểu giao diện |
 |---|---|---|---|
 | **1** | Nhóm vỉa | mã, tên | bảng phẳng ✅ dùng lại `CatalogPage` |
-| **1** | Nhóm tầng | giá trị số | bảng phẳng |
 | **1** | Chủng loại xe + DMNL | mã, tên | bảng phẳng |
 | **1** | Chủng loại xe + Phân loại | mã, tên | bảng phẳng |
 | **1** | Hệ số (Than tke trừ đá / Than kcs…) | mã hệ số | bảng phẳng |
@@ -146,6 +145,16 @@ Xếp theo **thứ tự phụ thuộc**, đúng yêu cầu "tuần tự từ dan
 | **2** | Năng suất xe (996) | (CLxe+Phân loại) × cung độ | **lưới 2 chiều** |
 | **2** | HS điều chỉnh NLĐM | CLxe_Hạng_Phân loại × khu vực | **lưới 2 chiều** |
 | **3** | STD (Đất SX/Than SX), STD (Đất CN) | Nhóm vỉa+Máy xúc × thời gian | phiếu-đầu + dòng |
+
+**Hai thứ đã LOẠI khỏi danh sách sau khi tra lại docx** (2026-08-31):
+
+| Bị loại | Lý do |
+|---|---|
+| Nhóm tầng | **Không phải danh mục** — là cột TÍNH: `TRUNC(tầng/15)*15` (docx dòng 293–300). Dựng thành danh mục là sai bản chất. |
+| Số thẻ lương | Docx dòng 62 có ghi `(danh mục)`, nhưng **đã tồn tại** trong hệ dưới dạng `User.salaryCode` (`userRepository.findBySalaryCode`). Dựng thêm sẽ tạo bảng trùng. |
+
+Đây là kết quả của việc đối chiếu 21 dòng có chữ `(danh mục)` trong docx với
+code hiện có, thay vì tin danh sách tự liệt kê ở lượt rà soát trước.
 
 **Nhận xét quan trọng:** 4 danh mục ở lớp 2 đều là **lưới hai chiều**. Đây
 là kiểu giao diện thứ ba (sau bảng phẳng và phiếu-đầu+dòng) — cần một

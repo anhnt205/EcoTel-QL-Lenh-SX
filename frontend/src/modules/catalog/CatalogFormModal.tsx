@@ -125,8 +125,15 @@ export function CatalogFormModal({
     const out: Record<string, unknown> = {};
     config.fields.forEach((f) => {
       const raw = (row[f.key] ?? "").trim();
-      // Trường select tham chiếu danh mục khác gửi lên dạng SỐ (id)
-      out[f.key] = f.optionsPath ? (raw === "" ? null : Number(raw)) : raw;
+      if (f.optionsPath) {
+        // Trường select tham chiếu danh mục khác gửi lên dạng SỐ (id)
+        out[f.key] = raw === "" ? null : Number(raw);
+      } else if (f.type === "number") {
+        // Gửi số thật: backend nhận BigDecimal/Integer, chuỗi "1,5" sẽ hỏng.
+        out[f.key] = raw === "" ? null : Number(raw.replace(",", "."));
+      } else {
+        out[f.key] = raw;
+      }
     });
     return out;
   };
@@ -199,6 +206,10 @@ export function CatalogFormModal({
     }
     return (
       <Input
+        type={f.type === "number" ? "number" : f.type === "date" ? "date" : "text"}
+        // Cho phép số thập phân (tỷ trọng, hệ số); mặc định của input số là
+        // bước nhảy 1 nên không gõ được 2,25.
+        step={f.type === "number" ? "any" : undefined}
         value={row[f.key] ?? ""}
         onChange={(e) => setCell(idx, f.key, e.target.value)}
         placeholder={f.placeholder}

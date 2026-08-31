@@ -106,3 +106,79 @@ export const ttlClhConfig: CatalogConfig = {
     { key: "note", label: "Ghi chú", type: "text", width: "min-w-[200px]" },
   ],
 };
+
+// ── Lớp 1 của B1: các danh mục phẳng phục vụ khoá ghép và công thức ────────
+// Xem docs/RA_SOAT_CHUAN_HOA_DANH_MUC.md mục 3.3.
+
+export const seamGroupConfig: CatalogConfig = {
+  basePath: "/seam-groups",
+  title: "Nhóm vỉa",
+  nounPhrase: "nhóm vỉa",
+  breadcrumb: ["Danh mục", "Thống kê sản lượng"],
+  searchPlaceholder: "Tìm kiếm theo mã nhóm vỉa, tên nhóm vỉa",
+  fields: [
+    { key: "code", label: "Mã nhóm vỉa", required: true, type: "text", width: "min-w-[170px]" },
+    { key: "name", label: "Nhóm vỉa", required: true, type: "text", width: "min-w-[170px]" },
+    { key: "note", label: "Ghi chú", type: "text", width: "min-w-[200px]" },
+  ],
+};
+
+export const vehicleFuelClassConfig: CatalogConfig = {
+  basePath: "/vehicle-fuel-classes",
+  title: "Chủng loại xe + DMNL",
+  nounPhrase: "chủng loại xe + DMNL",
+  breadcrumb: ["Danh mục", "Thống kê sản lượng"],
+  searchPlaceholder: "Tìm kiếm theo mã, tên chủng loại xe + DMNL",
+  fields: [
+    { key: "code", label: "Mã chủng loại xe + DMNL", required: true, type: "text", width: "min-w-[200px]" },
+    { key: "name", label: "Chủng loại xe + DMNL", required: true, type: "text", width: "min-w-[190px]" },
+    { key: "note", label: "Ghi chú", type: "text", width: "min-w-[200px]" },
+  ],
+};
+
+export const vehicleCategoryClassConfig: CatalogConfig = {
+  basePath: "/vehicle-category-classes",
+  title: "Chủng loại xe + Phân loại",
+  nounPhrase: "chủng loại xe + phân loại",
+  breadcrumb: ["Danh mục", "Thống kê sản lượng"],
+  searchPlaceholder: "Tìm kiếm theo mã, tên chủng loại xe + phân loại",
+  fields: [
+    { key: "code", label: "Mã chủng loại xe + phân loại", required: true, type: "text", width: "min-w-[210px]" },
+    { key: "name", label: "Chủng loại xe + phân loại", required: true, type: "text", width: "min-w-[200px]" },
+    { key: "note", label: "Ghi chú", type: "text", width: "min-w-[200px]" },
+  ],
+};
+
+export const coefficientConfig: CatalogConfig = {
+  basePath: "/coefficients",
+  title: "Hệ số",
+  nounPhrase: "hệ số",
+  breadcrumb: ["Danh mục", "Thống kê sản lượng"],
+  searchPlaceholder: "Tìm kiếm theo mã hệ số, tên hệ số",
+  fields: [
+    { key: "code", label: "Mã hệ số", required: true, type: "text", width: "min-w-[150px]" },
+    { key: "name", label: "Tên hệ số", required: true, type: "text", width: "min-w-[200px]" },
+    { key: "value", label: "Giá trị", required: true, type: "number", width: "min-w-[120px]" },
+    { key: "note", label: "Ghi chú", type: "text", width: "min-w-[200px]" },
+  ],
+};
+
+export const reportPeriodConfig: CatalogConfig = {
+  basePath: "/report-periods",
+  title: "Kỳ báo cáo",
+  nounPhrase: "kỳ báo cáo",
+  breadcrumb: ["Danh mục", "Thống kê sản lượng"],
+  searchPlaceholder: "Tìm kiếm theo tên kỳ, năm",
+  // Không có cột mã: trường đầu là "Năm", nhiều kỳ cùng năm là bình thường.
+  uniqueCodeKey: null,
+  labelKey: "displayName",
+  fields: [
+    { key: "year", label: "Năm", required: true, type: "number", width: "min-w-[100px]" },
+    { key: "month", label: "Tháng", required: true, type: "number", width: "min-w-[100px]" },
+    { key: "periodIndex", label: "Số kỳ", required: true, type: "number", width: "min-w-[100px]" },
+    { key: "fromDate", label: "Từ ngày", required: true, type: "date", width: "min-w-[150px]" },
+    { key: "toDate", label: "Đến ngày", required: true, type: "date", width: "min-w-[150px]" },
+    { key: "displayName", label: "Tên hiển thị", type: "text", width: "min-w-[200px]" },
+    { key: "note", label: "Ghi chú", type: "text", width: "min-w-[180px]" },
+  ],
+};

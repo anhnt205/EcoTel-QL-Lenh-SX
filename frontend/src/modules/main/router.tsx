@@ -47,6 +47,11 @@ const CargoTypesCatalogPage = lazy(() => import("@/modules/catalog/pages/CargoTy
 const CargoGroupsCatalogPage = lazy(() => import("@/modules/catalog/pages/CargoGroupsCatalog"));
 const AcceptanceProductsPage = lazy(() => import("@/modules/catalog/pages/AcceptanceProducts"));
 const TtlClhItemsPage = lazy(() => import("@/modules/catalog/pages/TtlClhItems"));
+const SeamGroupsPage = lazy(() => import("@/modules/catalog/pages/SeamGroups"));
+const VehicleFuelClassesPage = lazy(() => import("@/modules/catalog/pages/VehicleFuelClasses"));
+const VehicleCategoryClassesPage = lazy(() => import("@/modules/catalog/pages/VehicleCategoryClasses"));
+const CoefficientsPage = lazy(() => import("@/modules/catalog/pages/Coefficients"));
+const ReportPeriodsPage = lazy(() => import("@/modules/catalog/pages/ReportPeriods"));
 
 const PageLoader = () => (
   <div className="flex h-screen w-full items-center justify-center bg-background/50 backdrop-blur-xs">
@@ -236,6 +241,46 @@ export const mainRoutes = (
         element={
           <Suspense fallback={<PageLoader />}>
             <TtlClhItemsPage />
+          </Suspense>
+        }
+      />
+      <Route
+        path={ROUTES.DANH_MUC.NHOM_VIA}
+        element={
+          <Suspense fallback={<PageLoader />}>
+            <SeamGroupsPage />
+          </Suspense>
+        }
+      />
+      <Route
+        path={ROUTES.DANH_MUC.CHUNG_LOAI_XE_DMNL}
+        element={
+          <Suspense fallback={<PageLoader />}>
+            <VehicleFuelClassesPage />
+          </Suspense>
+        }
+      />
+      <Route
+        path={ROUTES.DANH_MUC.CHUNG_LOAI_XE_PHAN_LOAI}
+        element={
+          <Suspense fallback={<PageLoader />}>
+            <VehicleCategoryClassesPage />
+          </Suspense>
+        }
+      />
+      <Route
+        path={ROUTES.DANH_MUC.HE_SO}
+        element={
+          <Suspense fallback={<PageLoader />}>
+            <CoefficientsPage />
+          </Suspense>
+        }
+      />
+      <Route
+        path={ROUTES.DANH_MUC.KY_BAO_CAO}
+        element={
+          <Suspense fallback={<PageLoader />}>
+            <ReportPeriodsPage />
           </Suspense>
         }
       />

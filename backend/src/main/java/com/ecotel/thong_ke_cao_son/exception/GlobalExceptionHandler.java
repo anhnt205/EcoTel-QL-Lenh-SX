@@ -6,6 +6,7 @@ import jakarta.validation.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -91,6 +92,22 @@ public class GlobalExceptionHandler {
         log.error("Data integrity violation", ex);
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(ApiResponse.error(409, "Data integrity violation, please check your input"));
+    }
+
+    /**
+     * Thân request không đọc được (JSON sai cú pháp, sai bảng mã, sai kiểu).
+     *
+     * <p>Đây là lỗi của phía GỬI, phải trả 400. Trước đây nó rơi xuống
+     * {@link #handleGeneral} thành 500 "Internal server error" — vừa đổ oan
+     * cho máy chủ, vừa giấu mất nguyên nhân thật khiến người gọi không biết
+     * đường sửa.
+     */
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ApiResponse<Void>> handleUnreadableBody(HttpMessageNotReadableException ex) {
+        log.warn("Không đọc được thân request: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.error(400,
+                        "Dữ liệu gửi lên không đọc được (JSON sai định dạng hoặc sai bảng mã UTF-8)."));
     }
 
     @ExceptionHandler(Exception.class)

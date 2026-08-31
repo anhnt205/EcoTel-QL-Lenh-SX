@@ -260,6 +260,51 @@ export function Header() {
                   TTL CLH
                 </NavLink>
               </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <NavLink
+                  to={ROUTES.DANH_MUC.NHOM_VIA}
+                  className="flex items-center gap-2 px-2.5 py-2 text-sm rounded hover:bg-blue-50 cursor-pointer"
+                >
+                  <Layers className="h-4 w-4 text-blue-600" />
+                  Nhóm vỉa
+                </NavLink>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <NavLink
+                  to={ROUTES.DANH_MUC.CHUNG_LOAI_XE_DMNL}
+                  className="flex items-center gap-2 px-2.5 py-2 text-sm rounded hover:bg-blue-50 cursor-pointer"
+                >
+                  <Layers className="h-4 w-4 text-blue-600" />
+                  Chủng loại xe + DMNL
+                </NavLink>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <NavLink
+                  to={ROUTES.DANH_MUC.CHUNG_LOAI_XE_PHAN_LOAI}
+                  className="flex items-center gap-2 px-2.5 py-2 text-sm rounded hover:bg-blue-50 cursor-pointer"
+                >
+                  <Layers className="h-4 w-4 text-blue-600" />
+                  Chủng loại xe + Phân loại
+                </NavLink>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <NavLink
+                  to={ROUTES.DANH_MUC.HE_SO}
+                  className="flex items-center gap-2 px-2.5 py-2 text-sm rounded hover:bg-blue-50 cursor-pointer"
+                >
+                  <Layers className="h-4 w-4 text-blue-600" />
+                  Hệ số
+                </NavLink>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <NavLink
+                  to={ROUTES.DANH_MUC.KY_BAO_CAO}
+                  className="flex items-center gap-2 px-2.5 py-2 text-sm rounded hover:bg-blue-50 cursor-pointer"
+                >
+                  <Layers className="h-4 w-4 text-blue-600" />
+                  Kỳ báo cáo
+                </NavLink>
+              </DropdownMenuItem>
 
               {/* Loại hàng */}
               <DropdownMenuItem asChild>

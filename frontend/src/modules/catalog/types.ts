@@ -6,10 +6,12 @@ export interface CatalogField {
   required?: boolean;
   /**
    * `text`   — ô nhập chữ
+   * `number` — ô nhập số; payload gửi lên dạng SỐ, không phải chuỗi
+   * `date`   — ô chọn ngày, payload dạng ISO yyyy-MM-dd
    * `select` — combobox; nguồn lấy từ `optionsFrom` (endpoint phụ trả
-   *            mảng chuỗi) hoặc `optionsService` (danh mục khác, dùng id)
+   *            mảng chuỗi) hoặc `optionsPath` (danh mục khác, dùng id)
    */
-  type: "text" | "select";
+  type: "text" | "number" | "date" | "select";
   /** Với select: hậu tố endpoint trả mảng chuỗi, vd "seam-groups". */
   optionsFrom?: string;
   /** Với select tham chiếu danh mục khác: đường dẫn API, vd "/cargo-groups". */
@@ -32,4 +34,16 @@ export interface CatalogConfig {
   /** Gợi ý cho ô tìm kiếm. */
   searchPlaceholder: string;
   fields: CatalogField[];
+  /**
+   * Trường đóng vai trò MÃ duy nhất, dùng để chặn trùng khi nhập Excel.
+   *
+   * Mặc định là trường đầu tiên — đúng với hầu hết danh mục. Đặt `null` cho
+   * danh mục không có mã (vd Kỳ báo cáo: trường đầu là "Năm", nhiều kỳ cùng
+   * năm là chuyện bình thường, coi nó là mã sẽ báo trùng oan).
+   */
+  uniqueCodeKey?: string | null;
+  /**
+   * Trường hiển thị trong câu hỏi xác nhận xoá. Mặc định là trường thứ hai.
+   */
+  labelKey?: string;
 }

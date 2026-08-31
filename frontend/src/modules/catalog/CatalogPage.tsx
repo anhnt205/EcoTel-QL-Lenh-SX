@@ -57,7 +57,9 @@ export function CatalogPage({ config }: { config: CatalogConfig }) {
   const handleDelete = async (row: Rec) => {
     if (
       !window.confirm(
-        `Xoá ${config.nounPhrase} "${String(row[config.fields[1]?.key ?? "name"] ?? "")}"?`,
+        `Xoá ${config.nounPhrase} "${String(
+          row[config.labelKey ?? config.fields[1]?.key ?? "name"] ?? "",
+        )}"?`,
       )
     ) {
       return;

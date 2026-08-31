@@ -12,6 +12,39 @@ import type { CatalogConfig, CatalogField } from "./types";
 /** Nhãn cột trong file Excel = nhãn hiển thị trên giao diện. */
 const headerOf = (f: CatalogField) => f.label;
 
+/**
+ * Đưa ô ngày về ISO `yyyy-MM-dd`, trả `null` nếu không đọc được.
+ *
+ * Ô ngày trong Excel về đây có thể ở ba dạng khác nhau tuỳ cách người dùng
+ * gõ và tuỳ định dạng ô, nên phải nhận cả ba thay vì tin một dạng:
+ * chuỗi `dd/MM/yyyy`, chuỗi ISO sẵn, hoặc số sê-ri của Excel.
+ */
+function toIsoDate(value: string): string | null {
+  const iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (iso) return value;
+
+  const dmy = /^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/.exec(value);
+  if (dmy) {
+    const [, d, m, y] = dmy;
+    return `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
+  }
+
+  // Số sê-ri Excel: mốc 0 là 1899-12-30 (chừa chỗ cho lỗi năm nhuận 1900
+  // mà Excel cố tình giữ lại).
+  if (/^\d+(\.\d+)?$/.test(value)) {
+    const serial = Number(value);
+    if (serial > 0 && serial < 100000) {
+      const ms = Date.UTC(1899, 11, 30) + serial * 86400000;
+      return new Date(ms).toISOString().slice(0, 10);
+    }
+  }
+
+  const parsed = new Date(value);
+  if (!Number.isNaN(parsed.getTime())) return parsed.toISOString().slice(0, 10);
+
+  return null;
+}
+
 /** Giá trị hiển thị của một ô khi xuất. */
 const cellOf = (row: Record<string, unknown>, f: CatalogField): string => {
   // Trường tham chiếu danh mục khác: bản ghi trả về kèm "<key>Name"
@@ -62,7 +95,12 @@ function buildWorkbook(
     [],
     ["Lưu ý:"],
     ["- Giữ nguyên dòng tiêu đề, không đổi tên cột."],
-    ["- Cột đầu tiên là MÃ, không được trùng nhau và không trùng dữ liệu đã có."],
+    ...(config.uniqueCodeKey === null
+      ? []
+      : [["- Cột đầu tiên là MÃ, không được trùng nhau và không trùng dữ liệu đã có."]]),
+    ...(config.fields.some((f) => f.type === "date")
+      ? [["- Cột ngày nhập dạng dd/MM/yyyy hoặc yyyy-MM-dd."]]
+      : []),
     ["- Xoá hết các dòng ví dụ trước khi nhập dữ liệu thật."],
   ];
   const guideSheet = XLSX.utils.aoa_to_sheet(guide);
@@ -123,7 +161,14 @@ export async function parseCatalogExcel(
   const payloads: Record<string, unknown>[] = [];
   const errors: string[] = [];
   const seenCodes = new Set<string>();
-  const codeField = config.fields[0];
+  // `uniqueCodeKey === null` nghĩa là danh mục KHÔNG có mã duy nhất — bỏ hẳn
+  // bước chặn trùng thay vì mặc định lấy cột đầu.
+  const codeField =
+    config.uniqueCodeKey === null
+      ? undefined
+      : config.uniqueCodeKey
+        ? config.fields.find((f) => f.key === config.uniqueCodeKey)
+        : config.fields[0];
 
   raw.forEach((r, i) => {
     const lineNo = i + 2; // +1 vì 0-based, +1 vì dòng tiêu đề
@@ -153,6 +198,28 @@ export async function parseCatalogExcel(
           continue;
         }
         payload[f.key] = id;
+      } else if (f.type === "number") {
+        if (!value) {
+          payload[f.key] = null;
+        } else {
+          // Excel tiếng Việt hay dùng dấu phẩy thập phân; gửi thẳng chuỗi
+          // "2,25" lên backend sẽ hỏng khi parse BigDecimal.
+          const num = Number(value.replace(",", "."));
+          if (Number.isNaN(num)) {
+            errors.push(`Dòng ${lineNo}: "${f.label}" = "${value}" không phải số.`);
+            rowHasError = true;
+            continue;
+          }
+          payload[f.key] = num;
+        }
+      } else if (f.type === "date") {
+        payload[f.key] = value ? toIsoDate(value) : null;
+        if (value && payload[f.key] === null) {
+          errors.push(
+            `Dòng ${lineNo}: "${f.label}" = "${value}" không phải ngày hợp lệ (dùng dd/MM/yyyy hoặc yyyy-MM-dd).`,
+          );
+          rowHasError = true;
+        }
       } else {
         payload[f.key] = value;
       }
