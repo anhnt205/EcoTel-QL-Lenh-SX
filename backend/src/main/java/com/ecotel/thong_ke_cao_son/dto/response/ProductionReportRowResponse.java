@@ -68,4 +68,11 @@ public class ProductionReportRowResponse {
     BigDecimal hsTon;
     BigDecimal hsTkm;
     boolean tkeMode;
+
+    // ── Nhóm 7: nhiên liệu và năng suất ─────────────────────────────────────
+    BigDecimal fuelNorm;
+    BigDecimal fuelBaseConsumption;
+    BigDecimal fuelTotalBeforeAdjustment;
+    BigDecimal fuelCurrentNorm;
+    BigDecimal productivityNorm;
 }

@@ -121,6 +121,11 @@ public class ProductionReportService {
                 .hsTon(r.getHsTon())
                 .hsTkm(r.getHsTkm())
                 .tkeMode(r.isTkeMode())
+                .fuelNorm(r.getFuelNorm())
+                .fuelBaseConsumption(r.getFuelBaseConsumption())
+                .fuelTotalBeforeAdjustment(r.getFuelTotalBeforeAdjustment())
+                .fuelCurrentNorm(r.getFuelCurrentNorm())
+                .productivityNorm(r.getProductivityNorm())
                 .build();
     }
 

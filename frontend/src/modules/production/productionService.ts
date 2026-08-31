@@ -31,6 +31,11 @@ export interface ProductionReportRow {
   hsTon: number | null;
   hsTkm: number | null;
   tkeMode: boolean;
+  fuelNorm: number | null;
+  fuelBaseConsumption: number | null;
+  fuelTotalBeforeAdjustment: number | null;
+  fuelCurrentNorm: number | null;
+  productivityNorm: number | null;
 }
 
 export interface ProductionReportSummary {

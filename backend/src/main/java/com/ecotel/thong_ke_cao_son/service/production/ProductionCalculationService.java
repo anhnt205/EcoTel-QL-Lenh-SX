@@ -4,6 +4,7 @@ import com.ecotel.thong_ke_cao_son.exception.BadRequestException;
 import com.ecotel.thong_ke_cao_son.exception.ResourceNotFoundException;
 import com.ecotel.thong_ke_cao_son.model.*;
 import com.ecotel.thong_ke_cao_son.repository.*;
+import com.ecotel.thong_ke_cao_son.dto.response.MatrixGridResponse;
 import com.ecotel.thong_ke_cao_son.service.SurveyStandardService;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
@@ -62,6 +63,8 @@ public class ProductionCalculationService {
     private final SurveyCoefficientRepository coefficientRepository;
     private final ProductionResultRepository resultRepository;
     private final TripBaseCalculator baseCalculator;
+    private final FuelCalculator fuelCalculator;
+    private final com.ecotel.thong_ke_cao_son.service.MatrixCatalogService matrixService;
 
     /** Tóm tắt một lần chạy, trả về cho người bấm nút tính. */
     @Getter
@@ -140,12 +143,19 @@ public class ProductionCalculationService {
             apTkm.put(e.getKey(), buildApTkm(period, e.getKey(), e.getValue(), tkeMode));
         }
 
+        // ── Nhánh nhiên liệu: nạp ba lưới MỘT LẦN cho cả kỳ ─────────────────
+        // Nạp trong vòng lặp thì mỗi chuyến một lần đọc cả lưới — kỳ vài nghìn
+        // chuyến sẽ đọc lại cùng dữ liệu vài nghìn lần.
+        Map<String, MatrixGridResponse> grids = loadFuelGrids(warnings);
+
         // ── LƯỢT 3 + lưu kết quả ────────────────────────────────────────────
         List<ProductionResult> results = new ArrayList<>();
         LocalDateTime now = LocalDateTime.now();
         for (Stage2 s : stage2) {
             GroupKey gk = new GroupKey(s.base.getSeamGroupExcavatorKey(), s.base.getAcceptanceProduct());
-            results.add(finalise(period, s, apTdia.get(gk), apTkm.get(gk), tkeMode, now));
+            ProductionResult result = finalise(period, s, apTdia.get(gk), apTkm.get(gk), tkeMode, now);
+            applyFuel(result, s.base(), grids, warnings);
+            results.add(result);
         }
 
         coefficientRepository.saveAll(apTdia.values());
@@ -156,6 +166,41 @@ public class ProductionCalculationService {
                 period.getDisplayName(), results.size(), apTdia.size() + apTkm.size(), tkeMode);
 
         return new CalculationSummary(results.size(), apTdia.size() + apTkm.size(), tkeMode, warnings);
+    }
+
+    // ── nhánh nhiên liệu ────────────────────────────────────────────────────
+
+    /**
+     * Nạp ba lưới của nhánh nhiên liệu.
+     *
+     * <p>Lưới chưa khai báo thì bỏ qua kèm cảnh báo, KHÔNG ném lỗi: sản lượng
+     * tính được mà không cần nhiên liệu, nên chặn cả kỳ vì thiếu một lưới phụ
+     * là làm hỏng luôn phần vốn chạy đúng.
+     */
+    private Map<String, MatrixGridResponse> loadFuelGrids(List<String> warnings) {
+        Map<String, MatrixGridResponse> grids = new LinkedHashMap<>();
+        for (String code : List.of("DMNL", "NANG_SUAT_XE", "HS_DIEU_CHINH_NLDM")) {
+            try {
+                grids.put(code, matrixService.getGrid(code));
+            } catch (RuntimeException e) {
+                warnings.add("Chưa dùng được lưới " + code + " — nhánh nhiên liệu bỏ trống.");
+            }
+        }
+        return grids;
+    }
+
+    private void applyFuel(ProductionResult result, TripBaseResult base,
+                           Map<String, MatrixGridResponse> grids, List<String> warnings) {
+        if (grids.isEmpty()) return;
+        FuelResult fuel = fuelCalculator.calculate(base.getTrip(), base, grids);
+
+        result.setFuelNorm(fuel.getNormFinal());
+        result.setFuelBaseConsumption(fuel.getBaseConsumption());
+        result.setFuelTotalBeforeAdjustment(fuel.getTotalBeforeAdjustment());
+        result.setFuelCurrentNorm(fuel.getCurrentNorm());
+        result.setProductivityNorm(fuel.getProductivityNorm());
+
+        if (fuel.getWarnings() != null) warnings.addAll(fuel.getWarnings());
     }
 
     // ── rào chắn 1 ──────────────────────────────────────────────────────────

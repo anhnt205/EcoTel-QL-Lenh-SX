@@ -4,8 +4,9 @@ import type { ProductionReportRow } from "./productionService";
  * Định nghĩa cột của màn Báo cáo thống kê, gom theo NHÓM.
  *
  * Sheet `tinh toan` gốc có 206 cột đặt cạnh nhau không phân nhóm — đọc rất
- * dễ lạc. Ở đây gom thành 6 nhóm theo đúng trình tự nghiệp vụ: thông tin
- * chuyến → khoá gộp → thống kê → trắc địa → kết quả cuối → vết tính toán.
+ * dễ lạc. Ở đây gom thành 7 nhóm theo đúng trình tự nghiệp vụ: thông tin
+ * chuyến → khoá gộp → thống kê → trắc địa → kết quả cuối → vết tính toán →
+ * nhiên liệu & năng suất.
  *
  * Dùng chung cho cả bảng trên màn hình và file Excel xuất ra, để hai bên
  * không bao giờ lệch nhau về thứ tự hay nhãn cột.
@@ -88,6 +89,17 @@ export const REPORT_COLUMN_GROUPS: ReportColumnGroup[] = [
       { key: "hsM3", label: "HS m3", numeric: true, scale: 6, width: "min-w-[120px]" },
       { key: "hsTon", label: "HS tấn", numeric: true, scale: 6, width: "min-w-[120px]" },
       { key: "hsTkm", label: "HS tkm", numeric: true, scale: 6, width: "min-w-[120px]" },
+    ],
+  },
+  {
+    title: "Nhiên liệu & năng suất",
+    tone: "bg-violet-100 dark:bg-violet-950/40",
+    columns: [
+      { key: "fuelNorm", label: "ĐMNL xe", numeric: true, scale: 4, width: "min-w-[120px]" },
+      { key: "fuelBaseConsumption", label: "NL theo ĐM (lít)", numeric: true, scale: 4, width: "min-w-[150px]" },
+      { key: "fuelTotalBeforeAdjustment", label: "ĐMNL xe (QĐ 1828)", numeric: true, scale: 4, width: "min-w-[160px]" },
+      { key: "fuelCurrentNorm", label: "NLĐM hiện hành", numeric: true, scale: 4, width: "min-w-[150px]" },
+      { key: "productivityNorm", label: "ĐM năng suất (ch/ca)", numeric: true, scale: 2, width: "min-w-[170px]" },
     ],
   },
 ];

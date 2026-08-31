@@ -120,6 +120,28 @@ public class ProductionResult {
     @Column(name = "hs_tkm", precision = 19, scale = 10)
     private BigDecimal hsTkm;
 
+    // ── Nhánh nhiên liệu và năng suất (cột AZ…BR) ───────────────────────────
+
+    /** BF — ĐMNL xe sau mọi hệ số điều chỉnh tháng. */
+    @Column(name = "fuel_norm", precision = 19, scale = 6)
+    private BigDecimal fuelNorm;
+
+    /** BG — Nhiên liệu tiêu hao theo định mức (lít). */
+    @Column(name = "fuel_base_consumption", precision = 19, scale = 6)
+    private BigDecimal fuelBaseConsumption;
+
+    /** BP — ĐMNL xe (QĐ 1828) = tiêu hao theo ĐM + tám khoản bù. */
+    @Column(name = "fuel_total_before_adjustment", precision = 19, scale = 6)
+    private BigDecimal fuelTotalBeforeAdjustment;
+
+    /** BQ — NLĐM hiện hành. */
+    @Column(name = "fuel_current_norm", precision = 19, scale = 6)
+    private BigDecimal fuelCurrentNorm;
+
+    /** BR — Định mức năng suất xe tải (chuyến/ca). */
+    @Column(name = "productivity_norm", precision = 19, scale = 6)
+    private BigDecimal productivityNorm;
+
     /** Chạy ở chế độ TKE (QĐ-03) — khi đó mọi hệ số trắc địa bằng 1. */
     @Column(name = "tke_mode", nullable = false)
     private boolean tkeMode = false;

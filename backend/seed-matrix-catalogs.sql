@@ -27,17 +27,17 @@ VALUES
 -- Excel dùng MATCH(...,1) + SMALL(...) để lấy hai dải kề nhau rồi NỘI SUY,
 -- nên trục dòng phải là trục SỐ — sắp theo chuỗi sẽ cho "10" đứng trước "9".
 (2, 'DMNL', 'Định mức nhiên liệu',
- 'Cung độ (dải)', 'Độ dốc + chủng loại xe', 'lít',
+ 'Độ dốc (dải)', 'Chủng loại xe + cung độ', 'lít',
  NULL, NULL, true, false, 4,
- 'Trục dòng là DẢI GIÁ TRỊ, không phải mã. Công thức lấy hai dải kề nhau rồi nội suy tuyến tính, vì vậy thứ tự số của các dòng là một phần của phép tính.',
+ 'DÒNG là dải ĐỘ DỐC (trục số); CỘT ghép chủng loại xe với cung độ thành một khoá, vd CAT777E.KC_3 — đúng theo AT5. Dải cung độ nằm trong TÊN CỘT, không phải một trục riêng. Nội suy SONG TUYẾN trên 4 góc.',
  NOW(), NOW()),
 
 -- Bảng NS.XE nằm ngay trong sheet `tinh toan` (vùng EO..GY), tra theo
 -- chủng loại xe + phân loại và cung độ.
 (3, 'NANG_SUAT_XE', 'Năng suất xe (996)',
- 'Chủng loại xe + phân loại', 'Cung độ (dải)', 'năng suất',
- '/vehicle-category-classes', NULL, false, true, 4,
- 'Trục cột là dải cung độ (trục số). Đừng nhầm chủng loại xe ở đây với chủng loại xe + DMNL của lưới Mô hình — hai cách phân nhóm xe độc lập nhau.',
+ 'Cung độ (dải)', 'Chủng loại xe + phân loại', 'năng suất',
+ NULL, '/vehicle-category-classes', true, false, 4,
+ 'Trục DÒNG là dải cung độ (trục số) — đúng theo BR5: INDEX(NS.XE, MATCH(cung độ, NS.CDXE), MATCH(chủng loại xe, NS.CLXE)), tham số thứ hai của INDEX là DÒNG. Khoá cột dẫn xuất: mã chủng loại xe + DMNL nối "." + phân loại, vd CAT777E.DAT.',
  NOW(), NOW()),
 
 -- EC5: HS điều chỉnh NLĐM, vùng FW:FY của sheet `tinh toan`, cột khoá theo
