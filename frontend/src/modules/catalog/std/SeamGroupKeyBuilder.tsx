@@ -151,12 +151,22 @@ export function SeamGroupKeyBuilder() {
               </Field>
 
               <Field label="Ký hiệu bùn">
-                <Input
+                {/* Khi tính toán, hệ TỰ SUY ký hiệu này từ Chủng loại hàng.
+                    Ở đây phải nhập tay vì lúc khai STD chưa có chuyến nào —
+                    nên liệt kê sẵn giá trị hợp lệ để không gõ sai. */}
+                <select
                   value={mudMark}
                   onChange={(e) => setMudMark(e.target.value)}
-                  placeholder="để trống nếu không có"
-                  className="h-9"
-                />
+                  className="h-9 w-full rounded-md border bg-transparent px-2 text-sm"
+                >
+                  <option value="">— không có —</option>
+                  <option value="Bun">Bun</option>
+                  <option value="BĐ">BĐ</option>
+                  <option value="D.uot">D.uot</option>
+                  <option value="Dbun">Dbun</option>
+                  <option value="cũ">cũ</option>
+                  <option value="Bun_cũ">Bun_cũ</option>
+                </select>
               </Field>
 
               <Field label="Khu vực xúc">

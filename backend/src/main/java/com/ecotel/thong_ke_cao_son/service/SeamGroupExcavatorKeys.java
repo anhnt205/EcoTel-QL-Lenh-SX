@@ -114,6 +114,59 @@ public final class SeamGroupExcavatorKeys {
         return out;
     }
 
+    /**
+     * KÝ HIỆU BÙN — thành phần thứ tư của khoá, suy từ Chủng loại hàng.
+     *
+     * <p>Cột {@code BW} của bảng tính, khớp docx dòng 458–465:
+     *
+     * <pre>
+     * BW5 = IF(OR(LEFT(K5,6)="B.Loan", … ,"_Bun",
+     *        IF(LEFT(K5,6)="BunDac","_BĐ",
+     *         IF(LEFT(K5,5)="D.uot","_D.uot",
+     *          IF(LEFT(K5,6)="DBchan","_Dbun",
+     *           IF(LEFT(K5,6)="DBtron","_Dbun","")))))
+     *       & IF(RIGHT(K5,2)="cũ","_cũ","")
+     * </pre>
+     *
+     * <p>Hai điểm dễ sai:
+     * <ul>
+     *   <li>Hậu tố {@code _cũ} được <b>NỐI THÊM</b>, không phải nhánh thay thế
+     *       — docx đọc như một trường hợp riêng, nhưng Excel dùng dấu
+     *       {@code &}. Theo Excel.</li>
+     *   <li>Bảng tính ghép {@code E5 & BW5} <b>không có dấu ngăn</b> vì bản
+     *       thân {@code BW5} đã mang sẵn dấu gạch dưới. Ở đây trả về giá trị
+     *       ĐÃ BỎ gạch dưới đầu, để {@link #compose} tự nối như mọi thành
+     *       phần khác — nếu không sẽ thành gạch dưới kép.</li>
+     * </ul>
+     */
+    public static String mudMark(String cargoType) {
+        String k = trim(cargoType);
+        if (k.isEmpty()) return "";
+
+        String mark = "";
+        if (startsWithAny(k, "B.Loan", "B.Duot", "B.Tron", "Btr.Tron", "B.chan")) {
+            mark = "_Bun";
+        } else if (startsWithAny(k, "BunDac")) {
+            mark = "_BĐ";
+        } else if (startsWithAny(k, "D.uot")) {
+            mark = "_D.uot";
+        } else if (startsWithAny(k, "DBchan", "DBtron")) {
+            mark = "_Dbun";
+        }
+        if (k.toLowerCase().endsWith("cũ")) {
+            mark = mark + "_cũ";
+        }
+        // Bỏ đúng một dấu gạch dưới đầu; compose() sẽ tự thêm lại khi nối.
+        return mark.startsWith(SEPARATOR) ? mark.substring(1) : mark;
+    }
+
+    private static boolean startsWithAny(String value, String... prefixes) {
+        for (String p : prefixes) {
+            if (value.regionMatches(true, 0, p, 0, p.length())) return true;
+        }
+        return false;
+    }
+
     private static void addIfPresent(List<String> parts, String value) {
         String v = trim(value);
         if (!v.isEmpty()) parts.add(v);

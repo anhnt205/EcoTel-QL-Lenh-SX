@@ -245,7 +245,12 @@ public class TripBaseCalculator {
                 density,
                 cargoType.getName());
 
-        return SeamGroupExcavatorKeys.compose(seamGroup, benchGroup, excavator, null, area, suffixes);
+        // Ký hiệu bùn (cột BW) là THÀNH PHẦN của khoá, không phải hậu tố —
+        // bảng tính nối nó ngay sau Máy xúc. Trước đây truyền null nên chuyến
+        // chở bùn sinh ra khoá thiếu "_Bun" và không khớp dòng STD.
+        String mudMark = SeamGroupExcavatorKeys.mudMark(cargoType.getName());
+
+        return SeamGroupExcavatorKeys.compose(seamGroup, benchGroup, excavator, mudMark, area, suffixes);
     }
 
     // ── phụ trợ ─────────────────────────────────────────────────────────────
