@@ -30,3 +30,16 @@ export interface SurveyStandardResponse {
   coalTkm: number | null;
   note: string | null;
 }
+
+/**
+ * Mã QUẢN LÝ ổn định của một dòng STD — dựng từ `id` (không đổi, dù sửa gì
+ * đi nữa), KHÔNG dùng chuỗi khoá "Nhóm vỉa + Máy xúc" nữa.
+ *
+ * Trước đây bảng danh mục dùng thẳng `seamGroupExcavatorKey` làm "mã" —
+ * hợp lý khi khoá đó cố định. Nhưng từ khi cho sửa lại sáu ô ghép khoá qua
+ * "Sửa", chuỗi khoá của một dòng có thể ĐỔI sau khi lưu, nên không còn
+ * dùng được làm định danh nhìn-là-nhận-ra-đúng-dòng nữa — người dùng có
+ * thể sửa khoá xong không nhận ra đây vẫn là dòng cũ. `id` không đổi qua
+ * mọi lần sửa nên dùng nó, chỉ định dạng lại cho dễ đọc.
+ */
+export const formatStdCode = (id: number): string => `STD${String(id).padStart(6, "0")}`;

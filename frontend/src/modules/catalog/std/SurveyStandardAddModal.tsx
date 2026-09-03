@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import api from "@/config/api.config";
 import { createCatalogService } from "../catalogService";
 import { surveyStandardDatSxConfig } from "../configs";
-import type { SurveyStandardResponse } from "./types";
+import { formatStdCode, type SurveyStandardResponse } from "./types";
 
 interface NamedOption {
   id: number;
@@ -66,17 +66,15 @@ interface Entry {
   /** Khoá đã ghép — luôn tính ở BACKEND, không tự ghép ở đây (xem doc đầu file). */
   composedKey: string;
   /**
-   * `true` khi dòng nạp từ một bản ghi ĐÃ LƯU (xem/sửa) — sáu ô khoá bị
-   * KHOÁ, không cho sửa qua đó nữa.
+   * Id bản ghi GỐC nếu dòng này nạp từ một bản ghi đã lưu — `undefined` nếu
+   * là dòng MỚI (thêm dòng, hoặc chép từ dòng khác trong lúc sửa).
    *
-   * Lý do: composedKey của một bản ghi đã lưu không tách ngược được thành
-   * sáu phần gốc, nên sáu ô luôn để trống khi nạp. Nếu vẫn cho sửa qua đó,
-   * gõ/chọn MỘT ô (kể cả vô ý) sẽ kích hoạt ghép lại khoá CHỈ từ ô vừa gõ —
-   * năm ô còn lại vẫn trống — xoá mất khoá gốc mà không cảnh báo gì. Khoá
-   * lại để khoá là ĐỊNH DANH cố định khi sửa; muốn đổi khoá thì xoá dòng
-   * này và thêm dòng mới.
+   * Quyết định cách lưu ở `handleSubmit`: có `originalId` thì SỬA TẠI CHỖ
+   * (giữ nguyên id, nên mã quản lý ở {@link formatStdCode} không đổi dù
+   * sửa gì); không có thì TẠO MỚI. Mất hẳn khỏi danh sách khi lưu (người
+   * dùng bấm xoá dòng) thì id đó bị XOÁ. Xem doc `handleSubmit`.
    */
-  locked?: boolean;
+  originalId?: number;
   effectiveFrom: string;
   effectiveTo: string;
   earthM3: string;
@@ -129,15 +127,12 @@ const emptyEntry = (from: string, to: string, nextId: () => number): Entry => ({
  *
  * Sáu thành phần đọc THẲNG từ bản ghi (backend lưu riêng từ lúc tạo, không
  * chỉ lưu chuỗi khoá đã ghép — xem model `SurveyStandard`), nên Xem/Sửa
- * hiện đúng "Nhóm vỉa + Máy xúc" đã khai, không phải đoán ngược từ chuỗi.
- * Bản ghi CŨ khai qua ô gõ tự do trước đây (hoặc STD Đất CN) không có sáu
- * cột này — về "" là bình thường, hiện đúng những gì có.
+ * hiện đúng "Nhóm vỉa + Máy xúc" đã khai VÀ sửa lại được qua đúng sáu ô đó
+ * — không còn phải xoá dòng rồi thêm dòng mới chỉ để sửa một chữ.
  *
- * KHOÁ CỨNG sáu ô (`locked: true`, xem doc ở `Entry`) dù đã đọc lại được
- * giá trị: sửa qua đó vẫn kích hoạt ghép khoá MỚI, và nếu người dùng chỉ
- * sửa MỘT ô mà không biết/không sửa các ô còn lại, khoá mới có thể không
- * khớp ý — an toàn hơn là bắt xoá dòng + thêm dòng mới khi thật sự muốn
- * đổi khoá.
+ * Bản ghi CŨ khai qua ô gõ tự do trước đây (hoặc STD Đất CN) không có sáu
+ * cột này — về "" là bình thường; gõ lại từ đầu vào sáu ô đó cũng ghép ra
+ * khoá đúng như mọi dòng khác.
  */
 const entryFromRecord = (r: SurveyStandardResponse, nextId: () => number): Entry => ({
   id: nextId(),
@@ -148,7 +143,7 @@ const entryFromRecord = (r: SurveyStandardResponse, nextId: () => number): Entry
   excavationArea: r.excavationArea ?? "",
   suffix: r.suffix ?? "",
   composedKey: r.seamGroupExcavatorKey,
-  locked: true,
+  originalId: r.id,
   effectiveFrom: r.effectiveFrom,
   effectiveTo: r.effectiveTo,
   earthM3: r.earthM3 != null ? String(r.earthM3) : "",
@@ -311,16 +306,13 @@ export function SurveyStandardAddModal({
     const timer = setTimeout(async () => {
       const updated = await Promise.all(
         entries.map(async (e) => {
-          // Dòng KHOÁ (nạp từ bản ghi đã lưu) không bao giờ ghép lại — sáu ô
-          // của nó luôn để trống nên sẽ rơi vào nhánh dưới và bị hiểu nhầm
-          // là "người dùng vừa xoá hết sáu ô", xoá mất khoá gốc. Input cũng
-          // bị khoá ở giao diện (xem `EntryRow`) — chặn ở đây thêm một lớp.
-          if (e.locked) return e;
-
           const { seamGroup, benchGroup, excavator, mudMark, excavationArea, suffix } = e;
           if (!seamGroup && !benchGroup && !excavator && !mudMark && !excavationArea && !suffix) {
-            // Sáu ô trống ở dòng KHÔNG khoá — dòng mới tạo, composedKey rỗng
-            // sẵn nên giữ nguyên là đúng.
+            // Sáu ô trống KHÔNG có nghĩa "chưa có khoá": dòng nạp từ bản ghi
+            // CŨ (khai qua ô gõ tự do trước đây, không có sáu cột riêng) vẫn
+            // để trống cả sáu ô nhưng đã có sẵn khoá — giữ nguyên khoá đó
+            // thay vì xoá mất. Dòng mới tạo thì composedKey rỗng sẵn nên giữ
+            // nguyên cũng đúng.
             return e;
           }
           try {
@@ -358,12 +350,6 @@ export function SurveyStandardAddModal({
    * chia đôi khoảng thời gian còn lại của dòng gốc, dòng mới kế thừa cả
    * sáu ô khoá lẫn 14 ô giá trị làm điểm bắt đầu — sửa tiếp từ đó, kể cả
    * đổi hẳn máy xúc/khu vực nếu dòng mới thực ra là một khoá khác.
-   *
-   * Dòng SAO CHÉP luôn MỞ KHOÁ (`locked: false`) dù dòng gốc có khoá hay
-   * không — nó chưa gắn với bản ghi đã lưu nào, sửa sáu ô ở đây là an toàn.
-   * Không đổi gì thì cứ giữ nguyên chuỗi khoá đã kế thừa (đúng nghĩa "cùng
-   * một vỉa + máy xúc, khoảng thời gian khác"); đổi thì khoá ghép lại từ
-   * đúng những gì gõ vào, không còn phụ thuộc dòng gốc.
    */
   const duplicateEntry = (id: number) =>
     setEntries((prev) => {
@@ -384,7 +370,10 @@ export function SurveyStandardAddModal({
       const copy: Entry = {
         ...source,
         id: nextEntryId(),
-        locked: false,
+        // KHÔNG kế thừa originalId: đây là dòng MỚI, chưa gắn với bản ghi
+        // nào — hai dòng cùng trỏ một originalId sẽ đụng nhau lúc lưu (cả
+        // hai cùng cố UPDATE một id).
+        originalId: undefined,
         effectiveFrom: secondFrom,
         effectiveTo: source.effectiveTo,
       };
@@ -419,7 +408,7 @@ export function SurveyStandardAddModal({
     setError(null);
     setSubmitting(true);
     try {
-      const payloads: Omit<SurveyStandardPayload, "id">[] = entries.map((e) => ({
+      const toPayload = (e: Entry): Omit<SurveyStandardPayload, "id"> => ({
         catalogType: "DAT_SX_THAN_SX",
         seamGroupExcavatorKey: e.composedKey,
         seamGroup: e.seamGroup || null,
@@ -447,21 +436,44 @@ export function SurveyStandardAddModal({
         coalHaulDistance: numOrNull(e.coalHaulDistance),
         coalTkm: numOrNull(e.coalTkm),
         note: e.note.trim() || null,
-      }));
+      });
+
       if (mode === "edit") {
-        // Sửa = thay THẲNG tập bản ghi gốc, một giao dịch backend duy nhất
-        // — KHÔNG gọi tạo-rồi-xoá rời nhau ở đây. Trường hợp sửa phổ biến
-        // nhất là chỉ đổi số liệu, giữ nguyên khoá và thời gian; lúc đó bản
-        // ghi cũ và bản ghi mới trùng nguyên khoá + ngày, kiểm tra chồng lấn
-        // phía backend sẽ chặn nhầm nếu tạo trước khi xoá. Xem
-        // `SurveyStandardService#replaceBatch`.
-        const res = await api.put(`${surveyStandardDatSxConfig.basePath}/batch`, {
-          deleteIds: originalIdsRef.current,
-          creates: payloads,
-        });
-        const saved = (res.data?.data ?? []) as unknown[];
-        toast.success(`Đã cập nhật — ${saved.length} dòng STD (Đất SX/Than SX).`);
+        // Sửa TẠI CHỖ cho dòng có `originalId` (giữ nguyên id — mã quản lý
+        // ở formatStdCode không đổi), TẠO MỚI cho dòng không có, XOÁ những
+        // id gốc không còn dòng nào trong danh sách nhận nữa (người dùng đã
+        // bấm xoá dòng đó lúc sửa). KHÔNG dùng "xoá hết rồi tạo lại cả lô"
+        // nữa: cách đó sinh id MỚI cho mọi dòng, kể cả dòng không đổi gì —
+        // đúng bug chủ dự án vừa phát hiện, mã quản lý coi như vô nghĩa vì
+        // đổi theo mỗi lần sửa. `update()` an toàn để giữ nguyên khoá+ngày
+        // vì backend loại trừ CHÍNH bản ghi đang sửa khỏi kiểm tra chồng
+        // lấn (tham số `selfId` — xem `SurveyStandardService#build`).
+        //
+        // Thứ tự bắt buộc: XOÁ trước, rồi mới SỬA/TẠO. Ví dụ dòng bị xoá lúc
+        // sửa (bấm Xoá dòng này) để lại một dòng MỚI (từ "+") trùng khoá +
+        // đè lên đúng khoảng ngày dòng cũ đang chiếm — tạo trước khi xoá sẽ
+        // bị kiểm tra chồng lấn chặn nhầm vì dòng cũ vẫn còn trong DB lúc đó
+        // (đã tự phát hiện lúc kiểm thử sống, xem `SurveyStandardService#build`).
+        const kept = new Set(
+          entries.map((e) => e.originalId).filter((id): id is number => id != null),
+        );
+        const toDelete = originalIdsRef.current.filter((id) => !kept.has(id));
+
+        if (toDelete.length > 0) {
+          await service.bulkRemove(toDelete);
+        }
+        for (const e of entries) {
+          if (e.originalId != null) {
+            await service.update(e.originalId, toPayload(e));
+          }
+        }
+        const newPayloads = entries.filter((e) => e.originalId == null).map(toPayload);
+        if (newPayloads.length > 0) {
+          await service.bulkCreate(newPayloads);
+        }
+        toast.success(`Đã lưu ${entries.length} dòng STD (Đất SX/Than SX).`);
       } else {
+        const payloads = entries.map(toPayload);
         await service.bulkCreate(payloads);
         toast.success(`Đã thêm ${payloads.length} dòng STD (Đất SX/Than SX).`);
       }
@@ -495,6 +507,11 @@ export function SurveyStandardAddModal({
                 : mode === "edit"
                   ? "Sửa STD (Đất SX/Than SX)"
                   : "Thêm mới STD (Đất SX/Than SX)"}
+              {records?.length === 1 && (
+                <span className="ml-2 font-mono text-sm font-semibold text-gray-400">
+                  {formatStdCode(records[0].id)}
+                </span>
+              )}
             </h2>
             <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
               {mode === "view"
@@ -742,7 +759,7 @@ function EntryRow({
         )}
       </td>
 
-      {readOnly || entry.locked ? (
+      {readOnly ? (
         <>
           <LockedCell value={seamGroups.find((s) => s.code === entry.seamGroup)?.name || entry.seamGroup} />
           <LockedCell value={entry.benchGroup} />

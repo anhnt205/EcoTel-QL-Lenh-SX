@@ -19,7 +19,7 @@ import { createCatalogService } from "../catalogService";
 import { downloadCatalogExcel, parseCatalogExcel } from "../catalogExcel";
 import { surveyStandardDatSxConfig } from "../configs";
 import { SurveyStandardAddModal } from "./SurveyStandardAddModal";
-import type { SurveyStandardResponse } from "./types";
+import { formatStdCode, type SurveyStandardResponse } from "./types";
 
 type ModalMode = "create" | "view" | "edit";
 
@@ -30,9 +30,16 @@ const CATALOG_TYPE = surveyStandardDatSxConfig.fixedValues?.catalogType as strin
  *
  * Bảng cũ hiện đủ 20 cột (sáu ô khoá + 14 ô giá trị) trên một dòng — đúng
  * dữ liệu nhưng không đọc lướt được. Chủ dự án đưa mockup rút gọn: chỉ còn
- * STT, Thời gian, Mã (khoá), và Thao tác — Xem/Sửa mở lại đúng popup
- * "Thêm mới" (chỉ đọc hoặc ghi được), chi tiết đầy đủ nằm trong đó, không
- * cần hiện hết ra bảng ngoài.
+ * STT, Thời gian, Mã, và Thao tác — Xem/Sửa mở lại đúng popup "Thêm mới"
+ * (chỉ đọc hoặc ghi được), chi tiết đầy đủ nằm trong đó, không cần hiện
+ * hết ra bảng ngoài.
+ *
+ * Cột "Mã" dựng từ `id` ({@link formatStdCode}), KHÔNG còn dùng thẳng
+ * `seamGroupExcavatorKey` như lúc mới thiết kế: từ khi cho sửa lại sáu ô
+ * ghép khoá qua "Sửa", chuỗi khoá của một dòng có thể ĐỔI sau khi lưu, nên
+ * không còn dùng được làm định danh ổn định nữa — `id` thì không đổi qua
+ * mọi lần sửa. Khoá ghép hiện tại vẫn hiện, chỉ lùi xuống thành dòng phụ
+ * nhỏ dưới mã.
  */
 export default function SurveyStandardListPage() {
   const service = useMemo(
@@ -195,11 +202,16 @@ export default function SurveyStandardListPage() {
       },
       {
         id: "ma",
-        header: "Mã (khoá)",
+        header: "Mã",
         cell: ({ row }) => (
-          <span className="break-all font-mono text-xs font-semibold text-blue-600 dark:text-blue-400">
-            {row.original.seamGroupExcavatorKey}
-          </span>
+          <div className="flex flex-col gap-0.5">
+            <span className="font-mono text-xs font-semibold text-blue-600 dark:text-blue-400">
+              {formatStdCode(row.original.id)}
+            </span>
+            <span className="break-all font-mono text-[11px] text-gray-400">
+              {row.original.seamGroupExcavatorKey}
+            </span>
+          </div>
         ),
       },
       {
