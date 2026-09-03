@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Trash2, X } from "lucide-react";
+import { Copy, Plus, Trash2, X, ZoomIn, ZoomOut } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,6 +29,18 @@ const emptyRow = (fields: CatalogField[]): Row =>
   Object.fromEntries(fields.map((f) => [f.key, ""]));
 
 /**
+ * Zoom khu vực bảng nhập liệu.
+ *
+ * Danh mục nhiều cột (vd STD, Định mức) thì chữ nhỏ khó đọc/khó bấm đúng ô;
+ * danh mục nhiều dòng thì phóng to lại chiếm hết màn hình. Cho người dùng tự
+ * chọn thay vì cố định một cỡ.
+ */
+const ZOOM_MIN = 0.7;
+const ZOOM_MAX = 1.5;
+const ZOOM_STEP = 0.1;
+const ZOOM_DEFAULT = 1;
+
+/**
  * Modal thêm/sửa danh mục.
  *
  * Chế độ THÊM cho nhập NHIỀU dòng rồi lưu một lần (đúng mô tả trong thiết
@@ -55,7 +67,29 @@ export function CatalogFormModal({
     [config.fields],
   );
 
+  /**
+   * Trường mã DUY NHẤT của danh mục — `undefined` nếu danh mục không có.
+   *
+   * Có danh mục cố tình KHÔNG có mã duy nhất (Kỳ báo cáo, Tỷ trọng): ở đó
+   * nhiều dòng trùng cột đầu là hợp lệ, ví dụ cùng một chủng loại hàng ở hai
+   * khoảng thời gian khác nhau. Dùng chung cho việc chặn trùng lúc lưu và
+   * việc chép dòng, để hai chỗ không bao giờ hiểu khác nhau.
+   */
+  const codeField = useMemo(
+    () =>
+      config.uniqueCodeKey === null
+        ? undefined
+        : (config.uniqueCodeKey ?? fields[0]?.key),
+    [config.uniqueCodeKey, fields],
+  );
+
   const [rows, setRows] = useState<Row[]>([emptyRow(fields)]);
+  // Không reset theo `open`: giữ nguyên mức zoom người dùng chọn giữa các
+  // lần mở modal trong cùng phiên xem — chọn một lần cho danh mục nhiều
+  // cột thì không phải chỉnh lại mỗi lần bấm "Thêm mới".
+  const [zoom, setZoom] = useState(ZOOM_DEFAULT);
+  const zoomIn = () => setZoom((z) => Math.min(ZOOM_MAX, Math.round((z + ZOOM_STEP) * 100) / 100));
+  const zoomOut = () => setZoom((z) => Math.max(ZOOM_MIN, Math.round((z - ZOOM_STEP) * 100) / 100));
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   /** Lựa chọn cho các trường select: key trường -> danh sách {value,label}. */
@@ -122,6 +156,24 @@ export function CatalogFormModal({
 
   const addRow = () => setRows((prev) => [...prev, emptyRow(fields)]);
 
+  /**
+   * Chép một dòng thành dòng mới đặt NGAY DƯỚI nó.
+   *
+   * Đặt ngay dưới chứ không đẩy xuống cuối: người dùng chép để sửa vài ô
+   * khác nhau, để cạnh nhau mới so được. Ở danh sách dài, thêm vào cuối là
+   * mất dấu dòng vừa chép.
+   *
+   * Mã duy nhất KHÔNG chép theo — chép vào thì dòng mới chắc chắn bị chặn
+   * "trùng mã" lúc lưu, tức là tặng người dùng một lỗi có sẵn. Danh mục
+   * không có mã duy nhất thì chép nguyên vẹn mọi ô.
+   */
+  const copyRow = (idx: number) =>
+    setRows((prev) => {
+      const clone: Row = { ...prev[idx] };
+      if (codeField) clone[codeField] = "";
+      return [...prev.slice(0, idx + 1), clone, ...prev.slice(idx + 1)];
+    });
+
   const removeRow = (idx: number) =>
     setRows((prev) =>
       prev.length === 1 ? prev : prev.filter((_, i) => i !== idx),
@@ -157,14 +209,6 @@ export function CatalogFormModal({
     }
     // Chặn trùng mã ngay trong danh sách — backend cũng chặn, nhưng báo sớm
     // ở client thì người dùng sửa được ngay thay vì mất cả lần lưu.
-    //
-    // Phải tôn trọng `uniqueCodeKey`: có danh mục KHÔNG có mã duy nhất (Kỳ
-    // báo cáo, Tỷ trọng), ở đó nhiều dòng trùng cột đầu là hợp lệ — cùng một
-    // chủng loại hàng ở hai khoảng thời gian khác nhau chẳng hạn.
-    const codeField =
-      config.uniqueCodeKey === null
-        ? undefined
-        : (config.uniqueCodeKey ?? fields[0]?.key);
     if (codeField && !isEdit) {
       const codes = rows.map((r) => (r[codeField] ?? "").trim());
       const dup = codes.find((c, i) => c && codes.indexOf(c) !== i);
@@ -249,12 +293,39 @@ export function CatalogFormModal({
               </p>
             )}
           </div>
-          <button
-            onClick={onClose}
-            className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800"
-          >
-            <X className="h-5 w-5" />
-          </button>
+          <div className="flex items-center gap-1">
+            <div className="flex items-center gap-0.5 rounded-md border border-gray-200 p-0.5 dark:border-gray-700">
+              <button
+                onClick={zoomOut}
+                disabled={zoom <= ZOOM_MIN}
+                title="Thu nhỏ"
+                className="rounded p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-30 disabled:hover:bg-transparent dark:text-gray-400 dark:hover:bg-gray-800"
+              >
+                <ZoomOut className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => setZoom(ZOOM_DEFAULT)}
+                title="Về cỡ mặc định"
+                className="w-11 rounded px-1 py-1 text-center text-xs font-semibold text-gray-500 tabular-nums hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
+              >
+                {Math.round(zoom * 100)}%
+              </button>
+              <button
+                onClick={zoomIn}
+                disabled={zoom >= ZOOM_MAX}
+                title="Phóng to"
+                className="rounded p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-30 disabled:hover:bg-transparent dark:text-gray-400 dark:hover:bg-gray-800"
+              >
+                <ZoomIn className="h-4 w-4" />
+              </button>
+            </div>
+            <button
+              onClick={onClose}
+              className="ml-1 rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
         </div>
 
         {/* Thân */}
@@ -268,11 +339,22 @@ export function CatalogFormModal({
             </p>
           )}
 
-          <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
+          {/*
+            Zoom bằng transform + bù chiều rộng ngược (100% / zoom): scale
+            thẳng khiến vùng chiếm chỗ co lại theo cùng tỉ lệ, để lại khoảng
+            trắng bên phải hoặc cắt mất mép phải khi phóng to. Bù chiều rộng
+            giữ bảng luôn khớp khung nhìn ở MỌI mức zoom.
+          */}
+          <div
+            className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700"
+            style={{ transform: `scale(${zoom})`, transformOrigin: "top left", width: `${100 / zoom}%` }}
+          >
             <table className="w-full min-w-[720px] border-collapse text-sm">
               <thead>
                 <tr className="bg-gray-100 dark:bg-gray-900 text-left text-sm font-bold text-gray-800 dark:text-gray-100">
-                  <th className="w-12 border-b border-r border-gray-200 dark:border-gray-700 px-3 py-2.5 text-center">
+                  <th
+                    className={`border-b border-r border-gray-200 dark:border-gray-700 px-3 py-2.5 text-center ${isEdit ? "w-12" : "w-20"}`}
+                  >
                     #
                   </th>
                   {fields.map((f) => (
@@ -299,8 +381,19 @@ export function CatalogFormModal({
                         : "bg-gray-50/50 dark:bg-gray-900/40"
                     }
                   >
-                    <td className="border-b border-r border-gray-200 dark:border-gray-700 px-3 py-2 text-center font-semibold text-gray-500">
-                      {idx + 1}
+                    <td className="border-b border-r border-gray-200 dark:border-gray-700 px-2 py-2">
+                      <div className="flex items-center justify-center gap-1.5">
+                        <span className="font-semibold text-gray-500">{idx + 1}</span>
+                        {!isEdit && (
+                          <button
+                            onClick={() => copyRow(idx)}
+                            title="Chép thành dòng mới"
+                            className="rounded p-0.5 text-gray-400 hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-blue-950/30"
+                          >
+                            <Copy className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                      </div>
                     </td>
                     {fields.map((f) => (
                       <td
