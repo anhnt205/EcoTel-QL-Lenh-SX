@@ -19,6 +19,13 @@ interface SurveyStandardPayload {
   id?: number;
   catalogType: "DAT_SX_THAN_SX";
   seamGroupExcavatorKey: string;
+  /** Sáu thành phần đã ghép nên khoá — chỉ để Xem/Sửa hiện lại đúng, không dùng để tra cứu. */
+  seamGroup: string | null;
+  benchGroup: string | null;
+  excavator: string | null;
+  mudMark: string | null;
+  excavationArea: string | null;
+  suffix: string | null;
   effectiveFrom: string;
   effectiveTo: string;
   earthAcceptanceProduct: string;
@@ -120,21 +127,26 @@ const emptyEntry = (from: string, to: string, nextId: () => number): Entry => ({
 /**
  * Dựng lại một Entry từ bản ghi đã lưu — dùng cho "view"/"edit".
  *
- * Sáu ô ghép khoá KHÔNG lưu riêng ở backend, chỉ có chuỗi khoá đã ghép
- * (`seamGroupExcavatorKey`) — nên không tách ngược lại được sáu thành phần
- * gốc. Để trống cả sáu ô và KHOÁ luôn (`locked: true`, xem doc ở `Entry`) —
- * hiện thẳng chuỗi khoá đã lưu ở cột "Khoá", chỉ sửa số liệu. Muốn đổi khoá
- * thì xoá dòng này và thêm dòng mới (nút "+" ở dòng đã lưu cũng cho ra một
- * dòng MỚI không khoá — dùng nó nếu muốn "đổi khoá dựa trên dòng cũ").
+ * Sáu thành phần đọc THẲNG từ bản ghi (backend lưu riêng từ lúc tạo, không
+ * chỉ lưu chuỗi khoá đã ghép — xem model `SurveyStandard`), nên Xem/Sửa
+ * hiện đúng "Nhóm vỉa + Máy xúc" đã khai, không phải đoán ngược từ chuỗi.
+ * Bản ghi CŨ khai qua ô gõ tự do trước đây (hoặc STD Đất CN) không có sáu
+ * cột này — về "" là bình thường, hiện đúng những gì có.
+ *
+ * KHOÁ CỨNG sáu ô (`locked: true`, xem doc ở `Entry`) dù đã đọc lại được
+ * giá trị: sửa qua đó vẫn kích hoạt ghép khoá MỚI, và nếu người dùng chỉ
+ * sửa MỘT ô mà không biết/không sửa các ô còn lại, khoá mới có thể không
+ * khớp ý — an toàn hơn là bắt xoá dòng + thêm dòng mới khi thật sự muốn
+ * đổi khoá.
  */
 const entryFromRecord = (r: SurveyStandardResponse, nextId: () => number): Entry => ({
   id: nextId(),
-  seamGroup: "",
-  benchGroup: "",
-  excavator: "",
-  mudMark: "",
-  excavationArea: "",
-  suffix: "",
+  seamGroup: r.seamGroup ?? "",
+  benchGroup: r.benchGroup ?? "",
+  excavator: r.excavator ?? "",
+  mudMark: r.mudMark ?? "",
+  excavationArea: r.excavationArea ?? "",
+  suffix: r.suffix ?? "",
   composedKey: r.seamGroupExcavatorKey,
   locked: true,
   effectiveFrom: r.effectiveFrom,
@@ -410,6 +422,12 @@ export function SurveyStandardAddModal({
       const payloads: Omit<SurveyStandardPayload, "id">[] = entries.map((e) => ({
         catalogType: "DAT_SX_THAN_SX",
         seamGroupExcavatorKey: e.composedKey,
+        seamGroup: e.seamGroup || null,
+        benchGroup: e.benchGroup || null,
+        excavator: e.excavator || null,
+        mudMark: e.mudMark || null,
+        excavationArea: e.excavationArea || null,
+        suffix: e.suffix || null,
         effectiveFrom: e.effectiveFrom,
         effectiveTo: e.effectiveTo,
         earthAcceptanceProduct: "Đất SX",
@@ -725,13 +743,16 @@ function EntryRow({
       </td>
 
       {readOnly || entry.locked ? (
-        <td colSpan={6} className={`${cellCls} align-top text-center text-gray-400`}>
-          <span className="italic">
-            {readOnly
-              ? "(xem ở cột Khoá — sáu ô này không tách ngược được từ khoá đã lưu)"
-              : "(khoá đã lưu, không sửa được ở đây — bấm chép dòng nếu cần đổi khoá)"}
-          </span>
-        </td>
+        <>
+          <LockedCell value={seamGroups.find((s) => s.code === entry.seamGroup)?.name || entry.seamGroup} />
+          <LockedCell value={entry.benchGroup} />
+          <LockedCell value={entry.excavator} />
+          <LockedCell value={entry.mudMark} />
+          <LockedCell
+            value={excavationAreas.find((a) => a.code === entry.excavationArea)?.name || entry.excavationArea}
+          />
+          <LockedCell value={entry.suffix} />
+        </>
       ) : (
         <>
           <td className={`${cellCls} align-top min-w-[110px]`}>
@@ -872,6 +893,15 @@ function NumCell({
           className="h-9 text-xs"
         />
       )}
+    </td>
+  );
+}
+
+/** Một ô trong sáu ô ghép khoá khi bị khoá (Xem, hoặc Sửa một dòng đã lưu) — hiện giá trị THẬT, không sửa được. */
+function LockedCell({ value }: { value: string }) {
+  return (
+    <td className="border-b border-r border-gray-200 dark:border-gray-700 px-2 py-1.5 align-top min-w-[100px]">
+      <span className="px-1 text-gray-700 dark:text-gray-300">{value || "—"}</span>
     </td>
   );
 }

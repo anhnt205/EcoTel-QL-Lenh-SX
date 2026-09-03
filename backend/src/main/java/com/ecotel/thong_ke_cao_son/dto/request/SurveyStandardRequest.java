@@ -22,6 +22,14 @@ public class SurveyStandardRequest {
     @NotBlank(message = "Khoá Nhóm vỉa + Máy xúc là bắt buộc")
     String seamGroupExcavatorKey;
 
+    /** Sáu thành phần đã ghép nên khoá — chỉ để Xem/Sửa hiện lại đúng, xem model. */
+    String seamGroup;
+    String benchGroup;
+    String excavator;
+    String mudMark;
+    String excavationArea;
+    String suffix;
+
     @NotNull(message = "Từ ngày là bắt buộc")
     LocalDate effectiveFrom;
 

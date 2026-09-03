@@ -69,6 +69,33 @@ public class SurveyStandard {
     @Column(name = "seam_group_excavator_key", nullable = false)
     private String seamGroupExcavatorKey;
 
+    // ── Sáu thành phần đã ghép nên seamGroupExcavatorKey ────────────────────
+    //
+    // KHÔNG dùng để tra cứu — công thức và engine chỉ tra bằng chuỗi khoá đã
+    // ghép ở trên. Lưu riêng CHỈ để màn Xem/Sửa hiện lại đúng "Nhóm vỉa +
+    // Máy xúc" đã khai, thay vì phải đoán ngược từ chuỗi đã nối bằng "_" —
+    // việc đó không làm được chắc chắn vì một số thành phần có thể rỗng
+    // (không để lại khoảng trống) nên số dấu "_" không đủ xác định ranh giới.
+    // Để trống ở dòng khai qua ô gõ tự do cũ (STD Đất CN, xem
+    // SeamGroupKeyBuilder) — màn đó không có sáu ô rời để lưu.
+    @Column(name = "seam_group")
+    private String seamGroup;
+
+    @Column(name = "bench_group")
+    private String benchGroup;
+
+    @Column(name = "excavator")
+    private String excavator;
+
+    @Column(name = "mud_mark")
+    private String mudMark;
+
+    @Column(name = "excavation_area")
+    private String excavationArea;
+
+    @Column(name = "suffix")
+    private String suffix;
+
     @NotNull(message = "Từ ngày là bắt buộc")
     @Column(name = "effective_from", nullable = false)
     private LocalDate effectiveFrom;

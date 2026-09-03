@@ -18,6 +18,14 @@ public class SurveyStandardResponse {
     Long id;
     SurveyStandard.CatalogType catalogType;
     String seamGroupExcavatorKey;
+
+    /** Sáu thành phần đã ghép nên khoá — chỉ để Xem/Sửa hiện lại đúng, xem model. */
+    String seamGroup;
+    String benchGroup;
+    String excavator;
+    String mudMark;
+    String excavationArea;
+    String suffix;
     LocalDate effectiveFrom;
     LocalDate effectiveTo;
 

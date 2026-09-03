@@ -151,6 +151,12 @@ public class SurveyStandardService {
 
         entity.setCatalogType(r.getCatalogType());
         entity.setSeamGroupExcavatorKey(key);
+        entity.setSeamGroup(r.getSeamGroup());
+        entity.setBenchGroup(r.getBenchGroup());
+        entity.setExcavator(r.getExcavator());
+        entity.setMudMark(r.getMudMark());
+        entity.setExcavationArea(r.getExcavationArea());
+        entity.setSuffix(r.getSuffix());
         entity.setEffectiveFrom(r.getEffectiveFrom());
         entity.setEffectiveTo(r.getEffectiveTo());
 
@@ -188,6 +194,12 @@ public class SurveyStandardService {
                 .id(s.getId())
                 .catalogType(s.getCatalogType())
                 .seamGroupExcavatorKey(s.getSeamGroupExcavatorKey())
+                .seamGroup(s.getSeamGroup())
+                .benchGroup(s.getBenchGroup())
+                .excavator(s.getExcavator())
+                .mudMark(s.getMudMark())
+                .excavationArea(s.getExcavationArea())
+                .suffix(s.getSuffix())
                 .effectiveFrom(s.getEffectiveFrom())
                 .effectiveTo(s.getEffectiveTo())
                 .earthAcceptanceProduct(s.getEarthAcceptanceProduct())

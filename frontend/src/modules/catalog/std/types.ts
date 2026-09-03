@@ -3,6 +3,13 @@ export interface SurveyStandardResponse {
   id: number;
   catalogType: "DAT_CN" | "DAT_SX_THAN_SX";
   seamGroupExcavatorKey: string;
+  /** Sáu thành phần đã ghép nên khoá — chỉ để Xem/Sửa hiện lại đúng, có thể null (khai qua ô gõ tự do cũ). */
+  seamGroup: string | null;
+  benchGroup: string | null;
+  excavator: string | null;
+  mudMark: string | null;
+  excavationArea: string | null;
+  suffix: string | null;
   effectiveFrom: string;
   effectiveTo: string;
   earthAcceptanceProduct: string | null;
