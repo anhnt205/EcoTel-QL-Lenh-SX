@@ -1,12 +1,6 @@
-import { CatalogPage } from "../CatalogPage";
+import SurveyStandardListPage from "../std/SurveyStandardListPage";
 import { surveyStandardDatCnConfig } from "../configs";
-import { SeamGroupKeyBuilder } from "../std/SeamGroupKeyBuilder";
 
 export default function SurveyStandardDatCn() {
-  return (
-    <CatalogPage
-      config={surveyStandardDatCnConfig}
-      extraActions={<SeamGroupKeyBuilder />}
-    />
-  );
+  return <SurveyStandardListPage config={surveyStandardDatCnConfig} />;
 }

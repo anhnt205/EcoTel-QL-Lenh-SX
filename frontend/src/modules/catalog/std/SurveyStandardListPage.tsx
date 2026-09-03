@@ -17,19 +17,21 @@ import api from "@/config/api.config";
 import { formatDate } from "@/lib/utils";
 import { createCatalogService } from "../catalogService";
 import { downloadCatalogExcel, parseCatalogExcel } from "../catalogExcel";
-import { surveyStandardDatSxConfig } from "../configs";
+import type { CatalogConfig } from "../types";
 import { SurveyStandardAddModal } from "./SurveyStandardAddModal";
 import { formatStdCode, type SurveyStandardResponse } from "./types";
 
 type ModalMode = "create" | "view" | "edit";
 
-const CATALOG_TYPE = surveyStandardDatSxConfig.fixedValues?.catalogType as string;
-
 /**
- * Màn danh mục STD (Đất SX/Than SX) — KHÔNG dùng `CatalogPage` chung nữa.
+ * Màn danh mục STD (Đất CN / Đất SX/Than SX) — KHÔNG dùng `CatalogPage`
+ * chung nữa. Dùng CHUNG một trang cho cả hai màn STD (nhận `config` —
+ * {@link ../configs}'s `surveyStandardDatCnConfig`/`surveyStandardDatSxConfig`)
+ * thay vì hai file gần như trùng nhau — cùng lý do với
+ * {@link SurveyStandardAddModal}: sửa một chỗ tự áp dụng cho cả hai.
  *
- * Bảng cũ hiện đủ 20 cột (sáu ô khoá + 14 ô giá trị) trên một dòng — đúng
- * dữ liệu nhưng không đọc lướt được. Chủ dự án đưa mockup rút gọn: chỉ còn
+ * Bảng cũ hiện đủ 20 (hoặc 13, ở màn Đất CN) cột trên một dòng — đúng dữ
+ * liệu nhưng không đọc lướt được. Chủ dự án đưa mockup rút gọn: chỉ còn
  * STT, Thời gian, Mã, và Thao tác — Xem/Sửa mở lại đúng popup "Thêm mới"
  * (chỉ đọc hoặc ghi được), chi tiết đầy đủ nằm trong đó, không cần hiện
  * hết ra bảng ngoài.
@@ -41,10 +43,12 @@ const CATALOG_TYPE = surveyStandardDatSxConfig.fixedValues?.catalogType as strin
  * mọi lần sửa. Khoá ghép hiện tại vẫn hiện, chỉ lùi xuống thành dòng phụ
  * nhỏ dưới mã.
  */
-export default function SurveyStandardListPage() {
+export default function SurveyStandardListPage({ config }: { config: CatalogConfig }) {
+  const catalogType = config.fixedValues?.catalogType as "DAT_CN" | "DAT_SX_THAN_SX";
+
   const service = useMemo(
-    () => createCatalogService<SurveyStandardResponse>(surveyStandardDatSxConfig.basePath),
-    [],
+    () => createCatalogService<SurveyStandardResponse>(config.basePath),
+    [config.basePath],
   );
 
   const [page, setPage] = useState(0);
@@ -52,10 +56,10 @@ export default function SurveyStandardListPage() {
   const [searchValue, setSearchValue] = useState("");
 
   const { data, isLoading, refetch } = useQuery({
-    queryKey: ["survey-standards", CATALOG_TYPE, page, pageSize, searchValue],
+    queryKey: ["survey-standards", catalogType, page, pageSize, searchValue],
     queryFn: () =>
       service.getAll({
-        catalogType: CATALOG_TYPE,
+        catalogType,
         page,
         size: pageSize,
         sort: "effectiveFrom,DESC",
@@ -107,7 +111,7 @@ export default function SurveyStandardListPage() {
   // ── Xuất / nhập Excel — dữ liệu đã sẵn phẳng, không cần gộp/tách gì ───────
   const handleExport = (selectedRows: SurveyStandardResponse[]) => {
     const { isTemplate, count } = downloadCatalogExcel(
-      surveyStandardDatSxConfig,
+      config,
       selectedRows as unknown as Record<string, unknown>[],
     );
     toast.success(
@@ -121,7 +125,7 @@ export default function SurveyStandardListPage() {
 
   const buildLookups = async () => {
     const lookups: Record<string, Map<string, number>> = {};
-    for (const f of surveyStandardDatSxConfig.fields.filter((x) => x.optionsPath)) {
+    for (const f of config.fields.filter((x) => x.optionsPath)) {
       const res = await api.get(f.optionsPath!, { params: { size: 500 } });
       const list = (res.data?.data?.content ?? res.data?.data ?? []) as {
         id: number;
@@ -136,7 +140,7 @@ export default function SurveyStandardListPage() {
     setIsImporting(true);
     try {
       const lookups = await buildLookups();
-      const { payloads, errors } = await parseCatalogExcel(surveyStandardDatSxConfig, file, lookups);
+      const { payloads, errors } = await parseCatalogExcel(config, file, lookups);
       if (errors.length > 0) {
         toast.error(
           `File có ${errors.length} lỗi:\n${errors.slice(0, 5).join("\n")}${
@@ -254,7 +258,7 @@ export default function SurveyStandardListPage() {
     <div className="flex h-full flex-col gap-4 p-4 md:p-6">
       <Breadcrumb>
         <BreadcrumbList>
-          {surveyStandardDatSxConfig.breadcrumb.map((b) => (
+          {config.breadcrumb.map((b) => (
             <React.Fragment key={b}>
               <BreadcrumbItem>
                 <BreadcrumbLink href="#">{b}</BreadcrumbLink>
@@ -263,14 +267,14 @@ export default function SurveyStandardListPage() {
             </React.Fragment>
           ))}
           <BreadcrumbItem>
-            <BreadcrumbPage>{surveyStandardDatSxConfig.title}</BreadcrumbPage>
+            <BreadcrumbPage>{config.title}</BreadcrumbPage>
           </BreadcrumbItem>
         </BreadcrumbList>
       </Breadcrumb>
 
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold text-blue-700 dark:text-blue-400">
-          {surveyStandardDatSxConfig.title}
+          {config.title}
         </h1>
         <Button
           onClick={openCreate}
@@ -283,7 +287,7 @@ export default function SurveyStandardListPage() {
 
       <div className="min-h-0 flex-1">
         <AppDataTable
-          title={`Bảng ${surveyStandardDatSxConfig.title.toLowerCase()}`}
+          title={`Bảng ${config.title.toLowerCase()}`}
           data={rows}
           columns={columns}
           loading={isLoading}
@@ -316,6 +320,7 @@ export default function SurveyStandardListPage() {
 
       <SurveyStandardAddModal
         open={modalOpen}
+        catalogType={catalogType}
         mode={modalMode}
         records={activeRecords}
         onClose={() => setModalOpen(false)}

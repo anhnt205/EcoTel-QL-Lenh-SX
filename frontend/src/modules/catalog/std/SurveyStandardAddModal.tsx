@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import api from "@/config/api.config";
 import { createCatalogService } from "../catalogService";
-import { surveyStandardDatSxConfig } from "../configs";
 import { formatStdCode, type SurveyStandardResponse } from "./types";
 
 interface NamedOption {
@@ -14,10 +13,25 @@ interface NamedOption {
   name: string;
 }
 
+type StdCatalogType = "DAT_CN" | "DAT_SX_THAN_SX";
+
+/**
+ * Hai màn STD dùng CHUNG modal này — chỉ khác nhãn khối "Đất" và có/không
+ * khối "Than SX". Gom vào một bảng tra thay vì hai file gần như trùng nhau
+ * để sửa một chỗ (vd luồng lưu, sinh khoá sống) tự áp dụng cho cả hai, không
+ * còn nguy cơ sửa một bên quên sửa bên kia.
+ */
+const STD_VARIANTS: Record<StdCatalogType, { title: string; earthLabel: string; hasCoal: boolean }> = {
+  DAT_CN: { title: "STD (Đất CN)", earthLabel: "Đất CN", hasCoal: false },
+  DAT_SX_THAN_SX: { title: "STD (Đất SX/Than SX)", earthLabel: "Đất SX", hasCoal: true },
+};
+
+const BASE_PATH = "/survey-standards";
+
 /** Payload gửi lên — khớp `SurveyStandardRequest` phía backend. */
 interface SurveyStandardPayload {
   id?: number;
-  catalogType: "DAT_SX_THAN_SX";
+  catalogType: StdCatalogType;
   seamGroupExcavatorKey: string;
   /** Sáu thành phần đã ghép nên khoá — chỉ để Xem/Sửa hiện lại đúng, không dùng để tra cứu. */
   seamGroup: string | null;
@@ -182,27 +196,35 @@ const formatVN = (s: string) => {
   return `${d}/${m}/${y}`;
 };
 
-const service = createCatalogService<SurveyStandardPayload>(surveyStandardDatSxConfig.basePath);
+const service = createCatalogService<SurveyStandardPayload>(BASE_PATH);
 
 /**
- * Modal "Thêm mới STD (Đất SX/Than SX)" — thiết kế riêng, thay cho modal
- * chung `CatalogFormModal` ở chế độ thêm mới cho đúng màn này.
+ * Modal "Thêm mới STD" — thiết kế riêng, thay cho modal chung
+ * `CatalogFormModal` ở chế độ thêm mới cho đúng hai màn STD (Đất CN) và
+ * STD (Đất SX/Than SX). Dùng CHUNG một modal (phân biệt bằng prop
+ * `catalogType`, xem {@link STD_VARIANTS}) thay vì hai file gần như trùng
+ * nhau — hai màn khác nhau đúng một chỗ: STD (Đất CN) chỉ có một khối giá
+ * trị "Đất CN", STD (Đất SX/Than SX) có thêm khối "Than SX".
  *
- * <b>Khác biệt cốt lõi:</b> trước đây ô "Nhóm vỉa + Máy xúc" là MỘT Ô GÕ TỰ
- * DO — người dùng phải mở một hộp thoại "Dựng khoá" riêng, chép chuỗi kết
- * quả, rồi dán tay vào ô đó (xem {@link ../std/SeamGroupKeyBuilder}, vẫn
- * dùng ở màn STD (Đất CN)). Ở đây SÁU thành phần của khoá nằm NGAY trên
+ * <b>Khác biệt cốt lõi so với trước:</b> trước đây ô "Nhóm vỉa + Máy xúc" là
+ * MỘT Ô GÕ TỰ DO — người dùng phải mở một hộp thoại "Dựng khoá" riêng, chép
+ * chuỗi kết quả, rồi dán tay vào ô đó (xem {@link ../std/SeamGroupKeyBuilder},
+ * không còn dùng ở màn nào nữa). Ở đây SÁU thành phần của khoá nằm NGAY trên
  * dòng, và khoá được ghép sống — gõ đến đâu, cột "Khoá" hiện ra đến đó.
  *
  * <b>Khoá luôn ghép ở BACKEND</b> (gọi {@code POST /survey-standards/build-key}),
  * không tự ghép ở đây: đây chính là hàm engine tính sản lượng dùng để suy
  * khoá của mỗi chuyến — ghép lệch dù chỉ một dấu gạch dưới thì dòng danh
  * mục sẽ không bao giờ khớp, và triệu chứng là "thiếu dữ liệu STD" chứ
- * không phải một lỗi rõ ràng.
+ * không phải một lỗi rõ ràng. Hậu tố là Ô GÕ TỰ DO (không lọc qua danh sách
+ * bốn hậu tố hợp lệ) ở CẢ HAI màn — engine tự suy hậu tố từ dữ liệu chuyến
+ * theo đúng thuật toán chung (`SeamGroupExcavatorKeys.deriveSuffixes`),
+ * không phân biệt catalogType, nên gõ đúng hậu tố hợp lệ vẫn khớp được lúc
+ * tính sản lượng ở cả hai màn.
  *
  * <b>Mỗi dòng ĐỘC LẬP hoàn toàn</b> — không có khái niệm "một khoá dùng
  * chung cho nhiều khoảng thời gian". Nút "+" COPY dòng hiện tại (cả sáu ô
- * khoá lẫn 14 ô giá trị) thành một dòng mới ngay bên dưới, với khoảng thời
+ * khoá lẫn các ô giá trị) thành một dòng mới ngay bên dưới, với khoảng thời
  * gian chia đôi phần còn lại — người dùng sửa tiếp từ đó, kể cả đổi hẳn
  * sang máy xúc/khu vực khác nếu dòng mới thật ra là một khoá khác. Muốn
  * một dòng hoàn toàn trống thì bấm "Thêm dòng mới" ở cuối bảng.
@@ -212,12 +234,15 @@ const service = createCatalogService<SurveyStandardPayload>(surveyStandardDatSxC
  */
 export function SurveyStandardAddModal({
   open,
+  catalogType,
   mode = "create",
   records,
   onClose,
   onSaved,
 }: {
   open: boolean;
+  /** Quyết định nhãn khối "Đất" và có/không khối "Than SX" — xem {@link STD_VARIANTS}. */
+  catalogType: StdCatalogType;
   /** "create" thêm mới trống · "view" chỉ xem · "edit" sửa các bản ghi đã có. */
   mode?: "create" | "view" | "edit";
   /** Bản ghi hiện có — bắt buộc khi `mode` là "view"/"edit", bỏ trống khi "create". */
@@ -226,6 +251,7 @@ export function SurveyStandardAddModal({
   onSaved: () => void;
 }) {
   const isReadOnly = mode === "view";
+  const variant = STD_VARIANTS[catalogType];
 
   const [batchFrom, setBatchFrom] = useState(`${currentYear}-01-01`);
   const [batchTo, setBatchTo] = useState(`${currentYear}-12-31`);
@@ -409,7 +435,7 @@ export function SurveyStandardAddModal({
     setSubmitting(true);
     try {
       const toPayload = (e: Entry): Omit<SurveyStandardPayload, "id"> => ({
-        catalogType: "DAT_SX_THAN_SX",
+        catalogType,
         seamGroupExcavatorKey: e.composedKey,
         seamGroup: e.seamGroup || null,
         benchGroup: e.benchGroup || null,
@@ -419,7 +445,7 @@ export function SurveyStandardAddModal({
         suffix: e.suffix || null,
         effectiveFrom: e.effectiveFrom,
         effectiveTo: e.effectiveTo,
-        earthAcceptanceProduct: "Đất SX",
+        earthAcceptanceProduct: variant.earthLabel,
         earthM3: numOrNull(e.earthM3),
         earthDesignVolume: numOrNull(e.earthDesignVolume),
         earthDeviation: numOrNull(e.earthDeviation),
@@ -427,7 +453,10 @@ export function SurveyStandardAddModal({
         earthHaulDistance: numOrNull(e.earthHaulDistance),
         earthBulkDensity: numOrNull(e.earthBulkDensity),
         earthTkm: numOrNull(e.earthTkm),
-        coalAcceptanceProduct: "Than SX",
+        // Khối Than chỉ có nghĩa ở STD (Đất SX/Than SX) — backend cũng tự
+        // null hoá cột này khi catalogType không phải DAT_SX_THAN_SX (xem
+        // `SurveyStandardService#build`), gửi rỗng ở đây cho đúng ý nghĩa.
+        coalAcceptanceProduct: variant.hasCoal ? "Than SX" : "",
         coalM3: numOrNull(e.coalM3),
         coalBulkDensity: numOrNull(e.coalBulkDensity),
         coalTon: numOrNull(e.coalTon),
@@ -471,11 +500,11 @@ export function SurveyStandardAddModal({
         if (newPayloads.length > 0) {
           await service.bulkCreate(newPayloads);
         }
-        toast.success(`Đã lưu ${entries.length} dòng STD (Đất SX/Than SX).`);
+        toast.success(`Đã lưu ${entries.length} dòng ${variant.title}.`);
       } else {
         const payloads = entries.map(toPayload);
         await service.bulkCreate(payloads);
-        toast.success(`Đã thêm ${payloads.length} dòng STD (Đất SX/Than SX).`);
+        toast.success(`Đã thêm ${payloads.length} dòng ${variant.title}.`);
       }
       onSaved();
       onClose();
@@ -503,10 +532,10 @@ export function SurveyStandardAddModal({
           <div>
             <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">
               {mode === "view"
-                ? "Chi tiết STD (Đất SX/Than SX)"
+                ? `Chi tiết ${variant.title}`
                 : mode === "edit"
-                  ? "Sửa STD (Đất SX/Than SX)"
-                  : "Thêm mới STD (Đất SX/Than SX)"}
+                  ? `Sửa ${variant.title}`
+                  : `Thêm mới ${variant.title}`}
               {records?.length === 1 && (
                 <span className="ml-2 font-mono text-sm font-semibold text-gray-400">
                   {formatStdCode(records[0].id)}
@@ -518,7 +547,7 @@ export function SurveyStandardAddModal({
                 ? "Xem lại — bấm nút Sửa ở bảng danh mục nếu cần chỉnh."
                 : mode === "edit"
                   ? "Sửa xong bấm Lưu thay đổi — hệ thay toàn bộ các dòng này bằng dữ liệu mới."
-                  : "Có thể thêm nhiều dòng STD (Đất SX/Than SX) và lưu một lần"}
+                  : `Có thể thêm nhiều dòng ${variant.title} và lưu một lần`}
             </p>
           </div>
           <div className="flex items-center gap-1">
@@ -569,12 +598,12 @@ export function SurveyStandardAddModal({
           <p className="mb-3 text-sm text-gray-600 dark:text-gray-400">
             Tổng số{" "}
             <span className="font-semibold text-blue-700 dark:text-blue-400">
-              STD (Đất SX/Than SX): {entries.length}
+              {variant.title}: {entries.length}
             </span>
           </p>
 
           <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
-            <table className="w-full min-w-[2050px] border-collapse text-sm">
+            <table className={`w-full border-collapse text-sm ${variant.hasCoal ? "min-w-[2050px]" : "min-w-[1350px]"}`}>
               <thead>
                 <tr className="bg-gray-100 dark:bg-gray-900 text-center text-xs font-bold text-gray-800 dark:text-gray-100">
                   <th rowSpan={2} className="w-16 border-b border-r border-gray-200 dark:border-gray-700 px-2 py-2 align-middle">
@@ -590,11 +619,13 @@ export function SurveyStandardAddModal({
                     Khoá
                   </th>
                   <th colSpan={7} className="border-b border-r border-gray-200 dark:border-gray-700 px-2 py-2">
-                    Đất SX
+                    {variant.earthLabel}
                   </th>
-                  <th colSpan={7} className="border-b border-r border-gray-200 dark:border-gray-700 px-2 py-2">
-                    Than SX
-                  </th>
+                  {variant.hasCoal && (
+                    <th colSpan={7} className="border-b border-r border-gray-200 dark:border-gray-700 px-2 py-2">
+                      Than SX
+                    </th>
+                  )}
                   <th rowSpan={2} className="border-b border-r border-gray-200 dark:border-gray-700 px-2 py-2 align-middle min-w-[140px]">
                     Ghi chú
                   </th>
@@ -607,20 +638,24 @@ export function SurveyStandardAddModal({
                   <th className="border-b border-r border-gray-200 dark:border-gray-700 px-2 py-1.5 min-w-[100px]">Ký hiệu bùn</th>
                   <th className="border-b border-r border-gray-200 dark:border-gray-700 px-2 py-1.5 min-w-[110px]">Khu vực xúc</th>
                   <th className="border-b border-r border-gray-200 dark:border-gray-700 px-2 py-1.5 min-w-[90px]">Hậu tố</th>
-                  <th className="border-b border-r border-gray-200 dark:border-gray-700 px-2 py-1.5 min-w-[100px]">Đất SX (m3)</th>
+                  <th className="border-b border-r border-gray-200 dark:border-gray-700 px-2 py-1.5 min-w-[100px]">{variant.earthLabel} (m3)</th>
                   <th className="border-b border-r border-gray-200 dark:border-gray-700 px-2 py-1.5 min-w-[90px]">V Tke</th>
                   <th className="border-b border-r border-gray-200 dark:border-gray-700 px-2 py-1.5 min-w-[90px]">Clech</th>
-                  <th className="border-b border-r border-gray-200 dark:border-gray-700 px-2 py-1.5 min-w-[100px]">Đất SX (tấn)</th>
+                  <th className="border-b border-r border-gray-200 dark:border-gray-700 px-2 py-1.5 min-w-[100px]">{variant.earthLabel} (tấn)</th>
                   <th className="border-b border-r border-gray-200 dark:border-gray-700 px-2 py-1.5 min-w-[90px]">CD đất</th>
                   <th className="border-b border-r border-gray-200 dark:border-gray-700 px-2 py-1.5 min-w-[120px]">Thể trọng đất (TĐ)</th>
-                  <th className="border-b border-r border-gray-200 dark:border-gray-700 px-2 py-1.5 min-w-[100px]">Đất SX (tkm)</th>
-                  <th className="border-b border-r border-gray-200 dark:border-gray-700 px-2 py-1.5 min-w-[100px]">Than SX (m3)</th>
-                  <th className="border-b border-r border-gray-200 dark:border-gray-700 px-2 py-1.5 min-w-[120px]">Thể trọng than (TĐ)</th>
-                  <th className="border-b border-r border-gray-200 dark:border-gray-700 px-2 py-1.5 min-w-[100px]">Than SX (tấn)</th>
-                  <th className="border-b border-r border-gray-200 dark:border-gray-700 px-2 py-1.5 min-w-[90px]">Q Tke</th>
-                  <th className="border-b border-r border-gray-200 dark:border-gray-700 px-2 py-1.5 min-w-[90px]">Clech</th>
-                  <th className="border-b border-r border-gray-200 dark:border-gray-700 px-2 py-1.5 min-w-[90px]">CD than</th>
-                  <th className="border-b border-r border-gray-200 dark:border-gray-700 px-2 py-1.5 min-w-[100px]">Than SX (Tkm)</th>
+                  <th className="border-b border-r border-gray-200 dark:border-gray-700 px-2 py-1.5 min-w-[100px]">{variant.earthLabel} (tkm)</th>
+                  {variant.hasCoal && (
+                    <>
+                      <th className="border-b border-r border-gray-200 dark:border-gray-700 px-2 py-1.5 min-w-[100px]">Than SX (m3)</th>
+                      <th className="border-b border-r border-gray-200 dark:border-gray-700 px-2 py-1.5 min-w-[120px]">Thể trọng than (TĐ)</th>
+                      <th className="border-b border-r border-gray-200 dark:border-gray-700 px-2 py-1.5 min-w-[100px]">Than SX (tấn)</th>
+                      <th className="border-b border-r border-gray-200 dark:border-gray-700 px-2 py-1.5 min-w-[90px]">Q Tke</th>
+                      <th className="border-b border-r border-gray-200 dark:border-gray-700 px-2 py-1.5 min-w-[90px]">Clech</th>
+                      <th className="border-b border-r border-gray-200 dark:border-gray-700 px-2 py-1.5 min-w-[90px]">CD than</th>
+                      <th className="border-b border-r border-gray-200 dark:border-gray-700 px-2 py-1.5 min-w-[100px]">Than SX (Tkm)</th>
+                    </>
+                  )}
                 </tr>
               </thead>
               <tbody>
@@ -633,6 +668,7 @@ export function SurveyStandardAddModal({
                     excavationAreas={excavationAreas}
                     excavators={excavators}
                     readOnly={isReadOnly}
+                    hasCoal={variant.hasCoal}
                     canRemove={entries.length > 1}
                     onRemove={() => removeEntry(e.id)}
                     onDuplicate={() => duplicateEntry(e.id)}
@@ -699,6 +735,7 @@ function EntryRow({
   excavationAreas,
   excavators,
   readOnly,
+  hasCoal,
   canRemove,
   onRemove,
   onDuplicate,
@@ -710,6 +747,7 @@ function EntryRow({
   excavationAreas: NamedOption[];
   excavators: NamedOption[];
   readOnly: boolean;
+  hasCoal: boolean;
   canRemove: boolean;
   onRemove: () => void;
   onDuplicate: () => void;
@@ -854,13 +892,17 @@ function EntryRow({
       <NumCell readOnly={readOnly} value={entry.earthBulkDensity} onChange={(v) => onFieldChange("earthBulkDensity", v)} />
       <NumCell readOnly={readOnly} value={entry.earthTkm} onChange={(v) => onFieldChange("earthTkm", v)} />
 
-      <NumCell readOnly={readOnly} value={entry.coalM3} onChange={(v) => onFieldChange("coalM3", v)} />
-      <NumCell readOnly={readOnly} value={entry.coalBulkDensity} onChange={(v) => onFieldChange("coalBulkDensity", v)} />
-      <NumCell readOnly={readOnly} value={entry.coalTon} onChange={(v) => onFieldChange("coalTon", v)} />
-      <NumCell readOnly={readOnly} value={entry.coalDesignVolume} onChange={(v) => onFieldChange("coalDesignVolume", v)} />
-      <NumCell readOnly={readOnly} value={entry.coalDeviation} onChange={(v) => onFieldChange("coalDeviation", v)} />
-      <NumCell readOnly={readOnly} value={entry.coalHaulDistance} onChange={(v) => onFieldChange("coalHaulDistance", v)} />
-      <NumCell readOnly={readOnly} value={entry.coalTkm} onChange={(v) => onFieldChange("coalTkm", v)} />
+      {hasCoal && (
+        <>
+          <NumCell readOnly={readOnly} value={entry.coalM3} onChange={(v) => onFieldChange("coalM3", v)} />
+          <NumCell readOnly={readOnly} value={entry.coalBulkDensity} onChange={(v) => onFieldChange("coalBulkDensity", v)} />
+          <NumCell readOnly={readOnly} value={entry.coalTon} onChange={(v) => onFieldChange("coalTon", v)} />
+          <NumCell readOnly={readOnly} value={entry.coalDesignVolume} onChange={(v) => onFieldChange("coalDesignVolume", v)} />
+          <NumCell readOnly={readOnly} value={entry.coalDeviation} onChange={(v) => onFieldChange("coalDeviation", v)} />
+          <NumCell readOnly={readOnly} value={entry.coalHaulDistance} onChange={(v) => onFieldChange("coalHaulDistance", v)} />
+          <NumCell readOnly={readOnly} value={entry.coalTkm} onChange={(v) => onFieldChange("coalTkm", v)} />
+        </>
+      )}
 
       <td className={cellCls}>
         {readOnly ? (
