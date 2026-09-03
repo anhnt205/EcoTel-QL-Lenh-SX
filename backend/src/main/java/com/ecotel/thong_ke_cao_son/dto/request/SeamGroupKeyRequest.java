@@ -17,6 +17,12 @@ public class SeamGroupKeyRequest {
     String excavator;
     String mudMark;
     String excavationArea;
-    /** Hậu tố người dùng chọn: BK, SPNT, 2,25, dthai. */
+    /** Hậu tố người dùng CHỌN từ danh sách hợp lệ — màn "Dựng khoá" cũ. */
     List<String> suffixes;
+    /**
+     * Hậu tố người dùng GÕ TỰ DO — không lọc qua danh sách hợp lệ. Có mặt
+     * (kể cả rỗng) thì ưu tiên hơn {@link #suffixes}; xem
+     * {@code SeamGroupExcavatorKeys#compose(String, String, String, String, String, String)}.
+     */
+    String suffix;
 }

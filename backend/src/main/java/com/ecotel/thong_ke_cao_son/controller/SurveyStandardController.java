@@ -51,9 +51,16 @@ public class SurveyStandardController {
      */
     @PostMapping("/build-key")
     public ApiResponse<SeamGroupKeyResponse> buildKey(@RequestBody SeamGroupKeyRequest request) {
-        String key = SeamGroupExcavatorKeys.compose(
-                request.getSeamGroup(), request.getBenchGroup(), request.getExcavator(),
-                request.getMudMark(), request.getExcavationArea(), request.getSuffixes());
+        // `suffix` (chuỗi tự do) có mặt thì ưu tiên — màn Thêm mới STD (Đất
+        // SX/Than SX) gõ tự do; `suffixes` (danh sách hợp lệ) là màn "Dựng
+        // khoá" cũ, vẫn giữ nguyên cho STD (Đất CN).
+        String key = request.getSuffix() != null
+                ? SeamGroupExcavatorKeys.compose(
+                        request.getSeamGroup(), request.getBenchGroup(), request.getExcavator(),
+                        request.getMudMark(), request.getExcavationArea(), request.getSuffix())
+                : SeamGroupExcavatorKeys.compose(
+                        request.getSeamGroup(), request.getBenchGroup(), request.getExcavator(),
+                        request.getMudMark(), request.getExcavationArea(), request.getSuffixes());
         return ApiResponse.success(SeamGroupKeyResponse.builder()
                 .key(key)
                 .parts(SeamGroupExcavatorKeys.split(key))

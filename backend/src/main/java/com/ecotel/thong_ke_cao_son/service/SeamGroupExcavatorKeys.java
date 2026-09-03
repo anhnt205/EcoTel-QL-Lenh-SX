@@ -74,6 +74,36 @@ public final class SeamGroupExcavatorKeys {
     }
 
     /**
+     * Ghép khoá cho màn KHAI BÁO danh mục — hậu tố là một chuỗi TỰ DO người
+     * dùng gõ, KHÔNG lọc qua {@link #ALL_SUFFIXES}.
+     *
+     * <p>Khác {@link #compose(String, String, String, String, String, List)}
+     * ở đúng một chỗ: bản kia nhận {@code List<String>} và CHỈ giữ lại giá
+     * trị khớp một trong bốn hậu tố hợp lệ — đúng cho engine, vì
+     * {@link #deriveSuffixes} có thể suy ra nhiều hậu tố cùng lúc và phải
+     * luôn xếp theo đúng thứ tự chuẩn. Nhưng áp cách đó cho ô người dùng tự
+     * gõ thì gõ gì không khớp danh sách sẽ bị ÂM THẦM loại khỏi khoá, không
+     * báo lỗi — người khai báo tưởng đã lưu đúng nhưng khoá thực tế thiếu
+     * mất một đoạn.
+     *
+     * <p>Gõ đúng một hậu tố hợp lệ (hoặc nối đúng thứ tự chuẩn nhiều hậu tố,
+     * cách nhau bằng "_") thì khoá ra HỆT bản engine tự suy — vẫn khớp được
+     * lúc tính sản lượng. Gõ giá trị khác thì khoá không khớp chuyến nào —
+     * đó là lựa chọn của người khai báo, không phải lỗi hệ thống.
+     */
+    public static String compose(String seamGroup, String benchGroup, String excavator,
+                                 String mudMark, String excavationArea, String suffix) {
+        List<String> parts = new ArrayList<>();
+        addIfPresent(parts, seamGroup);
+        addIfPresent(parts, benchGroup);
+        addIfPresent(parts, excavator);
+        addIfPresent(parts, mudMark);
+        addIfPresent(parts, excavationArea);
+        addIfPresent(parts, suffix);
+        return String.join(SEPARATOR, parts);
+    }
+
+    /**
      * Suy hậu tố từ dữ liệu của một chuyến — docx dòng 492–500.
      *
      * <pre>
