@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
-import { Eye, Pencil, Plus } from "lucide-react";
+import { Eye, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import AppDataTable from "@/components/table/AppDataTable";
 import { Button } from "@/components/ui/button";
@@ -141,6 +141,27 @@ export default function DensityParametersPage() {
     setModalOpen(true);
   };
 
+  /** Xoá cả LÔ — tức xoá mọi bản ghi phẳng đứng sau nó, không phải một dòng. */
+  const handleDeleteBatch = async (b: DensityBatch) => {
+    const codes = b.records.map((r) => r.cargoTypeCode).join(", ");
+    if (
+      !window.confirm(
+        `Xoá lô "${formatDate(b.effectiveFrom)} - ${formatDate(b.effectiveTo)}" (${b.excavationAreaName})?\n\n` +
+          `Toàn bộ ${b.records.length} mã hàng trong lô sẽ bị xoá: ${codes}`,
+      )
+    ) {
+      return;
+    }
+    try {
+      await service.bulkRemove(b.records.map((r) => r.id));
+      toast.success(`Đã xoá lô — ${b.records.length} tỷ trọng.`);
+      refetch();
+    } catch (e: unknown) {
+      const res = (e as { response?: { data?: { message?: string } } }).response;
+      toast.error(res?.data?.message ?? "Xoá thất bại.");
+    }
+  };
+
   // ── Xuất / nhập Excel — vẫn thao tác trên BẢN GHI PHẲNG bên dưới lô ───────
   const handleExport = (selectedRows: DensityBatch[]) => {
     const flat = selectedRows.flatMap((b) => b.records) as unknown as Record<string, unknown>[];
@@ -225,24 +246,31 @@ export default function DensityParametersPage() {
       {
         id: "stt",
         header: "STT",
-        size: 60,
+        size: 64,
         cell: ({ row }) => row.index + 1,
       },
       {
         id: "thoiGian",
         header: "Thời gian",
+        // Rộng hẳn để hút hết khoảng trống thừa của bảng — bảng chỉ có 3 cột
+        // dữ liệu, không đủ tự nhiên lấp đầy chiều rộng như các danh mục
+        // khác có 8-10 cột; không khai rộng thì phần thừa dồn hết vào cột
+        // Thao tác, kéo dài ra rất xấu dù chỉ có vài icon.
+        size: 340,
         cell: ({ row }) =>
           `${formatDate(row.original.effectiveFrom)} - ${formatDate(row.original.effectiveTo)}`,
       },
       {
         id: "khuVucXuc",
         header: "Khu vực xúc",
+        size: 420,
         cell: ({ row }) => row.original.excavationAreaName,
       },
       {
         id: "actions",
-        header: "Xem",
-        size: 90,
+        header: "Thao tác",
+        size: 130,
+        meta: { align: "left" },
         cell: ({ row }) => (
           <div className="flex items-center gap-1">
             <button
@@ -258,6 +286,13 @@ export default function DensityParametersPage() {
               className="rounded p-1.5 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/30"
             >
               <Pencil className="h-4 w-4" />
+            </button>
+            <button
+              title="Xoá"
+              onClick={() => handleDeleteBatch(row.original)}
+              className="rounded p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30"
+            >
+              <Trash2 className="h-4 w-4" />
             </button>
           </div>
         ),
