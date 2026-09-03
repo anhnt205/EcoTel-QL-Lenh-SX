@@ -31,23 +31,10 @@ type Rec = Record<string, unknown> & { id?: number };
 export function CatalogPage({
   config,
   extraActions,
-  customAddModal,
 }: {
   config: CatalogConfig;
   /** Nút phụ cạnh "Thêm mới" — vd bộ dựng khoá của màn STD (Đất CN). */
   extraActions?: React.ReactNode;
-  /**
-   * Modal THÊM MỚI tuỳ biến, thay `CatalogFormModal` khi đang ở chế độ thêm
-   * (không dùng khi SỬA — sửa một bản ghi thì modal chung vẫn đủ, không có
-   * lý do phải tuỳ biến). Dùng cho STD (Đất SX/Than SX): sáu ô ghép khoá
-   * "Nhóm vỉa + Máy xúc" nằm ngay trên dòng thay vì một ô gõ tự do, khác
-   * hẳn bố cục phẳng của modal chung.
-   */
-  customAddModal?: (props: {
-    open: boolean;
-    onClose: () => void;
-    onSaved: () => void;
-  }) => React.ReactNode;
 }) {
   const service = useMemo(
     () => createCatalogService<Rec>(config.basePath),
@@ -311,21 +298,13 @@ export function CatalogPage({
         />
       </div>
 
-      {customAddModal && editing === null ? (
-        customAddModal({
-          open: modalOpen,
-          onClose: () => setModalOpen(false),
-          onSaved: refetch,
-        })
-      ) : (
-        <CatalogFormModal
-          config={config}
-          open={modalOpen}
-          editing={editing}
-          onClose={() => setModalOpen(false)}
-          onSaved={refetch}
-        />
-      )}
+      <CatalogFormModal
+        config={config}
+        open={modalOpen}
+        editing={editing}
+        onClose={() => setModalOpen(false)}
+        onSaved={refetch}
+      />
     </div>
   );
 }

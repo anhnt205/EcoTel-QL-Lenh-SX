@@ -86,6 +86,34 @@ public class SurveyStandardService {
     }
 
     /**
+     * Thay THẲNG một tập bản ghi: xoá bản ghi cũ rồi tạo bản ghi mới, trong
+     * CÙNG một giao dịch — dùng cho màn Sửa (mở lại popup "Thêm mới" ở chế
+     * độ ghi, có thể sửa/thêm/xoá dòng rồi lưu đè).
+     *
+     * <p>Không tách được thành "tạo mới rồi xoá cũ" ở tầng gọi (frontend):
+     * trường hợp sửa phổ biến nhất là chỉ đổi số liệu, GIỮ NGUYÊN khoá và
+     * thời gian — khi đó bản ghi cũ và bản ghi mới trùng nguyên khoá + ngày,
+     * và kiểm tra chồng lấn ({@link #build}) sẽ coi chúng là hai bản ghi
+     * CHỒNG NHAU rồi chặn nhầm ngay lúc tạo, trước khi kịp xoá bản cũ.
+     *
+     * <p>Xoá trước — rồi {@code flush()} ngay để câu kiểm tra chồng lấn (một
+     * SELECT riêng, không tự thấy các thay đổi Hibernate chưa ghi xuống) thật
+     * sự không còn thấy bản ghi cũ — và tạo mới trong CÙNG một giao dịch:
+     * bước tạo lỗi thì Spring rollback luôn cả bước xoá, không có khoảng hở
+     * nào để mất dữ liệu giữa chừng.
+     */
+    @Transactional
+    public List<SurveyStandardResponse> replaceBatch(List<Long> deleteIds,
+                                                      List<SurveyStandardRequest> creates) {
+        if (!deleteIds.isEmpty()) {
+            List<SurveyStandard> found = repository.findAllById(deleteIds);
+            repository.deleteAll(found);
+            repository.flush();
+        }
+        return bulkCreate(creates);
+    }
+
+    /**
      * Tra dòng STD có hiệu lực tại một ngày.
      *
      * <p>Engine tính sản lượng gọi hàm này. Không tra được thì <b>ném lỗi rõ

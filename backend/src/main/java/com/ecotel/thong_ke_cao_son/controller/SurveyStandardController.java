@@ -2,6 +2,7 @@ package com.ecotel.thong_ke_cao_son.controller;
 
 import com.ecotel.thong_ke_cao_son.dto.request.BulkDeleteRequest;
 import com.ecotel.thong_ke_cao_son.dto.request.SeamGroupKeyRequest;
+import com.ecotel.thong_ke_cao_son.dto.request.SurveyStandardReplaceRequest;
 import com.ecotel.thong_ke_cao_son.dto.request.SurveyStandardRequest;
 import com.ecotel.thong_ke_cao_son.dto.response.*;
 import com.ecotel.thong_ke_cao_son.model.SurveyStandard;
@@ -119,5 +120,16 @@ public class SurveyStandardController {
     @DeleteMapping("/bulk")
     public ApiResponse<BulkDeleteResponse> bulkDelete(@Valid @RequestBody BulkDeleteRequest request) {
         return ApiResponse.success(service.bulkDelete(request.getIds()));
+    }
+
+    /**
+     * Thay THẲNG một tập bản ghi: xoá bản ghi cũ + tạo bản ghi mới trong MỘT
+     * giao dịch. Dùng cho màn Sửa — xem lý do cần atomic ở
+     * {@link SurveyStandardService#replaceBatch}.
+     */
+    @PutMapping("/batch")
+    public ApiResponse<List<SurveyStandardResponse>> replaceBatch(
+            @Valid @RequestBody SurveyStandardReplaceRequest request) {
+        return ApiResponse.success(service.replaceBatch(request.getDeleteIds(), request.getCreates()));
     }
 }
