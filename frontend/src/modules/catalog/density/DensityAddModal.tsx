@@ -429,7 +429,12 @@ export function DensityAddModal({
                     className="text-sm"
                   />
                 </ComboboxChips>
-                <ComboboxContent anchor={cargoAnchorRef} sideOffset={4} align="start">
+                <ComboboxContent
+                  anchor={cargoAnchorRef}
+                  sideOffset={4}
+                  align="start"
+                  className="z-[120]"
+                >
                   <ComboboxEmpty className="text-xs py-2 text-gray-400">
                     Không tìm thấy chủng loại hàng
                   </ComboboxEmpty>
