@@ -25,6 +25,7 @@ import {
 import api from "@/config/api.config";
 import { createCatalogService } from "../catalogService";
 import { densityParameterConfig } from "../configs";
+import type { DensityBatch } from "./types";
 
 interface CargoTypeOption {
   id: number;
@@ -85,6 +86,11 @@ const parseISO = (s: string) => new Date(`${s}T00:00:00Z`);
 const toISO = (d: Date) => d.toISOString().slice(0, 10);
 const ONE_DAY_MS = 86_400_000;
 
+const formatVN = (s: string) => {
+  const [y, m, d] = s.split("-");
+  return `${d}/${m}/${y}`;
+};
+
 /** Hai khoảng chồng lấn khi khoảng sau bắt đầu trước khi khoảng trước kết thúc. */
 const hasOverlap = (periods: Period[]) => {
   const sorted = [...periods].sort((a, b) =>
@@ -96,9 +102,12 @@ const hasOverlap = (periods: Period[]) => {
   return false;
 };
 
+type Mode = "create" | "view" | "edit";
+
 /**
  * Modal "Thêm mới tỷ trọng" — thiết kế riêng cho danh mục Tỷ trọng, thay cho
- * modal chung `CatalogFormModal`.
+ * modal chung `CatalogFormModal`. Dùng chung cho CẢ BA việc: thêm mới, xem
+ * chi tiết một LÔ đã lưu, và sửa một lô đã lưu — chỉ khác nhau ở `mode`.
  *
  * Khác biệt cốt lõi với modal chung: người dùng không gõ tay từng dòng.
  * Chọn NĂM + Khu vực xúc (áp dụng chung cho cả lượt nhập) rồi chọn NHIỀU mã
@@ -110,14 +119,27 @@ const hasOverlap = (periods: Period[]) => {
  *
  * Lưu xuống vẫn PHẲNG — mỗi khoảng thời gian của mỗi mã hàng là một bản ghi
  * `DensityParameterRequest` riêng, gửi qua `/density-parameters/bulk`. Tầng
- * "phiếu" trên màn hình chỉ là cách nhập cho nhanh, không có gì lưu thêm.
+ * "phiếu"/"lô" trên màn hình chỉ là cách nhập/xem cho nhanh, không có gì lưu
+ * thêm — bảng danh mục ngoài tự gộp lại thành LÔ từ đúng các bản ghi phẳng
+ * này (xem `types.ts#groupIntoBatches`).
+ *
+ * Chế độ SỬA lưu bằng cách THAY THẾ toàn bộ lô: tạo bộ bản ghi mới trước
+ * (nếu lỗi thì dữ liệu cũ còn nguyên, không mất gì), chỉ xoá các bản ghi cũ
+ * SAU KHI tạo mới thành công — tránh khoảng hở kiểu "xoá trước, lỡ tạo mới
+ * lỗi thì mất trắng dữ liệu".
  */
 export function DensityAddModal({
   open,
+  mode = "create",
+  batch,
   onClose,
   onSaved,
 }: {
   open: boolean;
+  /** "create" thêm mới trống · "view" chỉ xem · "edit" sửa một lô đã có. */
+  mode?: Mode;
+  /** Lô hiện có — bắt buộc khi `mode` là "view"/"edit", bỏ trống khi "create". */
+  batch?: DensityBatch;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -125,6 +147,8 @@ export function DensityAddModal({
     () => createCatalogService<DensityParameterPayload>(densityParameterConfig.basePath),
     [],
   );
+
+  const isReadOnly = mode === "view";
 
   const [year, setYear] = useState(currentYear);
   const [excavationAreaId, setExcavationAreaId] = useState<string>("");
@@ -146,16 +170,37 @@ export function DensityAddModal({
   const yearRef = useRef(year);
   yearRef.current = year;
 
-  // Nạp lại từ đầu mỗi lần mở — nhất quán với modal chung: đóng rồi mở lại
-  // coi như một lượt nhập mới.
+  /**
+   * Dữ liệu gốc để dựng nhóm khi `cargoTypeCodes` đổi — bản ghi có sẵn của
+   * lô (view/edit) thắng giá trị mặc định "cả năm, tỷ trọng trống" của chế
+   * độ thêm mới. Khoá bằng mã hàng vì trong MỘT lô, mỗi mã hàng có nhiều
+   * nhất một bản ghi (khoá gộp của lô đã cố định Thời gian + Khu vực xúc).
+   */
+  const seedByCode = useMemo(() => {
+    const m = new Map<string, DensityBatch["records"][number]>();
+    batch?.records.forEach((r) => m.set(r.cargoTypeCode, r));
+    return m;
+  }, [batch]);
+
+  // Nạp lại từ đầu mỗi lần mở. "view"/"edit" nạp từ lô truyền vào; "create"
+  // nạp trống — đóng rồi mở lại coi như một lượt nhập mới. KHÔNG dựng
+  // `groups` ở đây: effect đồng bộ theo `cargoTypeCodes` bên dưới đảm nhiệm
+  // việc đó, để chỉ có DUY NHẤT một chỗ ghi vào `groups` — hai effect cùng
+  // ghi vào state đó trong cùng một lượt render sẽ đua nhau bằng closure cũ
+  // và effect chạy sau ghi đè mất kết quả của effect chạy trước.
   useEffect(() => {
     if (!open) return;
-    setYear(currentYear);
-    setExcavationAreaId("");
-    setCargoTypeCodes([]);
-    setGroups([]);
     setError(null);
-  }, [open]);
+    if (batch) {
+      setYear(Number(batch.effectiveFrom.slice(0, 4)));
+      setExcavationAreaId(batch.excavationAreaId != null ? String(batch.excavationAreaId) : "");
+      setCargoTypeCodes(batch.records.map((r) => r.cargoTypeCode));
+    } else {
+      setYear(currentYear);
+      setExcavationAreaId("");
+      setCargoTypeCodes([]);
+    }
+  }, [open, batch]);
 
   useEffect(() => {
     if (!open) return;
@@ -184,20 +229,35 @@ export function DensityAddModal({
     [cargoTypes],
   );
 
-  // Đồng bộ nhóm theo lựa chọn mã hàng: thêm nhóm mới (một khoảng = cả năm),
-  // giữ nguyên dữ liệu đã gõ của nhóm còn được chọn, bỏ nhóm bị bỏ chọn.
+  // Đồng bộ nhóm theo lựa chọn mã hàng: thêm nhóm mới (kế thừa bản ghi có
+  // sẵn trong `seedByCode` nếu có, không thì một khoảng = cả năm), giữ
+  // nguyên dữ liệu đã gõ của nhóm còn được chọn, bỏ nhóm bị bỏ chọn.
   useEffect(() => {
     setGroups((prev) => {
       const existing = new Map(prev.map((g) => [g.cargoTypeCode, g]));
-      return cargoTypeCodes.map(
-        (code) =>
-          existing.get(code) ?? {
+      return cargoTypeCodes.map((code) => {
+        const already = existing.get(code);
+        if (already) return already;
+        const seed = seedByCode.get(code);
+        if (seed) {
+          return {
             cargoTypeCode: code,
-            periods: [defaultPeriod(yearRef.current, nextPeriodId)],
-          },
-      );
+            periods: [
+              {
+                id: nextPeriodId(),
+                effectiveFrom: seed.effectiveFrom,
+                effectiveTo: seed.effectiveTo,
+                densityWet: String(seed.densityWet),
+                densityDry: String(seed.densityDry),
+                note: seed.note ?? "",
+              },
+            ],
+          };
+        }
+        return { cargoTypeCode: code, periods: [defaultPeriod(yearRef.current, nextPeriodId)] };
+      });
     });
-  }, [cargoTypeCodes]);
+  }, [cargoTypeCodes, seedByCode]);
 
   if (!open) return null;
 
@@ -314,8 +374,24 @@ export function DensityAddModal({
           note: p.note.trim() || null,
         }));
       });
-      await service.bulkCreate(payloads);
-      toast.success(`Đã thêm ${payloads.length} tỷ trọng.`);
+      if (mode === "edit" && batch) {
+        // "Sửa" = thay THẲNG cả lô, một giao dịch backend duy nhất — KHÔNG
+        // gọi tạo-rồi-xoá rời nhau ở đây. Trường hợp sửa phổ biến nhất là
+        // chỉ đổi tỷ trọng, giữ nguyên thời gian; lúc đó bản ghi cũ và bản
+        // ghi mới trùng nguyên khoảng ngày, và nếu tạo trước thì kiểm tra
+        // chồng lấn phía backend sẽ coi chúng là hai bản ghi chồng nhau rồi
+        // chặn nhầm. Backend xoá trước trong cùng giao dịch với tạo mới, và
+        // rollback cả hai nếu tạo lỗi — xem `DensityParameterService#replaceBatch`.
+        const res = await api.put(`${densityParameterConfig.basePath}/batch`, {
+          deleteIds: batch.records.map((r) => r.id),
+          creates: payloads,
+        });
+        const saved = (res.data?.data ?? []) as unknown[];
+        toast.success(`Đã cập nhật lô — ${saved.length} tỷ trọng.`);
+      } else {
+        await service.bulkCreate(payloads);
+        toast.success(`Đã thêm ${payloads.length} tỷ trọng.`);
+      }
       onSaved();
       onClose();
     } catch (e: unknown) {
@@ -327,6 +403,15 @@ export function DensityAddModal({
   };
 
   const totalPeriods = groups.reduce((n, g) => n + g.periods.length, 0);
+
+  const title =
+    mode === "view" ? "Chi tiết tỷ trọng" : mode === "edit" ? "Sửa tỷ trọng" : "Thêm mới tỷ trọng";
+  const subtitle =
+    mode === "view"
+      ? "Xem lại lô đã lưu — bấm nút Sửa ở bảng danh mục nếu cần chỉnh."
+      : mode === "edit"
+        ? "Sửa xong bấm Lưu thay đổi — hệ thay toàn bộ lô cũ bằng dữ liệu mới."
+        : "Chọn năm, khu vực xúc và các mã chủng loại hàng — bảng tự điền, chỉ cần gõ tỷ trọng";
 
   return (
     <div
@@ -342,13 +427,8 @@ export function DensityAddModal({
         {/* Tiêu đề */}
         <div className="flex items-start justify-between border-b border-gray-200 dark:border-gray-800 px-6 py-4">
           <div>
-            <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">
-              Thêm mới tỷ trọng
-            </h2>
-            <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-              Chọn năm, khu vực xúc và các mã chủng loại hàng — bảng tự điền,
-              chỉ cần gõ tỷ trọng
-            </p>
+            <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">{title}</h2>
+            <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{subtitle}</p>
           </div>
           <div className="flex items-center gap-1">
             <button
@@ -373,84 +453,95 @@ export function DensityAddModal({
 
         {/* Thân */}
         <div className="flex-1 overflow-y-auto px-6 py-4">
-          {/* Bộ chọn dùng chung cho cả lượt nhập */}
-          <div className="mb-4 flex flex-wrap items-end gap-4">
-            <Field label="Năm *" className="w-32">
-              <Select value={String(year)} onValueChange={(v) => setYear(Number(v))}>
-                <SelectTrigger className="h-9 text-sm w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="z-[120]">
-                  {YEAR_OPTIONS.map((y) => (
-                    <SelectItem key={y} value={String(y)}>
-                      {y}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </Field>
-
-            <Field label="Khu vực xúc" className="w-56">
-              <Select
-                value={excavationAreaId || "ALL"}
-                onValueChange={(v) => setExcavationAreaId(v === "ALL" ? "" : v)}
-              >
-                <SelectTrigger className="h-9 text-sm w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="z-[120]">
-                  <SelectItem value="ALL">Tất cả khu vực</SelectItem>
-                  {excavationAreas.map((a) => (
-                    <SelectItem key={a.id} value={String(a.id)}>
-                      {a.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </Field>
-
-            <Field label="Mã chủng loại hàng *" className="min-w-[320px] flex-1">
-              <Combobox
-                items={cargoTypes.map((c) => c.code)}
-                multiple
-                value={cargoTypeCodes}
-                onValueChange={setCargoTypeCodes}
-              >
-                <ComboboxChips ref={cargoAnchorRef} className="min-h-9 text-sm">
-                  <ComboboxValue placeholder="Chọn một hoặc nhiều mã...">
-                    {cargoTypeCodes.map((code) => (
-                      <ComboboxChip key={code} className="text-xs py-0.5">
-                        {code}
-                      </ComboboxChip>
+          {isReadOnly ? (
+            <div className="mb-4 flex flex-wrap gap-x-8 gap-y-2 rounded-md border border-gray-200 bg-gray-50 px-4 py-3 text-sm dark:border-gray-700 dark:bg-gray-900/40">
+              <ReadField label="Năm" value={String(year)} />
+              <ReadField
+                label="Khu vực xúc"
+                value={batch?.excavationAreaName ?? "Tất cả khu vực"}
+              />
+              <ReadField label="Số mã hàng" value={String(groups.length)} />
+            </div>
+          ) : (
+            // Bộ chọn dùng chung cho cả lượt nhập
+            <div className="mb-4 flex flex-wrap items-end gap-4">
+              <Field label="Năm *" className="w-32">
+                <Select value={String(year)} onValueChange={(v) => setYear(Number(v))}>
+                  <SelectTrigger className="h-9 text-sm w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="z-[120]">
+                    {YEAR_OPTIONS.map((y) => (
+                      <SelectItem key={y} value={String(y)}>
+                        {y}
+                      </SelectItem>
                     ))}
-                  </ComboboxValue>
-                  <ComboboxChipsInput
-                    placeholder={cargoTypeCodes.length === 0 ? "Chọn một hoặc nhiều mã..." : ""}
-                    className="text-sm"
-                  />
-                </ComboboxChips>
-                <ComboboxContent
-                  anchor={cargoAnchorRef}
-                  sideOffset={4}
-                  align="start"
-                  className="z-[120]"
+                  </SelectContent>
+                </Select>
+              </Field>
+
+              <Field label="Khu vực xúc" className="w-56">
+                <Select
+                  value={excavationAreaId || "ALL"}
+                  onValueChange={(v) => setExcavationAreaId(v === "ALL" ? "" : v)}
                 >
-                  <ComboboxEmpty className="text-xs py-2 text-gray-400">
-                    Không tìm thấy chủng loại hàng
-                  </ComboboxEmpty>
-                  <ComboboxList>
-                    {(code: string) => (
-                      <ComboboxItem key={code} value={code} className="text-sm">
-                        <span className="font-mono text-xs text-gray-500">{code}</span>
-                        {" — "}
-                        {cargoByCode.get(code)?.name ?? code}
-                      </ComboboxItem>
-                    )}
-                  </ComboboxList>
-                </ComboboxContent>
-              </Combobox>
-            </Field>
-          </div>
+                  <SelectTrigger className="h-9 text-sm w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="z-[120]">
+                    <SelectItem value="ALL">Tất cả khu vực</SelectItem>
+                    {excavationAreas.map((a) => (
+                      <SelectItem key={a.id} value={String(a.id)}>
+                        {a.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+
+              <Field label="Mã chủng loại hàng *" className="min-w-[320px] flex-1">
+                <Combobox
+                  items={cargoTypes.map((c) => c.code)}
+                  multiple
+                  value={cargoTypeCodes}
+                  onValueChange={setCargoTypeCodes}
+                >
+                  <ComboboxChips ref={cargoAnchorRef} className="min-h-9 text-sm">
+                    <ComboboxValue placeholder="Chọn một hoặc nhiều mã...">
+                      {cargoTypeCodes.map((code) => (
+                        <ComboboxChip key={code} className="text-xs py-0.5">
+                          {code}
+                        </ComboboxChip>
+                      ))}
+                    </ComboboxValue>
+                    <ComboboxChipsInput
+                      placeholder={cargoTypeCodes.length === 0 ? "Chọn một hoặc nhiều mã..." : ""}
+                      className="text-sm"
+                    />
+                  </ComboboxChips>
+                  <ComboboxContent
+                    anchor={cargoAnchorRef}
+                    sideOffset={4}
+                    align="start"
+                    className="z-[120]"
+                  >
+                    <ComboboxEmpty className="text-xs py-2 text-gray-400">
+                      Không tìm thấy chủng loại hàng
+                    </ComboboxEmpty>
+                    <ComboboxList>
+                      {(code: string) => (
+                        <ComboboxItem key={code} value={code} className="text-sm">
+                          <span className="font-mono text-xs text-gray-500">{code}</span>
+                          {" — "}
+                          {cargoByCode.get(code)?.name ?? code}
+                        </ComboboxItem>
+                      )}
+                    </ComboboxList>
+                  </ComboboxContent>
+                </Combobox>
+              </Field>
+            </div>
+          )}
 
           {groups.length === 0 ? (
             <p className="rounded-md border border-dashed border-gray-300 px-4 py-6 text-center text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">
@@ -483,15 +574,17 @@ export function DensityAddModal({
                       TTL CLH
                     </th>
                     <th className="border-b border-r border-gray-200 dark:border-gray-700 px-3 py-2.5 min-w-[130px]">
-                      Tỷ trọng (không quy ẩm) <span className="text-red-500">*</span>
+                      Tỷ trọng (không quy ẩm) {!isReadOnly && <span className="text-red-500">*</span>}
                     </th>
                     <th className="border-b border-r border-gray-200 dark:border-gray-700 px-3 py-2.5 min-w-[130px]">
-                      Tỷ trọng (quy ẩm) <span className="text-red-500">*</span>
+                      Tỷ trọng (quy ẩm) {!isReadOnly && <span className="text-red-500">*</span>}
                     </th>
                     <th className="border-b border-r border-gray-200 dark:border-gray-700 px-3 py-2.5 min-w-[140px]">
                       Ghi chú
                     </th>
-                    <th className="w-10 border-b border-gray-200 dark:border-gray-700" />
+                    {!isReadOnly && (
+                      <th className="w-10 border-b border-gray-200 dark:border-gray-700" />
+                    )}
                   </tr>
                 </thead>
                 <tbody>
@@ -511,35 +604,43 @@ export function DensityAddModal({
                             {pi === 0 && (
                               <span className="font-semibold text-gray-500">{gi + 1}</span>
                             )}
-                            <button
-                              onClick={() => splitPeriod(gi, p.id)}
-                              title="Tách thời gian này thành hai khoảng"
-                              className="rounded p-0.5 text-gray-400 hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-blue-950/30"
-                            >
-                              <Plus className="h-3.5 w-3.5" />
-                            </button>
+                            {!isReadOnly && (
+                              <button
+                                onClick={() => splitPeriod(gi, p.id)}
+                                title="Tách thời gian này thành hai khoảng"
+                                className="rounded p-0.5 text-gray-400 hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-blue-950/30"
+                              >
+                                <Plus className="h-3.5 w-3.5" />
+                              </button>
+                            )}
                           </div>
                         </td>
                         <td className="border-b border-r border-gray-200 dark:border-gray-700 px-2 py-1.5">
-                          <div className="flex items-center gap-1">
-                            <Input
-                              type="date"
-                              value={p.effectiveFrom}
-                              onChange={(e) =>
-                                setPeriodField(gi, p.id, "effectiveFrom", e.target.value)
-                              }
-                              className="h-9 text-xs"
-                            />
-                            <span className="text-gray-400">–</span>
-                            <Input
-                              type="date"
-                              value={p.effectiveTo}
-                              onChange={(e) =>
-                                setPeriodField(gi, p.id, "effectiveTo", e.target.value)
-                              }
-                              className="h-9 text-xs"
-                            />
-                          </div>
+                          {isReadOnly ? (
+                            <span className="px-1 text-gray-700 dark:text-gray-300">
+                              {formatVN(p.effectiveFrom)} – {formatVN(p.effectiveTo)}
+                            </span>
+                          ) : (
+                            <div className="flex items-center gap-1">
+                              <Input
+                                type="date"
+                                value={p.effectiveFrom}
+                                onChange={(e) =>
+                                  setPeriodField(gi, p.id, "effectiveFrom", e.target.value)
+                                }
+                                className="h-9 text-xs"
+                              />
+                              <span className="text-gray-400">–</span>
+                              <Input
+                                type="date"
+                                value={p.effectiveTo}
+                                onChange={(e) =>
+                                  setPeriodField(gi, p.id, "effectiveTo", e.target.value)
+                                }
+                                className="h-9 text-xs"
+                              />
+                            </div>
+                          )}
                         </td>
                         <td className="border-b border-r border-gray-200 dark:border-gray-700 px-3 py-2 text-gray-700 dark:text-gray-300">
                           {g.cargoTypeCode}
@@ -557,46 +658,60 @@ export function DensityAddModal({
                           {cargo?.ttlClhName ?? ""}
                         </td>
                         <td className="border-b border-r border-gray-200 dark:border-gray-700 px-2 py-1.5">
-                          <Input
-                            type="number"
-                            step="any"
-                            value={p.densityDry}
-                            onChange={(e) =>
-                              setPeriodField(gi, p.id, "densityDry", e.target.value)
-                            }
-                            className="h-9 text-sm"
-                          />
-                        </td>
-                        <td className="border-b border-r border-gray-200 dark:border-gray-700 px-2 py-1.5">
-                          <Input
-                            type="number"
-                            step="any"
-                            value={p.densityWet}
-                            onChange={(e) =>
-                              setPeriodField(gi, p.id, "densityWet", e.target.value)
-                            }
-                            className="h-9 text-sm"
-                          />
-                        </td>
-                        <td className="border-b border-r border-gray-200 dark:border-gray-700 px-2 py-1.5">
-                          <Input
-                            value={p.note}
-                            onChange={(e) => setPeriodField(gi, p.id, "note", e.target.value)}
-                            placeholder="Giai đoạn..."
-                            className="h-9 text-sm"
-                          />
-                        </td>
-                        <td className="border-b border-gray-200 dark:border-gray-700 px-2 py-1.5 text-center">
-                          {g.periods.length > 1 && (
-                            <button
-                              onClick={() => removePeriod(gi, p.id)}
-                              title="Xoá khoảng thời gian này"
-                              className="rounded p-1 text-red-500 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950/30"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
+                          {isReadOnly ? (
+                            <span className="px-1">{p.densityDry}</span>
+                          ) : (
+                            <Input
+                              type="number"
+                              step="any"
+                              value={p.densityDry}
+                              onChange={(e) =>
+                                setPeriodField(gi, p.id, "densityDry", e.target.value)
+                              }
+                              className="h-9 text-sm"
+                            />
                           )}
                         </td>
+                        <td className="border-b border-r border-gray-200 dark:border-gray-700 px-2 py-1.5">
+                          {isReadOnly ? (
+                            <span className="px-1">{p.densityWet}</span>
+                          ) : (
+                            <Input
+                              type="number"
+                              step="any"
+                              value={p.densityWet}
+                              onChange={(e) =>
+                                setPeriodField(gi, p.id, "densityWet", e.target.value)
+                              }
+                              className="h-9 text-sm"
+                            />
+                          )}
+                        </td>
+                        <td className="border-b border-r border-gray-200 dark:border-gray-700 px-2 py-1.5">
+                          {isReadOnly ? (
+                            <span className="px-1 text-gray-500">{p.note || "—"}</span>
+                          ) : (
+                            <Input
+                              value={p.note}
+                              onChange={(e) => setPeriodField(gi, p.id, "note", e.target.value)}
+                              placeholder="Giai đoạn..."
+                              className="h-9 text-sm"
+                            />
+                          )}
+                        </td>
+                        {!isReadOnly && (
+                          <td className="border-b border-gray-200 dark:border-gray-700 px-2 py-1.5 text-center">
+                            {g.periods.length > 1 && (
+                              <button
+                                onClick={() => removePeriod(gi, p.id)}
+                                title="Xoá khoảng thời gian này"
+                                className="rounded p-1 text-red-500 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950/30"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            )}
+                          </td>
+                        )}
                       </tr>
                     ));
                   })}
@@ -605,7 +720,7 @@ export function DensityAddModal({
             </div>
           )}
 
-          {groups.length > 0 && (
+          {groups.length > 0 && !isReadOnly && (
             <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
               Tổng số{" "}
               <span className="font-semibold text-blue-700 dark:text-blue-400">
@@ -623,16 +738,28 @@ export function DensityAddModal({
 
         {/* Chân */}
         <div className="flex justify-end gap-3 border-t border-gray-200 dark:border-gray-800 px-6 py-4">
-          <Button variant="outline" onClick={onClose} disabled={submitting}>
-            Huỷ
-          </Button>
-          <Button
-            onClick={handleSubmit}
-            disabled={submitting}
-            className="bg-blue-600 font-semibold text-white hover:bg-blue-700"
-          >
-            {submitting ? "Đang lưu..." : "Xác nhận"}
-          </Button>
+          {isReadOnly ? (
+            <Button variant="outline" onClick={onClose}>
+              Đóng
+            </Button>
+          ) : (
+            <>
+              <Button variant="outline" onClick={onClose} disabled={submitting}>
+                Huỷ
+              </Button>
+              <Button
+                onClick={handleSubmit}
+                disabled={submitting}
+                className="bg-blue-600 font-semibold text-white hover:bg-blue-700"
+              >
+                {submitting
+                  ? "Đang lưu..."
+                  : mode === "edit"
+                    ? "Lưu thay đổi"
+                    : "Xác nhận"}
+              </Button>
+            </>
+          )}
         </div>
       </div>
     </div>
@@ -652,6 +779,15 @@ function Field({
     <div className={`flex flex-col gap-1 ${className ?? ""}`}>
       <span className="text-xs font-medium text-gray-600 dark:text-gray-400">{label}</span>
       {children}
+    </div>
+  );
+}
+
+function ReadField({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-baseline gap-1.5">
+      <span className="text-xs font-medium text-gray-500 dark:text-gray-400">{label}:</span>
+      <span className="font-semibold text-gray-800 dark:text-gray-200">{value}</span>
     </div>
   );
 }

@@ -89,6 +89,34 @@ public class DensityParameterService {
     }
 
     /**
+     * Thay THẲNG một lô: xoá các bản ghi cũ rồi tạo bản ghi mới, trong CÙNG
+     * một giao dịch — dùng cho màn "Sửa tỷ trọng" khi người dùng nộp lại cả
+     * lô (nhiều mã hàng cùng một Thời gian + Khu vực xúc) sau khi sửa.
+     *
+     * <p>Không tách được thành "tạo mới rồi xoá cũ" ở tầng gọi (frontend):
+     * trường hợp sửa phổ biến nhất là chỉ đổi tỷ trọng, GIỮ NGUYÊN thời
+     * gian — khi đó bản ghi cũ và bản ghi mới trùng nguyên khoảng ngày, và
+     * kiểm tra chồng lấn ({@link #build}) sẽ coi chúng là hai bản ghi CHỒNG
+     * NHAU rồi chặn nhầm ngay lúc tạo, trước khi kịp xoá bản cũ.
+     *
+     * <p>Xoá trước — rồi {@code flush()} ngay để câu kiểm tra chồng lấn (một
+     * SELECT riêng, không tự thấy các thay đổi Hibernate chưa ghi xuống) thật
+     * sự không còn thấy bản ghi cũ — và tạo mới trong CÙNG một giao dịch:
+     * bước tạo lỗi thì Spring rollback luôn cả bước xoá, không có khoảng hở
+     * nào để mất dữ liệu giữa chừng.
+     */
+    @Transactional
+    public List<DensityParameterResponse> replaceBatch(List<Long> deleteIds,
+                                                        List<DensityParameterRequest> creates) {
+        if (!deleteIds.isEmpty()) {
+            List<DensityParameter> found = repository.findAllById(deleteIds);
+            repository.deleteAll(found);
+            repository.flush();
+        }
+        return bulkCreate(creates);
+    }
+
+    /**
      * Tra tỷ trọng có hiệu lực tại một ngày.
      *
      * <p>Đây là điểm mà engine tính sản lượng sẽ gọi. Hai quy tắc của QĐ-04

@@ -1,6 +1,7 @@
 package com.ecotel.thong_ke_cao_son.controller;
 
 import com.ecotel.thong_ke_cao_son.dto.request.BulkDeleteRequest;
+import com.ecotel.thong_ke_cao_son.dto.request.DensityParameterReplaceRequest;
 import com.ecotel.thong_ke_cao_son.dto.request.DensityParameterRequest;
 import com.ecotel.thong_ke_cao_son.dto.response.ApiResponse;
 import com.ecotel.thong_ke_cao_son.dto.response.BulkDeleteResponse;
@@ -81,5 +82,16 @@ public class DensityParameterController {
     @DeleteMapping("/bulk")
     public ApiResponse<BulkDeleteResponse> bulkDelete(@Valid @RequestBody BulkDeleteRequest request) {
         return ApiResponse.success(service.bulkDelete(request.getIds()));
+    }
+
+    /**
+     * Thay THẲNG một lô: xoá bản ghi cũ + tạo bản ghi mới trong MỘT giao
+     * dịch. Dùng cho màn "Sửa tỷ trọng" — xem lý do cần atomic ở
+     * {@link DensityParameterService#replaceBatch}.
+     */
+    @PutMapping("/batch")
+    public ApiResponse<List<DensityParameterResponse>> replaceBatch(
+            @Valid @RequestBody DensityParameterReplaceRequest request) {
+        return ApiResponse.success(service.replaceBatch(request.getDeleteIds(), request.getCreates()));
     }
 }
