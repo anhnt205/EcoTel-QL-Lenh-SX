@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Copy, Maximize, Minimize, Plus, Trash2, X } from "lucide-react";
+import { Maximize, Minimize, Plus, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -253,8 +253,7 @@ export function SurveyStandardAddModal({
   const isReadOnly = mode === "view";
   const variant = STD_VARIANTS[catalogType];
 
-  const [batchFrom, setBatchFrom] = useState(`${currentYear}-01-01`);
-  const [batchTo, setBatchTo] = useState(`${currentYear}-12-31`);
+  const [year, setYear] = useState(currentYear);
   const [entries, setEntries] = useState<Entry[]>([]);
   const [seamGroups, setSeamGroups] = useState<NamedOption[]>([]);
   const [excavationAreas, setExcavationAreas] = useState<NamedOption[]>([]);
@@ -270,22 +269,26 @@ export function SurveyStandardAddModal({
   // handleSubmit). Chụp lại đúng lúc mở, không đổi theo entries về sau.
   const originalIdsRef = useRef<number[]>([]);
 
-  // batchFrom/batchTo đổi không được kéo lùi ngày của các dòng ĐÃ có — chỉ
-  // dòng MỚI thêm sau đó mới dùng khoảng mặc định hiện tại.
-  const batchRef = useRef({ batchFrom, batchTo });
-  batchRef.current = { batchFrom, batchTo };
+  // year đổi không được kéo lùi ngày của các dòng ĐÃ có — chỉ dòng MỚI thêm
+  // sau đó mới dùng khoảng mặc định (1/1 – 31/12 của năm) hiện tại.
+  const yearRef = useRef(year);
+  yearRef.current = year;
 
-  // Nạp lại từ đầu mỗi lần mở. "view"/"edit" nạp từ các bản ghi truyền vào;
-  // "create" nạp trống — đóng rồi mở lại coi như một lượt khai mới.
+  // Nạp lại từ đầu mỗi lần mở. "view"/"edit" nạp từ các bản ghi truyền vào —
+  // năm mặc định lấy theo năm của dòng đầu (mọi dòng trong một lượt Xem/Sửa
+  // đều thuộc cùng một năm, vì bảng ngoài đã gộp theo năm trước khi mở modal
+  // này). "create" nạp trống, năm mặc định là năm hiện tại — đóng rồi mở lại
+  // coi như một lượt khai mới.
   useEffect(() => {
     if (!open) return;
     setError(null);
-    setBatchFrom(`${currentYear}-01-01`);
-    setBatchTo(`${currentYear}-12-31`);
     if (records && records.length > 0) {
+      const y = parseInt(records[0].effectiveFrom.slice(0, 4), 10);
+      setYear(Number.isNaN(y) ? currentYear : y);
       originalIdsRef.current = records.map((r) => r.id);
       setEntries(records.map((r) => entryFromRecord(r, nextEntryId)));
     } else {
+      setYear(currentYear);
       originalIdsRef.current = [];
       setEntries([emptyEntry(`${currentYear}-01-01`, `${currentYear}-12-31`, nextEntryId)]);
     }
@@ -362,7 +365,7 @@ export function SurveyStandardAddModal({
   const addEntry = () =>
     setEntries((prev) => [
       ...prev,
-      emptyEntry(batchRef.current.batchFrom, batchRef.current.batchTo, nextEntryId),
+      emptyEntry(`${yearRef.current}-01-01`, `${yearRef.current}-12-31`, nextEntryId),
     ]);
 
   const removeEntry = (id: number) =>
@@ -572,25 +575,18 @@ export function SurveyStandardAddModal({
           {/* Thời gian mặc định — chỉ áp cho dòng MỚI thêm sau đó, không cần khi chỉ xem */}
           {!isReadOnly && (
             <div className="mb-4 flex flex-wrap items-end gap-4">
-              <Field label="Thời gian *">
-                <div className="flex items-center gap-1.5">
-                  <Input
-                    type="date"
-                    value={batchFrom}
-                    onChange={(e) => setBatchFrom(e.target.value)}
-                    className="h-9 w-[150px] text-sm"
-                  />
-                  <span className="text-gray-400">–</span>
-                  <Input
-                    type="date"
-                    value={batchTo}
-                    onChange={(e) => setBatchTo(e.target.value)}
-                    className="h-9 w-[150px] text-sm"
-                  />
-                </div>
+              <Field label="Thời gian * (năm)">
+                <Input
+                  type="number"
+                  value={year}
+                  onChange={(e) => setYear(Number(e.target.value))}
+                  className="h-9 w-[110px] text-sm"
+                />
               </Field>
               <p className="pb-2 text-xs text-gray-500 dark:text-gray-400">
-                Khoảng mặc định cho dòng thêm mới — dòng đã có giữ nguyên thời gian đã sửa.
+                Mặc định 1/1 – 31/12 của năm này cho dòng thêm mới — dòng đã có giữ nguyên thời
+                gian đã sửa. Bấm "+" ở mỗi dòng để tách một khoảng thời gian thành hai khoảng
+                không trùng nhau, chi tiết hơn trong năm.
               </p>
             </div>
           )}
@@ -764,10 +760,10 @@ function EntryRow({
           {!readOnly && (
             <button
               onClick={onDuplicate}
-              title="Chép dòng này thành dòng mới, chia đôi khoảng thời gian còn lại"
+              title="Tách dòng này thành hai khoảng thời gian không trùng nhau"
               className="rounded p-0.5 text-gray-400 hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-blue-950/30"
             >
-              <Copy className="h-3.5 w-3.5" />
+              <Plus className="h-3.5 w-3.5" />
             </button>
           )}
         </div>
