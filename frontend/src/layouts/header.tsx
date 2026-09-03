@@ -18,6 +18,7 @@ import {
   Building2,
   Clock,
   FileCheck,
+  Ruler,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -370,6 +371,15 @@ export function Header() {
                 >
                   <Clock className="h-4 w-4 text-blue-600" />
                   STD (Đất SX/Than SX)
+                </NavLink>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <NavLink
+                  to={ROUTES.DANH_MUC.AP_TRAC_DIA}
+                  className="flex items-center gap-2 px-2.5 py-2 text-sm rounded hover:bg-blue-50 cursor-pointer"
+                >
+                  <Ruler className="h-4 w-4 text-blue-600" />
+                  Áp Trắc Địa (m3-tấn-tkm)
                 </NavLink>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>

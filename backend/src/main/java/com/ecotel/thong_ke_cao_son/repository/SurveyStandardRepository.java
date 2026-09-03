@@ -61,4 +61,7 @@ public interface SurveyStandardRepository extends JpaRepository<SurveyStandard, 
         ORDER BY s.seamGroupExcavatorKey
         """)
     List<String> findDistinctKeys();
+
+    /** Tra "Máy xúc" hiển thị theo khoá — dùng cho báo cáo Áp Trắc Địa. */
+    List<SurveyStandard> findBySeamGroupExcavatorKeyIn(List<String> keys);
 }

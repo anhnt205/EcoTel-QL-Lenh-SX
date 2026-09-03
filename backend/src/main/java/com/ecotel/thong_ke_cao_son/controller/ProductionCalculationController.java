@@ -3,6 +3,7 @@ package com.ecotel.thong_ke_cao_son.controller;
 import com.ecotel.thong_ke_cao_son.dto.response.*;
 import com.ecotel.thong_ke_cao_son.model.SurveyCoefficient;
 import com.ecotel.thong_ke_cao_son.repository.SurveyCoefficientRepository;
+import com.ecotel.thong_ke_cao_son.service.production.AreaApplicationReportService;
 import com.ecotel.thong_ke_cao_son.service.production.ProductionCalculationService;
 import com.ecotel.thong_ke_cao_son.service.production.ProductionReportService;
 import lombok.RequiredArgsConstructor;
@@ -27,6 +28,7 @@ public class ProductionCalculationController {
     private final ProductionCalculationService calculationService;
     private final ProductionReportService reportService;
     private final SurveyCoefficientRepository coefficientRepository;
+    private final AreaApplicationReportService areaApplicationReportService;
 
     /**
      * Tính lại toàn bộ một kỳ. Xoá kết quả cũ của kỳ trước khi tính.
@@ -66,5 +68,17 @@ public class ProductionCalculationController {
     public ApiResponse<List<SurveyCoefficient>> coefficients(@RequestParam Long periodId) {
         return ApiResponse.success(
                 coefficientRepository.findByReportPeriodIdOrderBySeamGroupExcavatorKeyAsc(periodId));
+    }
+
+    /**
+     * Danh mục "AP Tdia (m3-tấn-tkm)" (chỉ xem) — gộp theo tháng, đọc từ hệ số
+     * trắc địa mà "Tính lại kỳ" đã sinh sẵn cho các kỳ trong tháng đó.
+     */
+    @GetMapping("/ap-tracdia")
+    public ApiResponse<List<AreaApplicationRowResponse>> apTracDia(
+            @RequestParam int year, @RequestParam int month,
+            @RequestParam(required = false) String excavatorCode,
+            @RequestParam(required = false) String key) {
+        return ApiResponse.success(areaApplicationReportService.getMonth(year, month, excavatorCode, key));
     }
 }

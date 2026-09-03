@@ -59,6 +59,7 @@ const FuelAdjustMatrixPage = lazy(() => import("@/modules/catalog/pages/FuelAdju
 const DensityParametersPage = lazy(() => import("@/modules/catalog/pages/DensityParameters"));
 const SurveyStandardDatCnPage = lazy(() => import("@/modules/catalog/pages/SurveyStandardDatCn"));
 const SurveyStandardDatSxPage = lazy(() => import("@/modules/catalog/pages/SurveyStandardDatSx"));
+const AreaApplicationReportPage = lazy(() => import("@/modules/production/AreaApplicationReportPage"));
 const VehicleProductionAttrsPage = lazy(() => import("@/modules/catalog/pages/VehicleProductionAttrs"));
 const MachineProductionAttrsPage = lazy(() => import("@/modules/catalog/pages/MachineProductionAttrs"));
 
@@ -350,6 +351,14 @@ export const mainRoutes = (
         element={
           <Suspense fallback={<PageLoader />}>
             <SurveyStandardDatSxPage />
+          </Suspense>
+        }
+      />
+      <Route
+        path={ROUTES.DANH_MUC.AP_TRAC_DIA}
+        element={
+          <Suspense fallback={<PageLoader />}>
+            <AreaApplicationReportPage />
           </Suspense>
         }
       />

@@ -101,6 +101,46 @@ export interface SurveyCoefficientRow {
   tripCount: number | null;
 }
 
+/**
+ * Một dòng danh mục "AP Tdia (m3-tấn-tkm)" (chỉ xem) — khớp
+ * `AreaApplicationRowResponse` phía backend. Gộp theo tháng, PIVOT ba khối
+ * Đất CN / Đất SX / Than từ các dòng `SurveyCoefficient` (kind AP_TDIA) mà
+ * "Tính lại kỳ" ở màn Báo cáo thống kê đã sinh sẵn — không tính lại gì mới.
+ */
+export interface AreaApplicationRow {
+  year: number;
+  month: number;
+  excavatorCode: string | null;
+  seamGroupExcavatorKey: string;
+  earthCnTotalM3: number | null;
+  earthCnTotalTon: number | null;
+  earthCnTotalTkm: number | null;
+  earthSxTotalM3: number | null;
+  earthSxTotalTon: number | null;
+  earthSxTotalTkm: number | null;
+  coalTotalM3: number | null;
+  coalTotalTon: number | null;
+  coalTotalTkm: number | null;
+  earthCnSurveyM3: number | null;
+  earthCnSurveyTon: number | null;
+  earthCnSurveyTkm: number | null;
+  earthSxSurveyM3: number | null;
+  earthSxSurveyTon: number | null;
+  earthSxSurveyTkm: number | null;
+  coalSurveyM3: number | null;
+  coalSurveyTon: number | null;
+  coalSurveyTkm: number | null;
+  earthCnHsM3: number | null;
+  earthCnHsTon: number | null;
+  earthCnHsTkm: number | null;
+  earthSxHsM3: number | null;
+  earthSxHsTon: number | null;
+  earthSxHsTkm: number | null;
+  coalHsM3: number | null;
+  coalHsTon: number | null;
+  coalHsTkm: number | null;
+}
+
 const unwrap = <T,>(res: { data?: { data?: T } }): T => res.data?.data as T;
 
 export const productionService = {
@@ -129,4 +169,16 @@ export const productionService = {
 
   calculate: async (periodId: number, tkeMode: boolean): Promise<CalculationSummary> =>
     unwrap(await api.post("/production/calculate", null, { params: { periodId, tkeMode } })),
+
+  apTracDia: async (
+    year: number,
+    month: number,
+    excavatorCode?: string,
+    key?: string,
+  ): Promise<AreaApplicationRow[]> =>
+    unwrap(
+      await api.get("/production/ap-tracdia", {
+        params: { year, month, excavatorCode: excavatorCode || undefined, key: key || undefined },
+      }),
+    ) ?? [],
 };

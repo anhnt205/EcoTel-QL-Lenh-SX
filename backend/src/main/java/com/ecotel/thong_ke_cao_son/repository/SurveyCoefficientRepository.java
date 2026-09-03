@@ -16,6 +16,9 @@ public interface SurveyCoefficientRepository extends JpaRepository<SurveyCoeffic
 
     List<SurveyCoefficient> findByReportPeriodIdOrderBySeamGroupExcavatorKeyAsc(Long reportPeriodId);
 
+    /** Gộp nhiều kỳ trong CÙNG một tháng — dùng cho báo cáo Áp Trắc Địa theo tháng. */
+    List<SurveyCoefficient> findByReportPeriodIdInAndKind(List<Long> reportPeriodIds, SurveyCoefficient.Kind kind);
+
     @Modifying
     @Query("DELETE FROM SurveyCoefficient c WHERE c.reportPeriod.id = :periodId")
     int deleteByPeriod(@Param("periodId") Long periodId);
