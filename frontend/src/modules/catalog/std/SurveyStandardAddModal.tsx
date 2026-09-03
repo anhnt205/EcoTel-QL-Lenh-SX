@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Maximize, Minimize, Plus, Trash2, X } from "lucide-react";
+import { Copy, Maximize, Minimize, Plus, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,28 +39,24 @@ interface SurveyStandardPayload {
   note: string | null;
 }
 
-/** Sáu thành phần ghép khoá "Nhóm vỉa + Máy xúc" — áp cho CẢ HÀNG, không đổi theo từng khoảng thời gian. */
-interface KeyFields {
+/**
+ * Một dòng khai báo — ĐỘC LẬP hoàn toàn với các dòng khác.
+ *
+ * Sáu ô ghép khoá + khoảng thời gian + 14 ô giá trị đều thuộc về đúng MỘT
+ * dòng. Không có khái niệm "một khoá, nhiều khoảng thời gian dùng chung" —
+ * bấm "+" chỉ COPY dòng hiện tại thành một dòng mới độc lập, không ràng
+ * buộc hai dòng phải cùng khoá.
+ */
+interface Entry {
+  id: number;
   seamGroup: string;
   benchGroup: string;
   excavator: string;
   mudMark: string;
   excavationArea: string;
   suffix: string;
-}
-
-const emptyKeyFields = (): KeyFields => ({
-  seamGroup: "",
-  benchGroup: "",
-  excavator: "",
-  mudMark: "",
-  excavationArea: "",
-  suffix: "",
-});
-
-/** Một khoảng thời gian hiệu lực, kèm 14 ô giá trị Đất SX/Than SX của riêng nó. */
-interface Period {
-  id: number;
+  /** Khoá đã ghép — luôn tính ở BACKEND, không tự ghép ở đây (xem doc đầu file). */
+  composedKey: string;
   effectiveFrom: string;
   effectiveTo: string;
   earthM3: string;
@@ -80,8 +76,15 @@ interface Period {
   note: string;
 }
 
-const emptyPeriod = (from: string, to: string, nextId: () => number): Period => ({
+const emptyEntry = (from: string, to: string, nextId: () => number): Entry => ({
   id: nextId(),
+  seamGroup: "",
+  benchGroup: "",
+  excavator: "",
+  mudMark: "",
+  excavationArea: "",
+  suffix: "",
+  composedKey: "",
   effectiveFrom: from,
   effectiveTo: to,
   earthM3: "",
@@ -101,14 +104,7 @@ const emptyPeriod = (from: string, to: string, nextId: () => number): Period => 
   note: "",
 });
 
-/** Một dòng khai báo = một khoá "Nhóm vỉa + Máy xúc", có thể có nhiều khoảng thời gian. */
-interface Row {
-  id: number;
-  key: KeyFields;
-  /** Khoá đã ghép — luôn tính ở BACKEND, không tự ghép ở đây (xem doc dưới). */
-  composedKey: string;
-  periods: Period[];
-}
+const KEY_FIELDS = ["seamGroup", "benchGroup", "excavator", "mudMark", "excavationArea", "suffix"] as const;
 
 const currentYear = new Date().getFullYear();
 
@@ -122,15 +118,6 @@ const numOrNull = (s: string): number | null => {
   return t === "" ? null : Number(t.replace(",", "."));
 };
 
-/** Hai khoảng chồng lấn khi khoảng sau bắt đầu trước khi khoảng trước kết thúc. */
-const hasOverlap = (periods: Period[]) => {
-  const sorted = [...periods].sort((a, b) => a.effectiveFrom.localeCompare(b.effectiveFrom));
-  for (let i = 1; i < sorted.length; i++) {
-    if (sorted[i].effectiveFrom <= sorted[i - 1].effectiveTo) return true;
-  }
-  return false;
-};
-
 const service = createCatalogService<SurveyStandardPayload>(surveyStandardDatSxConfig.basePath);
 
 /**
@@ -141,7 +128,7 @@ const service = createCatalogService<SurveyStandardPayload>(surveyStandardDatSxC
  * DO — người dùng phải mở một hộp thoại "Dựng khoá" riêng, chép chuỗi kết
  * quả, rồi dán tay vào ô đó (xem {@link ../std/SeamGroupKeyBuilder}, vẫn
  * dùng ở màn STD (Đất CN)). Ở đây SÁU thành phần của khoá nằm NGAY trên
- * dòng, và khoá được ghép sống — gõ đến đâu, dòng chữ khoá hiện ra đến đó.
+ * dòng, và khoá được ghép sống — gõ đến đâu, cột "Khoá" hiện ra đến đó.
  *
  * <b>Khoá luôn ghép ở BACKEND</b> (gọi {@code POST /survey-standards/build-key}),
  * không tự ghép ở đây: đây chính là hàm engine tính sản lượng dùng để suy
@@ -149,14 +136,14 @@ const service = createCatalogService<SurveyStandardPayload>(surveyStandardDatSxC
  * mục sẽ không bao giờ khớp, và triệu chứng là "thiếu dữ liệu STD" chứ
  * không phải một lỗi rõ ràng.
  *
- * <b>Một DÒNG = một khoá, có thể nhiều KHOẢNG THỜI GIAN.</b> Sáu ô ghép khoá
- * áp cho cả dòng — tách thời gian không đổi khoá, vì cùng một vỉa + máy xúc
- * vật lý chỉ đổi số liệu trắc địa theo giai đoạn, không đổi máy xúc. Nút
- * "+" trên MỌI khoảng đều tách được — bấm lại vào khoảng vừa tách để chia
- * tiếp, tuỳ ý. Muốn khai một khoá KHÁC hẳn thì bấm "Thêm dòng mới" ở cuối
- * bảng — đó mới là dòng độc lập.
+ * <b>Mỗi dòng ĐỘC LẬP hoàn toàn</b> — không có khái niệm "một khoá dùng
+ * chung cho nhiều khoảng thời gian". Nút "+" COPY dòng hiện tại (cả sáu ô
+ * khoá lẫn 14 ô giá trị) thành một dòng mới ngay bên dưới, với khoảng thời
+ * gian chia đôi phần còn lại — người dùng sửa tiếp từ đó, kể cả đổi hẳn
+ * sang máy xúc/khu vực khác nếu dòng mới thật ra là một khoá khác. Muốn
+ * một dòng hoàn toàn trống thì bấm "Thêm dòng mới" ở cuối bảng.
  *
- * Lưu xuống vẫn PHẲNG: mỗi khoảng thời gian của mỗi dòng là một bản ghi
+ * Lưu xuống PHẲNG: mỗi dòng trên màn hình là một bản ghi
  * `SurveyStandardRequest` riêng, gửi qua `/survey-standards/bulk`.
  */
 export function SurveyStandardAddModal({
@@ -170,7 +157,7 @@ export function SurveyStandardAddModal({
 }) {
   const [batchFrom, setBatchFrom] = useState(`${currentYear}-01-01`);
   const [batchTo, setBatchTo] = useState(`${currentYear}-12-31`);
-  const [rows, setRows] = useState<Row[]>([]);
+  const [entries, setEntries] = useState<Entry[]>([]);
   const [seamGroups, setSeamGroups] = useState<NamedOption[]>([]);
   const [excavationAreas, setExcavationAreas] = useState<NamedOption[]>([]);
   const [excavators, setExcavators] = useState<NamedOption[]>([]);
@@ -178,21 +165,11 @@ export function SurveyStandardAddModal({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const rowIdRef = useRef(0);
-  const nextRowId = () => ++rowIdRef.current;
-  const periodIdRef = useRef(0);
-  const nextPeriodId = () => ++periodIdRef.current;
-
-  const makeRow = (): Row => ({
-    id: nextRowId(),
-    key: emptyKeyFields(),
-    composedKey: "",
-    periods: [emptyPeriod(batchFrom, batchTo, nextPeriodId)],
-  });
+  const entryIdRef = useRef(0);
+  const nextEntryId = () => ++entryIdRef.current;
 
   // batchFrom/batchTo đổi không được kéo lùi ngày của các dòng ĐÃ có — chỉ
-  // dòng MỚI thêm sau đó mới dùng khoảng mặc định hiện tại. Giữ trong ref để
-  // `addRow` không cần đưa batchFrom/batchTo vào deps của nơi gọi.
+  // dòng MỚI thêm sau đó mới dùng khoảng mặc định hiện tại.
   const batchRef = useRef({ batchFrom, batchTo });
   batchRef.current = { batchFrom, batchTo };
 
@@ -201,7 +178,7 @@ export function SurveyStandardAddModal({
     if (!open) return;
     setBatchFrom(`${currentYear}-01-01`);
     setBatchTo(`${currentYear}-12-31`);
-    setRows([makeRow()]);
+    setEntries([emptyEntry(`${currentYear}-01-01`, `${currentYear}-12-31`, nextEntryId)]);
     setError(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
@@ -236,29 +213,31 @@ export function SurveyStandardAddModal({
     })();
   }, [open]);
 
-  // Ghép khoá SỐNG cho mọi dòng — gọi backend mỗi khi sáu ô của dòng nào đó
-  // đổi. Debounce 300ms để không gọi dồn dập lúc đang gõ.
-  const keySignature = JSON.stringify(rows.map((r) => r.key));
+  // Ghép khoá SỐNG cho mọi dòng — gọi backend mỗi khi sáu ô khoá của dòng
+  // nào đó đổi. Debounce 300ms để không gọi dồn dập lúc đang gõ.
+  const keySignature = JSON.stringify(
+    entries.map((e) => KEY_FIELDS.map((f) => e[f])),
+  );
   useEffect(() => {
-    if (!open || rows.length === 0) return;
+    if (!open || entries.length === 0) return;
     const timer = setTimeout(async () => {
       const updated = await Promise.all(
-        rows.map(async (r) => {
-          const { seamGroup, benchGroup, excavator, mudMark, excavationArea, suffix } = r.key;
+        entries.map(async (e) => {
+          const { seamGroup, benchGroup, excavator, mudMark, excavationArea, suffix } = e;
           if (!seamGroup && !benchGroup && !excavator && !mudMark && !excavationArea && !suffix) {
-            return { ...r, composedKey: "" };
+            return { ...e, composedKey: "" };
           }
           try {
             const res = await api.post("/survey-standards/build-key", {
               seamGroup, benchGroup, excavator, mudMark, excavationArea, suffix,
             });
-            return { ...r, composedKey: res.data?.data?.key ?? "" };
+            return { ...e, composedKey: res.data?.data?.key ?? "" };
           } catch {
-            return { ...r, composedKey: "" };
+            return { ...e, composedKey: "" };
           }
         }),
       );
-      setRows(updated);
+      setEntries(updated);
     }, 300);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -266,98 +245,63 @@ export function SurveyStandardAddModal({
 
   if (!open) return null;
 
-  const addRow = () =>
-    setRows((prev) => [
+  const addEntry = () =>
+    setEntries((prev) => [
       ...prev,
-      {
-        id: nextRowId(),
-        key: emptyKeyFields(),
-        composedKey: "",
-        periods: [emptyPeriod(batchRef.current.batchFrom, batchRef.current.batchTo, nextPeriodId)],
-      },
+      emptyEntry(batchRef.current.batchFrom, batchRef.current.batchTo, nextEntryId),
     ]);
 
-  const removeRow = (rowId: number) =>
-    setRows((prev) => (prev.length === 1 ? prev : prev.filter((r) => r.id !== rowId)));
+  const removeEntry = (id: number) =>
+    setEntries((prev) => (prev.length === 1 ? prev : prev.filter((e) => e.id !== id)));
 
-  const setKeyField = (rowId: number, field: keyof KeyFields, value: string) =>
-    setRows((prev) =>
-      prev.map((r) => (r.id !== rowId ? r : { ...r, key: { ...r.key, [field]: value } })),
-    );
+  const setField = (id: number, field: keyof Omit<Entry, "id">, value: string) =>
+    setEntries((prev) => prev.map((e) => (e.id !== id ? e : { ...e, [field]: value })));
 
-  const setPeriodField = (
-    rowId: number,
-    periodId: number,
-    field: keyof Omit<Period, "id">,
-    value: string,
-  ) =>
-    setRows((prev) =>
-      prev.map((r) =>
-        r.id !== rowId
-          ? r
-          : {
-              ...r,
-              periods: r.periods.map((p) => (p.id !== periodId ? p : { ...p, [field]: value })),
-            },
-      ),
-    );
-
-  /** Tách MỘT khoảng bất kỳ của dòng thành hai khoảng liền kề — xem doc đầu file. */
-  const splitPeriod = (rowId: number, periodId: number) =>
-    setRows((prev) =>
-      prev.map((r) => {
-        if (r.id !== rowId) return r;
-        const idx = r.periods.findIndex((p) => p.id === periodId);
-        if (idx === -1) return r;
-        const target = r.periods[idx];
-        const fromMs = parseISO(target.effectiveFrom).getTime();
-        const toMs = parseISO(target.effectiveTo).getTime();
-        const totalDays = Math.round((toMs - fromMs) / ONE_DAY_MS);
-        if (!(totalDays > 0)) {
-          toast.error("Khoảng thời gian này chỉ có 1 ngày, không tách được.");
-          return r;
-        }
-        const midMs = fromMs + Math.floor(totalDays / 2) * ONE_DAY_MS;
-        const firstTo = toISO(new Date(midMs));
-        const secondFrom = toISO(new Date(midMs + ONE_DAY_MS));
-        const periods = [...r.periods];
-        periods.splice(
-          idx,
-          1,
-          { ...target, effectiveTo: firstTo },
-          { ...target, id: nextPeriodId(), effectiveFrom: secondFrom },
-        );
-        return { ...r, periods };
-      }),
-    );
-
-  const removePeriod = (rowId: number, periodId: number) =>
-    setRows((prev) =>
-      prev.map((r) =>
-        r.id !== rowId || r.periods.length === 1
-          ? r
-          : { ...r, periods: r.periods.filter((p) => p.id !== periodId) },
-      ),
-    );
+  /**
+   * "+" — COPY dòng hiện tại thành một dòng MỚI ĐỘC LẬP ngay bên dưới:
+   * chia đôi khoảng thời gian còn lại của dòng gốc, dòng mới kế thừa cả
+   * sáu ô khoá lẫn 14 ô giá trị làm điểm bắt đầu — sửa tiếp từ đó, kể cả
+   * đổi hẳn máy xúc/khu vực nếu dòng mới thực ra là một khoá khác.
+   */
+  const duplicateEntry = (id: number) =>
+    setEntries((prev) => {
+      const idx = prev.findIndex((e) => e.id === id);
+      if (idx === -1) return prev;
+      const source = prev[idx];
+      const fromMs = parseISO(source.effectiveFrom).getTime();
+      const toMs = parseISO(source.effectiveTo).getTime();
+      const totalDays = Math.round((toMs - fromMs) / ONE_DAY_MS);
+      if (!(totalDays > 0)) {
+        toast.error("Khoảng thời gian này chỉ có 1 ngày, không tách được.");
+        return prev;
+      }
+      const midMs = fromMs + Math.floor(totalDays / 2) * ONE_DAY_MS;
+      const firstTo = toISO(new Date(midMs));
+      const secondFrom = toISO(new Date(midMs + ONE_DAY_MS));
+      const updatedSource: Entry = { ...source, effectiveTo: firstTo };
+      const copy: Entry = {
+        ...source,
+        id: nextEntryId(),
+        effectiveFrom: secondFrom,
+        effectiveTo: source.effectiveTo,
+      };
+      const next = [...prev];
+      next.splice(idx, 1, updatedSource, copy);
+      return next;
+    });
 
   const validate = (): string | null => {
-    if (rows.length === 0) return "Chưa có dòng nào.";
-    for (let ri = 0; ri < rows.length; ri++) {
-      const r = rows[ri];
-      if (!r.composedKey.trim()) {
-        return `Dòng ${ri + 1}: chưa đủ thông tin để ghép khoá "Nhóm vỉa + Máy xúc".`;
+    if (entries.length === 0) return "Chưa có dòng nào.";
+    for (let i = 0; i < entries.length; i++) {
+      const e = entries[i];
+      if (!e.composedKey.trim()) {
+        return `Dòng ${i + 1}: chưa đủ thông tin để ghép khoá "Nhóm vỉa + Máy xúc".`;
       }
-      for (let i = 0; i < r.periods.length; i++) {
-        const p = r.periods[i];
-        if (!p.effectiveFrom || !p.effectiveTo) {
-          return `Dòng ${ri + 1}, khoảng ${i + 1}: chưa chọn đủ ngày.`;
-        }
-        if (p.effectiveFrom > p.effectiveTo) {
-          return `Dòng ${ri + 1}, khoảng ${i + 1}: "Từ ngày" phải trước "Đến ngày".`;
-        }
+      if (!e.effectiveFrom || !e.effectiveTo) {
+        return `Dòng ${i + 1}: chưa chọn đủ ngày.`;
       }
-      if (hasOverlap(r.periods)) {
-        return `Dòng ${ri + 1} (khoá "${r.composedKey}"): các khoảng thời gian bị chồng lấn nhau.`;
+      if (e.effectiveFrom > e.effectiveTo) {
+        return `Dòng ${i + 1}: "Từ ngày" phải trước "Đến ngày".`;
       }
     }
     return null;
@@ -372,31 +316,29 @@ export function SurveyStandardAddModal({
     setError(null);
     setSubmitting(true);
     try {
-      const payloads: Omit<SurveyStandardPayload, "id">[] = rows.flatMap((r) =>
-        r.periods.map((p) => ({
-          catalogType: "DAT_SX_THAN_SX",
-          seamGroupExcavatorKey: r.composedKey,
-          effectiveFrom: p.effectiveFrom,
-          effectiveTo: p.effectiveTo,
-          earthAcceptanceProduct: "Đất SX",
-          earthM3: numOrNull(p.earthM3),
-          earthDesignVolume: numOrNull(p.earthDesignVolume),
-          earthDeviation: numOrNull(p.earthDeviation),
-          earthTon: numOrNull(p.earthTon),
-          earthHaulDistance: numOrNull(p.earthHaulDistance),
-          earthBulkDensity: numOrNull(p.earthBulkDensity),
-          earthTkm: numOrNull(p.earthTkm),
-          coalAcceptanceProduct: "Than SX",
-          coalM3: numOrNull(p.coalM3),
-          coalBulkDensity: numOrNull(p.coalBulkDensity),
-          coalTon: numOrNull(p.coalTon),
-          coalDesignVolume: numOrNull(p.coalDesignVolume),
-          coalDeviation: numOrNull(p.coalDeviation),
-          coalHaulDistance: numOrNull(p.coalHaulDistance),
-          coalTkm: numOrNull(p.coalTkm),
-          note: p.note.trim() || null,
-        })),
-      );
+      const payloads: Omit<SurveyStandardPayload, "id">[] = entries.map((e) => ({
+        catalogType: "DAT_SX_THAN_SX",
+        seamGroupExcavatorKey: e.composedKey,
+        effectiveFrom: e.effectiveFrom,
+        effectiveTo: e.effectiveTo,
+        earthAcceptanceProduct: "Đất SX",
+        earthM3: numOrNull(e.earthM3),
+        earthDesignVolume: numOrNull(e.earthDesignVolume),
+        earthDeviation: numOrNull(e.earthDeviation),
+        earthTon: numOrNull(e.earthTon),
+        earthHaulDistance: numOrNull(e.earthHaulDistance),
+        earthBulkDensity: numOrNull(e.earthBulkDensity),
+        earthTkm: numOrNull(e.earthTkm),
+        coalAcceptanceProduct: "Than SX",
+        coalM3: numOrNull(e.coalM3),
+        coalBulkDensity: numOrNull(e.coalBulkDensity),
+        coalTon: numOrNull(e.coalTon),
+        coalDesignVolume: numOrNull(e.coalDesignVolume),
+        coalDeviation: numOrNull(e.coalDeviation),
+        coalHaulDistance: numOrNull(e.coalHaulDistance),
+        coalTkm: numOrNull(e.coalTkm),
+        note: e.note.trim() || null,
+      }));
       await service.bulkCreate(payloads);
       toast.success(`Đã thêm ${payloads.length} dòng STD (Đất SX/Than SX).`);
       onSaved();
@@ -409,8 +351,6 @@ export function SurveyStandardAddModal({
     }
   };
 
-  const totalPeriods = rows.reduce((n, r) => n + r.periods.length, 0);
-
   return (
     <div
       className={`fixed inset-0 z-[100] flex items-center justify-center bg-black/40 ${isFullscreen ? "" : "p-4"}`}
@@ -419,7 +359,7 @@ export function SurveyStandardAddModal({
         className={
           isFullscreen
             ? "flex h-screen w-screen flex-col overflow-hidden bg-white dark:bg-gray-900"
-            : "flex max-h-[90vh] w-full max-w-[1600px] flex-col overflow-hidden rounded-xl bg-white shadow-xl dark:bg-gray-900"
+            : "flex max-h-[90vh] w-full max-w-[1700px] flex-col overflow-hidden rounded-xl bg-white shadow-xl dark:bg-gray-900"
         }
       >
         {/* Tiêu đề */}
@@ -471,29 +411,32 @@ export function SurveyStandardAddModal({
               </div>
             </Field>
             <p className="pb-2 text-xs text-gray-500 dark:text-gray-400">
-              Khoảng mặc định cho dòng thêm mới — dòng đã có giữ nguyên thời gian đã tách.
+              Khoảng mặc định cho dòng thêm mới — dòng đã có giữ nguyên thời gian đã sửa.
             </p>
           </div>
 
           <p className="mb-3 text-sm text-gray-600 dark:text-gray-400">
             Tổng số{" "}
             <span className="font-semibold text-blue-700 dark:text-blue-400">
-              STD (Đất SX/Than SX): {rows.length}
+              STD (Đất SX/Than SX): {entries.length}
             </span>
           </p>
 
           <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
-            <table className="w-full min-w-[1800px] border-collapse text-sm">
+            <table className="w-full min-w-[2050px] border-collapse text-sm">
               <thead>
                 <tr className="bg-gray-100 dark:bg-gray-900 text-center text-xs font-bold text-gray-800 dark:text-gray-100">
-                  <th rowSpan={2} className="w-14 border-b border-r border-gray-200 dark:border-gray-700 px-2 py-2 align-middle">
+                  <th rowSpan={2} className="w-16 border-b border-r border-gray-200 dark:border-gray-700 px-2 py-2 align-middle">
                     #
                   </th>
-                  <th rowSpan={2} className="border-b border-r border-gray-200 dark:border-gray-700 px-2 py-2 align-middle min-w-[230px]">
+                  <th rowSpan={2} className="border-b border-r border-gray-200 dark:border-gray-700 px-2 py-2 align-middle min-w-[210px]">
                     Thời gian
                   </th>
                   <th colSpan={6} className="border-b border-r border-gray-200 dark:border-gray-700 px-2 py-2">
                     Nhóm vỉa + Máy xúc
+                  </th>
+                  <th rowSpan={2} className="border-b border-r border-gray-200 dark:border-gray-700 px-2 py-2 align-middle min-w-[190px]">
+                    Khoá
                   </th>
                   <th colSpan={7} className="border-b border-r border-gray-200 dark:border-gray-700 px-2 py-2">
                     Đất SX
@@ -530,22 +473,18 @@ export function SurveyStandardAddModal({
                 </tr>
               </thead>
               <tbody>
-                {rows.map((r, ri) => (
-                  <RowGroup
-                    key={r.id}
-                    row={r}
-                    rowIndex={ri}
+                {entries.map((e, i) => (
+                  <EntryRow
+                    key={e.id}
+                    entry={e}
+                    index={i}
                     seamGroups={seamGroups}
                     excavationAreas={excavationAreas}
                     excavators={excavators}
-                    canRemoveRow={rows.length > 1}
-                    onRemoveRow={() => removeRow(r.id)}
-                    onKeyFieldChange={(field, value) => setKeyField(r.id, field, value)}
-                    onPeriodFieldChange={(periodId, field, value) =>
-                      setPeriodField(r.id, periodId, field, value)
-                    }
-                    onSplitPeriod={(periodId) => splitPeriod(r.id, periodId)}
-                    onRemovePeriod={(periodId) => removePeriod(r.id, periodId)}
+                    canRemove={entries.length > 1}
+                    onRemove={() => removeEntry(e.id)}
+                    onDuplicate={() => duplicateEntry(e.id)}
+                    onFieldChange={(field, value) => setField(e.id, field, value)}
                   />
                 ))}
               </tbody>
@@ -555,19 +494,12 @@ export function SurveyStandardAddModal({
           <Button
             variant="ghost"
             size="sm"
-            onClick={addRow}
+            onClick={addEntry}
             className="mt-3 gap-1.5 text-sm text-blue-700 hover:bg-blue-50 dark:text-blue-400"
           >
             <Plus className="h-4 w-4" />
-            Thêm dòng mới (một khoá "Nhóm vỉa + Máy xúc" khác)
+            Thêm dòng mới (trống)
           </Button>
-
-          <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
-            Tổng{" "}
-            <span className="font-semibold text-blue-700 dark:text-blue-400">
-              {rows.length} khoá · {totalPeriods} khoảng thời gian
-            </span>
-          </p>
 
           {error && (
             <p className="mt-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-300">
@@ -594,195 +526,170 @@ export function SurveyStandardAddModal({
   );
 }
 
-/** Một DÒNG khoá — có thể chiếm nhiều `<tr>` (một cho mỗi khoảng thời gian). */
-function RowGroup({
-  row,
-  rowIndex,
+function EntryRow({
+  entry,
+  index,
   seamGroups,
   excavationAreas,
   excavators,
-  canRemoveRow,
-  onRemoveRow,
-  onKeyFieldChange,
-  onPeriodFieldChange,
-  onSplitPeriod,
-  onRemovePeriod,
+  canRemove,
+  onRemove,
+  onDuplicate,
+  onFieldChange,
 }: {
-  row: Row;
-  rowIndex: number;
+  entry: Entry;
+  index: number;
   seamGroups: NamedOption[];
   excavationAreas: NamedOption[];
   excavators: NamedOption[];
-  canRemoveRow: boolean;
-  onRemoveRow: () => void;
-  onKeyFieldChange: (field: keyof KeyFields, value: string) => void;
-  onPeriodFieldChange: (periodId: number, field: keyof Omit<Period, "id">, value: string) => void;
-  onSplitPeriod: (periodId: number) => void;
-  onRemovePeriod: (periodId: number) => void;
+  canRemove: boolean;
+  onRemove: () => void;
+  onDuplicate: () => void;
+  onFieldChange: (field: keyof Omit<Entry, "id">, value: string) => void;
 }) {
-  const span = row.periods.length;
-  const zebra = rowIndex % 2 === 0 ? "bg-white dark:bg-gray-950" : "bg-gray-50/50 dark:bg-gray-900/40";
+  const zebra = index % 2 === 0 ? "bg-white dark:bg-gray-950" : "bg-gray-50/50 dark:bg-gray-900/40";
   const cellCls = "border-b border-r border-gray-200 dark:border-gray-700 px-2 py-1.5";
 
   return (
-    <>
-      {row.periods.map((p, pi) => (
-        <tr key={p.id} className={`${zebra} ${pi === 0 && rowIndex > 0 ? "border-t-2 border-t-gray-300 dark:border-t-gray-600" : ""}`}>
-          {pi === 0 && (
-            <>
-              <td rowSpan={span} className={`${cellCls} text-center align-top`}>
-                <div className="flex items-center justify-center gap-1 pt-1">
-                  <span className="font-semibold text-gray-500">{rowIndex + 1}</span>
-                  {canRemoveRow && (
-                    <button
-                      onClick={onRemoveRow}
-                      title="Xoá cả dòng này"
-                      className="rounded p-0.5 text-red-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/30"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  )}
-                </div>
-              </td>
-            </>
+    <tr className={zebra}>
+      <td className={`${cellCls} text-center align-top`}>
+        <div className="flex items-center justify-center gap-1 pt-1">
+          <span className="font-semibold text-gray-500">{index + 1}</span>
+          <button
+            onClick={onDuplicate}
+            title="Chép dòng này thành dòng mới, chia đôi khoảng thời gian còn lại"
+            className="rounded p-0.5 text-gray-400 hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-blue-950/30"
+          >
+            <Copy className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      </td>
+
+      <td className={`${cellCls} align-top`}>
+        <div className="flex items-center gap-1">
+          <Input
+            type="date"
+            value={entry.effectiveFrom}
+            onChange={(e) => onFieldChange("effectiveFrom", e.target.value)}
+            className="h-9 text-xs"
+          />
+          <span className="text-gray-400">–</span>
+          <Input
+            type="date"
+            value={entry.effectiveTo}
+            onChange={(e) => onFieldChange("effectiveTo", e.target.value)}
+            className="h-9 text-xs"
+          />
+        </div>
+      </td>
+
+      <td className={`${cellCls} align-top min-w-[110px]`}>
+        <select
+          value={entry.seamGroup}
+          onChange={(e) => onFieldChange("seamGroup", e.target.value)}
+          className="h-9 w-full rounded-md border bg-transparent px-1.5 text-xs"
+        >
+          <option value="">—</option>
+          {seamGroups.map((s) => (
+            <option key={s.id} value={s.code}>{s.name}</option>
+          ))}
+        </select>
+      </td>
+      <td className={`${cellCls} align-top`}>
+        <Input
+          type="number"
+          step="any"
+          value={entry.benchGroup}
+          onChange={(e) => onFieldChange("benchGroup", e.target.value)}
+          placeholder="75"
+          className="h-9 text-xs"
+        />
+      </td>
+      <td className={`${cellCls} align-top`}>
+        <select
+          value={entry.excavator}
+          onChange={(e) => onFieldChange("excavator", e.target.value)}
+          className="h-9 w-full rounded-md border bg-transparent px-1.5 text-xs"
+        >
+          <option value="">—</option>
+          {excavators.map((m) => (
+            <option key={m.id} value={m.code}>{m.code}</option>
+          ))}
+        </select>
+      </td>
+      <td className={`${cellCls} align-top`}>
+        <Input
+          value={entry.mudMark}
+          onChange={(e) => onFieldChange("mudMark", e.target.value)}
+          placeholder="vd Bun"
+          className="h-9 text-xs"
+        />
+      </td>
+      <td className={`${cellCls} align-top`}>
+        <select
+          value={entry.excavationArea}
+          onChange={(e) => onFieldChange("excavationArea", e.target.value)}
+          className="h-9 w-full rounded-md border bg-transparent px-1.5 text-xs"
+        >
+          <option value="">—</option>
+          {excavationAreas.map((a) => (
+            <option key={a.id} value={a.code}>{a.name}</option>
+          ))}
+        </select>
+      </td>
+      <td className={`${cellCls} align-top`}>
+        <Input
+          value={entry.suffix}
+          onChange={(e) => onFieldChange("suffix", e.target.value)}
+          placeholder="vd BK"
+          className="h-9 text-xs"
+        />
+      </td>
+
+      {/* Cột Khoá — luôn hiện ngay cạnh sáu ô ghép, không phải cuộn ngang mới thấy */}
+      <td className={`${cellCls} align-top`}>
+        <span className="break-all font-mono text-xs font-semibold text-blue-600 dark:text-blue-400">
+          {entry.composedKey || (
+            <span className="font-sans italic font-normal text-gray-400">(chưa đủ thông tin)</span>
           )}
+        </span>
+      </td>
 
-          <td className={`${cellCls} align-top`}>
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => onSplitPeriod(p.id)}
-                title="Tách khoảng thời gian này thành hai"
-                className="rounded p-0.5 text-gray-400 hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-blue-950/30"
-              >
-                <Plus className="h-3.5 w-3.5" />
-              </button>
-              <Input
-                type="date"
-                value={p.effectiveFrom}
-                onChange={(e) => onPeriodFieldChange(p.id, "effectiveFrom", e.target.value)}
-                className="h-9 text-xs"
-              />
-              <span className="text-gray-400">–</span>
-              <Input
-                type="date"
-                value={p.effectiveTo}
-                onChange={(e) => onPeriodFieldChange(p.id, "effectiveTo", e.target.value)}
-                className="h-9 text-xs"
-              />
-            </div>
-          </td>
+      <NumCell value={entry.earthM3} onChange={(v) => onFieldChange("earthM3", v)} />
+      <NumCell value={entry.earthDesignVolume} onChange={(v) => onFieldChange("earthDesignVolume", v)} />
+      <NumCell value={entry.earthDeviation} onChange={(v) => onFieldChange("earthDeviation", v)} />
+      <NumCell value={entry.earthTon} onChange={(v) => onFieldChange("earthTon", v)} />
+      <NumCell value={entry.earthHaulDistance} onChange={(v) => onFieldChange("earthHaulDistance", v)} />
+      <NumCell value={entry.earthBulkDensity} onChange={(v) => onFieldChange("earthBulkDensity", v)} />
+      <NumCell value={entry.earthTkm} onChange={(v) => onFieldChange("earthTkm", v)} />
 
-          {pi === 0 && (
-            <>
-              <td rowSpan={span} className={`${cellCls} align-top min-w-[110px]`}>
-                <select
-                  value={row.key.seamGroup}
-                  onChange={(e) => onKeyFieldChange("seamGroup", e.target.value)}
-                  className="h-9 w-full rounded-md border bg-transparent px-1.5 text-xs"
-                >
-                  <option value="">—</option>
-                  {seamGroups.map((s) => (
-                    <option key={s.id} value={s.code}>{s.name}</option>
-                  ))}
-                </select>
-              </td>
-              <td rowSpan={span} className={`${cellCls} align-top`}>
-                <Input
-                  type="number"
-                  step="any"
-                  value={row.key.benchGroup}
-                  onChange={(e) => onKeyFieldChange("benchGroup", e.target.value)}
-                  placeholder="75"
-                  className="h-9 text-xs"
-                />
-              </td>
-              <td rowSpan={span} className={`${cellCls} align-top`}>
-                <select
-                  value={row.key.excavator}
-                  onChange={(e) => onKeyFieldChange("excavator", e.target.value)}
-                  className="h-9 w-full rounded-md border bg-transparent px-1.5 text-xs"
-                >
-                  <option value="">—</option>
-                  {excavators.map((m) => (
-                    <option key={m.id} value={m.code}>{m.code}</option>
-                  ))}
-                </select>
-              </td>
-              <td rowSpan={span} className={`${cellCls} align-top`}>
-                <Input
-                  value={row.key.mudMark}
-                  onChange={(e) => onKeyFieldChange("mudMark", e.target.value)}
-                  placeholder="vd Bun"
-                  className="h-9 text-xs"
-                />
-              </td>
-              <td rowSpan={span} className={`${cellCls} align-top`}>
-                <select
-                  value={row.key.excavationArea}
-                  onChange={(e) => onKeyFieldChange("excavationArea", e.target.value)}
-                  className="h-9 w-full rounded-md border bg-transparent px-1.5 text-xs"
-                >
-                  <option value="">—</option>
-                  {excavationAreas.map((a) => (
-                    <option key={a.id} value={a.code}>{a.name}</option>
-                  ))}
-                </select>
-              </td>
-              <td rowSpan={span} className={`${cellCls} align-top`}>
-                <Input
-                  value={row.key.suffix}
-                  onChange={(e) => onKeyFieldChange("suffix", e.target.value)}
-                  placeholder="vd BK"
-                  className="h-9 text-xs"
-                />
-              </td>
-            </>
-          )}
+      <NumCell value={entry.coalM3} onChange={(v) => onFieldChange("coalM3", v)} />
+      <NumCell value={entry.coalBulkDensity} onChange={(v) => onFieldChange("coalBulkDensity", v)} />
+      <NumCell value={entry.coalTon} onChange={(v) => onFieldChange("coalTon", v)} />
+      <NumCell value={entry.coalDesignVolume} onChange={(v) => onFieldChange("coalDesignVolume", v)} />
+      <NumCell value={entry.coalDeviation} onChange={(v) => onFieldChange("coalDeviation", v)} />
+      <NumCell value={entry.coalHaulDistance} onChange={(v) => onFieldChange("coalHaulDistance", v)} />
+      <NumCell value={entry.coalTkm} onChange={(v) => onFieldChange("coalTkm", v)} />
 
-          <NumCell value={p.earthM3} onChange={(v) => onPeriodFieldChange(p.id, "earthM3", v)} />
-          <NumCell value={p.earthDesignVolume} onChange={(v) => onPeriodFieldChange(p.id, "earthDesignVolume", v)} />
-          <NumCell value={p.earthDeviation} onChange={(v) => onPeriodFieldChange(p.id, "earthDeviation", v)} />
-          <NumCell value={p.earthTon} onChange={(v) => onPeriodFieldChange(p.id, "earthTon", v)} />
-          <NumCell value={p.earthHaulDistance} onChange={(v) => onPeriodFieldChange(p.id, "earthHaulDistance", v)} />
-          <NumCell value={p.earthBulkDensity} onChange={(v) => onPeriodFieldChange(p.id, "earthBulkDensity", v)} />
-          <NumCell value={p.earthTkm} onChange={(v) => onPeriodFieldChange(p.id, "earthTkm", v)} />
-
-          <NumCell value={p.coalM3} onChange={(v) => onPeriodFieldChange(p.id, "coalM3", v)} />
-          <NumCell value={p.coalBulkDensity} onChange={(v) => onPeriodFieldChange(p.id, "coalBulkDensity", v)} />
-          <NumCell value={p.coalTon} onChange={(v) => onPeriodFieldChange(p.id, "coalTon", v)} />
-          <NumCell value={p.coalDesignVolume} onChange={(v) => onPeriodFieldChange(p.id, "coalDesignVolume", v)} />
-          <NumCell value={p.coalDeviation} onChange={(v) => onPeriodFieldChange(p.id, "coalDeviation", v)} />
-          <NumCell value={p.coalHaulDistance} onChange={(v) => onPeriodFieldChange(p.id, "coalHaulDistance", v)} />
-          <NumCell value={p.coalTkm} onChange={(v) => onPeriodFieldChange(p.id, "coalTkm", v)} />
-
-          <td className={cellCls}>
-            <Input
-              value={p.note}
-              onChange={(e) => onPeriodFieldChange(p.id, "note", e.target.value)}
-              className="h-9 text-xs"
-            />
-          </td>
-          <td className="border-b border-gray-200 dark:border-gray-700 px-1.5 py-1.5 text-center">
-            {row.periods.length > 1 && (
-              <button
-                onClick={() => onRemovePeriod(p.id)}
-                title="Xoá khoảng thời gian này"
-                className="rounded p-1 text-red-500 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950/30"
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
-            )}
-          </td>
-        </tr>
-      ))}
-      <tr className={zebra}>
-        <td colSpan={2} className="border-b border-r border-gray-200 dark:border-gray-700" />
-        <td colSpan={6} className="border-b border-r border-gray-200 dark:border-gray-700 px-2 py-1 font-mono text-[11px] text-gray-500 dark:text-gray-400">
-          {row.composedKey || <span className="italic text-gray-400">(chưa đủ thông tin để ghép khoá)</span>}
-        </td>
-        <td colSpan={16} className="border-b border-gray-200 dark:border-gray-700" />
-      </tr>
-    </>
+      <td className={cellCls}>
+        <Input
+          value={entry.note}
+          onChange={(e) => onFieldChange("note", e.target.value)}
+          className="h-9 text-xs"
+        />
+      </td>
+      <td className="border-b border-gray-200 dark:border-gray-700 px-1.5 py-1.5 text-center">
+        {canRemove && (
+          <button
+            onClick={onRemove}
+            title="Xoá dòng này"
+            className="rounded p-1 text-red-500 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950/30"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        )}
+      </td>
+    </tr>
   );
 }
 
