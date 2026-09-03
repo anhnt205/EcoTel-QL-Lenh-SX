@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Maximize, Minimize, Plus, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -191,9 +191,46 @@ const numOrNull = (s: string): number | null => {
   return t === "" ? null : Number(t.replace(",", "."));
 };
 
+/** dd/mm/yy — chủ dự án chốt định dạng hiển thị (chỉ áp cho ô CHỈ ĐỌC; ô ngày sửa được là input type="date" gốc, định dạng hiện theo trình duyệt/hệ điều hành, không tự đổi được). */
 const formatVN = (s: string) => {
   const [y, m, d] = s.split("-");
-  return `${d}/${m}/${y}`;
+  return `${d}/${m}/${y.slice(-2)}`;
+};
+
+/**
+ * Kiểm tra các khoảng thời gian CÙNG khoá có NỐI LIỀN nhau không — ngày cuối
+ * của khoảng trước phải đúng bằng ngày đầu của khoảng sau trừ một, không hở
+ * ngày (thiếu STD cho những ngày đó, engine sẽ ném lỗi rõ ràng lúc tính sản
+ * lượng) và không chồng ngày (backend cũng tự chặn, nhưng báo ở đây SỚM hơn
+ * — ngay khi đang sửa, không phải đợi tới lúc bấm lưu).
+ *
+ * Gộp theo `composedKey` — khớp đúng khoá backend dùng để chặn chồng lấn.
+ * Hai khoá KHÁC NHAU không cần nối nhau: mỗi khoá là một dòng thời gian
+ * riêng (vd hai máy xúc cùng chạy song song cả năm là bình thường).
+ */
+const findContiguityIssue = (entries: Entry[]): string | null => {
+  const byKey = new Map<string, Entry[]>();
+  for (const e of entries) {
+    if (!e.composedKey.trim() || !e.effectiveFrom || !e.effectiveTo) continue;
+    if (!byKey.has(e.composedKey)) byKey.set(e.composedKey, []);
+    byKey.get(e.composedKey)!.push(e);
+  }
+  for (const [key, group] of byKey) {
+    if (group.length < 2) continue;
+    const sorted = [...group].sort((a, b) => a.effectiveFrom.localeCompare(b.effectiveFrom));
+    for (let i = 0; i < sorted.length - 1; i++) {
+      const cur = sorted[i];
+      const next = sorted[i + 1];
+      const gapMs = parseISO(next.effectiveFrom).getTime() - parseISO(cur.effectiveTo).getTime();
+      if (gapMs < ONE_DAY_MS) {
+        return `Khoá "${key}": khoảng ${formatVN(cur.effectiveFrom)}–${formatVN(cur.effectiveTo)} và khoảng ${formatVN(next.effectiveFrom)}–${formatVN(next.effectiveTo)} bị CHỒNG ngày.`;
+      }
+      if (gapMs > ONE_DAY_MS) {
+        return `Khoá "${key}": còn khoảng trống từ sau ${formatVN(cur.effectiveTo)} đến trước ${formatVN(next.effectiveFrom)} — ngày cuối dòng trên phải nối liền ngày đầu dòng dưới, không được cách ngày.`;
+      }
+    }
+  }
+  return null;
 };
 
 const service = createCatalogService<SurveyStandardPayload>(BASE_PATH);
@@ -360,6 +397,10 @@ export function SurveyStandardAddModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, keySignature]);
 
+  // Báo NGAY khi các khoảng thời gian cùng khoá bị hở/chồng ngày — không đợi
+  // tới lúc bấm lưu mới biết (xem doc `findContiguityIssue`).
+  const contiguityIssue = useMemo(() => findContiguityIssue(entries), [entries]);
+
   if (!open) return null;
 
   const addEntry = () =>
@@ -425,7 +466,7 @@ export function SurveyStandardAddModal({
         return `Dòng ${i + 1}: "Từ ngày" phải trước "Đến ngày".`;
       }
     }
-    return null;
+    return findContiguityIssue(entries);
   };
 
   const handleSubmit = async () => {
@@ -597,6 +638,12 @@ export function SurveyStandardAddModal({
               {variant.title}: {entries.length}
             </span>
           </p>
+
+          {!isReadOnly && contiguityIssue && (
+            <p className="mb-3 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-950/30 dark:text-amber-300">
+              ⚠ {contiguityIssue}
+            </p>
+          )}
 
           <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
             <table className={`w-full border-collapse text-sm ${variant.hasCoal ? "min-w-[2050px]" : "min-w-[1350px]"}`}>
