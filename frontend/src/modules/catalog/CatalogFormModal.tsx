@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Copy, Plus, Trash2, X, ZoomIn, ZoomOut } from "lucide-react";
+import { Copy, Maximize, Minimize, Plus, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,18 +27,6 @@ interface Props {
 
 const emptyRow = (fields: CatalogField[]): Row =>
   Object.fromEntries(fields.map((f) => [f.key, ""]));
-
-/**
- * Zoom khu vực bảng nhập liệu.
- *
- * Danh mục nhiều cột (vd STD, Định mức) thì chữ nhỏ khó đọc/khó bấm đúng ô;
- * danh mục nhiều dòng thì phóng to lại chiếm hết màn hình. Cho người dùng tự
- * chọn thay vì cố định một cỡ.
- */
-const ZOOM_MIN = 0.7;
-const ZOOM_MAX = 1.5;
-const ZOOM_STEP = 0.1;
-const ZOOM_DEFAULT = 1;
 
 /**
  * Modal thêm/sửa danh mục.
@@ -84,12 +72,10 @@ export function CatalogFormModal({
   );
 
   const [rows, setRows] = useState<Row[]>([emptyRow(fields)]);
-  // Không reset theo `open`: giữ nguyên mức zoom người dùng chọn giữa các
-  // lần mở modal trong cùng phiên xem — chọn một lần cho danh mục nhiều
-  // cột thì không phải chỉnh lại mỗi lần bấm "Thêm mới".
-  const [zoom, setZoom] = useState(ZOOM_DEFAULT);
-  const zoomIn = () => setZoom((z) => Math.min(ZOOM_MAX, Math.round((z + ZOOM_STEP) * 100) / 100));
-  const zoomOut = () => setZoom((z) => Math.max(ZOOM_MIN, Math.round((z - ZOOM_STEP) * 100) / 100));
+  // Không reset theo `open`: giữ nguyên lựa chọn toàn màn hình giữa các lần
+  // mở modal trong cùng phiên xem — danh mục nhiều cột thì không phải bấm
+  // lại mỗi lần "Thêm mới".
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   /** Lựa chọn cho các trường select: key trường -> danh sách {value,label}. */
@@ -157,20 +143,16 @@ export function CatalogFormModal({
   const addRow = () => setRows((prev) => [...prev, emptyRow(fields)]);
 
   /**
-   * Chép một dòng thành dòng mới đặt NGAY DƯỚI nó.
+   * Chép một dòng thành dòng mới đặt NGAY DƯỚI nó — chép NGUYÊN VẸN mọi ô,
+   * kể cả mã. Chỉ chỗ nào khác dòng gốc mới cần sửa tay, kể cả mã.
    *
    * Đặt ngay dưới chứ không đẩy xuống cuối: người dùng chép để sửa vài ô
    * khác nhau, để cạnh nhau mới so được. Ở danh sách dài, thêm vào cuối là
    * mất dấu dòng vừa chép.
-   *
-   * Mã duy nhất KHÔNG chép theo — chép vào thì dòng mới chắc chắn bị chặn
-   * "trùng mã" lúc lưu, tức là tặng người dùng một lỗi có sẵn. Danh mục
-   * không có mã duy nhất thì chép nguyên vẹn mọi ô.
    */
   const copyRow = (idx: number) =>
     setRows((prev) => {
       const clone: Row = { ...prev[idx] };
-      if (codeField) clone[codeField] = "";
       return [...prev.slice(0, idx + 1), clone, ...prev.slice(idx + 1)];
     });
 
@@ -279,8 +261,16 @@ export function CatalogFormModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-5xl max-h-[90vh] overflow-hidden rounded-xl bg-white dark:bg-gray-900 shadow-xl flex flex-col">
+    <div
+      className={`fixed inset-0 z-[100] flex items-center justify-center bg-black/40 ${isFullscreen ? "" : "p-4"}`}
+    >
+      <div
+        className={
+          isFullscreen
+            ? "flex h-screen w-screen flex-col overflow-hidden bg-white dark:bg-gray-900"
+            : "flex max-h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-xl bg-white shadow-xl dark:bg-gray-900"
+        }
+      >
         {/* Tiêu đề */}
         <div className="flex items-start justify-between border-b border-gray-200 dark:border-gray-800 px-6 py-4">
           <div>
@@ -294,34 +284,20 @@ export function CatalogFormModal({
             )}
           </div>
           <div className="flex items-center gap-1">
-            <div className="flex items-center gap-0.5 rounded-md border border-gray-200 p-0.5 dark:border-gray-700">
-              <button
-                onClick={zoomOut}
-                disabled={zoom <= ZOOM_MIN}
-                title="Thu nhỏ"
-                className="rounded p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-30 disabled:hover:bg-transparent dark:text-gray-400 dark:hover:bg-gray-800"
-              >
-                <ZoomOut className="h-4 w-4" />
-              </button>
-              <button
-                onClick={() => setZoom(ZOOM_DEFAULT)}
-                title="Về cỡ mặc định"
-                className="w-11 rounded px-1 py-1 text-center text-xs font-semibold text-gray-500 tabular-nums hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
-              >
-                {Math.round(zoom * 100)}%
-              </button>
-              <button
-                onClick={zoomIn}
-                disabled={zoom >= ZOOM_MAX}
-                title="Phóng to"
-                className="rounded p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-30 disabled:hover:bg-transparent dark:text-gray-400 dark:hover:bg-gray-800"
-              >
-                <ZoomIn className="h-4 w-4" />
-              </button>
-            </div>
+            <button
+              onClick={() => setIsFullscreen((v) => !v)}
+              title={isFullscreen ? "Thu nhỏ" : "Toàn màn hình"}
+              className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800"
+            >
+              {isFullscreen ? (
+                <Minimize className="h-4 w-4" />
+              ) : (
+                <Maximize className="h-4 w-4" />
+              )}
+            </button>
             <button
               onClick={onClose}
-              className="ml-1 rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800"
+              className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800"
             >
               <X className="h-5 w-5" />
             </button>
@@ -339,16 +315,7 @@ export function CatalogFormModal({
             </p>
           )}
 
-          {/*
-            Zoom bằng transform + bù chiều rộng ngược (100% / zoom): scale
-            thẳng khiến vùng chiếm chỗ co lại theo cùng tỉ lệ, để lại khoảng
-            trắng bên phải hoặc cắt mất mép phải khi phóng to. Bù chiều rộng
-            giữ bảng luôn khớp khung nhìn ở MỌI mức zoom.
-          */}
-          <div
-            className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700"
-            style={{ transform: `scale(${zoom})`, transformOrigin: "top left", width: `${100 / zoom}%` }}
-          >
+          <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
             <table className="w-full min-w-[720px] border-collapse text-sm">
               <thead>
                 <tr className="bg-gray-100 dark:bg-gray-900 text-left text-sm font-bold text-gray-800 dark:text-gray-100">
