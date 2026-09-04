@@ -2,7 +2,8 @@
 
 Cập nhật lần cuối: 2026-09-04 (lượt 5 — thiết kế lại các danh mục STD/Áp
 Trắc Địa, dựng lại trang Báo cáo thống kê theo mockup, thêm 6 trường báo
-chuyến cho Vận tải; CÓ sửa code, đã verify sống). Lượt 4 (2026-08-31) —
+chuyến cho Vận tải, sửa lỗi không tạo mới được báo chuyến Vận tải (3
+trường tra sai danh mục); CÓ sửa code, đã verify sống). Lượt 4 (2026-08-31) —
 dựng engine tính sản lượng + danh mục dạng lưới có phiên bản theo thời
 gian. Lượt 3 (2026-08-30) chỉ tài liệu. Lượt 2 (2026-08-29) — chuyển DB
 độc lập + bật lại bảo mật + dựng preview sống thật. Đọc file này TRƯỚC
@@ -299,23 +300,40 @@ Chuỗi yêu cầu UI/danh mục nhỏ, mỗi việc 1 commit riêng trên `clau
    mở lại form edit, xác nhận hiện đúng) — không verify được lưu-rồi-đọc-
    lại trọn vòng vì vướng lỗi có sẵn ở mục dưới.
 
-⚠ **Lỗi có sẵn phát hiện khi verify mục 8 (KHÔNG phải do lượt này gây
-ra, chưa sửa):** Tạo mới báo chuyến Vận tải (`POST /api/transport-
-reports`) luôn báo lỗi backend `"Khu vực xúc không tồn tại: <id>"` (404)
-với BẤT KỲ giá trị "Khu vực xúc" nào chọn từ UI. Nguyên nhân: cột
-`excavation_area_id` trong `transport_report_trips` có FK thật tới bảng
-riêng `excavation_areas` (có `ExcavationAreaController` + trang danh mục
-`ExcavationAreas.tsx`), nhưng
-`transportTripReportService.ts#buildTransportTripRequestItem` lại tra
-"Khu vực xúc" từ `rawLocations`/`rawDepartments` (2 danh sách SAI) thay vì
-gọi API `excavation-areas` — id tìm được không khớp bảng `excavation_
-areas` nên backend từ chối. Bản ghi cũ (id=1) trong DB có sẵn giá trị text
-"Khu Bắc" cũng không tự resolve được vì cùng lý do — nghĩa là **tạo mới
-báo chuyến Vận tải qua UI hiện KHÔNG DÙNG ĐƯỢC**, không riêng gì lượt này.
-Việc sửa cần: thêm fetch `rawExcavationAreas` (endpoint có sẵn) vào
-`TransportEntryPage.tsx`/modal, đổi nguồn tra trong hàm map ở trên. Chưa
-hỏi ý chủ dự án có muốn sửa ngay hay không — ngoài phạm vi yêu cầu 6
-trường của lượt này.
+✅ **Lỗi phát hiện khi verify mục 8 — ĐÃ SỬA cùng ngày (2026-09-04),
+commit `6feb8b6`.** Tạo mới báo chuyến Vận tải (`POST /api/transport-
+reports`) luôn báo lỗi backend 404 với BẤT KỲ giá trị nào chọn từ UI cho
+CẢ BA trường "Khu vực xúc", "Nơi nhận tải", "Nơi dỡ tải" (không chỉ Khu
+vực xúc như phát hiện ban đầu — vá xong Khu vực xúc thì lộ tiếp lỗi y hệt
+ở 2 trường kia, phải vá cả ba mới tạo mới được thật). Nguyên nhân: ba cột
+FK (`excavation_area_id`, `loading_point_id`, `unloading_point_id`) trỏ
+tới BA bảng danh mục riêng (`excavation_areas`, `receiving_points`,
+`unloading_points`, mỗi bảng có controller riêng), nhưng
+`transportTripReportService.ts#buildTransportTripRequestItem` tra cả ba
+từ `rawLocations`/`rawDepartments` (danh mục "locations" chung, SAI) —
+id tìm được không khớp bảng đích nên backend từ chối. Bản ghi cũ (id=1,
+seed data) mang giá trị text kiểu "Khu Bắc"/"Kho số 1" cũng không tự
+resolve được vì cùng lý do (record đó hiện chỉ SỬA được các trường khác,
+không sửa lại 3 trường vị trí — text cũ không khớp danh mục mới; chưa
+xử lý, coi là dữ liệu seed cũ có thể bỏ qua).
+
+**Fix:** thêm 3 API fetch mới vào `useMasterData.ts`
+(`fetchExcavationAreas`/`fetchReceivingPoints`/`fetchUnloadingPoints`,
+endpoint `/excavation-areas`, `/receiving-points`, `/unloading-points`
+đã có sẵn ở backend) → `rawExcavationAreas`/`rawReceivingPoints`/
+`rawUnloadingPoints` + option list riêng; đổi nguồn 3 combobox trong
+`TransportHeaderDetailModal.tsx` và logic tra ID trong
+`buildTransportTripRequestItem`/`buildTransportReportRequest`
+(`transportTripReportService.ts`) sang dùng đúng danh mục. Backend không
+đổi gì (3 endpoint đã tồn tại từ trước, chỉ frontend chưa gọi tới).
+
+Đã verify sống: tạo mới bản ghi Vận tải đầy đủ (khu vực xúc "Khu 1", nơi
+nhận "Kho trung chuyển 1", nơi dỡ "Kho A") → `POST` trả `200`/`Created
+successfully`, dữ liệu trả về đúng id + tên; đã xoá bản ghi test khỏi DB
+sau khi verify. Verify Mining không hồi quy: `useMasterData.ts` dùng
+chung nhưng chỉ THÊM field, `MiningBatchEntryModal.tsx` không đụng tới —
+mở lại "Thêm chuyến" bên Khai thác, form gốc vẫn nguyên vẹn, không lỗi
+console mới.
 
 ## Việc cần làm tiếp (ưu tiên theo thứ tự)
 
