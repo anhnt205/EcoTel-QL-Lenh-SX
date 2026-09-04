@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Download, Eye, Search } from "lucide-react";
 import { toast } from "sonner";
@@ -14,7 +14,7 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import api from "@/config/api.config";
-import { productionService } from "./productionService";
+import { productionService, type AreaApplicationRow } from "./productionService";
 
 interface NamedOption {
   id: number;
@@ -28,6 +28,49 @@ const fmt = (v: number | null, digits = 3): string => {
   if (v == null) return "—";
   return v.toLocaleString("vi-VN", { maximumFractionDigits: digits });
 };
+
+/**
+ * Gộp theo SẢN PHẨM (Đất CN / Đất SX / Than SX) thay vì theo LOẠI SỐ LIỆU
+ * (Tổng / Số Trắc địa / Hệ số) — mỗi sản phẩm một khối 9 cột liền nhau
+ * (Tổng m3/tấn/tkm, Số TĐ m3/tấn/tkm, HS m3/tấn/tkm), tô MỘT màu riêng cho
+ * cả khối. Trước đây ba loại số liệu tách thành ba khối lớn (Tổng, Số Trắc
+ * địa, Hệ số) — muốn so ba con số của "Đất CN" phải nhảy mắt qua chín cột
+ * ở giữa. Theo yêu cầu chủ dự án: gộp theo sản phẩm, tô màu để dễ đọc.
+ */
+const PRODUCT_GROUPS: {
+  key: "cn" | "sx" | "coal";
+  label: string;
+  color: string;
+  totalM3: keyof AreaApplicationRow;
+  totalTon: keyof AreaApplicationRow;
+  totalTkm: keyof AreaApplicationRow;
+  surveyM3: keyof AreaApplicationRow;
+  surveyTon: keyof AreaApplicationRow;
+  surveyTkm: keyof AreaApplicationRow;
+  hsM3: keyof AreaApplicationRow;
+  hsTon: keyof AreaApplicationRow;
+  hsTkm: keyof AreaApplicationRow;
+}[] = [
+  {
+    key: "cn", label: "Đất CN", color: "#f59e0b",
+    totalM3: "earthCnTotalM3", totalTon: "earthCnTotalTon", totalTkm: "earthCnTotalTkm",
+    surveyM3: "earthCnSurveyM3", surveyTon: "earthCnSurveyTon", surveyTkm: "earthCnSurveyTkm",
+    hsM3: "earthCnHsM3", hsTon: "earthCnHsTon", hsTkm: "earthCnHsTkm",
+  },
+  {
+    key: "sx", label: "Đất SX", color: "#16a34a",
+    totalM3: "earthSxTotalM3", totalTon: "earthSxTotalTon", totalTkm: "earthSxTotalTkm",
+    surveyM3: "earthSxSurveyM3", surveyTon: "earthSxSurveyTon", surveyTkm: "earthSxSurveyTkm",
+    hsM3: "earthSxHsM3", hsTon: "earthSxHsTon", hsTkm: "earthSxHsTkm",
+  },
+  {
+    key: "coal", label: "Than SX", color: "#475569",
+    totalM3: "coalTotalM3", totalTon: "coalTotalTon", totalTkm: "coalTotalTkm",
+    surveyM3: "coalSurveyM3", surveyTon: "coalSurveyTon", surveyTkm: "coalSurveyTkm",
+    hsM3: "coalHsM3", hsTon: "coalHsTon", hsTkm: "coalHsTkm",
+  },
+];
+const METRIC_LABELS = ["Tổng m3", "Tổng KLVC (tấn)", "Tổng Tkm", "Số TĐ (m3)", "Số TĐ (tấn)", "Số TĐ (tkm)", "HS (m3)", "HS (tấn)", "HS (tkm)"];
 
 /**
  * Danh mục "AP Tdia (m3-tấn-tkm)" — CHỈ XEM.
@@ -87,39 +130,28 @@ export default function AreaApplicationReportPage() {
       toast.warning("Chưa có dữ liệu để tải xuống.");
       return;
     }
-    const data = rows.map((r, i) => ({
-      STT: i + 1,
-      "Thời gian": `${String(month).padStart(2, "0")}/${searchYear}`,
-      "Máy xúc": r.excavatorCode ?? "",
-      "Nhóm vỉa + Máy xúc": r.seamGroupExcavatorKey,
-      "Đất CN - Tổng m3": r.earthCnTotalM3,
-      "Đất CN - Tổng KLVC (tấn)": r.earthCnTotalTon,
-      "Đất CN - Tổng Tkm": r.earthCnTotalTkm,
-      "Đất SX - Tổng m3": r.earthSxTotalM3,
-      "Đất SX - Tổng KLVC (tấn)": r.earthSxTotalTon,
-      "Đất SX - Tổng Tkm": r.earthSxTotalTkm,
-      "Than - Tổng m3": r.coalTotalM3,
-      "Than - Tổng KLVC (tấn)": r.coalTotalTon,
-      "Than - Tổng Tkm": r.coalTotalTkm,
-      "Đất CN (m3)": r.earthCnSurveyM3,
-      "Đất CN (tấn)": r.earthCnSurveyTon,
-      "Đất CN (tkm)": r.earthCnSurveyTkm,
-      "Đất SX (m3)": r.earthSxSurveyM3,
-      "Đất SX (tấn)": r.earthSxSurveyTon,
-      "Đất SX (tkm)": r.earthSxSurveyTkm,
-      "Than SX (m3)": r.coalSurveyM3,
-      "Than SX (tấn)": r.coalSurveyTon,
-      "Than SX (tkm)": r.coalSurveyTkm,
-      "HS Đất CN (m3)": r.earthCnHsM3,
-      "HS Đất CN (tấn)": r.earthCnHsTon,
-      "HS Đất CN (tkm)": r.earthCnHsTkm,
-      "HS Đất SX (m3)": r.earthSxHsM3,
-      "HS Đất SX (tấn)": r.earthSxHsTon,
-      "HS Đất SX (tkm)": r.earthSxHsTkm,
-      "HS Than SX (m3)": r.coalHsM3,
-      "HS Than SX (tấn)": r.coalHsTon,
-      "HS Than SX (tkm)": r.coalHsTkm,
-    }));
+    // Thứ tự cột khớp đúng bảng trên màn hình — gộp theo sản phẩm, không
+    // theo loại số liệu, xem doc `PRODUCT_GROUPS`.
+    const data = rows.map((r, i) => {
+      const row: Record<string, unknown> = {
+        STT: i + 1,
+        "Thời gian": `${String(month).padStart(2, "0")}/${searchYear}`,
+        "Máy xúc": r.excavatorCode ?? "",
+        "Nhóm vỉa + Máy xúc": r.seamGroupExcavatorKey,
+      };
+      for (const g of PRODUCT_GROUPS) {
+        row[`${g.label} - Tổng m3`] = r[g.totalM3];
+        row[`${g.label} - Tổng KLVC (tấn)`] = r[g.totalTon];
+        row[`${g.label} - Tổng Tkm`] = r[g.totalTkm];
+        row[`${g.label} - Số TĐ (m3)`] = r[g.surveyM3];
+        row[`${g.label} - Số TĐ (tấn)`] = r[g.surveyTon];
+        row[`${g.label} - Số TĐ (tkm)`] = r[g.surveyTkm];
+        row[`${g.label} - HS (m3)`] = r[g.hsM3];
+        row[`${g.label} - HS (tấn)`] = r[g.hsTon];
+        row[`${g.label} - HS (tkm)`] = r[g.hsTkm];
+      }
+      return row;
+    });
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "AP Tdia");
@@ -239,6 +271,15 @@ export default function AreaApplicationReportPage() {
             </Button>
           </div>
 
+          <div className="flex flex-wrap items-center gap-3 text-[11px] text-gray-500 dark:text-gray-400">
+            {PRODUCT_GROUPS.map((g) => (
+              <span key={g.key} className="flex items-center gap-1.5">
+                <i className="inline-block h-2.5 w-2.5 rounded-sm" style={{ background: g.color }} />
+                {g.label}
+              </span>
+            ))}
+          </div>
+
           <div className="min-h-0 flex-1 overflow-auto rounded-lg border border-gray-200 dark:border-gray-700">
             <table className="w-full min-w-[2200px] border-collapse text-xs">
               <thead>
@@ -247,40 +288,29 @@ export default function AreaApplicationReportPage() {
                   <th rowSpan={2} className={thCls}>Thời gian</th>
                   <th rowSpan={2} className={thCls}>Máy xúc</th>
                   <th rowSpan={2} className={`${thCls} min-w-[180px]`}>Nhóm vỉa + Máy xúc</th>
-                  <th colSpan={3} className={thCls}>Đất CN</th>
-                  <th colSpan={3} className={thCls}>Đất SX</th>
-                  <th colSpan={3} className={thCls}>Than</th>
-                  <th colSpan={9} className={thCls}>Số Trắc địa</th>
-                  <th colSpan={9} className={thCls}>Hệ số</th>
+                  {PRODUCT_GROUPS.map((g) => (
+                    <th
+                      key={g.key}
+                      colSpan={9}
+                      className={thCls}
+                      style={{ background: `color-mix(in srgb, ${g.color} 22%, white)` }}
+                    >
+                      {g.label}
+                    </th>
+                  ))}
                 </tr>
-                <tr className="bg-gray-50 text-center font-semibold text-gray-600 dark:bg-gray-900/60 dark:text-gray-300">
-                  <th className={thCls}>Tổng m3</th>
-                  <th className={thCls}>Tổng KLVC (tấn)</th>
-                  <th className={thCls}>Tổng Tkm</th>
-                  <th className={thCls}>Tổng m3</th>
-                  <th className={thCls}>Tổng KLVC (tấn)</th>
-                  <th className={thCls}>Tổng Tkm</th>
-                  <th className={thCls}>Tổng m3</th>
-                  <th className={thCls}>Tổng KLVC (tấn)</th>
-                  <th className={thCls}>Tổng Tkm</th>
-                  <th className={thCls}>Đất CN (m3)</th>
-                  <th className={thCls}>Đất CN (tấn)</th>
-                  <th className={thCls}>Đất CN (tkm)</th>
-                  <th className={thCls}>Đất SX (m3)</th>
-                  <th className={thCls}>Đất SX (tấn)</th>
-                  <th className={thCls}>Đất SX (tkm)</th>
-                  <th className={thCls}>Than SX (m3)</th>
-                  <th className={thCls}>Than SX (tấn)</th>
-                  <th className={thCls}>Than SX (tkm)</th>
-                  <th className={thCls}>HS Đất CN (m3)</th>
-                  <th className={thCls}>HS Đất CN (tấn)</th>
-                  <th className={thCls}>HS Đất CN (tkm)</th>
-                  <th className={thCls}>HS Đất SX (m3)</th>
-                  <th className={thCls}>HS Đất SX (tấn)</th>
-                  <th className={thCls}>HS Đất SX (tkm)</th>
-                  <th className={thCls}>HS Than SX (m3)</th>
-                  <th className={thCls}>HS Than SX (tấn)</th>
-                  <th className={thCls}>HS Than SX (tkm)</th>
+                <tr className="text-center font-semibold text-gray-600 dark:text-gray-300">
+                  {PRODUCT_GROUPS.map((g) =>
+                    METRIC_LABELS.map((label) => (
+                      <th
+                        key={`${g.key}-${label}`}
+                        className={thCls}
+                        style={{ background: `color-mix(in srgb, ${g.color} 8%, white)` }}
+                      >
+                        {label}
+                      </th>
+                    )),
+                  )}
                 </tr>
               </thead>
               <tbody>
@@ -306,33 +336,19 @@ export default function AreaApplicationReportPage() {
                     <td className={tdCls}>{monthLabel}</td>
                     <td className={tdCls}>{r.excavatorCode ?? "—"}</td>
                     <td className={`${tdCls} text-left`}>{r.seamGroupExcavatorKey}</td>
-                    <td className={tdCls}>{fmt(r.earthCnTotalM3)}</td>
-                    <td className={tdCls}>{fmt(r.earthCnTotalTon)}</td>
-                    <td className={tdCls}>{fmt(r.earthCnTotalTkm)}</td>
-                    <td className={tdCls}>{fmt(r.earthSxTotalM3)}</td>
-                    <td className={tdCls}>{fmt(r.earthSxTotalTon)}</td>
-                    <td className={tdCls}>{fmt(r.earthSxTotalTkm)}</td>
-                    <td className={tdCls}>{fmt(r.coalTotalM3)}</td>
-                    <td className={tdCls}>{fmt(r.coalTotalTon)}</td>
-                    <td className={tdCls}>{fmt(r.coalTotalTkm)}</td>
-                    <td className={tdCls}>{fmt(r.earthCnSurveyM3)}</td>
-                    <td className={tdCls}>{fmt(r.earthCnSurveyTon)}</td>
-                    <td className={tdCls}>{fmt(r.earthCnSurveyTkm)}</td>
-                    <td className={tdCls}>{fmt(r.earthSxSurveyM3)}</td>
-                    <td className={tdCls}>{fmt(r.earthSxSurveyTon)}</td>
-                    <td className={tdCls}>{fmt(r.earthSxSurveyTkm)}</td>
-                    <td className={tdCls}>{fmt(r.coalSurveyM3)}</td>
-                    <td className={tdCls}>{fmt(r.coalSurveyTon)}</td>
-                    <td className={tdCls}>{fmt(r.coalSurveyTkm)}</td>
-                    <td className={`${tdCls} text-red-600 dark:text-red-400`}>{fmt(r.earthCnHsM3)}</td>
-                    <td className={`${tdCls} text-red-600 dark:text-red-400`}>{fmt(r.earthCnHsTon)}</td>
-                    <td className={`${tdCls} text-red-600 dark:text-red-400`}>{fmt(r.earthCnHsTkm)}</td>
-                    <td className={`${tdCls} text-red-600 dark:text-red-400`}>{fmt(r.earthSxHsM3)}</td>
-                    <td className={`${tdCls} text-red-600 dark:text-red-400`}>{fmt(r.earthSxHsTon)}</td>
-                    <td className={`${tdCls} text-red-600 dark:text-red-400`}>{fmt(r.earthSxHsTkm)}</td>
-                    <td className={`${tdCls} text-red-600 dark:text-red-400`}>{fmt(r.coalHsM3)}</td>
-                    <td className={`${tdCls} text-red-600 dark:text-red-400`}>{fmt(r.coalHsTon)}</td>
-                    <td className={`${tdCls} text-red-600 dark:text-red-400`}>{fmt(r.coalHsTkm)}</td>
+                    {PRODUCT_GROUPS.map((g) => (
+                      <Fragment key={g.key}>
+                        <td className={tdCls} style={{ background: `color-mix(in srgb, ${g.color} 4%, white)` }}>{fmt(r[g.totalM3] as number | null)}</td>
+                        <td className={tdCls} style={{ background: `color-mix(in srgb, ${g.color} 4%, white)` }}>{fmt(r[g.totalTon] as number | null)}</td>
+                        <td className={tdCls} style={{ background: `color-mix(in srgb, ${g.color} 4%, white)` }}>{fmt(r[g.totalTkm] as number | null)}</td>
+                        <td className={tdCls} style={{ background: `color-mix(in srgb, ${g.color} 8%, white)` }}>{fmt(r[g.surveyM3] as number | null)}</td>
+                        <td className={tdCls} style={{ background: `color-mix(in srgb, ${g.color} 8%, white)` }}>{fmt(r[g.surveyTon] as number | null)}</td>
+                        <td className={tdCls} style={{ background: `color-mix(in srgb, ${g.color} 8%, white)` }}>{fmt(r[g.surveyTkm] as number | null)}</td>
+                        <td className={tdCls} style={{ background: `color-mix(in srgb, ${g.color} 14%, white)`, color: g.color, fontWeight: 700 }}>{fmt(r[g.hsM3] as number | null)}</td>
+                        <td className={tdCls} style={{ background: `color-mix(in srgb, ${g.color} 14%, white)`, color: g.color, fontWeight: 700 }}>{fmt(r[g.hsTon] as number | null)}</td>
+                        <td className={tdCls} style={{ background: `color-mix(in srgb, ${g.color} 14%, white)`, color: g.color, fontWeight: 700 }}>{fmt(r[g.hsTkm] as number | null)}</td>
+                      </Fragment>
+                    ))}
                   </tr>
                 ))}
               </tbody>
