@@ -93,6 +93,24 @@ export function useMasterData(options: UseMasterDataOptions = {}) {
         enabled,
         staleTime: 0,
       },
+      {
+        queryKey: ["masterData", "excavationAreas"],
+        queryFn: masterDataService.fetchExcavationAreas,
+        enabled,
+        staleTime: 0,
+      },
+      {
+        queryKey: ["masterData", "receivingPoints"],
+        queryFn: masterDataService.fetchReceivingPoints,
+        enabled,
+        staleTime: 0,
+      },
+      {
+        queryKey: ["masterData", "unloadingPoints"],
+        queryFn: masterDataService.fetchUnloadingPoints,
+        enabled,
+        staleTime: 0,
+      },
     ],
   });
 
@@ -106,6 +124,9 @@ export function useMasterData(options: UseMasterDataOptions = {}) {
     usersQ,
     cargoTypesQ,
     cargoGroupsQ,
+    excavationAreasQ,
+    receivingPointsQ,
+    unloadingPointsQ,
   ] = results;
 
   const rawShifts = shiftsQ.data ?? [];
@@ -118,6 +139,9 @@ export function useMasterData(options: UseMasterDataOptions = {}) {
   const rawUsers = usersQ.data ?? [];
   const rawCargoTypes = cargoTypesQ.data ?? [];
   const rawCargoGroups = cargoGroupsQ.data ?? [];
+  const rawExcavationAreas = excavationAreasQ.data ?? [];
+  const rawReceivingPoints = receivingPointsQ.data ?? [];
+  const rawUnloadingPoints = unloadingPointsQ.data ?? [];
 
   // Chuyển đổi thành mảng Option chuẩn
   const rawShiftOptions = rawShifts.map((s) => {
@@ -176,6 +200,9 @@ export function useMasterData(options: UseMasterDataOptions = {}) {
 
   const cargoTypeOptions = toOptions(rawCargoTypes, "name", "name");
   const cargoGroupOptions = toOptions(rawCargoGroups, "name", "name");
+  const excavationAreaOptions = toOptions(rawExcavationAreas, "name", "name");
+  const receivingPointOptions = toOptions(rawReceivingPoints, "name", "name");
+  const unloadingPointOptions = toOptions(rawUnloadingPoints, "name", "name");
 
   // Mảng chuỗi đơn giản dùng trực tiếp cho ComboboxInput / Select
   const shiftValues = shiftOptions.map((o) => o.value);
@@ -187,6 +214,9 @@ export function useMasterData(options: UseMasterDataOptions = {}) {
   const operatorBadgeValues = operatorOptions.map((o) => o.value);
   const cargoTypeValues = cargoTypeOptions.map((o) => o.value);
   const cargoGroupValues = cargoGroupOptions.map((o) => o.value);
+  const excavationAreaValues = excavationAreaOptions.map((o) => o.value);
+  const receivingPointValues = receivingPointOptions.map((o) => o.value);
+  const unloadingPointValues = unloadingPointOptions.map((o) => o.value);
 
   // Tra cứu tự động từ cache (thay thế cho lookup.ts)
   const getVehicleDetails = (
@@ -322,6 +352,9 @@ export function useMasterData(options: UseMasterDataOptions = {}) {
     rawUsers,
     rawCargoTypes,
     rawCargoGroups,
+    rawExcavationAreas,
+    rawReceivingPoints,
+    rawUnloadingPoints,
 
     // Option arrays
     shiftOptions,
@@ -333,6 +366,9 @@ export function useMasterData(options: UseMasterDataOptions = {}) {
     operatorOptions,
     cargoTypeOptions,
     cargoGroupOptions,
+    excavationAreaOptions,
+    receivingPointOptions,
+    unloadingPointOptions,
 
     // Value arrays (strings)
     shiftValues,
@@ -344,6 +380,9 @@ export function useMasterData(options: UseMasterDataOptions = {}) {
     operatorBadgeValues,
     cargoTypeValues,
     cargoGroupValues,
+    excavationAreaValues,
+    receivingPointValues,
+    unloadingPointValues,
 
     // Lookup functions
     getVehicleDetails,

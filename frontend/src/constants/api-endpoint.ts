@@ -27,6 +27,9 @@ export const API = {
     USERS: "/users",
     CARGO_GROUPS: "/cargo-groups",
     CARGO_TYPES: "/cargo-types",
+    EXCAVATION_AREAS: "/excavation-areas",
+    RECEIVING_POINTS: "/receiving-points",
+    UNLOADING_POINTS: "/unloading-points",
   },
   RECONCILIATION: {
     SEARCH: "/reconciliation",

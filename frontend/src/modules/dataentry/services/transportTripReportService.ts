@@ -176,21 +176,20 @@ export function buildTransportTripRequestItem(
     rawExcavators: any[];
     rawCargoTypes: any[];
     rawDepartments?: any[];
+    rawExcavationAreas?: any[];
+    rawReceivingPoints?: any[];
+    rawUnloadingPoints?: any[];
   },
   idx: number = 0,
 ): TransportReportTripRequest {
-  // Map excavationAreaId (Khu vực xúc)
-  const areaItem =
-    masterData.rawLocations.find(
-      (l) =>
-        l.name === t.excavationArea ||
-        String(l.id) === String(t.excavationArea),
-    ) ||
-    (masterData.rawDepartments || []).find(
-      (d) =>
-        d.name === t.excavationArea ||
-        String(d.id) === String(t.excavationArea),
-    );
+  // Map excavationAreaId (Khu vực xúc) — tra đúng danh mục "excavation_areas"
+  // (FK thật của cột excavation_area_id), KHÔNG tra rawLocations/rawDepartments
+  // như trước đây (2 danh sách đó là danh mục KHÁC, id không tương ứng nên
+  // backend luôn từ chối với "Khu vực xúc không tồn tại: <id>").
+  const areaItem = (masterData.rawExcavationAreas || []).find(
+    (a) =>
+      a.name === t.excavationArea || String(a.id) === String(t.excavationArea),
+  );
   if (!areaItem) {
     throw new Error(
       `Chuyến #${idx + 1}: Khu vực xúc "${t.excavationArea}" không tồn tại trong hệ thống`,
@@ -212,11 +211,11 @@ export function buildTransportTripRequestItem(
   }
   const excavatorDeviceId = Number(excavatorItem.id);
 
-  // Map loadingPointId (Nơi nhận tải)
-  const loadingLocItem = masterData.rawLocations.find(
+  // Map loadingPointId (Nơi nhận tải) — tra danh mục "receiving_points"
+  // (FK thật của loading_point_id), không phải rawLocations.
+  const loadingLocItem = (masterData.rawReceivingPoints || []).find(
     (l) =>
-      l.name === t.pickupLocation ||
-      String(l.id) === String(t.pickupLocation),
+      l.name === t.pickupLocation || String(l.id) === String(t.pickupLocation),
   );
   if (!loadingLocItem) {
     throw new Error(
@@ -225,8 +224,9 @@ export function buildTransportTripRequestItem(
   }
   const loadingPointId = Number(loadingLocItem.id);
 
-  // Map unloadingPointId (Nơi dỡ tải)
-  const unloadingLocItem = masterData.rawLocations.find(
+  // Map unloadingPointId (Nơi dỡ tải) — tra danh mục "unloading_points"
+  // (FK thật của unloading_point_id), không phải rawLocations.
+  const unloadingLocItem = (masterData.rawUnloadingPoints || []).find(
     (l) =>
       l.name === t.unloadLocationName ||
       String(l.id) === String(t.unloadLocationName),
@@ -315,6 +315,9 @@ export function buildTransportReportRequest(
     rawUsers: any[];
     rawCargoTypes: any[];
     rawDepartments?: any[];
+    rawExcavationAreas?: any[];
+    rawReceivingPoints?: any[];
+    rawUnloadingPoints?: any[];
   },
 ): TransportReportRequest {
   // 1. Map shiftId

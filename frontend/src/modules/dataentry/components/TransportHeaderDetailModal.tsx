@@ -127,7 +127,9 @@ export const TransportHeaderDetailModal: React.FC<
   const masterData = useMasterData({ enabled: isOpen });
   const {
     shiftOptions,
-    locationValues,
+    excavationAreaValues,
+    receivingPointValues,
+    unloadingPointValues,
     excavatorValues,
     vehicleValues,
     cargoGroupValues,
@@ -143,6 +145,9 @@ export const TransportHeaderDetailModal: React.FC<
     rawUsers = [],
     rawCargoTypes = [],
     rawDepartments = [],
+    rawExcavationAreas = [],
+    rawReceivingPoints = [],
+    rawUnloadingPoints = [],
   } = masterData;
 
   const createReportMutation = useCreateTransportReportMutation();
@@ -298,6 +303,9 @@ export const TransportHeaderDetailModal: React.FC<
           rawExcavators,
           rawCargoTypes,
           rawDepartments,
+          rawExcavationAreas,
+          rawReceivingPoints,
+          rawUnloadingPoints,
         });
         await updateTransportTripMutation.mutateAsync({
           tripId: sess.singleTripId!,
@@ -342,6 +350,9 @@ export const TransportHeaderDetailModal: React.FC<
           rawUsers,
           rawCargoTypes,
           rawDepartments,
+          rawExcavationAreas,
+          rawReceivingPoints,
+          rawUnloadingPoints,
         });
         payloads.push(payload);
       } catch (err: any) {
@@ -724,7 +735,7 @@ export const TransportHeaderDetailModal: React.FC<
                         {/* Khu vực xúc */}
                         <td className="px-1.5 py-1.5 border-r border-b border-gray-200 dark:border-gray-700">
                           <ComboboxInput
-                            options={locationValues}
+                            options={excavationAreaValues}
                             value={trip.excavationArea}
                             onChange={(v) =>
                               handleUpdateTrip(tIdx, { excavationArea: v })
@@ -750,7 +761,7 @@ export const TransportHeaderDetailModal: React.FC<
                         {/* Nơi nhận tải */}
                         <td className="px-1.5 py-1.5 border-r border-b border-gray-200 dark:border-gray-700">
                           <ComboboxInput
-                            options={locationValues}
+                            options={receivingPointValues}
                             value={trip.pickupLocation}
                             onChange={(v) =>
                               handleUpdateTrip(tIdx, { pickupLocation: v })
@@ -871,7 +882,7 @@ export const TransportHeaderDetailModal: React.FC<
                         {/* Nơi dỡ tải */}
                         <td className="px-1.5 py-1.5 border-r border-b border-gray-200 dark:border-gray-700">
                           <ComboboxInput
-                            options={locationValues}
+                            options={unloadingPointValues}
                             value={trip.unloadLocationName}
                             onChange={(v) =>
                               handleUpdateTrip(tIdx, {
