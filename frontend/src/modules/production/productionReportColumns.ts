@@ -22,15 +22,15 @@ export interface ReportColumn {
 
 export interface ReportColumnGroup {
   title: string;
-  /** Màu nền của dải tiêu đề nhóm. */
-  tone: string;
+  /** Mã màu nhóm (hex) — dùng cho dải tiêu đề, chú giải màu, và tô nền cột qua CSS color-mix(). */
+  color: string;
   columns: ReportColumn[];
 }
 
 export const REPORT_COLUMN_GROUPS: ReportColumnGroup[] = [
   {
     title: "Thông tin chuyến",
-    tone: "bg-slate-100 dark:bg-slate-800",
+    color: "#2f80ed",
     columns: [
       { key: "productionDate", label: "Ngày", width: "min-w-[110px]" },
       { key: "shiftName", label: "Ca", width: "min-w-[80px]" },
@@ -47,7 +47,7 @@ export const REPORT_COLUMN_GROUPS: ReportColumnGroup[] = [
   },
   {
     title: "Khoá gộp",
-    tone: "bg-indigo-100 dark:bg-indigo-950/40",
+    color: "#6366f1",
     columns: [
       { key: "seamGroupExcavatorKey", label: "Nhóm vỉa + Máy xúc", width: "min-w-[240px]" },
       { key: "acceptanceProduct", label: "Sản phẩm nghiệm thu", width: "min-w-[160px]" },
@@ -58,7 +58,7 @@ export const REPORT_COLUMN_GROUPS: ReportColumnGroup[] = [
   },
   {
     title: "Thống kê (chưa áp hệ số)",
-    tone: "bg-amber-100 dark:bg-amber-950/40",
+    color: "#f59e0b",
     columns: [
       { key: "totalM3", label: "Tổng m3", numeric: true, scale: 3, width: "min-w-[120px]" },
       { key: "totalTon", label: "Tổng KLVC (tấn)", numeric: true, scale: 3, width: "min-w-[140px]" },
@@ -67,7 +67,7 @@ export const REPORT_COLUMN_GROUPS: ReportColumnGroup[] = [
   },
   {
     title: "Trắc địa (đã áp hệ số m3)",
-    tone: "bg-sky-100 dark:bg-sky-950/40",
+    color: "#0891b2",
     columns: [
       { key: "surveyM3", label: "m3 trắc địa", numeric: true, scale: 3, width: "min-w-[130px]" },
       { key: "surveyTon", label: "tấn trắc địa", numeric: true, scale: 3, width: "min-w-[130px]" },
@@ -76,7 +76,7 @@ export const REPORT_COLUMN_GROUPS: ReportColumnGroup[] = [
   },
   {
     title: "Kết quả cuối",
-    tone: "bg-emerald-100 dark:bg-emerald-950/40",
+    color: "#16a34a",
     columns: [
       { key: "finalTon", label: "Tấn cuối cùng", numeric: true, scale: 3, width: "min-w-[140px]" },
       { key: "finalTkm", label: "Tkm cuối cùng", numeric: true, scale: 4, width: "min-w-[140px]" },
@@ -84,7 +84,7 @@ export const REPORT_COLUMN_GROUPS: ReportColumnGroup[] = [
   },
   {
     title: "Vết tính toán",
-    tone: "bg-rose-100 dark:bg-rose-950/40",
+    color: "#e11d48",
     columns: [
       { key: "modelUsed", label: "Mô hình đã dùng", numeric: true, scale: 3, width: "min-w-[140px]" },
       { key: "densityUsed", label: "Tỷ trọng đã dùng", numeric: true, scale: 3, width: "min-w-[150px]" },
@@ -96,7 +96,7 @@ export const REPORT_COLUMN_GROUPS: ReportColumnGroup[] = [
   },
   {
     title: "TKE ban đầu / không quy ẩm",
-    tone: "bg-teal-100 dark:bg-teal-950/40",
+    color: "#0d9488",
     columns: [
       { key: "totalM3Original", label: "Tổng KLVC TKE (m3) ban đầu", numeric: true, scale: 3, width: "min-w-[200px]" },
       { key: "densityNoMoisture", label: "Tỷ trọng (không quy ẩm)", numeric: true, scale: 3, width: "min-w-[180px]" },
@@ -107,7 +107,7 @@ export const REPORT_COLUMN_GROUPS: ReportColumnGroup[] = [
   },
   {
     title: "Nhiên liệu & năng suất",
-    tone: "bg-violet-100 dark:bg-violet-950/40",
+    color: "#7c3aed",
     columns: [
       { key: "fuelNorm", label: "ĐMNL xe", numeric: true, scale: 4, width: "min-w-[120px]" },
       { key: "fuelBaseConsumption", label: "NL theo ĐM (lít)", numeric: true, scale: 4, width: "min-w-[150px]" },
@@ -139,4 +139,16 @@ export function formatCell(value: unknown, col: ReportColumn): string {
     minimumFractionDigits: col.scale ?? 0,
     maximumFractionDigits: col.scale ?? 0,
   });
+}
+
+/**
+ * Phân loại Đất/Than của một dòng — dùng cho bộ lọc "Phân loại" trên màn
+ * Báo cáo thống kê. Chép LẠI đúng quy tắc backend
+ * (`ProductionKeys.classify` — cột AD của bảng tính gốc: chữ cái ĐẦU của
+ * Sản phẩm nghiệm thu là S hoặc D thì ĐẤT, còn lại là THAN), không suy diễn
+ * quy tắc mới — chỉ để lọc hiển thị, không dùng để tính toán.
+ */
+export function classifyEarthCoal(acceptanceProduct: string | null): "Đất" | "Than" {
+  const first = (acceptanceProduct ?? "").trim().charAt(0).toUpperCase();
+  return first === "S" || first === "D" ? "Đất" : "Than";
 }
