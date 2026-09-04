@@ -1,10 +1,12 @@
 # Context — THONGKE-CAOSON
 
-Cập nhật lần cuối: 2026-08-31 (lượt 4 — dựng engine tính sản lượng + danh
-mục dạng lưới có phiên bản theo thời gian; CÓ sửa code, đã verify sống).
-Lượt 3 (2026-08-30) chỉ tài liệu. Lượt 2 (2026-08-29) — chuyển DB độc lập
-+ bật lại bảo mật + dựng preview sống thật. Đọc file này TRƯỚC khi tiếp
-tục — tin file này hơn lịch sử chat đã bị nén.
+Cập nhật lần cuối: 2026-09-04 (lượt 5 — thiết kế lại các danh mục STD/Áp
+Trắc Địa, dựng lại trang Báo cáo thống kê theo mockup, thêm 6 trường báo
+chuyến cho Vận tải; CÓ sửa code, đã verify sống). Lượt 4 (2026-08-31) —
+dựng engine tính sản lượng + danh mục dạng lưới có phiên bản theo thời
+gian. Lượt 3 (2026-08-30) chỉ tài liệu. Lượt 2 (2026-08-29) — chuyển DB
+độc lập + bật lại bảo mật + dựng preview sống thật. Đọc file này TRƯỚC
+khi tiếp tục — tin file này hơn lịch sử chat đã bị nén.
 
 ## Tóm tắt trạng thái
 
@@ -252,6 +254,68 @@ Hai bảng trung gian còn treo: `AP BBNT xe-SP` (chờ chủ dự án xác nh�
 nghiệm thu* do người nhập, khoá hệ tự sinh) và `DuKien HS theo -2%`
 (khuyến nghị GÁC — nó chỉ là nguồn cho lưới HSDML, mà ba nơi tiêu thụ
 `EE`/`EG`/`EI` chưa có tài liệu).
+
+## Đã làm — lượt 5 (2026-09-04)
+
+Chuỗi yêu cầu UI/danh mục nhỏ, mỗi việc 1 commit riêng trên `claude-dev`:
+
+1. **STD (Đất SX/Than SX)** — sửa lỗi id không ổn định khi lưu (chuyển
+   sang lưu kiểu diff: bản ghi có `originalId` thì update-in-place, xoá
+   trước khi tạo mới đúng thứ tự) — commit `d49dfc4`.
+2. **STD (Đất CN)** — dùng chung component với STD (Đất SX/Than SX), tham
+   số hoá bằng `catalogType` — commit `389eeae`.
+3. Thêm danh mục **"AP Tdia (m3-tan-tkm)"** — chỉ xem, đọc từ
+   `SurveyCoefficient` có sẵn — commit `60bc15b`.
+4. **STD (cả 2 loại)** — đổi sang khai theo NĂM, dấu "+" thay dấu copy để
+   tách khoảng thời gian, bảng ngoài gộp theo năm (STT/Thời gian/thao
+   tác), sửa là sửa cả bảng năm đó — commit `d1671e5`.
+5. **STD (cả 2 loại)** — check nối tiếp thời gian khi tách (không trùng/
+   không hở giữa khoảng cuối dòng trên và đầu dòng dưới), định dạng hiển
+   thị `dd/mm/yy` — commit `6760da9`.
+6. **Trang "Báo cáo thống kê"** dựng lại hoàn toàn theo mockup HTML khách
+   cung cấp (KPI cards, nhóm cột tô màu, chọn cột hiển thị, drawer chi
+   tiết, bộ lọc, bảng sort/phân trang) — commit `fb9047c`. Bẫy CSS đã vấp:
+   `<table>` trong `overflow-auto` lồng trong `flex flex-col` không có
+   chiều cao cố định sẽ co về ~0px khi thêm nhiều "chrome" (KPI/filter) ở
+   trên — sửa bằng `max-height` cố định (giống chính CSS gốc của mockup),
+   không dùng `flex-1 min-h-0`.
+7. **Danh mục "Áp Trắc Địa (m3-tấn-tkm)"** — gom nhóm lại theo SẢN PHẨM
+   (Đất CN / Đất SX / Than SX) thay vì theo loại chỉ số, tô màu riêng mỗi
+   nhóm — commit `0852cad`.
+8. **Báo chuyến Vận tải** — thêm 6 trường: Ngày mưa, Khối lượng qua cân
+   (tấn), Mô hình (tạm tính), Tỷ trọng (tạm tính), Lái xe bổ túc (check
+   box), Trừ vơi (đất-m3, than-tấn) — commit `182ff16`. **Chỉ áp dụng cho
+   Vận tải** — ban đầu làm cả Khai thác theo yêu cầu gốc, nhưng chủ dự án
+   sau đó thu hẹp phạm vi ("Bên khai thác đủ rồi... Khai thác bạn back về
+   như lần trước cho mình"); đã `git checkout --` 6 file phía Khai thác về
+   nguyên trạng + `ALTER TABLE excavation_report_trips DROP COLUMN` 4 cột
+   Hibernate `ddl-auto: update` đã tự tạo trước khi revert (nó không tự
+   xoá cột không dùng nữa). Backend cho Vận tải **đã có sẵn** 6 trường này
+   từ trước (chỉ thiếu UI) — không cần sửa backend, chỉ sửa
+   `TransportHeaderDetailModal.tsx`, `useTransportDraftStore.ts`,
+   `transportTripReportService.ts`. Đã verify UI render đúng thứ tự cột +
+   verify round-trip request payload (field name/type khớp DTO) qua
+   network log thật + verify chiều đọc ngược (set giá trị thẳng trong DB,
+   mở lại form edit, xác nhận hiện đúng) — không verify được lưu-rồi-đọc-
+   lại trọn vòng vì vướng lỗi có sẵn ở mục dưới.
+
+⚠ **Lỗi có sẵn phát hiện khi verify mục 8 (KHÔNG phải do lượt này gây
+ra, chưa sửa):** Tạo mới báo chuyến Vận tải (`POST /api/transport-
+reports`) luôn báo lỗi backend `"Khu vực xúc không tồn tại: <id>"` (404)
+với BẤT KỲ giá trị "Khu vực xúc" nào chọn từ UI. Nguyên nhân: cột
+`excavation_area_id` trong `transport_report_trips` có FK thật tới bảng
+riêng `excavation_areas` (có `ExcavationAreaController` + trang danh mục
+`ExcavationAreas.tsx`), nhưng
+`transportTripReportService.ts#buildTransportTripRequestItem` lại tra
+"Khu vực xúc" từ `rawLocations`/`rawDepartments` (2 danh sách SAI) thay vì
+gọi API `excavation-areas` — id tìm được không khớp bảng `excavation_
+areas` nên backend từ chối. Bản ghi cũ (id=1) trong DB có sẵn giá trị text
+"Khu Bắc" cũng không tự resolve được vì cùng lý do — nghĩa là **tạo mới
+báo chuyến Vận tải qua UI hiện KHÔNG DÙNG ĐƯỢC**, không riêng gì lượt này.
+Việc sửa cần: thêm fetch `rawExcavationAreas` (endpoint có sẵn) vào
+`TransportEntryPage.tsx`/modal, đổi nguồn tra trong hàm map ở trên. Chưa
+hỏi ý chủ dự án có muốn sửa ngay hay không — ngoài phạm vi yêu cầu 6
+trường của lượt này.
 
 ## Việc cần làm tiếp (ưu tiên theo thứ tự)
 
