@@ -25,7 +25,11 @@ export const newTransportTripRow = (): TransportTripRow => ({
   loadStatus: "Đủ tải",
   loadStatusNote: "",
   isRainyDay: false,
+  weighedWeightTon: "",
+  provisionalModel: "",
+  provisionalDensity: "",
   isTraineeVehicle: false,
+  deductionAmount: "",
 });
 
 interface TransportDraftStore {

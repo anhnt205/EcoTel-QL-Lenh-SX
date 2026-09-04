@@ -63,7 +63,11 @@ export interface TransportTripRow {
   loadStatus: string; // Tải trọng (radio)
   loadStatusNote: string; // Ghi chú khi "Khác" (vd: "2/3", "1/2")
   isRainyDay: boolean; // Ngày mưa
-  isTraineeVehicle: boolean; // Xe bổ túc
+  weighedWeightTon: number | ""; // Khối lượng qua cân (tấn)
+  provisionalModel: number | ""; // Mô hình (tạm tính)
+  provisionalDensity: number | ""; // Tỷ trọng (tạm tính)
+  isTraineeVehicle: boolean; // Lái xe bổ túc
+  deductionAmount: number | ""; // Trừ vơi (đất-m3, than-tấn)
 }
 
 // ─── 1 bản ghi = 1 ca phân xưởng vận tải ─────────────────────────────────
@@ -187,7 +191,11 @@ export const TransportHeaderDetailModal: React.FC<
         loadStatus: "Đủ tải",
         loadStatusNote: "",
         isRainyDay: false,
+        weighedWeightTon: "",
+        provisionalModel: "",
+        provisionalDensity: "",
         isTraineeVehicle: false,
+        deductionAmount: "",
       };
     },
     [],
@@ -668,8 +676,30 @@ export const TransportHeaderDetailModal: React.FC<
                     <th className="px-2 py-2 border-r border-b border-gray-200 dark:border-gray-700 text-center min-w-[80px]">
                       Ngày mưa
                     </th>
+                    <th className="px-2 py-2 border-r border-b border-gray-200 dark:border-gray-700 text-center min-w-[125px]">
+                      Khối lượng
+                      <br />
+                      qua cân (tấn)
+                    </th>
+                    <th className="px-2 py-2 border-r border-b border-gray-200 dark:border-gray-700 text-center min-w-[110px]">
+                      Mô hình
+                      <br />
+                      (tạm tính)
+                    </th>
+                    <th className="px-2 py-2 border-r border-b border-gray-200 dark:border-gray-700 text-center min-w-[110px]">
+                      Tỷ trọng
+                      <br />
+                      (tạm tính)
+                    </th>
                     <th className="px-2 py-2 border-r border-b border-gray-200 dark:border-gray-700 text-center min-w-[80px]">
-                      Xe bổ túc
+                      Lái xe
+                      <br />
+                      bổ túc
+                    </th>
+                    <th className="px-2 py-2 border-r border-b border-gray-200 dark:border-gray-700 text-center min-w-[125px]">
+                      Trừ vơi
+                      <br />
+                      (đất-m3, than-tấn)
                     </th>
                     <th className="px-2 py-2 border-b border-gray-200 dark:border-gray-700 text-center w-15" />
                   </tr>
@@ -939,7 +969,55 @@ export const TransportHeaderDetailModal: React.FC<
                           </div>
                         </td>
 
-                        {/* Xe bổ túc */}
+                        {/* Khối lượng qua cân (tấn) */}
+                        <td className="px-1 py-1.5 border-r border-b border-gray-200 dark:border-gray-700">
+                          <Input
+                            type="number"
+                            step="any"
+                            value={trip.weighedWeightTon}
+                            onChange={(e) =>
+                              handleUpdateTrip(tIdx, {
+                                weighedWeightTon:
+                                  e.target.value === "" ? "" : Number(e.target.value),
+                              })
+                            }
+                            className="h-8 text-xs text-center px-1 w-full"
+                          />
+                        </td>
+
+                        {/* Mô hình (tạm tính) */}
+                        <td className="px-1 py-1.5 border-r border-b border-gray-200 dark:border-gray-700">
+                          <Input
+                            type="number"
+                            step="any"
+                            value={trip.provisionalModel}
+                            onChange={(e) =>
+                              handleUpdateTrip(tIdx, {
+                                provisionalModel:
+                                  e.target.value === "" ? "" : Number(e.target.value),
+                              })
+                            }
+                            className="h-8 text-xs text-center px-1 w-full"
+                          />
+                        </td>
+
+                        {/* Tỷ trọng (tạm tính) */}
+                        <td className="px-1 py-1.5 border-r border-b border-gray-200 dark:border-gray-700">
+                          <Input
+                            type="number"
+                            step="any"
+                            value={trip.provisionalDensity}
+                            onChange={(e) =>
+                              handleUpdateTrip(tIdx, {
+                                provisionalDensity:
+                                  e.target.value === "" ? "" : Number(e.target.value),
+                              })
+                            }
+                            className="h-8 text-xs text-center px-1 w-full"
+                          />
+                        </td>
+
+                        {/* Lái xe bổ túc */}
                         <td className="px-1 py-1.5 border-r border-b border-gray-200 dark:border-gray-700 text-center min-w-[65px]">
                           <div className="flex justify-center pt-1">
                             <Checkbox
@@ -951,6 +1029,22 @@ export const TransportHeaderDetailModal: React.FC<
                               }
                             />
                           </div>
+                        </td>
+
+                        {/* Trừ vơi (đất-m3, than-tấn) */}
+                        <td className="px-1 py-1.5 border-r border-b border-gray-200 dark:border-gray-700">
+                          <Input
+                            type="number"
+                            step="any"
+                            value={trip.deductionAmount}
+                            onChange={(e) =>
+                              handleUpdateTrip(tIdx, {
+                                deductionAmount:
+                                  e.target.value === "" ? "" : Number(e.target.value),
+                              })
+                            }
+                            className="h-8 text-xs text-center px-1 w-full"
+                          />
                         </td>
 
                         {/* Nút xóa dòng */}

@@ -9,6 +9,11 @@ import type {
 export const transportReportTripRequestSchema = z.object({
   rainyDay: z.boolean().optional(),
   supplementaryVehicle: z.boolean().optional(),
+  // Bốn trường "(Báo chuyến)" còn lại — để trống được, trống KHÁC 0.
+  weighedWeightTon: z.number().nullable().optional(),
+  provisionalModel: z.number().nullable().optional(),
+  provisionalDensity: z.number().nullable().optional(),
+  deductionAmount: z.number().nullable().optional(),
   excavationAreaId: z
     .number({ message: "Khu vực xúc không hợp lệ" })
     .min(1, "Khu vực xúc là bắt buộc"),
@@ -86,6 +91,10 @@ export interface TransportReportTripResponse {
   vehicleCategoryName?: string;
   rainyDay?: boolean;
   supplementaryVehicle?: boolean;
+  weighedWeightTon?: number | null;
+  provisionalModel?: number | null;
+  provisionalDensity?: number | null;
+  deductionAmount?: number | null;
   excavationAreaId: number;
   excavationAreaName: string;
   excavatorDeviceId: number;
@@ -256,6 +265,10 @@ export function buildTransportTripRequestItem(
   return {
     rainyDay: Boolean(t.isRainyDay),
     supplementaryVehicle: Boolean(t.isTraineeVehicle),
+    weighedWeightTon: t.weighedWeightTon === "" ? null : Number(t.weighedWeightTon),
+    provisionalModel: t.provisionalModel === "" ? null : Number(t.provisionalModel),
+    provisionalDensity: t.provisionalDensity === "" ? null : Number(t.provisionalDensity),
+    deductionAmount: t.deductionAmount === "" ? null : Number(t.deductionAmount),
     excavationAreaId,
     excavatorDeviceId,
     loadingPointId,
@@ -429,7 +442,11 @@ export function mapReportResponseToDraft(
           : "Đủ tải",
       loadStatusNote: t.loadLevelCustomValue || "",
       isRainyDay: Boolean(t.rainyDay),
+      weighedWeightTon: t.weighedWeightTon ?? "",
+      provisionalModel: t.provisionalModel ?? "",
+      provisionalDensity: t.provisionalDensity ?? "",
       isTraineeVehicle: Boolean(t.supplementaryVehicle),
+      deductionAmount: t.deductionAmount ?? "",
     })),
   };
 }
@@ -502,7 +519,11 @@ export function mapTransportTripResponseToDraft(
             : "Đủ tải",
         loadStatusNote: tripRes.loadLevelCustomValue || "",
         isRainyDay: Boolean(tripRes.rainyDay),
+        weighedWeightTon: tripRes.weighedWeightTon ?? "",
+        provisionalModel: tripRes.provisionalModel ?? "",
+        provisionalDensity: tripRes.provisionalDensity ?? "",
         isTraineeVehicle: Boolean(tripRes.supplementaryVehicle),
+        deductionAmount: tripRes.deductionAmount ?? "",
       },
     ],
   };
