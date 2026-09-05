@@ -443,6 +443,37 @@ chọn kỳ hoạt động, dữ liệu nhập ở "Thêm mới" hiện đúng v
 
 Commit liên quan: `ad59191` (400 + combobox), `59a239e` (bảng tổng hợp).
 
+**Tiếp ngay trong lượt 7** — 2 yêu cầu mới, cả hai đã sửa (commit `2205f86`):
+
+4. **Mẫu Excel DMNL phải khớp file thật của chủ dự án** — ảnh chụp thật gửi
+   kèm cho thấy sheet "DMNL T2-2025" gốc có CỘT "Cung độ" đứng TRƯỚC cột
+   "Độ dốc". Tra `docs/REQUIREMENT_SANLUONG_EXCEL.md` (công thức `AP5`/
+   `AQ5`) xác nhận: cột A ("Cung độ") là **danh sách mốc cung độ dùng
+   chung để nội suy** (`MATCH`/`SMALL` trên cả cột), **ĐỘC LẬP hoàn toàn**
+   với "Độ dốc" trên cùng dòng — không phải cặp khoá dòng. Đã thêm
+   `downloadFuelNormExcel`/import tương ứng trong
+   `fuelNormExcelImport.ts` (DMNL-specific, không đụng `matrixExcel.ts`
+   dùng chung cho 3 lưới kia ngoài việc export thêm `cellText` + tách
+   `parseMatrixRows` thuần — refactor an toàn, giữ nguyên hành vi
+   `MatrixCatalogPage.tsx`). Import nhận được CẢ file cũ (không cột Cung
+   độ) lẫn file mới, tự nhận diện qua `header[1] === rowAxisLabel`.
+2. **Cho chọn nhiều Chủng loại xe + nhiều Hậu tố khi thêm bộ định mức,
+   Cung độ nhập 1 lần dùng chung** — trước đó "+ Thêm bộ định mức" chỉ
+   chọn được 1 xe + 1 hậu tố, rồi phải gõ tay từng cung độ một cho từng
+   bộ. File mới `FuelNormBulkAddModal.tsx`: checkbox nhiều xe + nhiều hậu
+   tố + textarea nhập danh sách cung độ 1 lần → tự sinh tích Descartes
+   (xe × hậu tố × cung độ) thành cột, bỏ qua cột đã có, gọi
+   `matrixService.addCols` một lần. Modal cũ `FuelNormAddDatasetModal`
+   (chọn đơn) GIỮ NGUYÊN, chỉ dùng cho luồng "Sao chép" ở màn Quản lý
+   (ngữ nghĩa khác — chọn đúng 1 đích để sao chép sang).
+
+Build Docker sạch (`tsc -b` không lỗi), redirect login bình thường không
+crash console. **Vẫn CHƯA click-through được** vì lý do cũ (không có mật
+khẩu Portal) — việc đầu tiên phiên sau/chủ dự án nên làm: mở
+`/danh-muc/dinh-muc-nhien-lieu/them-moi`, thử "+ Thêm bộ định mức" chọn
+nhiều xe+hậu tố+cung độ, và tải/nhập thử file Excel để xác nhận đúng mẫu
+"Cung độ" + "Độ dốc" hoạt động với dữ liệu thật.
+
 ## Việc cần làm tiếp (ưu tiên theo thứ tự)
 
 0. **ĐÃ CÓ THIẾT KẾ → `docs/DESIGN_SANLUONG.md`** (2026-08-30). Mô hình dữ
