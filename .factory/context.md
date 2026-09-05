@@ -474,6 +474,21 @@ khẩu Portal) — việc đầu tiên phiên sau/chủ dự án nên làm: mở
 nhiều xe+hậu tố+cung độ, và tải/nhập thử file Excel để xác nhận đúng mẫu
 "Cung độ" + "Độ dốc" hoạt động với dữ liệu thật.
 
+5. **Bảng tổng hợp to + nút mở rộng, biểu đồ thu nhỏ** (commit `d6957d5`)
+   — chủ dự án: "Bảng tổng hợp ... để to và cho nút expand vì đó là cái
+   chính. Biểu đồ minh hoạ để bé. vẽ các chủng loại xe của bảng." Đã sửa
+   `FuelNormOverviewPage.tsx`: bảng tổng hợp thêm nút mở rộng toàn màn
+   hình (giống pattern `isFullscreen` đã dùng ở `FuelNormAddPage.tsx`),
+   tăng chiều cao mặc định 60vh→75vh. `FuelNormChartPanel.tsx` **đổi hẳn
+   ý nghĩa**: trước vẽ nhiều đường Độ dốc cho MỘT bộ dữ liệu (kèm panel
+   xem trước nội suy 2 ô nhập); giờ vẽ MỘT đường mỗi bộ dữ liệu (mỗi
+   Chủng loại xe+Hậu tố đang hiển thị trong bảng) tại MỘT mức Độ dốc chọn
+   qua dropdown nhỏ — nhỏ gọn (`max-w-md`, cao 150px), bỏ hẳn panel nội
+   suy chi tiết cũ (đúng tinh thần "để bé", chỉ còn 1 nơi dùng component
+   này nên đổi thoải mái, không ảnh hưởng chỗ khác). Build sạch, verify
+   redirect login không crash console (vẫn chưa click-through được, cùng
+   lý do thiếu mật khẩu Portal).
+
 ## Việc cần làm tiếp (ưu tiên theo thứ tự)
 
 0. **ĐÃ CÓ THIẾT KẾ → `docs/DESIGN_SANLUONG.md`** (2026-08-30). Mô hình dữ
