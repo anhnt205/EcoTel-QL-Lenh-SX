@@ -16,9 +16,9 @@ import {
 import { cn } from "@/lib/utils";
 import { ROUTES } from "@/constants/routes";
 import { matrixService, type MatrixCellUpsert } from "../matrix/matrixService";
-import { downloadMatrixExcel } from "../matrix/matrixExcel";
 import { MatrixAxisAddModal } from "../matrix/MatrixAxisAddModal";
 import {
+  downloadFuelNormExcel,
   importFuelNormExcel,
   previewFuelNormExcel,
   type FuelNormImportPreview,
@@ -27,9 +27,10 @@ import {
   STATUS_LABEL,
   buildColumnKey,
   groupColumnsByVehicleSuffix,
+  parseColumnKey,
   statusOf,
 } from "./fuelNormKeys";
-import { FuelNormAddDatasetModal } from "./FuelNormAddDatasetModal";
+import { FuelNormBulkAddModal } from "./FuelNormBulkAddModal";
 
 const DMNL_CODE = "DMNL";
 
@@ -182,11 +183,7 @@ export default function FuelNormAddPage() {
 
   // ── bộ dữ liệu (pill) theo Chủng loại xe + Hậu tố ────────────────────────
   const datasets = useMemo(() => (grid ? groupColumnsByVehicleSuffix(grid) : []), [grid]);
-  const [extraPills, setExtraPills] = useState<string[]>([]);
-  const pillKeys = useMemo(() => {
-    const fromGrid = datasets.map((d) => d.vehicleSuffixKey);
-    return Array.from(new Set([...fromGrid, ...extraPills]));
-  }, [datasets, extraPills]);
+  const pillKeys = useMemo(() => datasets.map((d) => d.vehicleSuffixKey), [datasets]);
 
   const [activeKey, setActiveKey] = useState<string | null>(null);
   useEffect(() => {
@@ -262,6 +259,26 @@ export default function FuelNormAddPage() {
     onError: (e: unknown) => {
       const res = (e as { response?: { data?: { message?: string } } }).response;
       toast.error(res?.data?.message ?? "Thêm cung độ thất bại.");
+    },
+  });
+
+  const bulkAddMutation = useMutation({
+    mutationFn: async (columns: { key: string; label: string }[]) => {
+      if (!grid) throw new Error("Chưa tạo bộ định mức.");
+      return matrixService.addCols(grid.code, grid.versionId, columns);
+    },
+    onSuccess: (_updated, columns) => {
+      queryClient.invalidateQueries({ queryKey: ["matrix", DMNL_CODE] });
+      setShowAddDataset(false);
+      if (columns[0]) {
+        const vs = parseColumnKey(columns[0].key)?.vehicleSuffixKey;
+        if (vs) setActiveKey(vs);
+      }
+      toast.success(`Đã thêm ${columns.length} cột.`);
+    },
+    onError: (e: unknown) => {
+      const res = (e as { response?: { data?: { message?: string } } }).response;
+      toast.error(res?.data?.message ?? "Thêm bộ định mức thất bại.");
     },
   });
 
@@ -619,7 +636,7 @@ export default function FuelNormAddPage() {
                 )}
 
                 <div className="flex justify-end">
-                  <Button variant="ghost" size="sm" className="gap-1.5 text-xs text-muted-foreground" onClick={() => downloadMatrixExcel(grid)}>
+                  <Button variant="ghost" size="sm" className="gap-1.5 text-xs text-muted-foreground" onClick={() => downloadFuelNormExcel(grid)}>
                     <Download className="h-3.5 w-3.5" /> Tải xuống cả lưới (Excel)
                   </Button>
                 </div>
@@ -631,7 +648,7 @@ export default function FuelNormAddPage() {
                     variant="outline"
                     size="sm"
                     className="h-8 gap-1.5 text-xs"
-                    onClick={() => downloadMatrixExcel(grid)}
+                    onClick={() => downloadFuelNormExcel(grid)}
                   >
                     <Download className="h-3.5 w-3.5" /> Tải file mẫu Excel
                   </Button>
@@ -682,15 +699,11 @@ export default function FuelNormAddPage() {
         )}
       </div>
 
-      {showAddDataset && (
-        <FuelNormAddDatasetModal
-          existingKeys={new Set(pillKeys)}
+      {showAddDataset && grid && (
+        <FuelNormBulkAddModal
+          existingColumnKeys={new Set(grid.cols.map((c) => c.key))}
           onClose={() => setShowAddDataset(false)}
-          onConfirm={(key) => {
-            setExtraPills((prev) => [...prev, key]);
-            setActiveKey(key);
-            setShowAddDataset(false);
-          }}
+          onConfirm={(columns) => bulkAddMutation.mutate(columns)}
         />
       )}
 

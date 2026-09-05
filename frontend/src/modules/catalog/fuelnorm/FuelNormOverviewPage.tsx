@@ -23,7 +23,7 @@ import {
 import { cn } from "@/lib/utils";
 import { ROUTES } from "@/constants/routes";
 import { matrixService, type MatrixGrid } from "../matrix/matrixService";
-import { downloadMatrixExcel } from "../matrix/matrixExcel";
+import { downloadFuelNormExcel } from "./fuelNormExcelImport";
 import {
   STATUS_LABEL,
   buildColumnKey,
@@ -200,7 +200,7 @@ export default function FuelNormOverviewPage() {
 
   const handleExportDataset = (grid: MatrixGrid, dataset: FuelNormDataset) => {
     const filteredGrid: MatrixGrid = { ...grid, cols: dataset.columns };
-    downloadMatrixExcel(filteredGrid);
+    downloadFuelNormExcel(filteredGrid);
   };
 
   const goToEdit = (versionId: number, vehicleSuffixKey: string) =>
@@ -425,7 +425,7 @@ export default function FuelNormOverviewPage() {
             size="sm"
             className="h-8 gap-1.5 text-xs"
             disabled={grids.length === 0}
-            onClick={() => grids[0] && downloadMatrixExcel(grids[0])}
+            onClick={() => grids[0] && downloadFuelNormExcel(grids[0])}
           >
             <Download className="h-3.5 w-3.5" /> Tải file mẫu
           </Button>

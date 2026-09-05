@@ -10,7 +10,7 @@ import type { MatrixCellUpsert, MatrixGrid } from "./matrixService";
  */
 
 /** Ô trống trong Excel = chưa khai báo. Chuỗi rỗng chứ không phải số 0. */
-const cellText = (grid: MatrixGrid, rowKey: string, colKey: string): string => {
+export const cellText = (grid: MatrixGrid, rowKey: string, colKey: string): string => {
   const v = grid.cells[rowKey]?.[colKey];
   return v === undefined || v === null ? "" : String(v);
 };
@@ -57,23 +57,17 @@ export interface ParsedMatrix {
 }
 
 /**
- * Đọc file lưới thành danh sách ô cần ghi.
+ * Đọc mảng dòng (đã đọc sẵn từ sheet) thành danh sách ô cần ghi.
  *
  * Đối chiếu theo NHÃN hiển thị (đúng thứ người dùng nhìn thấy trong file),
  * rồi quy về khoá. Nhãn không khớp thì báo rõ tên dòng/cột thay vì bỏ qua
  * lặng lẽ — bỏ qua sẽ khiến người dùng tưởng đã nhập xong.
+ *
+ * Tách riêng khỏi việc đọc file để nơi khác (vd import DMNL — có thêm một
+ * cột nhãn phụ đứng trước cần cắt bỏ trước khi tới đây) có thể tự tiền xử
+ * lý mảng dòng rồi tái dùng đúng logic đối chiếu này, không phải chép lại.
  */
-export async function parseMatrixExcel(
-  grid: MatrixGrid,
-  file: File,
-): Promise<ParsedMatrix> {
-  const wb = XLSX.read(await file.arrayBuffer(), { type: "array" });
-  const sheetName = wb.SheetNames.includes("Luoi") ? "Luoi" : wb.SheetNames[0];
-  const rows = XLSX.utils.sheet_to_json<unknown[]>(wb.Sheets[sheetName], {
-    header: 1,
-    blankrows: false,
-  });
-
+export function parseMatrixRows(grid: MatrixGrid, rows: unknown[][], sheetName = "Luoi"): ParsedMatrix {
   const cells: MatrixCellUpsert[] = [];
   const errors: string[] = [];
 
@@ -138,4 +132,15 @@ export async function parseMatrixExcel(
   }
 
   return { cells, errors };
+}
+
+/** Đọc file lưới thành danh sách ô cần ghi — xem `parseMatrixRows`. */
+export async function parseMatrixExcel(grid: MatrixGrid, file: File): Promise<ParsedMatrix> {
+  const wb = XLSX.read(await file.arrayBuffer(), { type: "array" });
+  const sheetName = wb.SheetNames.includes("Luoi") ? "Luoi" : wb.SheetNames[0];
+  const rows = XLSX.utils.sheet_to_json<unknown[]>(wb.Sheets[sheetName], {
+    header: 1,
+    blankrows: false,
+  });
+  return parseMatrixRows(grid, rows, sheetName);
 }
