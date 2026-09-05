@@ -503,6 +503,21 @@ giữa các lượt sửa DMNL này — KHÔNG phải của lượt DMNL, một 
 khác đã commit vào cùng worktree `claude-dev`. Không đụng tới, chỉ ghi
 nhận để không nhầm là của các thay đổi DMNL ở trên.
 
+7. **Bảng bị bóp dẹt — xác nhận qua ảnh chụp màn hình thật của chủ dự án**
+   (commit `8f802b4`, chủ dự án ĐÃ đăng nhập được, đây là phản hồi từ UI
+   thật đầu tiên trong lượt 7). Nguyên nhân: card bảng có `min-h-0` (bỏ
+   bảo vệ chiều cao mặc định của flexbox) nhưng KHÔNG có `flex-1`, trong
+   khi container cha trang là `h-full flex-col` — thiếu hụt chiều cao dồn
+   hết vào ĐÚNG card này (các card khác không có `min-h-0` nên được bảo
+   vệ), ép bảng gần như về 0 (ảnh chụp chỉ thấy đỉnh header, không thấy
+   dữ liệu). Sửa theo đúng pattern đã chạy ổn ở `FuelNormAddPage.tsx`:
+   thêm `flex-1` vào card kể cả khi KHÔNG fullscreen; vùng cuộn bên trong
+   đổi từ `maxHeight: 75vh` cố định sang `flex-1` luôn (tự lấp đầy không
+   gian còn lại của trang). **Bài học cho lần sau**: khi 1 flex-item được
+   gán `min-h-0` để cho phép co/cuộn nội bộ, LUÔN đi kèm `flex-1` cùng
+   lúc — thiếu 1 trong 2 sẽ gây đúng lỗi này, dễ tái diễn nếu có màn khác
+   dùng lại pattern "card + min-h-0" mà quên `flex-1`.
+
 ## Việc cần làm tiếp (ưu tiên theo thứ tự)
 
 0. **ĐÃ CÓ THIẾT KẾ → `docs/DESIGN_SANLUONG.md`** (2026-08-30). Mô hình dữ
