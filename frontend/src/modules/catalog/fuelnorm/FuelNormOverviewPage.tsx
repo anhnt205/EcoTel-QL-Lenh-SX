@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Copy, Download, Fuel, Gauge, Grid3x3, Layers, Plus, Settings2, SquarePen } from "lucide-react";
+import { Copy, Download, Fuel, Gauge, Grid3x3, Layers, Maximize, Minimize, Plus, Settings2, SquarePen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -157,11 +157,8 @@ export default function FuelNormOverviewPage() {
   const versionLabelOf = (v: { versionLabel: string | null; effectiveFrom: string | null; effectiveTo: string | null }) =>
     v.versionLabel || `${v.effectiveFrom ?? "từ đầu"} → ${v.effectiveTo ?? "nay"}`;
 
-  // ── chọn bộ dữ liệu để xem biểu đồ ────────────────────────────────────────
-  const [selectedDatasetKey, setSelectedDatasetKey] = useState<string | null>(null);
-  const selectedRow = rows.find(
-    (r) => r.versionId === activeVersionId && r.vehicleSuffixKey === (selectedDatasetKey ?? visibleDatasets[0]?.vehicleSuffixKey),
-  );
+  // ── mở rộng toàn màn hình bảng tổng hợp — đây là nội dung chính của trang ──
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   // ── sao chép 1 bộ dữ liệu sang chủng loại xe/hậu tố khác (cùng phiên bản) ─
   const [copySource, setCopySource] = useState<FuelNormRow | null>(null);
@@ -275,13 +272,28 @@ export default function FuelNormOverviewPage() {
         <Kpi icon={<Gauge className="h-5 w-5" />} label="Tỷ lệ hoàn thiện" value={`${completion}%`} />
       </div>
 
-      {/* Bảng tổng hợp — chọn kỳ, hiện toàn bộ Chủng loại xe + Hậu tố của kỳ đó trong 1 bảng */}
-      <div className="rounded-lg border bg-card">
-        <div className="border-b px-4 py-3">
-          <h2 className="text-sm font-bold">Bảng tổng hợp định mức nhiên liệu</h2>
-          <p className="text-xs text-muted-foreground">
-            Dữ liệu điền ở "Thêm mới"/"Sửa" hiện ngay ở đây — cùng một nguồn, không phải bảng riêng.
-          </p>
+      {/* Bảng tổng hợp — nội dung chính của trang, chọn kỳ rồi hiện toàn bộ
+          Chủng loại xe + Hậu tố của kỳ đó trong 1 bảng */}
+      <div
+        className={cn(
+          "flex min-h-0 flex-col rounded-lg border bg-card",
+          isFullscreen && "fixed inset-0 z-[100] flex-1 rounded-none",
+        )}
+      >
+        <div className="flex items-center justify-between border-b px-4 py-3">
+          <div>
+            <h2 className="text-sm font-bold">Bảng tổng hợp định mức nhiên liệu</h2>
+            <p className="text-xs text-muted-foreground">
+              Dữ liệu điền ở "Thêm mới"/"Sửa" hiện ngay ở đây — cùng một nguồn, không phải bảng riêng.
+            </p>
+          </div>
+          <button
+            title={isFullscreen ? "Thu nhỏ" : "Mở rộng toàn màn hình"}
+            onClick={() => setIsFullscreen((v) => !v)}
+            className="shrink-0 rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800"
+          >
+            {isFullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
+          </button>
         </div>
 
         {/* Chọn kỳ */}
@@ -324,7 +336,10 @@ export default function FuelNormOverviewPage() {
         ) : visibleDatasets.length === 0 ? (
           <p className="p-4 text-sm text-muted-foreground">Kỳ này chưa có bộ dữ liệu nào khớp bộ lọc.</p>
         ) : (
-          <div className="overflow-auto" style={{ maxHeight: "60vh" }}>
+          <div
+            className={cn("min-h-0 overflow-auto", isFullscreen ? "flex-1" : "")}
+            style={isFullscreen ? undefined : { maxHeight: "75vh" }}
+          >
             <table className="border-collapse text-xs">
               <thead>
                 <tr>
@@ -340,9 +355,7 @@ export default function FuelNormOverviewPage() {
                         className={cn("sticky top-0 z-20 border-b border-r px-2 py-1.5 text-center font-semibold", color.header)}
                       >
                         <div className="flex items-center justify-center gap-1.5">
-                          <button className="hover:underline" onClick={() => setSelectedDatasetKey(ds.vehicleSuffixKey)}>
-                            {ds.vehicleSuffixKey}
-                          </button>
+                          <span>{ds.vehicleSuffixKey}</span>
                           <button title="Sửa" onClick={() => goToEdit(yearGrid.versionId, ds.vehicleSuffixKey)}>
                             <SquarePen className="h-3.5 w-3.5" />
                           </button>
@@ -397,15 +410,17 @@ export default function FuelNormOverviewPage() {
         )}
       </div>
 
-      {/* Biểu đồ */}
-      <div className="rounded-lg border bg-card p-3">
-        <h2 className="mb-2 text-sm font-bold">Biểu đồ minh hoạ {selectedRow ? `— ${selectedRow.displayCode}` : ""}</h2>
-        {selectedRow ? (
-          <FuelNormChartPanel grid={selectedRow.grid} dataset={selectedRow.dataset} />
-        ) : (
-          <p className="text-sm text-muted-foreground">Chọn một bộ dữ liệu ở bảng trên để xem biểu đồ.</p>
-        )}
-      </div>
+      {/* Biểu đồ — phụ, chỉ minh hoạ nhanh nên để nhỏ, không chiếm hết chiều ngang */}
+      {!isFullscreen && (
+        <div className="max-w-md rounded-lg border bg-card p-2.5">
+          <h2 className="mb-1.5 text-xs font-bold">Biểu đồ minh hoạ — các chủng loại xe trong bảng</h2>
+          {yearGrid && visibleDatasets.length > 0 ? (
+            <FuelNormChartPanel grid={yearGrid} datasets={visibleDatasets} />
+          ) : (
+            <p className="text-xs text-muted-foreground">Chưa có bộ dữ liệu nào để vẽ.</p>
+          )}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <div className="rounded-lg border bg-card p-3">
