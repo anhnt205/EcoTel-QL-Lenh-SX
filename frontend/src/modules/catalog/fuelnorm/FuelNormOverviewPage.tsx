@@ -410,66 +410,42 @@ export default function FuelNormOverviewPage() {
         )}
       </div>
 
-      {/* Biểu đồ — phụ, chỉ minh hoạ nhanh nên để nhỏ, không chiếm hết chiều ngang */}
       {!isFullscreen && (
-        <div className="max-w-md rounded-lg border bg-card p-2.5">
-          <h2 className="mb-1.5 text-xs font-bold">Biểu đồ minh hoạ — các chủng loại xe trong bảng</h2>
-          {yearGrid && visibleDatasets.length > 0 ? (
-            <FuelNormChartPanel grid={yearGrid} datasets={visibleDatasets} />
-          ) : (
-            <p className="text-xs text-muted-foreground">Chưa có bộ dữ liệu nào để vẽ.</p>
-          )}
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="rounded-lg border bg-card p-2.5 sm:col-span-2">
+            <h3 className="mb-1.5 text-xs font-bold">Biểu đồ minh hoạ — các chủng loại xe trong bảng</h3>
+            {yearGrid && visibleDatasets.length > 0 ? (
+              <FuelNormChartPanel grid={yearGrid} datasets={visibleDatasets} />
+            ) : (
+              <p className="text-xs text-muted-foreground">Chưa có bộ dữ liệu nào để vẽ.</p>
+            )}
+          </div>
+          <div className="rounded-lg border bg-card p-3">
+            <h3 className="mb-2 text-sm font-bold">Cập nhật gần đây</h3>
+            <div className="space-y-1.5 text-xs">
+              {recentUpdates.length === 0 && <p className="text-muted-foreground">Chưa có dữ liệu.</p>}
+              {recentUpdates.map((v) => (
+                <div key={v.versionId} className="flex justify-between border-b py-1 last:border-0">
+                  <span>{v.versionLabel || v.effectiveFrom || `#${v.versionId}`}</span>
+                  <span className="text-muted-foreground">{v.effectiveFrom ?? "—"}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="rounded-lg border bg-card p-3">
+            <h3 className="mb-2 text-sm font-bold">Thống kê theo năm</h3>
+            <div className="flex h-[110px] items-end gap-4 border-b border-l pb-1 pl-1">
+              {yearStats.map((s) => (
+                <div key={s.year} className="flex flex-col items-center gap-1">
+                  <span className="text-[11px] font-semibold">{s.count}</span>
+                  <div className="w-6 rounded-t bg-blue-600" style={{ height: `${(s.count / maxYearCount) * 80 + 4}px` }} />
+                  <span className="text-[10px] text-muted-foreground">{s.year}</span>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       )}
-
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="rounded-lg border bg-card p-3">
-          <h3 className="mb-2 text-sm font-bold">Hướng dẫn sử dụng</h3>
-          <ol className="list-decimal space-y-1 pl-4 text-xs text-muted-foreground">
-            <li>Chọn kỳ ở bảng tổng hợp để xem toàn bộ dữ liệu của kỳ đó.</li>
-            <li>Bấm "Thêm mới" để tạo bộ định mức, hoặc bấm biểu tượng sửa trên từng cột nhóm.</li>
-            <li>Có thể nhập trực tiếp hoặc Import từ file Excel.</li>
-            <li>Dữ liệu sau khi lưu hiển thị ngay trong bảng tổng hợp này.</li>
-          </ol>
-        </div>
-        <div className="rounded-lg border bg-card p-3">
-          <h3 className="mb-2 text-sm font-bold">Tải file mẫu</h3>
-          <p className="mb-2 text-xs text-muted-foreground">Xuất lưới của phiên bản mới nhất làm định dạng mẫu.</p>
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-8 gap-1.5 text-xs"
-            disabled={grids.length === 0}
-            onClick={() => grids[0] && downloadFuelNormExcel(grids[0])}
-          >
-            <Download className="h-3.5 w-3.5" /> Tải file mẫu
-          </Button>
-        </div>
-        <div className="rounded-lg border bg-card p-3">
-          <h3 className="mb-2 text-sm font-bold">Cập nhật gần đây</h3>
-          <div className="space-y-1.5 text-xs">
-            {recentUpdates.length === 0 && <p className="text-muted-foreground">Chưa có dữ liệu.</p>}
-            {recentUpdates.map((v) => (
-              <div key={v.versionId} className="flex justify-between border-b py-1 last:border-0">
-                <span>{v.versionLabel || v.effectiveFrom || `#${v.versionId}`}</span>
-                <span className="text-muted-foreground">{v.effectiveFrom ?? "—"}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-        <div className="rounded-lg border bg-card p-3">
-          <h3 className="mb-2 text-sm font-bold">Thống kê theo năm</h3>
-          <div className="flex h-[110px] items-end gap-4 border-b border-l pb-1 pl-1">
-            {yearStats.map((s) => (
-              <div key={s.year} className="flex flex-col items-center gap-1">
-                <span className="text-[11px] font-semibold">{s.count}</span>
-                <div className="w-6 rounded-t bg-blue-600" style={{ height: `${(s.count / maxYearCount) * 80 + 4}px` }} />
-                <span className="text-[10px] text-muted-foreground">{s.year}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
 
       {copySource && (
         <FuelNormAddDatasetModal
