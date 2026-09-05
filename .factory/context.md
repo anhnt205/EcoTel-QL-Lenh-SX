@@ -518,6 +518,39 @@ nhận để không nhầm là của các thay đổi DMNL ở trên.
    lúc — thiếu 1 trong 2 sẽ gây đúng lỗi này, dễ tái diễn nếu có màn khác
    dùng lại pattern "card + min-h-0" mà quên `flex-1`.
 
+   **Chẩn đoán trên SAI** — chủ dự án báo "vẫn chưa được" sau khi deploy
+   commit `8f802b4`. Gốc rễ thật (commit `fd87460`): `flex-1` (flex-grow)
+   chỉ giúp một item GIÀNH không gian THỪA, KHÔNG hề bảo vệ nó khỏi bị ép
+   khi THIẾU không gian — bảo vệ đó chỉ đến từ `min-height`. Card bảng
+   vẫn có `min-h-0` (bỏ bảo vệ) nên vẫn là item DUY NHẤT có thể bị ép về
+   0 bất kể có `flex-1` hay không. Thêm nữa: `MainLayout` (`main-layout.tsx`)
+   đã có `<main className="flex-1 min-h-0 overflow-y-auto">` — tức là
+   TOÀN TRANG vốn đã tự cuộn ở cấp `<main>`, card bảng KHÔNG CẦN (và
+   không nên) tự nhét vừa `h-full` của trang. **Sửa đúng**: bỏ hẳn
+   `min-h-0`/`flex-1` khỏi card ở trạng thái bình thường (chỉ còn dùng
+   khi `isFullscreen` — lúc đó card là `position: fixed`, tách khỏi flex
+   của trang nên áp dụng lại đúng). **Bài học đã sửa lại**: đây là lỗi
+   flexbox kinh điển (grow ≠ bảo vệ khỏi shrink) — khi debug lỗi
+   "bị bóp/che" tương tự sau này, luôn hỏi "phần tử có `overflow-y-auto`
+   ở cấp cha xa hơn không" trước khi thêm `flex-1 min-h-0` vào con.
+
+8. **Thêm phân trang + khung bảng rõ** (cùng commit `fd87460`, theo yêu
+   cầu tiếp theo của chủ dự án) — phân trang theo dòng Độ dốc, 20
+   dòng/trang, nút Trước/Sau; thêm viền `border-2` quanh vùng bảng để
+   ranh giới rõ ràng ("trực quan" theo đúng từ chủ dự án dùng).
+9. **Đã chèn dữ liệu DEMO trực tiếp vào DB** (theo yêu cầu "đưa vài
+   thông tin vào để hiển thị thử") — phiên bản DMNL id 155 (2026-01-01→
+   2026-12-31, "Đang áp dụng"), thêm 27 dòng Độ dốc (0→500, đúng dải
+   tham chiếu chủ dự án từng gửi ảnh chụp), 20 cột `CAT777E.CS`/`.KC` ×
+   9 cung độ, 486 ô — giá trị tính bằng công thức tuyến tính đơn giản,
+   **KHÔNG PHẢI định mức thật**, chỉ để có đủ dữ liệu kiểm tra khung
+   bảng + phân trang (27 > 20 dòng/trang → chắc chắn thấy "Trang 1/2").
+   **Việc cần làm khi chủ dự án nhập dữ liệu thật**: xoá số liệu demo
+   này (`DELETE FROM matrix_cells/matrix_axis_entries WHERE definition_id
+   =155 AND ...` — cẩn thận KHÔNG xoá 4 ô gốc `200/250 × CAT777E.KC_3/_4`
+   chủ dự án đã tự nhập trước đó) hoặc đơn giản là ghi đè khi nhập liệu
+   thật (ô đã có giá trị demo vẫn ghi đè bình thường qua UI/Excel).
+
 ## Việc cần làm tiếp (ưu tiên theo thứ tự)
 
 0. **ĐÃ CÓ THIẾT KẾ → `docs/DESIGN_SANLUONG.md`** (2026-08-30). Mô hình dữ
