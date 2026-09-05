@@ -123,6 +123,38 @@ export const seamGroupConfig: CatalogConfig = {
   ],
 };
 
+export const vehicleTypeConfig: CatalogConfig = {
+  basePath: "/vehicle-types",
+  title: "Chủng loại xe",
+  nounPhrase: "chủng loại xe",
+  breadcrumb: ["Danh mục", "Thống kê sản lượng"],
+  searchPlaceholder: "Tìm kiếm theo mã chủng loại xe, tên chủng loại xe",
+  fields: placeFields("chủng loại xe"),
+};
+
+export const vehicleRankGroupConfig: CatalogConfig = {
+  basePath: "/vehicle-rank-groups",
+  title: "Nhóm hạng xe",
+  nounPhrase: "nhóm hạng xe",
+  breadcrumb: ["Danh mục", "Thống kê sản lượng"],
+  searchPlaceholder: "Tìm kiếm theo mã nhóm, tên nhóm hạng xe",
+  fields: placeFields("nhóm hạng xe"),
+};
+
+export const vehicleRankConfig: CatalogConfig = {
+  basePath: "/vehicle-ranks",
+  title: "Hạng xe",
+  nounPhrase: "hạng xe",
+  breadcrumb: ["Danh mục", "Thống kê sản lượng"],
+  searchPlaceholder: "Tìm kiếm theo mã hạng, nhóm hạng xe",
+  fields: [
+    { key: "code", label: "Mã hạng", required: true, type: "text", width: "min-w-[140px]" },
+    { key: "rank", label: "Xếp hạng", required: true, type: "number", width: "min-w-[110px]" },
+    { key: "vehicleRankGroupId", label: "Nhóm hạng xe", required: true, type: "select", optionsPath: "/vehicle-rank-groups", width: "min-w-[180px]" },
+    { key: "note", label: "Ghi chú", type: "text", width: "min-w-[200px]" },
+  ],
+};
+
 export const vehicleFuelClassConfig: CatalogConfig = {
   basePath: "/vehicle-fuel-classes",
   title: "Chủng loại xe + DMNL",

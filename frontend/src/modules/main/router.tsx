@@ -48,6 +48,9 @@ const CargoGroupsCatalogPage = lazy(() => import("@/modules/catalog/pages/CargoG
 const AcceptanceProductsPage = lazy(() => import("@/modules/catalog/pages/AcceptanceProducts"));
 const TtlClhItemsPage = lazy(() => import("@/modules/catalog/pages/TtlClhItems"));
 const SeamGroupsPage = lazy(() => import("@/modules/catalog/pages/SeamGroups"));
+const VehicleTypesPage = lazy(() => import("@/modules/catalog/pages/VehicleTypes"));
+const VehicleRankGroupsPage = lazy(() => import("@/modules/catalog/pages/VehicleRankGroups"));
+const VehicleRanksPage = lazy(() => import("@/modules/catalog/pages/VehicleRanks"));
 const VehicleFuelClassesPage = lazy(() => import("@/modules/catalog/pages/VehicleFuelClasses"));
 const VehicleCategoryClassesPage = lazy(() => import("@/modules/catalog/pages/VehicleCategoryClasses"));
 const CoefficientsPage = lazy(() => import("@/modules/catalog/pages/Coefficients"));
@@ -265,6 +268,14 @@ export const mainRoutes = (
         }
       />
       <Route
+        path={ROUTES.DANH_MUC.CHUNG_LOAI_XE}
+        element={
+          <Suspense fallback={<PageLoader />}>
+            <VehicleTypesPage />
+          </Suspense>
+        }
+      />
+      <Route
         path={ROUTES.DANH_MUC.CHUNG_LOAI_XE_DMNL}
         element={
           <Suspense fallback={<PageLoader />}>
@@ -277,6 +288,22 @@ export const mainRoutes = (
         element={
           <Suspense fallback={<PageLoader />}>
             <VehicleCategoryClassesPage />
+          </Suspense>
+        }
+      />
+      <Route
+        path={ROUTES.DANH_MUC.NHOM_HANG_XE}
+        element={
+          <Suspense fallback={<PageLoader />}>
+            <VehicleRankGroupsPage />
+          </Suspense>
+        }
+      />
+      <Route
+        path={ROUTES.DANH_MUC.HANG_XE}
+        element={
+          <Suspense fallback={<PageLoader />}>
+            <VehicleRanksPage />
           </Suspense>
         }
       />

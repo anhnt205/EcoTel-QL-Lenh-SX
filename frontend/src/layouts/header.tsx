@@ -274,6 +274,15 @@ export function Header() {
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
                 <NavLink
+                  to={ROUTES.DANH_MUC.CHUNG_LOAI_XE}
+                  className="flex items-center gap-2 px-2.5 py-2 text-sm rounded hover:bg-blue-50 cursor-pointer"
+                >
+                  <Layers className="h-4 w-4 text-blue-600" />
+                  Chủng loại xe
+                </NavLink>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <NavLink
                   to={ROUTES.DANH_MUC.CHUNG_LOAI_XE_DMNL}
                   className="flex items-center gap-2 px-2.5 py-2 text-sm rounded hover:bg-blue-50 cursor-pointer"
                 >
@@ -288,6 +297,24 @@ export function Header() {
                 >
                   <Layers className="h-4 w-4 text-blue-600" />
                   Chủng loại xe + Phân loại
+                </NavLink>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <NavLink
+                  to={ROUTES.DANH_MUC.NHOM_HANG_XE}
+                  className="flex items-center gap-2 px-2.5 py-2 text-sm rounded hover:bg-blue-50 cursor-pointer"
+                >
+                  <Layers className="h-4 w-4 text-blue-600" />
+                  Nhóm hạng xe
+                </NavLink>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <NavLink
+                  to={ROUTES.DANH_MUC.HANG_XE}
+                  className="flex items-center gap-2 px-2.5 py-2 text-sm rounded hover:bg-blue-50 cursor-pointer"
+                >
+                  <Layers className="h-4 w-4 text-blue-600" />
+                  Hạng xe
                 </NavLink>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
