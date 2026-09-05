@@ -276,8 +276,8 @@ export default function FuelNormOverviewPage() {
           Chủng loại xe + Hậu tố của kỳ đó trong 1 bảng */}
       <div
         className={cn(
-          "flex min-h-0 flex-col rounded-lg border bg-card",
-          isFullscreen && "fixed inset-0 z-[100] flex-1 rounded-none",
+          "flex min-h-0 flex-1 flex-col rounded-lg border bg-card",
+          isFullscreen && "fixed inset-0 z-[100] rounded-none",
         )}
       >
         <div className="flex items-center justify-between border-b px-4 py-3">
@@ -336,10 +336,7 @@ export default function FuelNormOverviewPage() {
         ) : visibleDatasets.length === 0 ? (
           <p className="p-4 text-sm text-muted-foreground">Kỳ này chưa có bộ dữ liệu nào khớp bộ lọc.</p>
         ) : (
-          <div
-            className={cn("min-h-0 overflow-auto", isFullscreen ? "flex-1" : "")}
-            style={isFullscreen ? undefined : { maxHeight: "75vh" }}
-          >
+          <div className="min-h-0 flex-1 overflow-auto">
             <table className="border-collapse text-xs">
               <thead>
                 <tr>
