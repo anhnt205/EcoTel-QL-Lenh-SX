@@ -3,6 +3,7 @@ package com.ecotel.thong_ke_cao_son.controller;
 import com.ecotel.thong_ke_cao_son.dto.request.MatrixAxisEntryRequest;
 import com.ecotel.thong_ke_cao_son.dto.request.MatrixCellUpsertRequest;
 import com.ecotel.thong_ke_cao_son.dto.request.MatrixVersionRequest;
+import com.ecotel.thong_ke_cao_son.dto.request.MatrixVersionUpdateRequest;
 import com.ecotel.thong_ke_cao_son.dto.response.ApiResponse;
 import com.ecotel.thong_ke_cao_son.dto.response.MatrixGridResponse;
 import com.ecotel.thong_ke_cao_son.model.MatrixAxisEntry;
@@ -73,8 +74,23 @@ public class MatrixCatalogController {
             @Valid @RequestBody MatrixVersionRequest request) {
         return ApiResponse.success(service.createVersion(
                 code, request.getSourceId(), request.getEffectiveFrom(),
-                request.getEffectiveTo(), request.getVersionLabel(),
+                request.getEffectiveTo(), request.getVersionLabel(), request.getNote(),
                 !Boolean.FALSE.equals(request.getCopyCells())));
+    }
+
+    /**
+     * Sửa siêu dữ liệu (ngày hiệu lực, nhãn, mô tả) của một phiên bản đã có —
+     * không đụng trục hay ô. Dùng khi chỉ cần chỉnh mô tả/khoảng hiệu lực mà
+     * không muốn xoá-tạo-lại (xoá sẽ mất hết ô đã nhập).
+     */
+    @PutMapping("/{code}/versions/{versionId}")
+    public ApiResponse<MatrixGridResponse> updateVersion(
+            @PathVariable String code,
+            @PathVariable Long versionId,
+            @Valid @RequestBody MatrixVersionUpdateRequest request) {
+        return ApiResponse.success(service.updateVersionMeta(
+                code, versionId, request.getEffectiveFrom(),
+                request.getEffectiveTo(), request.getVersionLabel(), request.getNote()));
     }
 
     /**

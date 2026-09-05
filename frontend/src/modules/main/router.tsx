@@ -57,6 +57,8 @@ const CoefficientsPage = lazy(() => import("@/modules/catalog/pages/Coefficients
 const ReportPeriodsPage = lazy(() => import("@/modules/catalog/pages/ReportPeriods"));
 const ModelMatrixPage = lazy(() => import("@/modules/catalog/pages/ModelMatrix"));
 const FuelNormMatrixPage = lazy(() => import("@/modules/catalog/pages/FuelNormMatrix"));
+const FuelNormOverviewPage = lazy(() => import("@/modules/catalog/fuelnorm/FuelNormOverviewPage"));
+const FuelNormAddPage = lazy(() => import("@/modules/catalog/fuelnorm/FuelNormAddPage"));
 const VehicleOutputMatrixPage = lazy(() => import("@/modules/catalog/pages/VehicleOutputMatrix"));
 const FuelAdjustMatrixPage = lazy(() => import("@/modules/catalog/pages/FuelAdjustMatrix"));
 const DensityParametersPage = lazy(() => import("@/modules/catalog/pages/DensityParameters"));
@@ -335,6 +337,22 @@ export const mainRoutes = (
       />
       <Route
         path={ROUTES.DANH_MUC.DINH_MUC_NHIEN_LIEU}
+        element={
+          <Suspense fallback={<PageLoader />}>
+            <FuelNormOverviewPage />
+          </Suspense>
+        }
+      />
+      <Route
+        path={ROUTES.DANH_MUC.DINH_MUC_NHIEN_LIEU_THEM_MOI}
+        element={
+          <Suspense fallback={<PageLoader />}>
+            <FuelNormAddPage />
+          </Suspense>
+        }
+      />
+      <Route
+        path={ROUTES.DANH_MUC.DINH_MUC_NHIEN_LIEU_LUOI}
         element={
           <Suspense fallback={<PageLoader />}>
             <FuelNormMatrixPage />

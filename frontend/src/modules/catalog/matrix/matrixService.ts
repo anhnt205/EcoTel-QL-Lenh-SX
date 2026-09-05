@@ -67,9 +67,19 @@ export const matrixService = {
 
   createVersion: async (code: string, body: {
     sourceId?: number; effectiveFrom: string; effectiveTo?: string | null;
-    versionLabel?: string; copyCells: boolean;
+    versionLabel?: string; note?: string; copyCells: boolean;
   }): Promise<MatrixGrid> =>
     unwrap(await api.post(`${BASE}/${code}/versions`, body)),
+
+  /**
+   * Sửa siêu dữ liệu (ngày hiệu lực, nhãn, mô tả) của một phiên bản đã có —
+   * không đụng trục hay ô.
+   */
+  updateVersion: async (code: string, versionId: number, body: {
+    effectiveFrom: string; effectiveTo?: string | null;
+    versionLabel?: string; note?: string;
+  }): Promise<MatrixGrid> =>
+    unwrap(await api.put(`${BASE}/${code}/versions/${versionId}`, body)),
 
   /** Xoá phiên bản; phiên bản cuối cùng của lưới thì máy chủ từ chối. */
   deleteVersion: async (code: string, versionId: number): Promise<void> => {

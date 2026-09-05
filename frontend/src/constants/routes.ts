@@ -49,6 +49,8 @@ export const ROUTES = {
     KY_BAO_CAO: '/danh-muc/ky-bao-cao',
     MO_HINH: '/danh-muc/mo-hinh',
     DINH_MUC_NHIEN_LIEU: '/danh-muc/dinh-muc-nhien-lieu',
+    DINH_MUC_NHIEN_LIEU_THEM_MOI: '/danh-muc/dinh-muc-nhien-lieu/them-moi',
+    DINH_MUC_NHIEN_LIEU_LUOI: '/danh-muc/dinh-muc-nhien-lieu/luoi-day-du',
     NANG_SUAT_XE: '/danh-muc/nang-suat-xe',
     HS_DIEU_CHINH_NLDM: '/danh-muc/hs-dieu-chinh-nldm',
     TY_TRONG: '/danh-muc/ty-trong',

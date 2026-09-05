@@ -103,11 +103,13 @@ public class MatrixCatalogService {
      * hiệu lực và việc tra sẽ phụ thuộc thứ tự — thứ không nên để tuỳ may rủi.
      *
      * @param sourceId phiên bản nguồn; để trống thì lấy phiên bản mới nhất
+     * @param note     mô tả phiên bản mới; để trống thì sao chép mô tả từ
+     *                 phiên bản nguồn (hành vi cũ)
      */
     @Transactional
     public MatrixGridResponse createVersion(String code, Long sourceId, LocalDate effectiveFrom,
                                             LocalDate effectiveTo, String versionLabel,
-                                            boolean copyCells) {
+                                            String note, boolean copyCells) {
         if (effectiveFrom == null) {
             throw new BadRequestException("Phiên bản mới phải có ngày bắt đầu hiệu lực");
         }
@@ -140,7 +142,7 @@ public class MatrixCatalogService {
         copy.setNumericRowAxis(source.isNumericRowAxis());
         copy.setNumericColAxis(source.isNumericColAxis());
         copy.setValueScale(source.getValueScale());
-        copy.setNote(source.getNote());
+        copy.setNote(note != null && !note.isBlank() ? note : source.getNote());
         copy.setEffectiveFrom(effectiveFrom);
         copy.setEffectiveTo(effectiveTo);
         copy.setVersionLabel(versionLabel);
@@ -181,6 +183,40 @@ public class MatrixCatalogService {
         }
 
         return buildGrid(copy);
+    }
+
+    /**
+     * Sửa SIÊU DỮ LIỆU của một phiên bản đã có (ngày hiệu lực, nhãn, mô tả) —
+     * KHÔNG đụng trục hay ô.
+     *
+     * <p>Dùng khi chỉ cần chỉnh lại mô tả/khoảng hiệu lực của một bộ định mức
+     * đã tạo, mà không muốn xoá-tạo-lại — xoá sẽ mất hết ô đã nhập.
+     */
+    @Transactional
+    public MatrixGridResponse updateVersionMeta(String code, Long versionId, LocalDate effectiveFrom,
+                                                LocalDate effectiveTo, String versionLabel, String note) {
+        MatrixDefinition target = resolveTarget(code, versionId);
+
+        if (effectiveFrom == null) {
+            throw new BadRequestException("Phiên bản phải có ngày bắt đầu hiệu lực");
+        }
+        if (effectiveTo != null && effectiveTo.isBefore(effectiveFrom)) {
+            throw new BadRequestException("\"Đến ngày\" phải sau \"Từ ngày\"");
+        }
+
+        boolean duplicated = definitionRepository.findVersions(code).stream()
+                .filter(v -> !v.getId().equals(target.getId()))
+                .anyMatch(v -> effectiveFrom.equals(v.getEffectiveFrom()));
+        if (duplicated) {
+            throw new BadRequestException("Đã có phiên bản khác bắt đầu từ ngày " + effectiveFrom);
+        }
+
+        target.setEffectiveFrom(effectiveFrom);
+        target.setEffectiveTo(effectiveTo);
+        target.setVersionLabel(versionLabel);
+        target.setNote(note);
+        definitionRepository.save(target);
+        return buildGrid(target);
     }
 
     /**

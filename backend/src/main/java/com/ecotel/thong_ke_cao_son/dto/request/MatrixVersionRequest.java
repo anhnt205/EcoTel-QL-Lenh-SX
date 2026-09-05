@@ -27,6 +27,12 @@ public class MatrixVersionRequest {
     String versionLabel;
 
     /**
+     * Mô tả phiên bản. Để trống thì sao chép mô tả từ phiên bản nguồn —
+     * giữ nguyên hành vi cũ cho các lưới không truyền trường này.
+     */
+    String note;
+
+    /**
      * Sao chép giá trị ô từ phiên bản nguồn. Mặc định CÓ — lưới định mức có
      * hàng nghìn ô, nhập lại từ đầu mỗi tháng là không thực tế.
      */
