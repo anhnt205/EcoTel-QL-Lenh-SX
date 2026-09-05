@@ -1,9 +1,11 @@
 # Context — THONGKE-CAOSON
 
-Cập nhật lần cuối: 2026-09-05 (lượt 6 — thêm danh mục Chủng loại xe/Nhóm
-hạng xe/Hạng xe, dựng lại Định mức nhiên liệu thành 2 màn Thêm mới +
-Quản lý theo mockup; CÓ sửa code, build sạch, CHƯA verify click-through
-UI thật — xem mục "BÀN GIAO"). Lượt 5 (2026-09-04) — thiết kế lại các
+Cập nhật lần cuối: 2026-09-05 (lượt 7 — chủ dự án đã tự đăng nhập và
+click-through thật DMNL, báo 2 lỗi cụ thể + 1 yêu cầu redesign, cả 3 đã
+sửa/dựng lại và build+deploy sạch; xem mục "Đã làm — lượt 7"). Lượt 6
+— thêm danh mục Chủng loại xe/Nhóm hạng xe/Hạng xe, dựng lại Định mức
+nhiên liệu thành 2 màn Thêm mới + Quản lý theo mockup. Lượt 5 (2026-09-04)
+— thiết kế lại các
 danh mục STD/Áp Trắc Địa, dựng lại trang Báo cáo thống kê theo mockup,
 thêm 6 trường báo chuyến cho Vận tải, sửa lỗi không tạo mới được báo
 chuyến Vận tải (3 trường tra sai danh mục). Lượt 4 (2026-08-31) — dựng
@@ -382,23 +384,64 @@ console mới.
    - Đã lập kế hoạch qua Plan Mode trước khi code (file plan:
      `witty-wandering-kernighan.md`), chủ dự án đã duyệt trước khi làm.
 
-⚠ **CẢ HAI VIỆC TRÊN ĐỀU CHƯA VERIFY CLICK-THROUGH UI THẬT** — chỉ mới
-xác nhận: build backend (Maven) + frontend (`tsc -b && vite build`)
-sạch; Hibernate tạo đúng bảng mới (`vehicle_types`, `vehicle_rank_groups`
-có unique `code`, `vehicle_ranks` có FK tới `vehicle_rank_groups`); mọi
-endpoint mới/đã sửa đều trả `401` đồng nhất khi chưa đăng nhập (không có
-`500` mới phát sinh) — kể cả regression-check cho MO_HINH/NANG_SUAT_XE/
-HS_DIEU_CHINH_NLDM (đối chứng vì có sửa `MatrixCatalogService`/
-`Controller` dùng chung); bảng `matrix_definitions` xác nhận KHÔNG đổi
-schema qua `\d`. **Lý do chưa verify được**: phiên trình duyệt (Browser
-pane) bị đăng xuất giữa chừng phiên làm việc này và cần mật khẩu Portal/
-admin để đăng nhập lại — trợ lý không được đoán/nhập mật khẩu theo quy
-tắc dự án. Đã báo lại nhiều lần trong phiên, chủ dự án chưa đăng nhập
-lại. **Việc đầu tiên phiên sau nên làm**: nếu chủ dự án đã đăng nhập
-Portal ở máy/tab khác, mở lại `http://thongke-caoson.preview.localhost:
-8080/danh-muc/chung-loai-xe`, `/danh-muc/nhom-hang-xe`, `/danh-muc/hang-
-xe`, `/danh-muc/dinh-muc-nhien-lieu` để click-through thật (thêm/sửa/xoá
-1 bản ghi test rồi dọn dẹp) trước khi coi các việc này là xong.
+⚠ Tại thời điểm viết mục này (cuối lượt 6), CẢ HAI VIỆC TRÊN CHƯA
+verify click-through UI thật bởi trợ lý (Browser pane bị đăng xuất, quy
+tắc dự án mục 8 cấm đoán/nhập mật khẩu). **Lượt 7 xác nhận chủ dự án đã
+tự đăng nhập ở phiên trình duyệt riêng của họ và test thật** — xem mục
+"Đã làm — lượt 7" ngay dưới đây để biết lỗi thật đã phát hiện + đã sửa.
+
+## Đã làm — lượt 7 (2026-09-05)
+
+Chủ dự án tự đăng nhập (không qua trợ lý) và test thật màn DMNL, báo 3
+việc qua session tương tác — cả 3 đã sửa xong, build Docker sạch
+(`tsc -b && vite build` không lỗi), đã `docker compose up -d` deploy lại
+frontend. Chỉ sửa file frontend, KHÔNG đụng backend/schema ở lượt này.
+
+1. **Combobox hẹp, thừa khoảng trống** — `SelectTrigger` (shadcn) mặc
+   định `w-fit` (xem `frontend/src/components/ui/select.tsx`), 3 chỗ
+   trong module fuelnorm thiếu override `w-full` (đúng tiền lệ đã có ở
+   `CatalogFormModal.tsx`). Đã thêm `w-full` cho `FuelNormAddDatasetModal.tsx`
+   (2 combobox) và `FuelNormOverviewPage.tsx` (`FilterSelect`).
+2. **Lỗi 400 khi ấn "Tạo bộ định mức"** — xác nhận qua truy vấn thẳng DB
+   (`matrix_definitions` bảng DMNL đã có sẵn phiên bản `effective_from =
+   2026-01-01`, id 155), form mặc định ngày `${năm hiện tại}-01-01` nên
+   trùng, backend đúng chặn theo ràng buộc unique `(code, effective_from)`
+   → 400 hợp lệ nhưng UI không xử lý được va chạm. Đã sửa
+   `FuelNormAddPage.tsx`: kiểm tra trước khi tạo (`handleCreateClick`),
+   nếu trùng ngày thì tự chuyển sang chế độ sửa phiên bản đã có thay vì
+   báo lỗi. Nhân tiện phát hiện + sửa thêm 1 lỗi khác cùng chỗ:
+   `createMutation.onError` không unwrap `error.response.data.message`
+   (khác với `updateMetaMutation` bên cạnh đã làm đúng) nên chủ dự án
+   không thấy lý do thật — đã sửa cho khớp pattern đúng.
+3. **Yêu cầu redesign "Danh sách bộ định mức nhiên liệu" thành bảng tổng
+   của cả năm, điền tới đâu hiện tới đó"** — trang Quản lý
+   (`FuelNormOverviewPage.tsx`) trước đó liệt kê mỗi bộ dữ liệu (Chủng
+   loại xe + Hậu tố) là 1 dòng phẳng trong bảng. Đã dựng lại: chọn KỲ
+   (phiên bản) bằng dãy tab thay vì lọc theo năm (phát hiện quan trọng:
+   1 năm dương lịch CÓ THỂ có NHIỀU phiên bản chồng nhau — đối chiếu DB
+   thật thấy `2026` có cả id 155 "01/01–31/12" và id 105 "17/08–31/08" —
+   nên chọn theo phiên bản chính xác hơn theo năm), sau đó hiện MỘT
+   bảng duy nhất cho phiên bản đó: dòng = Độ dốc, cột = TẤT CẢ bộ dữ
+   liệu (Chủng loại xe.Hậu tố_Cung độ) của phiên bản, nhóm màu theo bộ
+   dữ liệu, header nhóm có sẵn nút Sửa/Sao chép/Xuất Excel. Không đổi
+   dữ liệu nguồn (vẫn `matrixService`/`groupColumnsByVehicleSuffix` sẵn
+   có) — chỉ đổi cách trình bày, nên dữ liệu nhập ở "Thêm mới" hiện
+   ngay vào bảng này (cùng 1 nguồn, không có kho riêng phải đồng bộ tay).
+   Bộ lọc "Năm áp dụng" cũ bị thay bằng tab chọn kỳ; bộ lọc "Trạng thái"
+   đổi mục đích: từ lọc từng dòng phẳng sang lọc DANH SÁCH TAB kỳ hiển
+   thị (ẩn kỳ hết hiệu lực/sắp tới nếu muốn); "Chủng loại xe"/"Hậu tố"/
+   "Từ khoá" vẫn lọc như cũ nhưng áp lên CỘT của bảng tổng hợp thay vì
+   lọc DÒNG của danh sách phẳng.
+
+Đã build qua Docker (lock Redis đúng quy trình), verify: build TypeScript
+sạch (không lỗi `tsc -b`), trang load không có lỗi console (không đăng
+nhập được nên chỉ xác nhận tới màn hình đăng nhập, KHÔNG crash React) —
+**chưa click-through được màn DMNL thật sau đổi vì lý do cũ (không có
+mật khẩu Portal)**. Việc đầu tiên phiên sau/chủ dự án nên làm: mở lại
+`/danh-muc/dinh-muc-nhien-lieu`, xác nhận bảng tổng hợp hiện đúng, tab
+chọn kỳ hoạt động, dữ liệu nhập ở "Thêm mới" hiện đúng vào bảng.
+
+Commit liên quan: `ad59191` (400 + combobox), `59a239e` (bảng tổng hợp).
 
 ## Việc cần làm tiếp (ưu tiên theo thứ tự)
 
