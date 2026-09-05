@@ -93,7 +93,13 @@ services:
     build:
       context: ../../frontend
       args:
-        VITE_API_KONG_URL: http://thongke-caoson.preview.localhost:8080/api
+        # RELATIVE (không phải origin tuyệt đối) — để CÙNG 1 bundle build
+        # ra dùng đúng dù truy cập qua subdomain gateway
+        # (thongke-caoson.preview.localhost:8080) HAY qua cổng host riêng
+        # (localhost:${PREVIEW_HOST_PORT:-8997}, xem ports: bên dưới) —
+        # trình duyệt tự resolve "/api" theo đúng origin đang mở. Trước đây
+        # hardcode origin tuyệt đối nên chỉ chạy đúng qua 1 cổng duy nhất.
+        VITE_API_KONG_URL: /api
         VITE_PORTAL_URL: http://localhost:18090/
     networks: [frontnet]
     restart: unless-stopped
@@ -103,6 +109,12 @@ services:
       context: ../../reverse_proxy
       args:
         NGINX_CONF: nginx_preview.conf
+    ports:
+      # Truy cập trực tiếp localhost:<port>, không cần qua gateway subdomain
+      # (*.preview.localhost) — theo yêu cầu người dùng 2026-09-05. Cổng
+      # 8997 xác nhận rảnh lúc thêm (không trùng port nào khác đang publish
+      # trong toàn bộ factory, xem `docker ps` trước khi đổi số này).
+      - "${PREVIEW_HOST_PORT:-8997}:80"
     depends_on:
       - frontend-service
       - backend-service
