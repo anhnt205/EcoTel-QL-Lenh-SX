@@ -425,7 +425,7 @@ function FilterSelect({
     <div>
       <label className="mb-1 block text-[11px] font-medium text-muted-foreground">{label}</label>
       <Select value={value} onValueChange={onChange}>
-        <SelectTrigger className="h-9 text-sm">
+        <SelectTrigger className="h-9 w-full text-sm">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>

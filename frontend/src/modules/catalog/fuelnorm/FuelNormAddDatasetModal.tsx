@@ -67,7 +67,7 @@ export function FuelNormAddDatasetModal({
           <div>
             <label className="mb-1 block text-xs font-medium">Chủng loại xe</label>
             <Select value={vehicleCode} onValueChange={setVehicleCode}>
-              <SelectTrigger className="h-9 text-sm">
+              <SelectTrigger className="h-9 w-full text-sm">
                 <SelectValue placeholder={isLoading ? "Đang tải…" : "Chọn chủng loại xe"} />
               </SelectTrigger>
               <SelectContent className="z-[120]">
@@ -83,7 +83,7 @@ export function FuelNormAddDatasetModal({
           <div>
             <label className="mb-1 block text-xs font-medium">Hậu tố</label>
             <Select value={suffix} onValueChange={(v) => setSuffix(v as FuelNormSuffix)}>
-              <SelectTrigger className="h-9 text-sm">
+              <SelectTrigger className="h-9 w-full text-sm">
                 <SelectValue placeholder="Chọn hậu tố" />
               </SelectTrigger>
               <SelectContent className="z-[120]">

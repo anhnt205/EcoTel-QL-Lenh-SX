@@ -71,6 +71,16 @@ export default function FuelNormAddPage() {
     enabled: editingVersionId === null,
   });
 
+  // Toàn bộ phiên bản đã có — dùng để phát hiện trùng "Ngày hiệu lực từ"
+  // TRƯỚC khi gọi tạo mới, vì backend chặn trùng theo đúng ngày này (mỗi
+  // mã chỉ có một phiên bản cho một effectiveFrom). Mặc định "Năm áp dụng"
+  // luôn là năm hiện tại, nên rất dễ trùng với kỳ đã khai từ trước.
+  const { data: allVersions = [] } = useQuery({
+    queryKey: ["matrix-versions", DMNL_CODE],
+    queryFn: () => matrixService.versions(DMNL_CODE),
+    enabled: editingVersionId === null,
+  });
+
   const isEdit = editingVersionId !== null;
 
   // ── form thông tin chung ───────────────────────────────────────────────
@@ -121,8 +131,32 @@ export default function FuelNormAddPage() {
       setHydrated(true);
       setParams({ versionId: String(created.versionId) });
     },
-    onError: (e: unknown) => toast.error((e as Error).message ?? "Tạo bộ định mức thất bại."),
+    onError: (e: unknown) => {
+      const res = (e as { response?: { data?: { message?: string } } }).response;
+      toast.error(res?.data?.message ?? (e as Error).message ?? "Tạo bộ định mức thất bại.");
+    },
   });
+
+  /**
+   * Bấm "Tạo bộ định mức" — kiểm tra trùng "Ngày hiệu lực từ" TRƯỚC khi
+   * gọi API. Backend chặn trùng đúng theo ngày này (mỗi mã chỉ một phiên
+   * bản cho một effectiveFrom), mà mặc định "Năm áp dụng" luôn là năm hiện
+   * tại nên rất dễ trùng với kỳ đã khai — lúc đó gọi tạo mới sẽ luôn ra lỗi
+   * 400. Trùng thì coi như người dùng muốn thêm bộ dữ liệu vào ĐÚNG kỳ đã
+   * có (chuyển sang sửa kỳ đó), thay vì báo lỗi khó hiểu.
+   */
+  const handleCreateClick = () => {
+    const existing = allVersions.find((v) => v.effectiveFrom === effectiveFrom);
+    if (existing) {
+      toast.message(
+        `Đã có bộ định mức bắt đầu từ ngày ${effectiveFrom} — chuyển sang bộ đó để thêm dữ liệu.`,
+      );
+      setHydrated(false);
+      setParams({ versionId: String(existing.versionId) });
+      return;
+    }
+    createMutation.mutate();
+  };
 
   // ── sửa thông tin chung của kỳ đã có ─────────────────────────────────────
   const updateMetaMutation = useMutation({
@@ -373,7 +407,7 @@ export default function FuelNormAddPage() {
                 size="sm"
                 className="h-9 gap-1.5 bg-blue-600 text-white hover:bg-blue-700"
                 disabled={createMutation.isPending}
-                onClick={() => createMutation.mutate()}
+                onClick={handleCreateClick}
               >
                 <Save className="h-4 w-4" /> Tạo bộ định mức
               </Button>
