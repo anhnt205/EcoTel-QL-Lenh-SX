@@ -139,7 +139,11 @@ export function Header() {
           {/* Danh mục ∨ */}
           <DropdownMenu>
             <DropdownMenuTrigger
-              className={dropdownTriggerClass(pathname.startsWith("/danh-muc"))}
+              className={dropdownTriggerClass(
+                pathname.startsWith("/danh-muc") &&
+                  !pathname.startsWith(ROUTES.DANH_MUC.DINH_MUC_NHIEN_LIEU) &&
+                  !pathname.startsWith(ROUTES.DANH_MUC.AP_TRAC_DIA),
+              )}
             >
               <FolderTree className="h-4 w-4 mr-0.5" />
               Danh mục
@@ -348,15 +352,6 @@ export function Header() {
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
                 <NavLink
-                  to={ROUTES.DANH_MUC.DINH_MUC_NHIEN_LIEU}
-                  className="flex items-center gap-2 px-2.5 py-2 text-sm rounded hover:bg-blue-50 cursor-pointer"
-                >
-                  <Grid3x3 className="h-4 w-4 text-blue-600" />
-                  Định mức nhiên liệu
-                </NavLink>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <NavLink
                   to={ROUTES.DANH_MUC.NANG_SUAT_XE}
                   className="flex items-center gap-2 px-2.5 py-2 text-sm rounded hover:bg-blue-50 cursor-pointer"
                 >
@@ -398,15 +393,6 @@ export function Header() {
                 >
                   <Clock className="h-4 w-4 text-blue-600" />
                   STD (Đất SX/Than SX)
-                </NavLink>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <NavLink
-                  to={ROUTES.DANH_MUC.AP_TRAC_DIA}
-                  className="flex items-center gap-2 px-2.5 py-2 text-sm rounded hover:bg-blue-50 cursor-pointer"
-                >
-                  <Ruler className="h-4 w-4 text-blue-600" />
-                  Áp Trắc Địa (m3-tấn-tkm)
                 </NavLink>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
@@ -495,6 +481,32 @@ export function Header() {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+
+          {/* Định mức nhiên liệu — tách riêng khỏi Danh mục, đặt ngay cạnh */}
+          <NavLink
+            to={ROUTES.DANH_MUC.DINH_MUC_NHIEN_LIEU}
+            className={({ isActive }) =>
+              navItemClass(
+                isActive || pathname.startsWith(ROUTES.DANH_MUC.DINH_MUC_NHIEN_LIEU),
+              )
+            }
+          >
+            <Grid3x3 className="h-4 w-4 mr-0.5" />
+            Định mức nhiên liệu
+          </NavLink>
+
+          {/* Áp Trắc Địa — tách riêng khỏi Danh mục, đặt ngay cạnh */}
+          <NavLink
+            to={ROUTES.DANH_MUC.AP_TRAC_DIA}
+            className={({ isActive }) =>
+              navItemClass(
+                isActive || pathname.startsWith(ROUTES.DANH_MUC.AP_TRAC_DIA),
+              )
+            }
+          >
+            <Ruler className="h-4 w-4 mr-0.5" />
+            Áp Trắc Địa
+          </NavLink>
 
           {/* Đối chiếu */}
           <NavLink

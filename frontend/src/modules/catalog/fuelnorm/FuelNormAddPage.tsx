@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ArrowLeft, Download, Plus, Save, Trash2, Upload } from "lucide-react";
+import { ArrowLeft, Download, Maximize, Minimize, Plus, Save, Trash2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -259,6 +259,9 @@ export default function FuelNormAddPage() {
     },
   });
 
+  // ── mở rộng toàn màn hình phần nhập dữ liệu ──────────────────────────────
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
   // ── Import Excel ─────────────────────────────────────────────────────────
   const [tab, setTab] = useState<"direct" | "excel">("direct");
   const [preview, setPreview] = useState<FuelNormImportPreview | null>(null);
@@ -385,30 +388,44 @@ export default function FuelNormAddPage() {
       </div>
 
       {/* Nhập dữ liệu định mức */}
-      <div className="flex min-h-0 flex-1 flex-col rounded-lg border bg-card">
+      <div
+        className={cn(
+          "flex min-h-0 flex-1 flex-col rounded-lg border bg-card",
+          isFullscreen && "fixed inset-0 z-[100] rounded-none",
+        )}
+      >
         <div className="flex items-center justify-between border-b px-4 py-3">
           <h2 className="text-sm font-bold">Nhập dữ liệu định mức</h2>
-          {grid && (
-            <div className="flex gap-2">
-              <input
-                ref={importRef}
-                type="file"
-                accept=".xlsx,.xls"
-                className="hidden"
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (f) { setTab("excel"); handlePickFile(f); }
-                  e.target.value = "";
-                }}
-              />
-              <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs" onClick={() => importRef.current?.click()}>
-                <Upload className="h-3.5 w-3.5" /> Chọn file Excel
-              </Button>
-              <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs" onClick={() => setTab("direct")}>
-                <Plus className="h-3.5 w-3.5" /> Nhập dữ liệu
-              </Button>
-            </div>
-          )}
+          <div className="flex items-center gap-2">
+            {grid && (
+              <>
+                <input
+                  ref={importRef}
+                  type="file"
+                  accept=".xlsx,.xls"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) { setTab("excel"); handlePickFile(f); }
+                    e.target.value = "";
+                  }}
+                />
+                <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs" onClick={() => importRef.current?.click()}>
+                  <Upload className="h-3.5 w-3.5" /> Chọn file Excel
+                </Button>
+                <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs" onClick={() => setTab("direct")}>
+                  <Plus className="h-3.5 w-3.5" /> Nhập dữ liệu
+                </Button>
+              </>
+            )}
+            <button
+              title={isFullscreen ? "Thu nhỏ" : "Mở rộng toàn màn hình"}
+              onClick={() => setIsFullscreen((v) => !v)}
+              className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800"
+            >
+              {isFullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
+            </button>
+          </div>
         </div>
 
         {!grid ? (
@@ -575,6 +592,16 @@ export default function FuelNormAddPage() {
               </div>
             ) : (
               <div className="flex-1 overflow-auto p-4">
+                <div className="mb-3 flex justify-end">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 gap-1.5 text-xs"
+                    onClick={() => downloadMatrixExcel(grid)}
+                  >
+                    <Download className="h-3.5 w-3.5" /> Tải file mẫu Excel
+                  </Button>
+                </div>
                 <div
                   className="cursor-pointer rounded-lg border-2 border-dashed border-blue-300 bg-blue-50/40 p-8 text-center dark:bg-blue-950/10"
                   onClick={() => importRef.current?.click()}
