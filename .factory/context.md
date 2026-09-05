@@ -1,13 +1,16 @@
 # Context — THONGKE-CAOSON
 
-Cập nhật lần cuối: 2026-09-04 (lượt 5 — thiết kế lại các danh mục STD/Áp
-Trắc Địa, dựng lại trang Báo cáo thống kê theo mockup, thêm 6 trường báo
-chuyến cho Vận tải, sửa lỗi không tạo mới được báo chuyến Vận tải (3
-trường tra sai danh mục); CÓ sửa code, đã verify sống). Lượt 4 (2026-08-31) —
-dựng engine tính sản lượng + danh mục dạng lưới có phiên bản theo thời
-gian. Lượt 3 (2026-08-30) chỉ tài liệu. Lượt 2 (2026-08-29) — chuyển DB
-độc lập + bật lại bảo mật + dựng preview sống thật. Đọc file này TRƯỚC
-khi tiếp tục — tin file này hơn lịch sử chat đã bị nén.
+Cập nhật lần cuối: 2026-09-05 (lượt 6 — thêm danh mục Chủng loại xe/Nhóm
+hạng xe/Hạng xe, dựng lại Định mức nhiên liệu thành 2 màn Thêm mới +
+Quản lý theo mockup; CÓ sửa code, build sạch, CHƯA verify click-through
+UI thật — xem mục "BÀN GIAO"). Lượt 5 (2026-09-04) — thiết kế lại các
+danh mục STD/Áp Trắc Địa, dựng lại trang Báo cáo thống kê theo mockup,
+thêm 6 trường báo chuyến cho Vận tải, sửa lỗi không tạo mới được báo
+chuyến Vận tải (3 trường tra sai danh mục). Lượt 4 (2026-08-31) — dựng
+engine tính sản lượng + danh mục dạng lưới có phiên bản theo thời gian.
+Lượt 3 (2026-08-30) chỉ tài liệu. Lượt 2 (2026-08-29) — chuyển DB độc
+lập + bật lại bảo mật + dựng preview sống thật. Đọc file này TRƯỚC khi
+tiếp tục — tin file này hơn lịch sử chat đã bị nén.
 
 ## Tóm tắt trạng thái
 
@@ -334,6 +337,68 @@ sau khi verify. Verify Mining không hồi quy: `useMasterData.ts` dùng
 chung nhưng chỉ THÊM field, `MiningBatchEntryModal.tsx` không đụng tới —
 mở lại "Thêm chuyến" bên Khai thác, form gốc vẫn nguyên vẹn, không lỗi
 console mới.
+
+## Đã làm — lượt 6 (2026-09-05)
+
+1. **3 danh mục mới** (commit `094da4b`): "Chủng loại xe" (độc lập, KHÔNG
+   trùng với 2 danh mục "Chủng loại xe + DMNL"/"+ Phân loại" đã có từ
+   trước — đã hỏi và chủ dự án xác nhận đây là danh mục thứ 3, mục đích
+   khác), "Nhóm hạng xe" (Mã/Tên/Ghi chú), "Hạng xe" (Mã/Xếp hạng/Nhóm
+   hạng xe [FK bắt buộc]/Ghi chú — theo đúng mẫu quan hệ cha-con
+   CargoGroup/CargoType). Cả 3 dùng chung `CatalogPage`/`CatalogFormModal`
+   có sẵn, chỉ thêm backend entity/dto/mapper/repository/service/
+   controller theo khuôn `ExcavationArea` + 1 dòng config + 1 trang
+   wrapper + route/menu — không sửa danh mục cũ nào. Cột DB `rank_order`
+   (không đặt tên `rank` — từ khoá cửa sổ trong chuẩn SQL).
+2. **Định mức nhiên liệu (DMNL) — dựng lại thành 2 màn theo 2 mockup HTML
+   chủ dự án cung cấp** (commit `7d44b0b`): "Thêm mới bộ định mức" và
+   "Quản lý" (danh sách + bộ lọc + KPI + biểu đồ xem trước). Phát hiện
+   quan trọng: DMNL **đã có sẵn** từ lượt 4, là 1 trong 4 "lưới có phiên
+   bản theo thời gian" dùng chung (`MatrixDefinition`/`MatrixAxisEntry`/
+   `MatrixCell` + `MatrixCatalogController`/`Service`). "Bộ định mức theo
+   Chủng loại xe + Hậu tố" trong mockup **suy hoàn toàn ở frontend** từ
+   quy ước khoá cột đã có (`<mã xe>.<CS|KC>_<cung độ>`, đối chiếu đúng
+   `FuelNormInterpolator.java` + công thức Excel gốc) — KHÔNG đổi schema
+   `MatrixDefinition`/`MatrixAxisEntry`/`MatrixCell` (tránh ảnh hưởng 3
+   lưới dùng chung: MO_HINH/NANG_SUAT_XE/HS_DIEU_CHINH_NLDM). Hậu tố thật
+   chỉ có 2 giá trị `.CS`/`.KC` (không phải `.BK/.DAT/.THAN/.SP` minh hoạ
+   trong mockup).
+   - Backend CHỈ thêm (không đổi hành vi cũ): `MatrixVersionRequest` thêm
+     field `note`; endpoint mới `PUT /api/matrix-catalogs/{code}/versions/
+     {versionId}` + `MatrixCatalogService.updateVersionMeta` (sửa ngày
+     hiệu lực/nhãn/mô tả của 1 phiên bản đã có, không đụng ô/trục — cần
+     cho nút "Sửa" ở màn Quản lý, tránh phải xoá-tạo-lại làm mất hết ô).
+   - Frontend: module mới `frontend/src/modules/catalog/fuelnorm/`
+     (`fuelNormKeys.ts` — hàm thuần suy nhóm cột + nội suy song tuyến
+     PORT TypeScript của `FuelNormInterpolator.java` CHỈ để xem trước UI;
+     `FuelNormAddPage.tsx`, `FuelNormOverviewPage.tsx`,
+     `FuelNormChartPanel.tsx`, `FuelNormAddDatasetModal.tsx`,
+     `fuelNormExcelImport.ts`). Trang lưới đầy đủ cũ (`FuelNormMatrix.tsx`/
+     `MatrixCatalogPage.tsx`) **không sửa file**, chỉ dời sang route
+     `/danh-muc/dinh-muc-nhien-lieu/luoi-day-du` — vẫn dùng chung
+     `matrixService`, nên tự động đồng bộ với 2 màn mới, không có kho dữ
+     liệu riêng nào phải giữ khớp tay (đúng yêu cầu "kiểm tra đồng bộ
+     giữa Thêm mới và Quản lý" của chủ dự án).
+   - Đã lập kế hoạch qua Plan Mode trước khi code (file plan:
+     `witty-wandering-kernighan.md`), chủ dự án đã duyệt trước khi làm.
+
+⚠ **CẢ HAI VIỆC TRÊN ĐỀU CHƯA VERIFY CLICK-THROUGH UI THẬT** — chỉ mới
+xác nhận: build backend (Maven) + frontend (`tsc -b && vite build`)
+sạch; Hibernate tạo đúng bảng mới (`vehicle_types`, `vehicle_rank_groups`
+có unique `code`, `vehicle_ranks` có FK tới `vehicle_rank_groups`); mọi
+endpoint mới/đã sửa đều trả `401` đồng nhất khi chưa đăng nhập (không có
+`500` mới phát sinh) — kể cả regression-check cho MO_HINH/NANG_SUAT_XE/
+HS_DIEU_CHINH_NLDM (đối chứng vì có sửa `MatrixCatalogService`/
+`Controller` dùng chung); bảng `matrix_definitions` xác nhận KHÔNG đổi
+schema qua `\d`. **Lý do chưa verify được**: phiên trình duyệt (Browser
+pane) bị đăng xuất giữa chừng phiên làm việc này và cần mật khẩu Portal/
+admin để đăng nhập lại — trợ lý không được đoán/nhập mật khẩu theo quy
+tắc dự án. Đã báo lại nhiều lần trong phiên, chủ dự án chưa đăng nhập
+lại. **Việc đầu tiên phiên sau nên làm**: nếu chủ dự án đã đăng nhập
+Portal ở máy/tab khác, mở lại `http://thongke-caoson.preview.localhost:
+8080/danh-muc/chung-loai-xe`, `/danh-muc/nhom-hang-xe`, `/danh-muc/hang-
+xe`, `/danh-muc/dinh-muc-nhien-lieu` để click-through thật (thêm/sửa/xoá
+1 bản ghi test rồi dọn dẹp) trước khi coi các việc này là xong.
 
 ## Việc cần làm tiếp (ưu tiên theo thứ tự)
 
