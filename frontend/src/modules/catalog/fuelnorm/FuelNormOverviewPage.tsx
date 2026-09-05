@@ -1,8 +1,22 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Copy, Download, Fuel, Gauge, Grid3x3, Layers, Maximize, Minimize, Plus, Settings2, SquarePen } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Copy,
+  Download,
+  Fuel,
+  Gauge,
+  Grid3x3,
+  Layers,
+  Maximize,
+  Minimize,
+  Plus,
+  Settings2,
+  SquarePen,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -160,6 +174,16 @@ export default function FuelNormOverviewPage() {
   // ── mở rộng toàn màn hình bảng tổng hợp — đây là nội dung chính của trang ──
   const [isFullscreen, setIsFullscreen] = useState(false);
 
+  // ── phân trang theo dòng (Độ dốc) — lưới nhiều dòng thì cuộn/tràn khó nhìn ──
+  const ROWS_PER_PAGE = 20;
+  const [pageIndex, setPageIndex] = useState(0);
+  useEffect(() => setPageIndex(0), [activeVersionId]);
+  const totalRows = yearGrid?.rows.length ?? 0;
+  const totalPages = Math.max(1, Math.ceil(totalRows / ROWS_PER_PAGE));
+  const pagedRows = yearGrid
+    ? yearGrid.rows.slice(pageIndex * ROWS_PER_PAGE, pageIndex * ROWS_PER_PAGE + ROWS_PER_PAGE)
+    : [];
+
   // ── sao chép 1 bộ dữ liệu sang chủng loại xe/hậu tố khác (cùng phiên bản) ─
   const [copySource, setCopySource] = useState<FuelNormRow | null>(null);
   const [copying, setCopying] = useState(false);
@@ -276,8 +300,8 @@ export default function FuelNormOverviewPage() {
           Chủng loại xe + Hậu tố của kỳ đó trong 1 bảng */}
       <div
         className={cn(
-          "flex min-h-0 flex-1 flex-col rounded-lg border bg-card",
-          isFullscreen && "fixed inset-0 z-[100] rounded-none",
+          "flex flex-col rounded-lg border bg-card",
+          isFullscreen && "fixed inset-0 z-[100] min-h-0 flex-1 rounded-none",
         )}
       >
         <div className="flex items-center justify-between border-b px-4 py-3">
@@ -336,7 +360,13 @@ export default function FuelNormOverviewPage() {
         ) : visibleDatasets.length === 0 ? (
           <p className="p-4 text-sm text-muted-foreground">Kỳ này chưa có bộ dữ liệu nào khớp bộ lọc.</p>
         ) : (
-          <div className="min-h-0 flex-1 overflow-auto">
+          <div
+            className={cn(
+              "m-3 overflow-auto rounded-md border-2 border-slate-300 dark:border-slate-600",
+              isFullscreen && "min-h-0 flex-1",
+            )}
+            style={isFullscreen ? undefined : { maxHeight: "60vh" }}
+          >
             <table className="border-collapse text-xs">
               <thead>
                 <tr>
@@ -385,7 +415,7 @@ export default function FuelNormOverviewPage() {
                 </tr>
               </thead>
               <tbody>
-                {yearGrid.rows.map((r) => (
+                {pagedRows.map((r) => (
                   <tr key={r.key}>
                     <th className="sticky left-0 z-10 border-b border-r bg-card px-2 py-1 text-left font-medium">{r.label}</th>
                     {visibleDatasets.map((ds, idx) => {
@@ -403,6 +433,34 @@ export default function FuelNormOverviewPage() {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {yearGrid && visibleDatasets.length > 0 && totalPages > 1 && (
+          <div className="flex items-center justify-between border-t px-4 py-2">
+            <span className="text-xs text-muted-foreground">
+              {totalRows} dòng {yearGrid.rowAxisLabel.toLowerCase()} — trang {pageIndex + 1}/{totalPages}
+            </span>
+            <div className="flex items-center gap-1.5">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 gap-1 px-2 text-xs"
+                disabled={pageIndex === 0}
+                onClick={() => setPageIndex((p) => Math.max(0, p - 1))}
+              >
+                <ChevronLeft className="h-3.5 w-3.5" /> Trước
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 gap-1 px-2 text-xs"
+                disabled={pageIndex >= totalPages - 1}
+                onClick={() => setPageIndex((p) => Math.min(totalPages - 1, p + 1))}
+              >
+                Sau <ChevronRight className="h-3.5 w-3.5" />
+              </Button>
+            </div>
           </div>
         )}
       </div>
