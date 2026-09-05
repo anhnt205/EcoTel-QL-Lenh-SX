@@ -488,6 +488,20 @@ nhiều xe+hậu tố+cung độ, và tải/nhập thử file Excel để xác n
    này nên đổi thoải mái, không ảnh hưởng chỗ khác). Build sạch, verify
    redirect login không crash console (vẫn chưa click-through được, cùng
    lý do thiếu mật khẩu Portal).
+6. **Biểu đồ trờm lên bảng + bỏ 2 thẻ không cần** (commit `67e3f8a`) — chủ
+   dự án báo biểu đồ minh hoạ (khối riêng ngay dưới bảng tổng hợp) bị
+   tràn/đè lên bảng, và yêu cầu bỏ hẳn 2 thẻ "Hướng dẫn sử dụng"/"Tải
+   file mẫu" (không cần), thay bằng biểu đồ. Đã sửa: xoá khối biểu đồ
+   đứng riêng, xoá 2 thẻ đó khỏi lưới sidebar 4 cột, đặt biểu đồ vào đúng
+   chỗ đó (chiếm 2 cột, cùng hàng với "Cập nhật gần đây"/"Thống kê theo
+   năm") — tách hẳn khỏi khối bảng nên hết chồng lấn. **Chưa xác nhận
+   trực quan** (không đăng nhập được) — phiên sau/chủ dự án mở lại trang
+   để xác nhận hết tràn.
+
+⚠ Lưu ý: có commit `758e40a` ("feat(preview): publish host port...") xen
+giữa các lượt sửa DMNL này — KHÔNG phải của lượt DMNL, một phiên/nguồn
+khác đã commit vào cùng worktree `claude-dev`. Không đụng tới, chỉ ghi
+nhận để không nhầm là của các thay đổi DMNL ở trên.
 
 ## Việc cần làm tiếp (ưu tiên theo thứ tự)
 
