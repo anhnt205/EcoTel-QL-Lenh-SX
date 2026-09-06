@@ -609,42 +609,70 @@ nhận để không nhầm là của các thay đổi DMNL ở trên.
       "+ Thêm dòng", tách thời gian 1 dòng bằng "+", lưu/sửa/xoá — xác
       nhận đúng mockup.
 
-## Hàng đợi việc chủ dự án đã yêu cầu tiếp (lượt 7, chưa bắt đầu)
+## Lượt 7 (tiếp) — 3 việc chủ dự án yêu cầu dồn dập, CẢ 3 ĐÃ XONG + đã build/deploy
 
-Chủ dự án gửi dồn dập 3 yêu cầu tiếp khi đang code Mô hình — xử lý theo
-đúng thứ tự đã báo, CHƯA bắt đầu việc nào dưới đây:
+Ngay sau khi xong Mô hình, chủ dự án gửi dồn dập 3 yêu cầu tiếp trong lúc
+tôi đang code — cả 3 đã hoàn thành, build sạch, deploy xong (commit
+`a56d12d`, `efb64ff`, `8a5cc7b`). Chi tiết:
 
-1. **Thêm danh mục "Phân loại"** — Mã phân loại / Phân loại (text) / Ghi
-   chú. Danh mục CRUD đơn giản, khớp đúng khuôn `VehicleType` (danh mục
-   Chủng loại xe) đã làm ở lượt 6 — tái dùng `CatalogPage`/
-   `CatalogFormModal`, chỉ thêm entity/dto/mapper/repository/service/
-   controller theo khuôn cũ.
-2. **Sửa danh mục "Năng suất xe"** (NANG_SUAT_XE — 1 trong 4 lưới dùng
-   chung) — mockup: modal "Thêm mới năng suất xe" có "Thời gian *" +
-   "Khu vực xúc *" ở TRÊN (áp dụng CHUNG cho cả bảng — khác Mô hình,
-   GIỐNG DMNL/kiến trúc lưới hiện có, không cần đổi kiến trúc dữ liệu),
-   bảng: dòng = Cung độ (km, numeric — giống hệt trục Độ dốc của DMNL),
-   cột = nhóm "Chủng loại hàng + Phân loại" (2 dropdown mỗi nhóm), nút
-   "+ Thêm nhóm" (thêm 1 nhóm cột) và "+ Thêm dòng" (thêm 1 Cung độ).
-   **Nhiều khả năng KHÔNG cần đổi kiến trúc backend** (ở lại
-   `MatrixDefinition`/`MatrixCell` dùng chung, giống DMNL trước khi có
-   UI riêng) — chỉ cần xây modal "Thêm mới" bespoke kiểu DMNL, thu gọn
-   thành modal thay vì trang riêng. **Việc đầu tiên khi bắt đầu**: đọc
-   `matrix_definitions` row NANG_SUAT_XE (row_axis_label/col_axis_label/
-   row_source_path/col_source_path) qua `psql` để xác nhận đúng giả
-   định trước khi code — đúng cách đã làm với MO_HINH trước khi thiết kế
-   lại.
-3. **Sửa danh mục "HS điều chỉnh NLDM"** (HS_DIEU_CHINH_NLDM — 1 trong 4
-   lưới dùng chung) — mockup: modal "Thêm mới HS điều chỉnh NLDM" có
-   "Năm *" + "Khu vực xúc *" ở TRÊN (chung cho cả bảng, giống Năng suất
-   xe/DMNL — KHÔNG phải per-row như Mô hình), bảng: dòng = tổ hợp 3
-   dropdown "Chủng loại xe + Chất lượng + Phân loại" (vd
-   "CAT773E_C_OAT"), cột = 12 tháng cố định (Tháng 1..12) + 1 cột tính
-   "HSNL điều chỉnh" (hệ số NĂM, chú thích "hệ thống tự động cập nhật
-   theo hệ số 12 tháng" — cần làm rõ công thức tổng hợp 12→1 khi bắt
-   tay vào, KHÔNG suy đoán). **Cùng nhận định như Năng suất xe: nhiều
-   khả năng ở lại kiến trúc lưới dùng chung**, chỉ cần modal bespoke.
-   Đọc `matrix_definitions` row HS_DIEU_CHINH_NLDM trước khi code.
+13. **Danh mục "Phân loại"** (commit `a56d12d`) — Mã phân loại / Phân
+    loại (text) / Ghi chú. Danh mục CRUD đơn giản, khuôn y hệt
+    `VehicleType` (Chủng loại xe, lượt 6) — entity/dto/mapper/
+    repository/service/controller `Classification`* mới, frontend dùng
+    lại `CatalogPage`/`configs.ts` (hàm `placeFields` có sẵn khớp đúng
+    3 nhãn cần). Route `/danh-muc/phan-loai`, menu đặt cạnh "Chủng loại
+    xe" trong dropdown "Danh mục".
+14. **"Năng suất xe" (NANG_SUAT_XE)** (commit `efb64ff`) — modal "Thêm
+    mới năng suất xe" bespoke, Ở LẠI kiến trúc lưới dùng chung
+    (`MatrixDefinition`/`MatrixCell` qua `matrixService`, giống DMNL
+    trước khi có UI riêng) — KHÔNG đổi kiến trúc backend. Đã hỏi rõ chủ
+    dự án (đọc DB thấy 3 tín hiệu khác nhau: nhãn cấu hình DB ghi
+    "Chủng loại xe + phân loại", mockup ghi "Chủng loại hàng + Phân
+    loại", dữ liệu cột cũ "CAT777E.Than" lại gợi ý khác nữa) — **chốt
+    dùng đúng chữ trên mockup: Chủng loại hàng (CargoType) + Phân loại
+    (Classification vừa thêm)**, coi dữ liệu cũ là nháp/test. Khoá cột
+    ghép: `<mã CLH>_<mã phân loại>.<CS|KC>` — gấp Khu vực xúc làm hậu tố
+    cuối (đúng quy ước `.CS`/`.KC` đã dùng ở DMNL) để 1 năm = 1 phiên
+    bản vẫn chứa được cả 2 khu vực ở 2 nhóm cột khác nhau, không đụng
+    ràng buộc duy nhất `(code, effective_from)`. Thêm prop
+    `extraActions?` (tuỳ chọn, mặc định rỗng) vào `MatrixCatalogPage.tsx`
+    dùng chung — chỉ `VehicleOutputMatrix.tsx` gắn nút "Thêm mới", 3
+    trang còn lại dùng chung component không đổi hành vi (đã regression-
+    check qua `curl` cả 4 catalog).
+15. **"HS điều chỉnh NLDM" (HS_DIEU_CHINH_NLDM)** (commit `8a5cc7b`) —
+    cùng mô hình như Năng suất xe (modal bespoke qua `extraActions`, ở
+    lại kiến trúc lưới dùng chung). Đã hỏi rõ chủ dự án 2 điểm KHÔNG thể
+    suy đoán an toàn:
+    - Cấu trúc cột: DB đang cấu hình Khu vực xúc LÀM CỘT
+      (`col_source_path=/excavation-areas`) nhưng mockup lại vẽ 12
+      tháng cố định + 1 cột tổng hợp năm, Khu vực xúc là ô chọn RIÊNG ở
+      trên — **chốt theo đúng mockup** (12 tháng + cột năm), coi cấu
+      hình DB cũ + dữ liệu cột cũ ("KVX001") là nháp/test.
+    - Phần giữa của khoá dòng ("Chất lượng", vd "C"/"B") — nhãn cấu
+      hình DB ghi "hạng" — **chốt dùng đúng danh mục "Hạng xe" đã có**
+      (`/vehicle-ranks`), không tạo danh mục mới.
+    - Công thức "HSNL điều chỉnh" (hệ số năm) — mockup chỉ ghi "hệ
+      thống tự động cập nhật theo hệ số 12 tháng", không đọc chắc được
+      công thức từ ảnh (thử khớp thấy vài dòng giống "=tháng 1", vài
+      dòng giống "=min" nhưng không khớp hết) — **chốt = TRUNG BÌNH
+      CỘNG 12 tháng**, không đoán vì sai sẽ ra sai hệ số nhiên liệu
+      thật.
+    Khoá dòng ghép: `<mã xe>_<mã hạng>_<mã phân loại>.<mã khu vực xúc>`
+    — cùng lý do gấp Khu vực xúc làm hậu tố như Năng suất xe (Khu vực
+    xúc ở đây có NHIỀU giá trị thật từ danh mục Khu vực xúc, không phải
+    chỉ CS/KC, nhưng cùng cơ chế tránh xung đột ràng buộc phiên bản).
+
+⚠ **CẢ 3 VIỆC TRÊN + Mô hình ĐỀU CHƯA CLICK-THROUGH UI THẬT** — cùng lý
+do cũ (thiếu mật khẩu Portal, quy tắc dự án mục 8). Chỉ verify được:
+build backend+frontend sạch, backend khởi động healthy không lỗi, `curl`
+trực tiếp mọi endpoint liên quan (kể cả 4 catalog lưới dùng chung, để
+regression-check `extraActions` không ảnh hưởng 3 trang còn lại) đều trả
+`401` đồng nhất không có `500` mới, trang load không crash console.
+**Việc đầu tiên phiên sau/chủ dự án nên làm**: click-through cả 4 tính
+năng mới (`/danh-muc/mo-hinh`, `/danh-muc/phan-loai`,
+`/danh-muc/nang-suat-xe`, `/danh-muc/hs-dieu-chinh-nldm`) — đặc biệt xác
+nhận công thức HSNL=trung bình cộng và quy ước khoá `Chủng loại hàng +
+Phân loại` cho Năng suất xe đúng ý chủ dự án khi thấy dữ liệu thật.
 
 ## Việc cần làm tiếp (ưu tiên theo thứ tự)
 
