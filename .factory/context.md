@@ -932,3 +932,54 @@ docker exec -i thongke-caoson-preview-postgres-1 psql -U postgres -d thong_ke < 
 
 Phân bố: KX1/tầng 300/ca 1 = 2 phiếu 5 chuyến · KX2/250/ca 2 = 2 phiếu 4
 chuyến · KX3/200/ca 3 = 1 phiếu 1 chuyến · KX4/150/ca 4 = 1 phiếu 1 chuyến.
+
+---
+
+## Lượt 8 (2026-09-07) — chốt QĐ-10…13, nối khoá ngoại danh mục xe, báo cáo tổng hợp
+
+### Đọc trước tiên
+
+**`docs/BAO_CAO_TONG_HOP_LOGIC.md`** — báo cáo tổng hợp toàn bộ logic
+(danh mục + báo cáo thống kê) viết cho chủ dự án rà soát. Nó gộp lại mọi
+kết luận của `RA_SOAT_COT_BAO_CAO_THONGKE.md` và `DECISIONS.md`, kèm số
+liệu dòng thật của từng danh mục. Bắt đầu từ đó, không đọc lại từ đầu.
+
+### Đã làm
+
+1. **Bước 1 — chốt 5 mâu thuẫn** → `docs/DECISIONS.md` QĐ-10…QĐ-13.
+2. **Bước 5 — nối danh mục xe thành khoá ngoại thật** (commit `25466f4`):
+   `devices.vehicle_type_id` + `devices.vehicle_rank_id`,
+   `excavation_areas.area_group` (CS/KC) + endpoint `/area-groups`,
+   `vehicle_class` chuyển `@Deprecated` (engine ưu tiên `vehicleRank`,
+   lùi về chuỗi cũ; khi lưu chỉ ghi đè nếu request thực sự gửi giá trị),
+   `VehicleRankResponse.name` = mã hạng (combobox/Excel đọc theo `name`).
+3. **Báo cáo tổng hợp** `docs/BAO_CAO_TONG_HOP_LOGIC.md`.
+
+### Việc tiếp theo — BƯỚC 2 (chưa làm)
+
+Viết lại `ProductionKeys` cho ĐMNL theo QĐ-11 và sửa 3 giao diện dựng
+ngày 06/09 (ĐMNL, Năng suất xe, HS điều chỉnh) cho khớp QĐ-10…13.
+**Chỗ hở đã biết:** `FuelCalculator.vehicleModel()` vẫn đọc
+`Device.category.name` và chú thích là "DQ5"; theo QĐ-11 DQ phải là
+`Device.fuelClass.code`. Cố tình chưa sửa lẻ — sửa cùng bước 2.
+
+**Không có lưới an toàn:** `backend/src/test` chỉ có `contextLoads` (vốn
+đã fail độc lập). Bổ sung test đơn vị cho `ProductionKeys` TRƯỚC khi đổi
+engine.
+
+### Bẫy mới ghi nhận
+
+- **`VehicleRank` không có trường `name`.** Cả `CatalogFormModal`
+  (`optionsPath` → `label: it.name`) lẫn `CatalogPage.buildLookups`
+  (tên→id khi nhập Excel) đều đọc theo quy ước `name`. Đã vá bằng cách
+  cho `VehicleRankResponse.name = code`. Danh mục nào khác thiếu `name`
+  mà đem làm `optionsPath` sẽ hỏng y hệt, không báo lỗi.
+- **`apply()` của `DeviceProductionAttributesService` có ngữ nghĩa THAY
+  THẾ** — gỡ một trường khỏi giao diện/Excel mà vẫn ghi đè vô điều kiện
+  sẽ âm thầm xoá trắng dữ liệu cũ của trường đó.
+
+### Dữ liệu DEMO phải xoá trước khi dùng thật
+
+486 ô lưới ĐMNL ở `matrix_definitions` id=155 (27 dòng × 18 cột) là dữ
+liệu GIẢ nạp thẳng bằng `psql` ở lượt 7 chỉ để xem giao diện bảng/phân
+trang. Không phải dữ liệu nghiệp vụ.
