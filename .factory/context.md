@@ -569,6 +569,83 @@ nhận để không nhầm là của các thay đổi DMNL ở trên.
     cột — thêm hàng tiêu đề "Cung độ (km)" span trên các cột, giống cấu
     trúc 2 tầng đã dùng ở bảng tổng hợp Quản lý.
 
+12. **Danh mục "Mô hình" tách khỏi kiến trúc lưới dùng chung, mỗi dòng 1
+    kỳ riêng** (commit `83442b0`) — chủ dự án gửi mockup + xác nhận rõ
+    (qua AskUserQuestion): mỗi dòng (1 mã chủng loại hàng) cần khoảng
+    thời gian RIÊNG, tách nhỏ bằng "+", giống hệt "Thêm mới tỷ trọng"
+    (Density) đã có. Kiến trúc `MatrixDefinition` dùng chung (1 phiên
+    bản = 1 khoảng thời gian cho MỌI dòng) không làm được — dùng
+    `EnterPlanMode` (agent Explore đọc kỹ Density backend+frontend, agent
+    Plan thiết kế, tự verify lại từng chi tiết bằng Read trước khi chốt)
+    cho ra kiến trúc mới, ĐÃ ĐƯỢC DUYỆT trước khi code.
+    - Backend (file MỚI hoàn toàn, không sửa gì có sẵn): `ModelPeriod`
+      (mirror `DensityParameter`, bỏ Khu vực xúc + 2 trường cố định) +
+      `ModelPeriodValue` (con, `vehicleKey` chuỗi tự do `<mã xe>.<CS|KC>`
+      → giá trị, giống `MatrixCell` nhưng gắn với TỪNG kỳ riêng của
+      TỪNG dòng). `ModelPeriodService` mirror đúng
+      `bulkCreate`/`replaceBatch`/kiểm tra chồng lấn của
+      `DensityParameterService`. Bẫy kỹ thuật duy nhất: sync `values`
+      phải `.clear()` + add lại vào ĐÚNG list instance (không gán list
+      mới) vì có `orphanRemoval=true`.
+    - Frontend: `frontend/src/modules/catalog/model/` — `ModelAddModal.tsx`
+      (mirror khung+thuật toán tách kỳ của `DensityAddModal.tsx`, khác 2
+      điểm: "Chủng loại xe" là combobox multi-choice DÙNG CHUNG cạnh
+      Thời gian — mỗi xe chọn sinh 2 cột `.CS`/`.KC`; "Mã chủng loại" là
+      dropdown SỬA ĐƯỢC TỪNG DÒNG qua nút "+ Thêm dòng", không tự sinh
+      từ multi-select như Density), `ModelPeriodsPage.tsx` (mỗi dòng
+      bảng = 1 bản ghi đã lưu, KHÔNG gộp "lô" — vì mỗi dòng có thời gian
+      riêng nên không còn khoá gộp chung).
+    - Route: tái dùng URL `MO_HINH` cho trang mới, lưới cũ (data cũ
+      trong `matrix_definitions` GIỮ NGUYÊN, không xoá) dời sang
+      `MO_HINH_LUOI` — đúng cách DMNL đã làm với
+      `DINH_MUC_NHIEN_LIEU_LUOI`. `header.tsx` KHÔNG sửa.
+    - Verify: build backend (Maven qua container) sạch, backend khởi
+      động healthy, Hibernate tự tạo đúng 2 bảng mới + FK + unique
+      constraint (đã `\d` xác nhận), `curl` trực tiếp 3 endpoint mới
+      (`GET/POST /api/model-periods`, `GET /{id}`) đều trả `401` đồng
+      nhất không token — không có `500` mới. Build frontend sạch.
+      **CHƯA click-through UI thật** (thiếu mật khẩu Portal) — việc đầu
+      tiên phiên sau/chủ dự án nên làm: mở `/danh-muc/mo-hinh`, thử
+      "+ Thêm dòng", tách thời gian 1 dòng bằng "+", lưu/sửa/xoá — xác
+      nhận đúng mockup.
+
+## Hàng đợi việc chủ dự án đã yêu cầu tiếp (lượt 7, chưa bắt đầu)
+
+Chủ dự án gửi dồn dập 3 yêu cầu tiếp khi đang code Mô hình — xử lý theo
+đúng thứ tự đã báo, CHƯA bắt đầu việc nào dưới đây:
+
+1. **Thêm danh mục "Phân loại"** — Mã phân loại / Phân loại (text) / Ghi
+   chú. Danh mục CRUD đơn giản, khớp đúng khuôn `VehicleType` (danh mục
+   Chủng loại xe) đã làm ở lượt 6 — tái dùng `CatalogPage`/
+   `CatalogFormModal`, chỉ thêm entity/dto/mapper/repository/service/
+   controller theo khuôn cũ.
+2. **Sửa danh mục "Năng suất xe"** (NANG_SUAT_XE — 1 trong 4 lưới dùng
+   chung) — mockup: modal "Thêm mới năng suất xe" có "Thời gian *" +
+   "Khu vực xúc *" ở TRÊN (áp dụng CHUNG cho cả bảng — khác Mô hình,
+   GIỐNG DMNL/kiến trúc lưới hiện có, không cần đổi kiến trúc dữ liệu),
+   bảng: dòng = Cung độ (km, numeric — giống hệt trục Độ dốc của DMNL),
+   cột = nhóm "Chủng loại hàng + Phân loại" (2 dropdown mỗi nhóm), nút
+   "+ Thêm nhóm" (thêm 1 nhóm cột) và "+ Thêm dòng" (thêm 1 Cung độ).
+   **Nhiều khả năng KHÔNG cần đổi kiến trúc backend** (ở lại
+   `MatrixDefinition`/`MatrixCell` dùng chung, giống DMNL trước khi có
+   UI riêng) — chỉ cần xây modal "Thêm mới" bespoke kiểu DMNL, thu gọn
+   thành modal thay vì trang riêng. **Việc đầu tiên khi bắt đầu**: đọc
+   `matrix_definitions` row NANG_SUAT_XE (row_axis_label/col_axis_label/
+   row_source_path/col_source_path) qua `psql` để xác nhận đúng giả
+   định trước khi code — đúng cách đã làm với MO_HINH trước khi thiết kế
+   lại.
+3. **Sửa danh mục "HS điều chỉnh NLDM"** (HS_DIEU_CHINH_NLDM — 1 trong 4
+   lưới dùng chung) — mockup: modal "Thêm mới HS điều chỉnh NLDM" có
+   "Năm *" + "Khu vực xúc *" ở TRÊN (chung cho cả bảng, giống Năng suất
+   xe/DMNL — KHÔNG phải per-row như Mô hình), bảng: dòng = tổ hợp 3
+   dropdown "Chủng loại xe + Chất lượng + Phân loại" (vd
+   "CAT773E_C_OAT"), cột = 12 tháng cố định (Tháng 1..12) + 1 cột tính
+   "HSNL điều chỉnh" (hệ số NĂM, chú thích "hệ thống tự động cập nhật
+   theo hệ số 12 tháng" — cần làm rõ công thức tổng hợp 12→1 khi bắt
+   tay vào, KHÔNG suy đoán). **Cùng nhận định như Năng suất xe: nhiều
+   khả năng ở lại kiến trúc lưới dùng chung**, chỉ cần modal bespoke.
+   Đọc `matrix_definitions` row HS_DIEU_CHINH_NLDM trước khi code.
+
 ## Việc cần làm tiếp (ưu tiên theo thứ tự)
 
 0. **ĐÃ CÓ THIẾT KẾ → `docs/DESIGN_SANLUONG.md`** (2026-08-30). Mô hình dữ
