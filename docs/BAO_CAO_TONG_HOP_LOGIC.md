@@ -17,7 +17,8 @@ và Excel mâu thuẫn → **tin Excel**.
 | Danh mục đã đủ về CẤU TRÚC chưa? | **Gần đủ** — 39 danh mục đã dựng; sau lượt này còn 1 chỗ hở (xem §D.3) |
 | Danh mục đã đủ DỮ LIỆU chưa? | **Không** — 5 danh mục quyết định kết quả tính đang trống hoặc 1 dòng (xem §A.4) |
 | Báo cáo thống kê đủ cột để tính chưa? | **Chưa** — 3 nhóm thiếu, xem §C |
-| Điều nguy hiểm nhất | **Quy ước khoá tra bảng**: 4 bảng tra dùng 4 họ khoá KHÁC NHAU, code trước đây gộp chung → tra sai bảng, ra sai số mà không báo lỗi. Xem §B |
+| Điều nguy hiểm nhất | **Quy ước khoá tra bảng**: 4 bảng tra dùng 4 họ khoá KHÁC NHAU, code trước đây gộp chung → tra sai bảng, ra sai số mà không báo lỗi. **Đã sửa lượt này** (§B, §D.3), có 22 test khoá lại |
+| Việc chặn tiến độ lớn nhất | **Dữ liệu danh mục thật** — công thức đúng rồi nhưng chưa có gì để tính (§A.2) |
 
 **Việc cần chủ dự án làm khi đọc bản này:** soát §B (4 họ khoá) và §F
 (5 điểm cần xác nhận). Hai mục đó quyết định mọi con số phía sau.
@@ -131,8 +132,9 @@ Khoá cột = <Chủng loại xe> . <DAT|Than>       vd: CAT777E.DAT
 Khoá dòng = Cung độ (>8 thì lấy 8; còn lại làm tròn 1 chữ số)
 ```
 
-⚠ Chỗ này giao diện tôi dựng ngày 06/09 đang **sai**: đang lấy *Chủng
-loại hàng* làm gốc thay vì *Chủng loại xe*. Chưa sửa — nằm ở bước 2.
+✅ **Đã sửa** (commit `222b4c1`). Giao diện dựng ngày 06/09 lấy *Chủng loại
+hàng* làm gốc — sai; nay lấy *Chủng loại xe* (`/vehicle-types`), Phân loại
+là DAT/Than tự suy, và bỏ hậu tố khu vực.
 
 ### B.3 Định mức nhiên liệu — hậu tố THEO QUY TẮC (không phải khu vực)
 
@@ -151,8 +153,9 @@ Khoá cột đầy đủ = <gốc + hậu tố> _ <cung độ>   vd: CAT777E.BK_
 Khoá dòng = Độ dốc (dải)  →  nội suy song tuyến (cung độ × độ dốc)
 ```
 
-⚠ Code hiện tại (`ProductionKeys.vehicleFuelClassKey`) đang gắn `.CS`/`.KC`
-— **sai**. Chưa sửa — nằm ở bước 2.
+✅ **Đã sửa** (commit `222b4c1`). Code cũ (`ProductionKeys.vehicleFuelClassKey`)
+gắn `.CS`/`.KC` — sai; nay là `ProductionKeys.fuelNormVehicleKey` dựng đủ 4
+nhánh trên, có test phủ cả thứ tự ưu tiên giữa các nhánh.
 
 ### B.4 HS điều chỉnh NLĐM — 12 tháng × 2 nhóm khu vực
 
@@ -163,8 +166,9 @@ Khoá cột  = <tháng> . <nhóm khu vực>          vd: T6.CS
 Hệ số năm = trung bình cộng 12 tháng
 ```
 
-⚠ Engine hiện chỉ tra theo khu vực, **chưa xét tháng của ngày sản xuất**.
-Chưa sửa — nằm ở bước 2.
+✅ **Đã sửa** (commit `222b4c1`). Engine cũ chỉ tra theo khu vực; nay
+`fuelAdjustColumnKey` chọn cột theo **tháng của ngày sản xuất** + nhóm khu
+vực, và giao diện chọn **nhóm** CS/KC thay cho từng khu vực cụ thể.
 
 ### B.5 Quy ước "Phân loại" (QĐ-10)
 
@@ -182,10 +186,14 @@ vực (Khu Bắc, Khu Nam, Bãi thải…). Đã thêm thuộc tính **Nhóm khu
 (`CS`/`KC`) vào danh mục Khu vực xúc trong lượt này. Mọi so sánh phải so
 theo **nhóm**, không so mã/tên khu vực.
 
-Các chỗ đang so sai, **chưa sửa hết**: `ProductionKeys.vehicleFuelClassKey`,
-`ReceivingFloorGroupCalculator` (đang so TÊN với `"Khe Chàm"`),
-`TripBaseCalculator`, `FuelCalculator.coalCnNkFactor`, tỷ lệ đá thải `FK5`,
-quy đổi m3 đá thải `FJ5`.
+Các chỗ so sai — **đã sửa** trong commit `222b4c1`:
+`ProductionKeys` (khoá ĐMNL) · `ReceivingFloorGroupCalculator` (trước so
+TÊN với `"Khe Chàm"`, trong khi `AK5` thật ra xét `D5="KC"`) ·
+`TripBaseCalculator.acceptanceProductOf` · `FuelCalculator.coalCnNkFactor`.
+
+**Còn lại:** tỷ lệ đá thải `FK5` và quy đổi m3 `FJ5` — hai cột này chưa
+được tính ở bất kỳ đâu, nên chưa có chỗ để so sai. Hằng số đã có chỗ khai
+(xem §C.3), công thức nằm ở bước 6.
 
 ---
 
@@ -216,12 +224,22 @@ CR · CC..CG · toàn chuỗi nhiên liệu AZ→BQ · BR · DS,DT,DU,DW,DX,DY,D
 
 ### C.4 Hằng số nghiệp vụ chưa khai báo
 
-| Hằng số | Hiện trạng |
-|---|---|
-| 3 tỷ lệ đá thải theo khu vực (`$D$3`, `$F$3`, `$B$3`) | chưa có |
-| Quy đổi m3 đá thải: **2,625** (KC) / **2,617** (CS) | **không tồn tại ở bất kỳ đâu trong code** |
-| `HS.THAN.TRUDA` = 0,985 | ✅ đã có |
-| `HS.BUN` | code đọc nhưng **chưa nạp** → trả 0 kèm cảnh báo |
+Đã tạo `backend/seed-he-so.sql` và nạp vào CSDL preview (bước 4):
+
+| Mã trong danh mục Hệ số | Nguồn Excel | Giá trị |
+|---|---|---|
+| `HS.THAN.TRUDA` | `$AM$3` | 0,985 (có sẵn từ trước) |
+| `HS.BUN` | `$BN$2` | **0 — chưa có số thật, cần nhập** |
+| `HS.DATHAI.M3.KC` | `FJ5` | 2,625 |
+| `HS.DATHAI.M3.CS` | `FJ5` | 2,617 |
+| `HS.DATHAI.TYLE.CS` | `$D$3` | **0 — chưa có số thật, cần nhập** |
+| `HS.DATHAI.TYLE.KC.CS` | `$F$3` | **0 — chưa có số thật, cần nhập** |
+| `HS.DATHAI.TYLE.KHAC` | `$B$3` | **0 — chưa có số thật, cần nhập** |
+
+Ba ô tỷ lệ đá thải nằm ngoài vùng đã trích xuất từ workbook nên chưa biết
+số thật; seed = 0 để **có chỗ khai** mà không âm thầm đổi kết quả (0 × khối
+lượng = 0, đúng bằng hành vi hiện tại). Script chạy lại nhiều lần được và
+**không ghi đè** giá trị người dùng đã sửa.
 
 ### C.5 Tính rồi nhưng bị vứt (chỉ cần lưu thêm)
 
@@ -271,13 +289,33 @@ Commit `25466f4`:
 đủ trường mới; mọi endpoint nghiệp vụ vẫn trả `401` đồng nhất, không có
 `500` mới; frontend build sạch (`tsc -b && vite build` trong container).
 
-### D.3 Chỗ hở còn lại của bước 5
+### D.3 Bước 2 — tách bốn họ khoá ✅
 
-`FuelCalculator.vehicleModel()` vẫn đọc `Device.category.name` (danh mục
-Loại thiết bị) và chú thích là "DQ5 — Chủng loại xe". Theo QĐ-11, DQ phải
-là **Chủng loại xe (NL)** = `Device.fuelClass.code`. Chưa sửa vì đó là
-việc của bước 2 (viết lại `ProductionKeys`) — sửa lẻ ở đây sẽ làm hai nơi
-hiểu khác nhau.
+Commit `222b4c1`. Nội dung ở §B; tóm tắt phần engine:
+
+- `ProductionKeys` tách thành 4 hàm dựng khoá riêng, thay cho một hàm
+  dùng chung gắn `.CS`/`.KC` cho cả bốn bảng.
+- `TripBaseCalculator` tra lưới Mô hình bằng `vehicleType` (DA) thay cho
+  `fuelClass` (DQ) — trước đây dùng nhầm danh mục.
+- `FuelCalculator.vehicleModel()` đọc `fuelClass.code` thay cho
+  `category.name` (danh mục **Loại thiết bị** — sai hẳn). `BK5` tra theo
+  `DF5 = LEFT(DA5,7)` chứ không phải khoá ĐMNL.
+- Mọi chỗ so `"CS"`/`"KC"` nay so theo **nhóm** khu vực.
+
+### D.4 Lưới an toàn mới — `ProductionKeysTest`
+
+22 test **thuần JUnit** (không cần Spring/Postgres, vì `contextLoads` vốn
+đã fail khi không có hạ tầng sống). Phủ cả bốn họ khoá, bốn nhánh của
+`DE5` và **thứ tự ưu tiên** giữa chúng, bẫy `"SP than sạch"` bắt đầu bằng
+`S` nên là ĐẤT, và các đầu vào thiếu.
+
+Chạy lại:
+
+```bash
+docker run --rm -v "D:/Coding/DU_AN/AI_Software_Factory/projects/THONGKE-CAOSON/.factory/worktrees/claude-dev/backend:/app" -v thongke_m2_cache:/root/.m2 -w //app maven:3.9.8-eclipse-temurin-21 mvn -B test -Dtest=ProductionKeysTest
+```
+
+Kết quả lượt này: **22/22 PASS, BUILD SUCCESS**.
 
 ---
 
@@ -285,14 +323,19 @@ hiểu khác nhau.
 
 | Bước | Nội dung | Trạng thái |
 |---|---|---|
-| 1 | Chốt 5 mâu thuẫn | ✅ xong (QĐ-10…13) |
-| 5 | Nối danh mục xe thành khoá ngoại | ✅ xong (làm trước vì bước 2 phụ thuộc) |
-| **2** | Sửa `ProductionKeys` cho ĐMNL + sửa 3 giao diện (ĐMNL, Năng suất xe, HS điều chỉnh) | ⏳ **việc tiếp theo** |
-| 3 | Bổ sung 4 ô nhập ở màn báo chuyến | ⏳ |
-| 4 | Khai hằng số còn thiếu vào danh mục Hệ số | ⏳ |
+| 1 | Chốt 5 mâu thuẫn | ✅ xong — QĐ-10…13 |
+| 5 | Nối danh mục xe thành khoá ngoại | ✅ xong — `25466f4` (làm trước vì bước 2 phụ thuộc) |
+| 2 | Tách 4 họ khoá + sửa 3 giao diện | ✅ xong — `222b4c1`, có 22 test |
+| 4 | Khai hằng số còn thiếu vào danh mục Hệ số | ✅ xong — `backend/seed-he-so.sql`; **3 tỷ lệ đá thải còn chờ số thật** |
+| **3** | Bổ sung 4 ô nhập ở màn báo chuyến | ⏳ **việc tiếp theo** |
 | 6 | Lưu thêm các cột đang bị vứt + mở rộng màn báo cáo | ⏳ |
 | 7 | Nhập dữ liệu danh mục thật | ⏳ *(cần chủ dự án)* |
 | 8 | Quyết định số phận nhóm cột "bùn" và ~60 cột chưa nhắc tới | ⏳ *(cần chủ dự án)* |
+
+**Thứ tự đề xuất cho lượt sau:** bước 7 trước bước 3 và 6. Lý do: công
+thức nay đã đúng nhưng danh mục xe gần như trống (§A.2), nên chưa ra được
+con số nào để đối chiếu với Excel. Có dữ liệu thật rồi thì mới biết bước 6
+nên hiện thêm cột nào.
 
 ---
 
@@ -328,7 +371,11 @@ hiểu khác nhau.
   + mã trạng thái HTTP. Việc đầu tiên khi có tài khoản: mở
   `/danh-muc/thuoc-tinh-san-luong-xe` xác nhận 2 combobox mới (Chủng loại
   xe, Hạng xe) và `/danh-muc/khu-vuc-xuc` xác nhận combobox Nhóm khu vực.
-- **Không có test tự động cho engine**: `backend/src/test` chỉ có
-  `contextLoads`, và test đó vốn đã fail khi chạy độc lập (cần Postgres/Redis
-  sống, không có H2/Testcontainers). Sửa engine ở bước 2 sẽ **không có lưới
-  an toàn** — nên bổ sung test đơn vị cho `ProductionKeys` trước khi đổi.
+- **Engine chỉ có test cho phần khoá tra bảng** (`ProductionKeysTest`, 22
+  test). Phần còn lại — nội suy, chuỗi hệ số nhiên liệu, tổng hợp hai lượt
+  — vẫn **không có lưới an toàn**, vì `@SpringBootTest` cần Postgres/Redis
+  sống (không có H2/Testcontainers). `contextLoads` vẫn fail khi chạy độc
+  lập, đúng như trước.
+- **Chưa đối chiếu được số cuối cùng với Excel**: công thức nay đã theo
+  đúng bảng tính, nhưng danh mục xe gần như trống nên engine chưa ra được
+  con số nào để so. Đó là lý do bước 7 nên làm trước.

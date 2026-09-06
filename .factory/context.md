@@ -983,3 +983,46 @@ engine.
 486 ô lưới ĐMNL ở `matrix_definitions` id=155 (27 dòng × 18 cột) là dữ
 liệu GIẢ nạp thẳng bằng `psql` ở lượt 7 chỉ để xem giao diện bảng/phân
 trang. Không phải dữ liệu nghiệp vụ.
+
+### Bổ sung cuối lượt 8 — đã làm thêm bước 2 và bước 4
+
+4. **Bước 2 — tách BỐN họ khoá tra bảng** (commit `222b4c1`).
+   `ProductionKeys` nay có 4 hàm riêng: `modelColumnKey` (Mô hình,
+   `<DA>.<CS|KC>`), `vehicleOutputColumnKey` (Năng suất xe,
+   `<DA>.<DAT|Than>`), `fuelNormVehicleKey` (ĐMNL, `<DQ>` + hậu tố theo 4
+   nhánh `DE5`), `fuelAdjustRowKey`/`fuelAdjustColumnKey` (HS điều chỉnh,
+   `<DQ>_<chữ đầu hạng>_<DAT|Than>` × `T<tháng>.<CS|KC>`).
+   Kéo theo: `TripBaseCalculator` tra Mô hình bằng `vehicleType` chứ không
+   phải `fuelClass`; `FuelCalculator.vehicleModel()` đọc `fuelClass.code`
+   thay cho `category.name`; `ReceivingFloorGroupCalculator` nhận
+   `ExcavationArea` và so theo NHÓM thay vì so tên với "Khe Chàm".
+   Ba giao diện dựng 06/09 (ĐMNL, Năng suất xe, HS điều chỉnh) sửa cho khớp.
+5. **Bước 4 — hằng số** (`backend/seed-he-so.sql`, đã nạp vào preview):
+   `HS.BUN`, `HS.DATHAI.M3.KC`=2,625, `HS.DATHAI.M3.CS`=2,617, và 3 tỷ lệ
+   đá thải. **Ba tỷ lệ + HS.BUN seed = 0 vì chưa biết số thật** — ba ô
+   `$B$3/$D$3/$F$3` nằm ngoài vùng đã trích xuất từ workbook.
+
+### Lưới an toàn MỚI
+
+`backend/src/test/.../ProductionKeysTest.java` — 22 test THUẦN JUnit
+(không cần Spring/Postgres). Chạy:
+```bash
+docker run --rm -v "D:/Coding/DU_AN/AI_Software_Factory/projects/THONGKE-CAOSON/.factory/worktrees/claude-dev/backend:/app" -v thongke_m2_cache:/root/.m2 -w //app maven:3.9.8-eclipse-temurin-21 mvn -B test -Dtest=ProductionKeysTest
+```
+Lượt này: 22/22 PASS. `contextLoads` VẪN fail độc lập như cũ — đừng chạy
+`mvn test` trần rồi tưởng hỏng do thay đổi mới.
+
+### Bẫy mới (lượt 8, phần 2)
+
+- **Recreate backend container xong thì reverse-proxy trả 502.**
+  `nginx_preview.conf` dùng `proxy_pass` TĨNH (bắt buộc, xem quy tắc dự án
+  mục 5) nên nginx phân giải DNS đúng một lần lúc khởi động; backend đổi IP
+  là hỏng. Cách sửa: `docker restart thongke-caoson-preview-reverse-proxy-1`.
+- **Docker chạy từ Git Bash cần `MSYS_NO_PATHCONV=1` và `-w //app`** — nếu
+  không, đường dẫn bị dịch thành `C:/Program Files/Git/app`.
+
+### Việc tiếp theo — đề xuất BƯỚC 7 TRƯỚC bước 3/6
+
+Công thức nay đã đúng theo bảng tính, nhưng danh mục xe gần như trống
+(`vehicle_types` 0 dòng) nên engine chưa ra được con số nào để đối chiếu
+với Excel. Nhập dữ liệu thật rồi mới biết bước 6 cần hiện thêm cột nào.
