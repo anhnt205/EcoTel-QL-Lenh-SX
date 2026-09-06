@@ -723,6 +723,46 @@ Phân loại` cho Năng suất xe đúng ý chủ dự án khi thấy dữ liệ
     `VehicleOutputAddModal`) nhưng chúng dùng `Select` (đã có `z-[120]`)
     chứ KHÔNG dùng Combobox này → không đụng tới, chỉ ghi nhận.
 
+## ⚠ LƯỢT 8 (2026-09-07) — RÀ SOÁT CỘT BÁO CÁO: PHÁT HIỆN 3 UI VỪA DỰNG TRA SAI KHOÁ
+
+Chủ dự án gửi đặc tả đầy đủ ~75 cột báo cáo thống kê và yêu cầu "nghiên
+cứu sâu, chưa cần code, xem đã đủ thông tin tính toán chưa". Kết quả đầy
+đủ: **`docs/RA_SOAT_COT_BAO_CAO_THONGKE.md`** (commit `de09d23`). Tóm tắt
+những gì PHẢI đọc trước khi động vào phần sản lượng:
+
+1. **DMNL đang tra SAI cột.** Khoá cột DMNL thật là cột `DE`
+   (`LoaiXe_DMNL`) = `<Chủng loại xe (NL) = cột DQ>` + hậu tố THEO QUY TẮC
+   (`.Bun` / `.Dat` / `.BK` / `.DAT|.Than`), rồi mới `_<cung độ>`.
+   Code (`ProductionKeys.vehicleFuelClassKey`) và toàn bộ UI DMNL tôi dựng
+   đang dùng `<mã>.CS/.KC` — SAI. Bằng chứng sống dòng 1250:
+   `DA=CAT777E.CS` nhưng `DE=CAT777E.BK` (và còn `CZ=CAT777E.CS.BK` là họ
+   khoá thứ ba).
+   **Nguồn gốc sai**: `docs/RA_SOAT_CHUAN_HOA_DANH_MUC.md:375` đặt tiêu đề
+   "Khoá cột lưới Mô hình **/ DMNL** có HẬU TỐ KHU VỰC" nhưng chỉ trích
+   công thức của Mô hình. Ghi chú "chỉ có .CS/.KC là thật" trong
+   `fuelNormKeys.ts` + context.md lượt 6 là **SAI**, đừng tin nữa.
+2. **Mô hình `.CS/.KC` là ĐÚNG** (khác DMNL) — UI Mô hình vừa dựng OK.
+3. **Năng suất xe (996) tra theo `<Chủng loại XE>.<DAT|Than>`**, không
+   phải "Chủng loại hàng + Phân loại". Backend đang đúng; **modal tôi dựng
+   hôm 06/09 SAI** (do câu trả lời AskUserQuestion của chủ dự án chọn theo
+   chữ trên mockup, nhưng đặc tả mới của chính chủ dự án + docx gốc + Excel
+   đều ghi "Chủng loại xe"). Cần chốt lại rồi sửa modal.
+4. **HS điều chỉnh NLĐM**: dòng = `<xe>_<hạng>_<DAT|Than>` (giá trị thật
+   `CAT777E_C_DAT`), cột = **KC/CS**. Modal tôi dựng dùng danh mục Phân
+   loại mới + mã khu vực `KVX0xx` + 12 tháng → lệch 3 chỗ. 12 tháng là
+   yêu cầu MỚI, nếu giữ thì `FuelCalculator` phải sửa để biết lấy tháng nào.
+5. **Thiếu để tính đủ**: 4 ô nhập ở báo chuyến (HS chênh lệch CTNB, Đá
+   thải tự nhập — *cả hai đã có cột DB nhưng không có ô nhập*, Hệ số chất
+   tải bùn, Tầng dỡ tải kiểu số); 4 hằng số (2,625/2,617, 3 tỷ lệ đá thải,
+   `HS.BUN` chưa seed); 3 thuộc tính xe còn là chuỗi tự do (Chủng loại xe,
+   Hạng xe, Chủng loại xe (NL)); ~30 cột tính xong nhưng không lưu (8 khoản
+   BSNL, 10 cột nội suy, P, EC…).
+6. **Dữ liệu danh mục gần như trống** (`vehicle_types` 0, `classifications`
+   0, `model_periods` 0, `coefficient_items` 1) — công thức đúng cũng chưa
+   ra số đúng.
+
+**Chưa sửa gì cả — chờ chủ dự án chốt 5 mâu thuẫn ở mục 4 của tài liệu.**
+
 ## Việc cần làm tiếp (ưu tiên theo thứ tự)
 
 0. **ĐÃ CÓ THIẾT KẾ → `docs/DESIGN_SANLUONG.md`** (2026-08-30). Mô hình dữ
