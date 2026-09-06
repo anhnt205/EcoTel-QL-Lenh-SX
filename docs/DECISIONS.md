@@ -421,3 +421,90 @@ Xem `DESIGN_SANLUONG.md` mục 2.4.
 
 **Điểm cần lưu ý:** `Material` còn có `mongoId` — dấu vết của cơ chế đồng bộ
 MongoDB đã gỡ. Khi di trú thì bỏ trường này, không mang sang.
+
+---
+
+## QĐ-10 (2026-09-07) — "Phân loại" trong các bảng tra là DAT/Than, KHÔNG phải danh mục
+
+**Bối cảnh:** ba bảng tra (ĐMNL, Năng suất xe, HS điều chỉnh NLĐM) đều có
+một thành phần khoá gọi là "Phân loại". Ngày 06/09 chủ dự án từng chọn
+"Chủng loại hàng + Phân loại" theo chữ trên mockup, dẫn tới việc dựng modal
+sai. Rà soát lại Excel thật cho thấy khác.
+
+**Quyết định: "Phân loại" = giá trị `DAT` / `Than`, tự suy ra**, đúng công
+thức `AD5 = IF(OR(LEFT(AG5,1)="S", LEFT(AG5,1)="D"), "DAT", "Than")` — xét
+CHỮ CÁI ĐẦU của Sản phẩm nghiệm thu, không phải tiền tố `Dat_`/`Than_`.
+
+**Hệ quả:**
+- Không cho người dùng chọn tay "Phân loại" ở 3 bảng tra này.
+- Danh mục `Classification` ("Phân loại", thêm 06/09) **không dùng** cho 3
+  bảng này. Giữ nguyên, chưa xoá (quy tắc dự án).
+- Lưu ý khi so chuỗi: `AD` trả `"DAT"` viết HOA nhưng `"Than"` viết thường.
+  Excel `MATCH` không phân biệt hoa thường, Java `equals` thì có → phải so
+  `equalsIgnoreCase`.
+
+## QĐ-11 (2026-09-07) — Khoá cột ĐMNL dùng hậu tố THEO QUY TẮC, không phải khu vực
+
+**Bối cảnh:** `fuelNormKeys.ts` và `.factory/context.md` (lượt 6) từng kết
+luận hậu tố thật chỉ có `.CS`/`.KC`. **Kết luận đó SAI.** Nguồn gốc:
+`RA_SOAT_CHUAN_HOA_DANH_MUC.md:375` đặt tiêu đề "Khoá cột lưới Mô hình /
+DMNL có HẬU TỐ KHU VỰC" nhưng bên dưới chỉ trích công thức của Mô hình.
+
+**Quyết định: ĐMNL tra theo cột `DE` (`LoaiXe_DMNL`)**, dựng theo `DE5`:
+
+```
+gốc = Chủng loại xe (NL)                       [Device.fuelClass.code]
+DC  = <Chủng loại xe> _ <chữ đầu Hạng xe>      vd "HM400-2R_C"
+
+1. DC = "HM400-2R_C" và Chủng loại hàng ∈ {B.Loang*, B.Duot, DBuot,
+   B.Duot.CN, Dbuot.CN}                                   → gốc + ".Bun"
+2. DC ∈ {VolvoA40-GCoi_A, VolvoA40-F_C, HM400-2R_C} và (Chủng loại hàng
+   bắt đầu "bundac" | Nơi dỡ tải ∈ {"Cạp đường.","Cạp công nghệ."} |
+   Nơi dỡ tải bắt đầu "Cạp" | SPNT = "Dat_CN")             → gốc + ".Dat"
+3. Nơi dỡ tải = "Băng tải." | Chủng loại hàng ∈ {SPNT.via,
+   SPNT_uot.via}                                          → gốc + ".BK"
+4. còn lại                                        → gốc + "." + Phân loại
+```
+Khoá cột đầy đủ = `<kết quả trên>_<cung độ>`, vd `CAT777E.BK_0,05`.
+
+**Bằng chứng sống** (dòng 1250 Excel): `DQ=CAT777E`, `DA=CAT777E.CS`,
+`DE=CAT777E.BK`, `CZ=CAT777E.CS.BK` — bốn chuỗi khác nhau, chỉ `DE` dùng
+tra ĐMNL.
+
+**Hệ quả:** `.CS`/`.KC` vẫn ĐÚNG nhưng chỉ cho **Mô hình** (cột `DA`) và
+làm gốc khoá **Năng suất xe** (`LEFT(DA,len−3) & "." & Phân loại`). Ba họ
+khoá phải tách riêng, không dùng chung một hàm.
+
+## QĐ-12 (2026-09-07) — HS điều chỉnh NLĐM: 12 tháng × (KC và CS)
+
+**Bối cảnh:** Excel dòng 5 chỉ tra 1 cặp cột KC/CS (`EC5 = INDEX($FX$5:$FY$50,
+MATCH(EA5,…), MATCH(D5,$FX$4:$FY$4,0))`), nhưng vùng `FW..GY` có ~14 cặp
+KC/CS — trông như các tháng. Mockup chủ dự án gửi có 12 tháng + 1 cột hệ
+số năm.
+
+**Quyết định: bảng có 12 tháng × 2 khu vực = 24 cột, cộng 1 cột hệ số năm**
+(= trung bình cộng 12 tháng, theo QĐ trước đó trong lượt 7).
+
+- Khoá DÒNG: `<Chủng loại xe (NL)> _ <chữ đầu Hạng xe> _ <DAT|Than>`
+  (= `EA5`), vd `CAT777E_C_DAT`.
+- Khoá CỘT: `<tháng>.<nhóm khu vực>`, vd `T6.CS`.
+- Engine phải chọn cột theo **tháng của ngày sản xuất** + nhóm khu vực của
+  chuyến — hiện `FuelCalculator` mới chỉ tra theo khu vực, phải sửa.
+
+## QĐ-13 (2026-09-07) — Khu vực xúc: nhiều khu vực, `CS`/`KC` là NHÓM
+
+**Bối cảnh:** mọi công thức Excel so `D5="CS"` / `D5="KC"`, nhưng danh mục
+Khu vực xúc thực tế có nhiều khu (Khu Bắc, Khu Nam, Bãi thải…).
+
+**Quyết định: giữ danh mục Khu vực xúc nhiều dòng, thêm thuộc tính "Nhóm
+khu vực" nhận đúng 2 giá trị `CS` / `KC`.** Mọi công thức so khu vực phải
+so theo NHÓM, không so mã/tên khu vực.
+
+**Hệ quả — các chỗ đang so sai, phải sửa hết:**
+- `ProductionKeys.vehicleFuelClassKey` — đang so mã khu vực với `"CS"`.
+- `ReceivingFloorGroupCalculator` — đang so TÊN với `"Khe Chàm"`.
+- `TripBaseCalculator` (nhánh `CS` + `DaXit.NK` → `Dat_SX`).
+- `FuelCalculator.coalCnNkFactor` (nhánh `CS` + `SPNT.Baichua` + `HD465`).
+- Đá thải: tỷ lệ theo khu vực (`FK5`) và quy đổi m3 (`FJ5`: 2,625 cho KC /
+  2,617 cho CS).
+- Khoá cột Mô hình (`.CS`/`.KC`) và khoá cột HS điều chỉnh.
