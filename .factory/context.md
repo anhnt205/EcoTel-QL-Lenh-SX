@@ -674,6 +674,25 @@ năng mới (`/danh-muc/mo-hinh`, `/danh-muc/phan-loai`,
 nhận công thức HSNL=trung bình cộng và quy ước khoá `Chủng loại hàng +
 Phân loại` cho Năng suất xe đúng ý chủ dự án khi thấy dữ liệu thật.
 
+16. **Mô hình: danh sách xổ xuống của combobox che mất hàng tiêu đề bảng**
+    (commit `fb41745`, chủ dự án tự đăng nhập báo qua ảnh chụp) — combobox
+    multi-choice "Chủng loại xe" (`@/components/ui/combobox.tsx`, dùng
+    `@base-ui/react`) render danh sách xổ xuống qua PORTAL với `z-40` CỐ
+    ĐỊNH trong chính component (không đọc `className` tôi truyền vào
+    `ComboboxContent` — cái đó chỉ merge vào phần tử `Popup` bên trong,
+    không phải `Positioner` mang z-index thật). Vì là portal, thư viện
+    định vị (Base UI Positioner) CHỈ tự né mép màn hình, KHÔNG tự né nội
+    dung khác trên trang — khoảng cách cũ giữa ô chọn và bảng chỉ 16px
+    (`mb-4`) trong khi 1 mục danh sách đã cao ~40-50px, nên dù danh mục
+    Chủng loại xe chỉ có 1 dòng cũng đủ che kín hàng tiêu đề bảng ngay
+    bên dưới khi mở danh sách. Sửa bằng tăng khoảng cách lên 56px
+    (`mb-14`). **Lưu ý cho lần sau**: `DensityAddModal.tsx` dùng ĐÚNG
+    component Combobox này theo cùng cách (combobox multi-choice ngay
+    trên bảng) — CÙNG rủi ro tiềm ẩn nếu danh mục Chủng loại hàng ngắn
+    và bảng nằm sát ngay dưới, nhưng CHƯA được yêu cầu sửa (chưa đụng
+    tới, không phải quy tắc chung nào — chỉ là quan sát, để dành nếu chủ
+    dự án báo tương tự ở Tỷ trọng).
+
 ## Việc cần làm tiếp (ưu tiên theo thứ tự)
 
 0. **ĐÃ CÓ THIẾT KẾ → `docs/DESIGN_SANLUONG.md`** (2026-08-30). Mô hình dữ
