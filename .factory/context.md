@@ -1,6 +1,8 @@
 # Context — THONGKE-CAOSON
 
-Cập nhật lần cuối: 2026-09-05 (lượt 7 — chủ dự án đã tự đăng nhập và
+Cập nhật lần cuối: 2026-09-07 (lượt 8 — sửa nốt cùng lỗi combobox che
+hàng tiêu đề bảng ở màn Tỷ trọng, xem mục 17). Trước đó 2026-09-05
+(lượt 7 — chủ dự án đã tự đăng nhập và
 click-through thật DMNL, báo 2 lỗi cụ thể + 1 yêu cầu redesign, cả 3 đã
 sửa/dựng lại và build+deploy sạch; xem mục "Đã làm — lượt 7"). Lượt 6
 — thêm danh mục Chủng loại xe/Nhóm hạng xe/Hạng xe, dựng lại Định mức
@@ -692,6 +694,34 @@ Phân loại` cho Năng suất xe đúng ý chủ dự án khi thấy dữ liệ
     và bảng nằm sát ngay dưới, nhưng CHƯA được yêu cầu sửa (chưa đụng
     tới, không phải quy tắc chung nào — chỉ là quan sát, để dành nếu chủ
     dự án báo tương tự ở Tỷ trọng).
+
+17. **Tỷ trọng: sửa TRƯỚC cùng lỗi che hàng tiêu đề bảng** (cùng ngày,
+    tiếp ngay sau mục 16). Đã kiểm tra `DensityAddModal.tsx`: hàng bộ
+    chọn (`Năm` + `Khu vực xúc` + combobox multi-choice `Mã chủng loại
+    hàng`) nằm trong đúng 1 div `mb-4` (16px), bảng nhập tỷ trọng ngay
+    dưới, KHÔNG có margin nào khác chen giữa → ĐÚNG điều kiện gây lỗi ở
+    Mô hình. Tính cụ thể: `sideOffset=4` + `ComboboxList` `p-1` (4+4px)
+    + 1 `ComboboxItem` `py-1.5 text-sm` (~32px) = ~44px tính từ đáy ô
+    chọn, trong khi chỉ có 16px trống → tràn ~28px vào hàng tiêu đề
+    (`th` `py-2.5` ≈ 40px); từ 2 mục trở lên thì che hết cả hàng tiêu đề.
+    Lỗi xảy ra ở luồng dùng thật: chọn 1 mã (bảng hiện ra) rồi mở lại
+    combobox để thêm mã thứ hai. Sửa y hệt Mô hình: `mb-4` → `mb-14`
+    (chỉ nhánh nhập liệu; nhánh `isReadOnly` cũng có `mb-4` nhưng không
+    có combobox nên GIỮ NGUYÊN). Chỉ đổi khoảng cách, không đổi logic.
+    Verify: `tsc -b` + `vite build` sạch qua Docker (đúng quy trình khoá
+    Redis), deploy lại preview và grep chính artifact đã build — chunk
+    `DensityParameters-*.js` và `ModelPeriodsPage-*.js` đều chứa
+    `mb-14 flex flex-wrap items-end gap-4`, CSS có `.mb-14{margin-bottom:
+    calc(var(--spacing) * 14)}` (=56px). **CHƯA click-through UI thật**
+    (vẫn thiếu mật khẩu Portal, quy tắc dự án mục 8) — chủ dự án tự đăng
+    nhập xác nhận lại giúp: `/danh-muc/ty-trong` → Thêm mới → chọn 1 mã
+    → mở lại danh sách, xem còn che hàng tiêu đề không.
+    Quét regression toàn frontend: chỉ 2 file dùng `ComboboxChips` theo
+    kiểu combobox-ngay-trên-bảng là Mô hình + Tỷ trọng, cả 2 đã sửa. Còn
+    3 modal khác vẫn để `mb-4 flex flex-wrap items-end gap-4`
+    (`FuelAdjustAddModal`, `SurveyStandardAddModal`,
+    `VehicleOutputAddModal`) nhưng chúng dùng `Select` (đã có `z-[120]`)
+    chứ KHÔNG dùng Combobox này → không đụng tới, chỉ ghi nhận.
 
 ## Việc cần làm tiếp (ưu tiên theo thứ tự)
 

@@ -464,7 +464,14 @@ export function DensityAddModal({
             </div>
           ) : (
             // Bộ chọn dùng chung cho cả lượt nhập
-            <div className="mb-4 flex flex-wrap items-end gap-4">
+            /* mb lớn hơn bình thường — cùng lý do đã sửa ở ModelAddModal:
+               danh sách xổ xuống của combobox nổi qua portal với z-40 cố
+               định (xem components/ui/combobox.tsx), chỉ né mép màn hình
+               chứ không né nội dung bên dưới. Cách bảng đúng 16px (mb-4)
+               thì dù danh mục chỉ có 1 mã chủng loại hàng, danh sách xổ
+               xuống (~40px + sideOffset 4px) vẫn che mất hàng tiêu đề của
+               bảng nhập tỷ trọng ngay bên dưới. */
+            <div className="mb-14 flex flex-wrap items-end gap-4">
               <Field label="Năm *" className="w-32">
                 <Select value={String(year)} onValueChange={(v) => setYear(Number(v))}>
                   <SelectTrigger className="h-9 text-sm w-full">
