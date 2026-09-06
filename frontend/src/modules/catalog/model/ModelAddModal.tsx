@@ -375,7 +375,11 @@ export function ModelAddModal({
 
         <div className="flex-1 overflow-y-auto px-6 py-4">
           {!isReadOnly && (
-            <div className="mb-4 flex flex-wrap items-end gap-4">
+            /* mb lớn hơn bình thường: danh sách xổ xuống của combobox nổi
+               (portal, z-40) không tự né nội dung bên dưới — chỉ né mép
+               màn hình. Sát ngay bảng bên dưới như trước (mb-4 = 16px) thì
+               dù chỉ 1 mục trong danh sách cũng đủ che mất hàng tiêu đề. */
+            <div className="mb-14 flex flex-wrap items-end gap-4">
               <div className="flex flex-col gap-1 min-w-[320px] flex-1">
                 <span className="text-xs font-medium text-gray-600 dark:text-gray-400">Chủng loại xe *</span>
                 <Combobox items={vehicles.map((v) => v.code)} multiple value={vehicleCodes} onValueChange={setVehicleCodes}>
