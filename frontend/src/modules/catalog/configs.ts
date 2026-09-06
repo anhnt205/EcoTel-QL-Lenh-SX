@@ -132,6 +132,15 @@ export const vehicleTypeConfig: CatalogConfig = {
   fields: placeFields("chủng loại xe"),
 };
 
+export const classificationConfig: CatalogConfig = {
+  basePath: "/classifications",
+  title: "Phân loại",
+  nounPhrase: "phân loại",
+  breadcrumb: ["Danh mục", "Thống kê sản lượng"],
+  searchPlaceholder: "Tìm kiếm theo mã phân loại, phân loại",
+  fields: placeFields("phân loại"),
+};
+
 export const vehicleRankGroupConfig: CatalogConfig = {
   basePath: "/vehicle-rank-groups",
   title: "Nhóm hạng xe",

@@ -49,6 +49,7 @@ const AcceptanceProductsPage = lazy(() => import("@/modules/catalog/pages/Accept
 const TtlClhItemsPage = lazy(() => import("@/modules/catalog/pages/TtlClhItems"));
 const SeamGroupsPage = lazy(() => import("@/modules/catalog/pages/SeamGroups"));
 const VehicleTypesPage = lazy(() => import("@/modules/catalog/pages/VehicleTypes"));
+const ClassificationsPage = lazy(() => import("@/modules/catalog/pages/Classifications"));
 const VehicleRankGroupsPage = lazy(() => import("@/modules/catalog/pages/VehicleRankGroups"));
 const VehicleRanksPage = lazy(() => import("@/modules/catalog/pages/VehicleRanks"));
 const VehicleFuelClassesPage = lazy(() => import("@/modules/catalog/pages/VehicleFuelClasses"));
@@ -275,6 +276,14 @@ export const mainRoutes = (
         element={
           <Suspense fallback={<PageLoader />}>
             <VehicleTypesPage />
+          </Suspense>
+        }
+      />
+      <Route
+        path={ROUTES.DANH_MUC.PHAN_LOAI}
+        element={
+          <Suspense fallback={<PageLoader />}>
+            <ClassificationsPage />
           </Suspense>
         }
       />

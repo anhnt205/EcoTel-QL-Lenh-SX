@@ -287,6 +287,15 @@ export function Header() {
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
                 <NavLink
+                  to={ROUTES.DANH_MUC.PHAN_LOAI}
+                  className="flex items-center gap-2 px-2.5 py-2 text-sm rounded hover:bg-blue-50 cursor-pointer"
+                >
+                  <Layers className="h-4 w-4 text-blue-600" />
+                  Phân loại
+                </NavLink>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <NavLink
                   to={ROUTES.DANH_MUC.CHUNG_LOAI_XE_DMNL}
                   className="flex items-center gap-2 px-2.5 py-2 text-sm rounded hover:bg-blue-50 cursor-pointer"
                 >

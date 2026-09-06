@@ -41,6 +41,7 @@ export const ROUTES = {
     TTL_CLH: '/danh-muc/ttl-clh',
     NHOM_VIA: '/danh-muc/nhom-via',
     CHUNG_LOAI_XE: '/danh-muc/chung-loai-xe',
+    PHAN_LOAI: '/danh-muc/phan-loai',
     CHUNG_LOAI_XE_DMNL: '/danh-muc/chung-loai-xe-dmnl',
     CHUNG_LOAI_XE_PHAN_LOAI: '/danh-muc/chung-loai-xe-phan-loai',
     NHOM_HANG_XE: '/danh-muc/nhom-hang-xe',
