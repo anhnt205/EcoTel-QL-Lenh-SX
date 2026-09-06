@@ -32,9 +32,12 @@ type DirtyMap = Record<string, Record<string, string>>;
 export function MatrixCatalogPage({
   code,
   breadcrumb = ["Danh mục", "Thống kê sản lượng"],
+  extraActions,
 }: {
   code: string;
   breadcrumb?: string[];
+  /** Nút riêng của danh mục gọi trang này (vd modal "Thêm mới" bespoke) — hiện TRƯỚC các nút chung. */
+  extraActions?: React.ReactNode;
 }) {
   const queryClient = useQueryClient();
   const [dirty, setDirty] = useState<DirtyMap>({});
@@ -181,6 +184,7 @@ export function MatrixCatalogPage({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          {extraActions}
           <input
             ref={importRef}
             type="file"
