@@ -560,6 +560,7 @@ export default function FuelNormAddPage() {
                           size="sm"
                           className="h-8 gap-1.5 bg-blue-600 text-xs text-white hover:bg-blue-700"
                           disabled={dirtyCount === 0 || saveCellsMutation.isPending}
+                          title={dirtyCount === 0 ? "Chưa có ô nào vừa sửa để lưu" : undefined}
                           onClick={() => saveCellsMutation.mutate()}
                         >
                           <Save className="h-3.5 w-3.5" /> {dirtyCount > 0 ? `Lưu ${dirtyCount} ô` : "Lưu"}
@@ -580,11 +581,19 @@ export default function FuelNormAddPage() {
                         <table className="border-collapse text-sm">
                           <thead>
                             <tr>
-                              <th className="sticky left-0 top-0 z-20 min-w-[140px] border-b border-r bg-muted px-3 py-2 text-left font-semibold">
+                              <th rowSpan={2} className="sticky left-0 top-0 z-20 min-w-[140px] border-b border-r bg-muted px-3 py-2 text-left font-semibold">
                                 {grid.rowAxisLabel}
                               </th>
+                              <th
+                                colSpan={activeDataset.columns.length}
+                                className="sticky top-0 z-10 border-b border-r bg-muted px-2 py-1.5 text-center font-semibold"
+                              >
+                                Cung độ (km)
+                              </th>
+                            </tr>
+                            <tr>
                               {activeDataset.columns.map((c) => (
-                                <th key={c.key} className="group sticky top-0 z-10 min-w-[100px] border-b border-r bg-muted px-2 py-2 text-center font-semibold">
+                                <th key={c.key} className="group sticky top-[33px] z-10 min-w-[100px] border-b border-r bg-muted px-2 py-2 text-center font-semibold">
                                   <div className="flex items-center justify-center gap-1">
                                     <span>{c.distance}</span>
                                     <button
@@ -701,9 +710,11 @@ export default function FuelNormAddPage() {
 
       {showAddDataset && grid && (
         <FuelNormBulkAddModal
-          existingColumnKeys={new Set(grid.cols.map((c) => c.key))}
+          existingDatasets={datasets}
           onClose={() => setShowAddDataset(false)}
           onConfirm={(columns) => bulkAddMutation.mutate(columns)}
+          onRemoveColumn={(colKey) => removeColumnMutation.mutate(colKey)}
+          onRemoveDataset={(key) => removeDatasetMutation.mutate(key)}
         />
       )}
 
