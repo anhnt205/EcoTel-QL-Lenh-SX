@@ -156,17 +156,17 @@ public class TripBaseCalculator {
         if (vehicle == null) {
             throw missing(trip, "phiếu vận tải chưa gắn Số xe nên không tra được lưới Mô hình");
         }
-        VehicleFuelClass fuelClass = vehicle.getFuelClass();
-        if (fuelClass == null) {
+        // Lưới Mô hình tra theo danh mục "Chủng loại xe" (cột DA), KHÔNG phải
+        // "Chủng loại xe (NL)" (cột DQ, dùng cho ĐMNL) — QĐ-11.
+        if (vehicle.getVehicleType() == null) {
             throw missing(trip, "xe \"" + vehicle.getCode()
-                    + "\" chưa khai Chủng loại xe + DMNL (màn Thuộc tính sản lượng — Xe)");
+                    + "\" chưa khai Chủng loại xe (màn Thuộc tính sản lượng — Xe)");
         }
-        // Khoá cột KHÔNG phải mã trần của chủng loại xe: bảng tính ghép thêm
-        // hậu tố khu vực (DA5 = mã & IF(D5="CS",".CS",".KC")), nên cột lưới
-        // là "CAT777E.CS" / "CAT777E.KC". Tra bằng mã trần sẽ không khớp ô nào.
-        String areaCode = trip.getExcavationArea() != null
-                ? trip.getExcavationArea().getCode() : null;
-        String columnKey = ProductionKeys.vehicleFuelClassKey(fuelClass.getCode(), areaCode);
+        // Khoá cột KHÔNG phải mã trần: bảng tính ghép thêm hậu tố khu vực
+        // (DA5 = mã & IF(D5="CS",".CS",".KC")), nên cột lưới là
+        // "CAT777E.CS" / "CAT777E.KC". Tra bằng mã trần sẽ không khớp ô nào.
+        String columnKey = ProductionKeys.modelColumnKey(
+                vehicle.getVehicleType().getCode(), areaGroupOf(trip));
         return matrixService.requireCell(MATRIX_MO_HINH, cargoType.getCode(), columnKey,
                 productionDateOf(trip));
     }
@@ -329,14 +329,30 @@ public class TripBaseCalculator {
     // ── phụ trợ ─────────────────────────────────────────────────────────────
 
     /**
+     * Nhóm khu vực xúc (CS/KC) của chuyến — QĐ-13.
+     *
+     * <p>Mọi công thức Excel so {@code D5="CS"}/{@code "KC"}, nhưng danh mục
+     * thật có nhiều khu vực. Ưu tiên thuộc tính "Nhóm khu vực" đã khai, chưa
+     * khai thì lùi về so mã để dữ liệu cũ không đứt.
+     */
+    static String areaGroupOf(TransportReportTrip trip) {
+        ExcavationArea area = trip.getExcavationArea();
+        return area == null
+                ? ProductionKeys.AREA_KC
+                : ProductionKeys.areaGroup(area.getAreaGroup(), area.getCode());
+    }
+
+    /**
      * Sản phẩm nghiệm thu (AG5).
      *
      * <p>Ngoại lệ trong công thức: Khu vực xúc = CS và Chủng loại hàng =
      * DaXit.NK thì luôn là {@code Dat_SX}, bất kể danh mục ghi gì.
      */
     private String acceptanceProductOf(TransportReportTrip trip, CargoType cargoType) {
-        String area = trip.getExcavationArea() != null ? trip.getExcavationArea().getCode() : "";
-        if ("CS".equalsIgnoreCase(area) && "DaXit.NK".equalsIgnoreCase(cargoType.getName())) {
+        // So theo NHÓM khu vực (CS/KC), không so mã khu vực — danh mục thật có
+        // nhiều khu vực, bảng tính chỉ biết hai nhóm (QĐ-13).
+        if (ProductionKeys.AREA_CS.equals(areaGroupOf(trip))
+                && "DaXit.NK".equalsIgnoreCase(cargoType.getName())) {
             return "Dat_SX";
         }
         AcceptanceProduct product = cargoType.getAcceptanceProduct();

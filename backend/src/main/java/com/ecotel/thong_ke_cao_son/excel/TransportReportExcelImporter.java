@@ -202,7 +202,7 @@ public class TransportReportExcelImporter {
 
         Integer receivingFloor = parseIntOrNull(row.get("receivingFloor"));
         trip.setReceivingFloor(receivingFloor);
-        trip.setReceivingFloorGroup(floorGroupCalculator.calculate(excavationArea.getName(), receivingFloor));
+        trip.setReceivingFloorGroup(floorGroupCalculator.calculate(excavationArea, receivingFloor));
 
         trip.setUnloadingFloor(emptyToNull(row.get("unloadingFloor")));
         trip.setTotalRouteDistanceKm(parseDouble(row.get("totalRouteDistanceKm")));

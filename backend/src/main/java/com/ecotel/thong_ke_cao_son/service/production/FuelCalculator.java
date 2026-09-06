@@ -70,9 +70,19 @@ public class FuelCalculator {
             return out.warnings(warnings).build();
         }
 
-        String areaCode = trip.getExcavationArea() != null ? trip.getExcavationArea().getCode() : null;
-        String fuelClassKey = ProductionKeys.vehicleFuelClassKey(vehicle.getFuelClass().getCode(), areaCode);
+        String areaGroup = TripBaseCalculator.areaGroupOf(trip);
         String classification = ProductionKeys.classify(base.getAcceptanceProduct());
+
+        // Khoá cột ĐMNL (cột DE) dựng theo QUY TẮC trên "Chủng loại xe (NL)",
+        // KHÔNG gắn hậu tố khu vực — QĐ-11. Điều kiện rẽ nhánh là DC, ghép từ
+        // "Chủng loại xe" + chữ đầu Hạng xe, tức hai danh mục KHÁC.
+        String fuelClassKey = ProductionKeys.fuelNormVehicleKey(
+                vehicle.getFuelClass().getCode(),
+                ProductionKeys.vehicleTypeRankKey(vehicleTypeCode(vehicle), vehicleRankCode(vehicle)),
+                trip.getCargoType() != null ? trip.getCargoType().getCode() : null,
+                trip.getUnloadingPoint() != null ? trip.getUnloadingPoint().getName() : null,
+                base.getAcceptanceProduct(),
+                classification);
 
         BigDecimal routeDistance = decimal(trip.getTotalRouteDistanceKm());
         BigDecimal liftHeight = decimal(trip.getTotalRouteLiftM());
@@ -109,7 +119,8 @@ public class FuelCalculator {
         BigDecimal bh = pct(bg, isRoda(trip) ? new BigDecimal("0.5") : BigDecimal.ZERO);
         BigDecimal bi = pct(bg, Boolean.TRUE.equals(trip.getRainyDay()) ? new BigDecimal("0.05") : BigDecimal.ZERO);
         BigDecimal bj = pct(bg, Boolean.TRUE.equals(trip.getSupplementaryVehicle()) ? new BigDecimal("0.04") : BigDecimal.ZERO);
-        BigDecimal bk = pct(bg, maintenanceRate(fuelClassKey));
+        BigDecimal bk = pct(bg, maintenanceRate(
+                ProductionKeys.modelColumnKey(vehicleTypeCode(vehicle), areaGroup)));
         BigDecimal bl = pct(bg, isVehicle965(vehicle) ? new BigDecimal("0.05") : BigDecimal.ZERO);
         BigDecimal bm = pct(bg, spntRate(trip, vehicle));
         BigDecimal bn = pct(bg, mudRate(trip, vehicle, warnings));
@@ -125,7 +136,7 @@ public class FuelCalculator {
 
         // ── BQ: × HS điều chỉnh NLĐM ────────────────────────────────────────
         BigDecimal ec = adjustmentFactor(grids.get(MATRIX_HS_DIEU_CHINH), vehicle,
-                classification, areaCode, trip, warnings);
+                classification, areaGroup, base, trip, warnings);
         out.adjustmentFactor(ec);
         if (ec != null) {
             out.currentNorm(scale(bp.multiply(ec)));
@@ -176,9 +187,10 @@ public class FuelCalculator {
         if ("VolvoA40F".equalsIgnoreCase(model) || "VolvoA40G".equalsIgnoreCase(model)) {
             return new BigDecimal("1.02");
         }
-        String area = trip.getExcavationArea() != null ? trim(trip.getExcavationArea().getCode()) : "";
+        // So theo NHÓM khu vực, không so mã (QĐ-13).
         String cargoTypeName = trip.getCargoType() != null ? trim(trip.getCargoType().getName()) : "";
-        if ("CS".equalsIgnoreCase(area) && "SPNT.Baichua".equalsIgnoreCase(cargoTypeName)
+        if (ProductionKeys.AREA_CS.equals(TripBaseCalculator.areaGroupOf(trip))
+                && "SPNT.Baichua".equalsIgnoreCase(cargoTypeName)
                 && startsWith(model, "HD465")) {
             return new BigDecimal("0.9");
         }
@@ -192,13 +204,14 @@ public class FuelCalculator {
     /**
      * BK5 — BSNL SC,BD theo chủng loại xe.
      *
-     * <p>Bảng tính so trên {@code DF5 = LEFT(DA5, 7)}, tức mã chủng loại xe +
-     * DMNL cắt còn 7 ký tự. Giữ nguyên cách cắt đó: nhánh so với
-     * {@code "HD465-7R"} (8 ký tự) trong bảng tính vốn không bao giờ đúng, mà
-     * xe HD465-7R vẫn rơi vào nhánh {@code "HD465-7"} nên kết quả không đổi.
+     * <p>Bảng tính so trên {@code DF5 = LEFT(DA5, 7)}, tức khoá cột <b>Mô
+     * hình</b> (Chủng loại xe kèm hậu tố khu vực) cắt còn 7 ký tự — KHÔNG
+     * phải khoá ĐMNL. Giữ nguyên cách cắt đó: nhánh so với {@code "HD465-7R"}
+     * (8 ký tự) trong bảng tính vốn không bao giờ đúng, mà xe HD465-7R vẫn
+     * rơi vào nhánh {@code "HD465-7"} nên kết quả không đổi.
      */
-    private BigDecimal maintenanceRate(String fuelClassKey) {
-        String df = fuelClassKey.length() > 7 ? fuelClassKey.substring(0, 7) : fuelClassKey;
+    private BigDecimal maintenanceRate(String modelColumnKey) {
+        String df = modelColumnKey.length() > 7 ? modelColumnKey.substring(0, 7) : modelColumnKey;
         if (equalsAny(df, "HD465-7", "CAT773E")) return new BigDecimal("0.01");
         if (equalsAny(df, "CAT777", "CAT777D", "CAT777E", "HD785-7")) return new BigDecimal("0.005");
         return new BigDecimal("0.015");
@@ -236,19 +249,27 @@ public class FuelCalculator {
                 });
     }
 
-    /** EC5 — HS điều chỉnh NLĐM, khoá dòng {@code chủngLoạiXe_hạng_phânLoại}. */
+    /**
+     * EC5 — HS điều chỉnh NLĐM.
+     *
+     * <p>Khoá DÒNG {@code EA5 = <Chủng loại xe (NL)>_<chữ đầu Hạng xe>_<Phân
+     * loại>}; khoá CỘT {@code T<tháng>.<nhóm khu vực>} (QĐ-12) — bảng có 12
+     * tháng × 2 nhóm, nên phải chọn cột theo THÁNG của ngày sản xuất chứ
+     * không chỉ theo khu vực như trước.
+     */
     private BigDecimal adjustmentFactor(MatrixGridResponse grid, Device vehicle,
-                                        String classification, String areaCode,
+                                        String classification, String areaGroup,
+                                        TripBaseResult base,
                                         TransportReportTrip trip, List<String> warnings) {
         if (grid == null) return null;
-        String vehicleClass = vehicleRankCode(vehicle);
-        String rowKey = vehicleModel(vehicle) + "_"
-                + (vehicleClass.isEmpty() ? "" : vehicleClass.substring(0, 1))
-                + "_" + classification;
-        BigDecimal value = cell(grid, rowKey, trim(areaCode));
+        String rowKey = ProductionKeys.fuelAdjustRowKey(
+                vehicle.getFuelClass() != null ? vehicle.getFuelClass().getCode() : null,
+                vehicleRankCode(vehicle), classification);
+        String colKey = ProductionKeys.fuelAdjustColumnKey(base.getProductionDate(), areaGroup);
+        BigDecimal value = cell(grid, rowKey, colKey);
         if (value == null) {
             warnings.add("Chuyến id=" + trip.getId() + ": lưới HS điều chỉnh NLĐM chưa có ô ["
-                    + rowKey + " × " + areaCode + "] nên chưa tính được NLĐM hiện hành.");
+                    + rowKey + " × " + colKey + "] nên chưa tính được NLĐM hiện hành.");
         }
         return value;
     }
@@ -275,8 +296,10 @@ public class FuelCalculator {
                         && r.getNumericValue().compareTo(lookupDistance) == 0)
                 .map(MatrixGridResponse.AxisEntry::getKey)
                 .findFirst().orElse(null);
-        String colKey = ProductionKeys.vehicleCategoryKey(
-                vehicle.getFuelClass().getCode(), classification);
+        // Cột lưới Năng suất xe dựng trên "Chủng loại xe" (cột DA cắt hậu tố),
+        // KHÔNG phải "Chủng loại xe (NL)" và cũng không phải chủng loại hàng.
+        String colKey = ProductionKeys.vehicleOutputColumnKey(
+                vehicleTypeCode(vehicle), classification);
 
         if (rowKey == null) {
             warnings.add("Chuyến id=" + trip.getId() + ": lưới Năng suất xe chưa có dòng cung độ "
@@ -293,9 +316,26 @@ public class FuelCalculator {
 
     // ── phụ trợ ─────────────────────────────────────────────────────────────
 
-    /** DQ5 — Chủng loại xe, lưu ở {@code Device.category.name}. */
+    /**
+     * DQ5 — <b>Chủng loại xe (NL)</b>, khoá ngoại tới danh mục cùng tên.
+     *
+     * <p>Trước 07/09/2026 hàm này đọc {@code Device.category.name} (danh mục
+     * Loại thiết bị) — SAI: đó là loại thiết bị, không phải chủng loại xe.
+     * Lùi về tên loại thiết bị khi xe chưa khai, để dữ liệu cũ không đứt.
+     */
     private static String vehicleModel(Device vehicle) {
+        if (vehicle.getFuelClass() != null) {
+            return trim(vehicle.getFuelClass().getCode());
+        }
         return vehicle.getCategory() != null ? trim(vehicle.getCategory().getName()) : "";
+    }
+
+    /**
+     * DA5 (phần trước hậu tố) — <b>Chủng loại xe</b>, gốc khoá cột lưới Mô
+     * hình và Năng suất xe. KHÁC {@link #vehicleModel} (QĐ-11).
+     */
+    private static String vehicleTypeCode(Device vehicle) {
+        return vehicle.getVehicleType() != null ? trim(vehicle.getVehicleType().getCode()) : "";
     }
 
     /**

@@ -1,30 +1,58 @@
 import type { MatrixAxisEntry, MatrixGrid } from "../matrix/matrixService";
 
 /**
- * Suy "bộ định mức theo Chủng loại xe + Hậu tố" từ quy ước khoá cột đã có
- * của lưới DMNL — KHÔNG phải một trục/bảng riêng ở backend.
+ * Suy "bộ định mức theo Chủng loại xe (NL) + Hậu tố" từ quy ước khoá cột đã
+ * có của lưới DMNL — KHÔNG phải một trục/bảng riêng ở backend.
  *
- * Khoá cột thật (`ProductionKeys.vehicleFuelClassKey` + `FuelNormInterpolator`
- * ở backend): {@code <mã chủng loại xe>.<CS|KC>_<cung độ>}, vd
- * {@code CAT777E.KC_3}. Hậu tố khu vực chỉ có đúng 2 giá trị thật — KHÔNG
- * phải các hậu tố minh hoạ trong mockup (.BK/.DAT/.THAN/.SP).
+ * Khoá cột thật (`ProductionKeys.fuelNormVehicleKey` + `FuelNormInterpolator`
+ * ở backend): {@code <mã Chủng loại xe (NL)><hậu tố>_<cung độ>}, vd
+ * {@code CAT777E.BK_0,05}.
+ *
+ * HẬU TỐ Ở ĐÂY KHÔNG PHẢI KHU VỰC (QĐ-11). Trước 07/09/2026 file này ghi
+ * hậu tố chỉ có `.CS`/`.KC` — SAI. Gốc của nhầm lẫn:
+ * `RA_SOAT_CHUAN_HOA_DANH_MUC.md:375` đặt tiêu đề "Khoá cột lưới Mô hình /
+ * DMNL có HẬU TỐ KHU VỰC" nhưng bên dưới chỉ trích công thức của Mô hình.
+ * Bằng chứng sống (bảng tính dòng 1250): cùng một xe có `DA=CAT777E.CS`
+ * (Mô hình) nhưng `DE=CAT777E.BK` (DMNL) — hai khoá khác nhau.
+ *
+ * Hậu tố thật do công thức `DE5` tự suy theo chuyến (chủng loại hàng, nơi
+ * dỡ tải, SPNT, hạng xe). Người nhập danh mục không tính được điều đó, nên
+ * ở đây chỉ liệt kê năm GIÁ TRỊ mà công thức có thể sinh ra, để khai đủ cột.
+ *
+ * Lưu ý: `.Dat` (nhánh xe cạp) và `.DAT` (nhánh Phân loại) là HAI chuỗi
+ * KHÁC NHAU trong bảng tính — không gộp, không đổi hoa thường.
  */
 
-export type FuelNormSuffix = "CS" | "KC";
+export type FuelNormSuffix = "Bun" | "Dat" | "BK" | "DAT" | "Than";
 
 export const FUEL_NORM_SUFFIXES: { value: FuelNormSuffix; label: string }[] = [
-  { value: "CS", label: ".CS (Cao Sơn)" },
-  { value: "KC", label: ".KC (Ngoài khu vực)" },
+  { value: "DAT", label: ".DAT (Phân loại Đất)" },
+  { value: "Than", label: ".Than (Phân loại Than)" },
+  { value: "BK", label: ".BK (dỡ băng tải / SPNT vỉa)" },
+  { value: "Dat", label: ".Dat (xe cạp chở đất)" },
+  { value: "Bun", label: ".Bun (HM400-2R hạng C chở bùn)" },
 ];
 
 export const vehicleSuffixKeyOf = (vehicleCode: string, suffix: FuelNormSuffix): string =>
   `${vehicleCode}.${suffix}`;
 
+/**
+ * Tách `<mã xe><hậu tố>`.
+ *
+ * Thử hậu tố DÀI trước để `.Than` không bị `.DAT`/`.Dat` cắt nhầm, và so
+ * PHÂN BIỆT hoa thường vì `.Dat` ≠ `.DAT`.
+ */
+const SUFFIXES_LONGEST_FIRST: FuelNormSuffix[] = ["Than", "DAT", "Dat", "Bun", "BK"];
+
 export function parseVehicleSuffixKey(
   key: string,
 ): { vehicleCode: string; suffix: FuelNormSuffix } | null {
-  if (key.endsWith(".CS")) return { vehicleCode: key.slice(0, -3), suffix: "CS" };
-  if (key.endsWith(".KC")) return { vehicleCode: key.slice(0, -3), suffix: "KC" };
+  for (const suffix of SUFFIXES_LONGEST_FIRST) {
+    const tail = `.${suffix}`;
+    if (key.endsWith(tail)) {
+      return { vehicleCode: key.slice(0, -tail.length), suffix };
+    }
+  }
   return null;
 }
 

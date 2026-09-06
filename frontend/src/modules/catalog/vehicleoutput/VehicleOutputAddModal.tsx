@@ -13,17 +13,15 @@ import {
 } from "@/components/ui/select";
 import api from "@/config/api.config";
 import { matrixService, type MatrixCellUpsert, type MatrixGrid } from "../matrix/matrixService";
-import { VEHICLE_OUTPUT_AREAS, cargoClassificationKeyOf, type VehicleOutputArea } from "./vehicleOutputKeys";
+import {
+  VEHICLE_OUTPUT_CLASSIFICATIONS,
+  vehicleClassificationKeyOf,
+  type VehicleOutputClassification,
+} from "./vehicleOutputKeys";
 
 const CODE = "NANG_SUAT_XE";
 
-interface CargoTypeOption {
-  id: number;
-  code: string;
-  name: string;
-}
-
-interface ClassificationOption {
+interface VehicleTypeOption {
   id: number;
   code: string;
   name: string;
@@ -36,8 +34,8 @@ interface DistanceRow {
 
 interface ColumnGroup {
   id: number;
-  cargoTypeCode: string;
-  classificationCode: string;
+  vehicleTypeCode: string;
+  classification: VehicleOutputClassification | "";
 }
 
 const currentYear = new Date().getFullYear();
@@ -48,8 +46,8 @@ const YEAR_OPTIONS = Array.from({ length: 7 }, (_, i) => currentYear - 3 + i);
  * (NANG_SUAT_XE), một trong 4 lưới dùng chung (`MatrixDefinition`/
  * `MatrixCell` qua `matrixService`, y hệt cách DMNL đã dùng trước khi có
  * UI riêng). KHÔNG cần đổi kiến trúc dữ liệu — mỗi năm là một phiên bản
- * lưới (giống DMNL), Cung độ là dòng số (numericRowAxis), "Chủng loại
- * hàng + Phân loại" gộp lại một khoá cột kèm hậu tố Khu vực xúc (xem
+ * lưới (giống DMNL), Cung độ là dòng số (numericRowAxis), "Chủng loại xe +
+ * Phân loại" gộp lại một khoá cột KHÔNG có hậu tố khu vực (xem
  * `vehicleOutputKeys.ts`).
  *
  * Trang lưới đầy đủ cũ (`MatrixCatalogPage`) KHÔNG sửa file — modal này
@@ -66,7 +64,6 @@ export function VehicleOutputAddModal({
   onSaved: () => void;
 }) {
   const [year, setYear] = useState(currentYear);
-  const [area, setArea] = useState<VehicleOutputArea>("CS");
   const [rows, setRows] = useState<DistanceRow[]>([]);
   const [groups, setGroups] = useState<ColumnGroup[]>([]);
   const [values, setValues] = useState<Record<number, Record<number, string>>>({});
@@ -81,26 +78,18 @@ export function VehicleOutputAddModal({
     if (!open) return;
     setError(null);
     setYear(currentYear);
-    setArea("CS");
     setRows([{ id: nextId(), distance: "" }]);
-    setGroups([{ id: nextId(), cargoTypeCode: "", classificationCode: "" }]);
+    setGroups([{ id: nextId(), vehicleTypeCode: "", classification: "" }]);
     setValues({});
   }, [open]);
 
-  const { data: cargoTypes = [] } = useQuery({
-    queryKey: ["cargo-types-options"],
+  // Danh mục "Chủng loại xe" (cột DA), KHÔNG phải "Chủng loại xe (NL)" của
+  // ĐMNL và cũng không phải chủng loại hàng — xem `vehicleOutputKeys.ts`.
+  const { data: vehicleTypes = [] } = useQuery({
+    queryKey: ["vehicle-types-options"],
     queryFn: async () => {
-      const res = await api.get("/cargo-types", { params: { size: 500 } });
-      return (res.data?.data?.content ?? res.data?.data ?? []) as CargoTypeOption[];
-    },
-    enabled: open,
-  });
-
-  const { data: classifications = [] } = useQuery({
-    queryKey: ["classifications-options"],
-    queryFn: async () => {
-      const res = await api.get("/classifications", { params: { size: 500 } });
-      return (res.data?.data?.content ?? res.data?.data ?? []) as ClassificationOption[];
+      const res = await api.get("/vehicle-types", { params: { size: 500 } });
+      return (res.data?.data?.content ?? res.data?.data ?? []) as VehicleTypeOption[];
     },
     enabled: open,
   });
@@ -118,10 +107,14 @@ export function VehicleOutputAddModal({
   const setDistance = (id: number, distance: string) =>
     setRows((prev) => prev.map((r) => (r.id !== id ? r : { ...r, distance })));
 
-  const addGroup = () => setGroups((prev) => [...prev, { id: nextId(), cargoTypeCode: "", classificationCode: "" }]);
+  const addGroup = () => setGroups((prev) => [...prev, { id: nextId(), vehicleTypeCode: "", classification: "" }]);
   const removeGroup = (id: number) => setGroups((prev) => (prev.length === 1 ? prev : prev.filter((g) => g.id !== id)));
-  const setGroupField = (id: number, field: "cargoTypeCode" | "classificationCode", value: string) =>
+  const setGroupField = (id: number, field: "vehicleTypeCode" | "classification", value: string) =>
     setGroups((prev) => prev.map((g) => (g.id !== id ? g : { ...g, [field]: value })));
+
+  /** Khoá cột của một nhóm — dùng chung cho kiểm tra, tạo cột và ghi ô. */
+  const groupKey = (g: ColumnGroup) =>
+    vehicleClassificationKeyOf(g.vehicleTypeCode, g.classification as VehicleOutputClassification);
 
   const setCellValue = (rowId: number, groupId: number, value: string) =>
     setValues((prev) => ({ ...prev, [rowId]: { ...(prev[rowId] ?? {}), [groupId]: value } }));
@@ -132,10 +125,10 @@ export function VehicleOutputAddModal({
     if (distances.some((d) => Number.isNaN(Number(d.replace(",", ".")))))
       return "Cung độ phải là số.";
     if (new Set(distances).size !== distances.length) return "Có Cung độ bị trùng nhau.";
-    if (groups.some((g) => !g.cargoTypeCode || !g.classificationCode))
-      return "Có nhóm cột chưa chọn đủ Chủng loại hàng + Phân loại.";
-    const keys = groups.map((g) => cargoClassificationKeyOf(g.cargoTypeCode, g.classificationCode, area));
-    if (new Set(keys).size !== keys.length) return "Có nhóm cột bị trùng nhau (cùng Chủng loại hàng + Phân loại).";
+    if (groups.some((g) => !g.vehicleTypeCode || !g.classification))
+      return "Có nhóm cột chưa chọn đủ Chủng loại xe + Phân loại.";
+    const keys = groups.map(groupKey);
+    if (new Set(keys).size !== keys.length) return "Có nhóm cột bị trùng nhau (cùng Chủng loại xe + Phân loại).";
     const hasAnyValue = rows.some((r) => groups.some((g) => values[r.id]?.[g.id]?.trim()));
     if (!hasAnyValue) return "Chưa nhập giá trị nào.";
     return null;
@@ -174,11 +167,7 @@ export function VehicleOutputAddModal({
       }
 
       const existingColKeys = new Set(grid.cols.map((c) => c.key));
-      const newColKeys = new Set(
-        groups
-          .map((g) => cargoClassificationKeyOf(g.cargoTypeCode, g.classificationCode, area))
-          .filter((k) => !existingColKeys.has(k)),
-      );
+      const newColKeys = new Set(groups.map(groupKey).filter((k) => !existingColKeys.has(k)));
       if (newColKeys.size > 0) {
         grid = await matrixService.addCols(
           CODE,
@@ -195,8 +184,7 @@ export function VehicleOutputAddModal({
           if (!raw) continue;
           const num = Number(raw.replace(",", "."));
           if (Number.isNaN(num)) continue;
-          const colKey = cargoClassificationKeyOf(g.cargoTypeCode, g.classificationCode, area);
-          cellPayload.push({ rowKey, colKey, value: num });
+          cellPayload.push({ rowKey, colKey: groupKey(g), value: num });
         }
       }
       if (cellPayload.length > 0) {
@@ -261,21 +249,8 @@ export function VehicleOutputAddModal({
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex flex-col gap-1">
-              <span className="text-xs font-medium text-gray-600 dark:text-gray-400">Khu vực xúc *</span>
-              <Select value={area} onValueChange={(v) => setArea(v as VehicleOutputArea)}>
-                <SelectTrigger className="h-9 w-44 text-sm">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="z-[120]">
-                  {VEHICLE_OUTPUT_AREAS.map((a) => (
-                    <SelectItem key={a.value} value={a.value}>
-                      {a.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {/* Không có ô "Khu vực xúc": khoá cột Năng suất xe KHÔNG mang hậu
+                tố khu vực (công thức BR5 cắt bỏ đúng hậu tố đó). Xem QĐ-11. */}
           </div>
 
           <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
@@ -289,7 +264,7 @@ export function VehicleOutputAddModal({
                     Cung độ (km)
                   </th>
                   <th colSpan={groups.length} className="border-b border-r border-gray-200 bg-gray-100 px-3 py-2 text-center font-bold dark:border-gray-700 dark:bg-gray-900">
-                    Chủng loại hàng + Phân loại
+                    Chủng loại xe + Phân loại
                   </th>
                   <th rowSpan={2} className="w-10 border-b border-gray-200 bg-gray-100 dark:border-gray-700 dark:bg-gray-900" />
                 </tr>
@@ -297,26 +272,29 @@ export function VehicleOutputAddModal({
                   {groups.map((g) => (
                     <th key={g.id} className="min-w-[220px] border-b border-r border-gray-200 bg-gray-50 px-2 py-2 dark:border-gray-700 dark:bg-gray-900/60">
                       <div className="flex items-center gap-1">
-                        <Select value={g.cargoTypeCode} onValueChange={(v) => setGroupField(g.id, "cargoTypeCode", v)}>
+                        <Select value={g.vehicleTypeCode} onValueChange={(v) => setGroupField(g.id, "vehicleTypeCode", v)}>
                           <SelectTrigger className="h-8 w-full text-xs">
-                            <SelectValue placeholder="Chủng loại hàng" />
+                            <SelectValue placeholder="Chủng loại xe" />
                           </SelectTrigger>
                           <SelectContent className="z-[120]">
-                            {cargoTypes.map((c) => (
+                            {vehicleTypes.map((c) => (
                               <SelectItem key={c.id} value={c.code}>
                                 {c.code} — {c.name}
                               </SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
-                        <Select value={g.classificationCode} onValueChange={(v) => setGroupField(g.id, "classificationCode", v)}>
+                        <Select value={g.classification} onValueChange={(v) => setGroupField(g.id, "classification", v)}>
                           <SelectTrigger className="h-8 w-full text-xs">
                             <SelectValue placeholder="Phân loại" />
                           </SelectTrigger>
                           <SelectContent className="z-[120]">
-                            {classifications.map((c) => (
-                              <SelectItem key={c.id} value={c.code}>
-                                {c.code} — {c.name}
+                            {/* Chỉ hai giá trị: công thức AD5 tự suy DAT/Than
+                                từ Sản phẩm nghiệm thu, không có danh mục
+                                "Phân loại" ở đây (QĐ-10). */}
+                            {VEHICLE_OUTPUT_CLASSIFICATIONS.map((c) => (
+                              <SelectItem key={c.value} value={c.value}>
+                                {c.label}
                               </SelectItem>
                             ))}
                           </SelectContent>

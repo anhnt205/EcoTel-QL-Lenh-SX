@@ -1,27 +1,48 @@
 /**
- * Khoá cột "Năng suất xe" — chốt qua trao đổi trực tiếp với chủ dự án
- * (mockup ghi "Chủng loại hàng + Phân loại" cho 2 dropdown mỗi nhóm cột,
- * xác nhận lấy đúng chữ trên mockup dù nhãn cấu hình sẵn trong DB
- * (`col_axis_label`) và dữ liệu cột cũ đang có ("CAT777E.Than") gợi ý
- * khác — dữ liệu cũ coi như dữ liệu nháp/test, không phải chuẩn áp dụng).
+ * Khoá cột lưới "Năng suất xe (996)".
  *
- * Khu vực xúc gấp vào làm hậu tố cuối, đúng quy ước `.CS`/`.KC` đã dùng ở
- * DMNL/Mô hình — mockup chỉ hiện MỘT "Khu vực xúc" ở trên nên một lượt
- * "Thêm mới" chỉ nhập cho MỘT khu vực; muốn đủ cả hai thì thêm lượt thứ 2
- * chọn khu vực còn lại, cột mới tự nối thêm vào lưới đã có.
+ * Công thức thật (`BR5` của bảng tính):
+ * ```
+ * MATCH( LEFT($DA5, LEN($DA5)-3) & "." & AD5, NS.CLXE, 0)
+ * ```
+ * `LEFT(DA5, len-3)` cắt hậu tố `.CS`/`.KC` của cột DA, tức trả về mã
+ * **Chủng loại xe** trần; `AD5` là Phân loại `DAT`/`Than`. Khoá đầy đủ:
+ * {@code <mã Chủng loại xe>.<DAT|Than>}, vd {@code CAT777E.DAT}.
  *
- * Khoá đầy đủ: {@code <mã chủng loại hàng>_<mã phân loại>.<CS|KC>}.
+ * SỬA NGÀY 07/09/2026 (QĐ-10 + QĐ-11). Bản dựng ngày 06/09 làm khoá
+ * {@code <mã chủng loại hàng>_<mã phân loại>.<CS|KC>} theo đúng chữ trên
+ * mockup — sai ba chỗ so với bảng tính:
+ *  1. gốc là chủng loại **XE**, không phải chủng loại **HÀNG**;
+ *  2. "Phân loại" là `DAT`/`Than` TỰ SUY từ Sản phẩm nghiệm thu, không
+ *     phải danh mục người dùng chọn (QĐ-10);
+ *  3. khoá này KHÔNG có hậu tố khu vực.
  */
 
-export type VehicleOutputArea = "CS" | "KC";
+/** Phân loại — hai giá trị duy nhất công thức `AD5` sinh ra (QĐ-10). */
+export type VehicleOutputClassification = "DAT" | "Than";
 
-export const VEHICLE_OUTPUT_AREAS: { value: VehicleOutputArea; label: string }[] = [
-  { value: "CS", label: "CS (Cao Sơn)" },
-  { value: "KC", label: "KC (Ngoài khu vực)" },
+export const VEHICLE_OUTPUT_CLASSIFICATIONS: {
+  value: VehicleOutputClassification;
+  label: string;
+}[] = [
+  { value: "DAT", label: "DAT (Đất)" },
+  { value: "Than", label: "Than" },
 ];
 
-export const cargoClassificationKeyOf = (
-  cargoTypeCode: string,
-  classificationCode: string,
-  area: VehicleOutputArea,
-): string => `${cargoTypeCode}_${classificationCode}.${area}`;
+export const vehicleClassificationKeyOf = (
+  vehicleTypeCode: string,
+  classification: VehicleOutputClassification,
+): string => `${vehicleTypeCode}.${classification}`;
+
+/** Tách khoá cột về {mã xe, phân loại}; null nếu cột không theo quy ước. */
+export function parseVehicleOutputKey(
+  key: string,
+): { vehicleTypeCode: string; classification: VehicleOutputClassification } | null {
+  for (const c of ["Than", "DAT"] as VehicleOutputClassification[]) {
+    const tail = `.${c}`;
+    if (key.endsWith(tail)) {
+      return { vehicleTypeCode: key.slice(0, -tail.length), classification: c };
+    }
+  }
+  return null;
+}

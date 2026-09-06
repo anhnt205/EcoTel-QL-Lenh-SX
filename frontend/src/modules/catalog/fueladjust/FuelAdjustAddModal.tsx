@@ -13,7 +13,18 @@ import {
 } from "@/components/ui/select";
 import api from "@/config/api.config";
 import { matrixService, type MatrixCellUpsert, type MatrixGrid } from "../matrix/matrixService";
-import { MONTH_COUNT, MONTH_KEYS, MONTH_LABELS, YEARLY_COL_KEY, YEARLY_COL_LABEL, averageOf, rowKeyOf } from "./fuelAdjustKeys";
+import {
+  AREA_GROUPS,
+  FUEL_ADJUST_CLASSIFICATIONS,
+  MONTH_COUNT,
+  YEARLY_COL_LABEL,
+  averageOf,
+  monthColumnKeyOf,
+  rowKeyOf,
+  yearlyColumnKeyOf,
+  type AreaGroup,
+  type FuelAdjustClassification,
+} from "./fuelAdjustKeys";
 
 const CODE = "HS_DIEU_CHINH_NLDM";
 
@@ -28,23 +39,11 @@ interface VehicleRankOption {
   code: string;
 }
 
-interface ClassificationOption {
-  id: number;
-  code: string;
-  name: string;
-}
-
-interface ExcavationAreaOption {
-  id: number;
-  code: string;
-  name: string;
-}
-
 interface Row {
   id: number;
   vehicleCode: string;
   rankCode: string;
-  classificationCode: string;
+  classification: FuelAdjustClassification | "";
   months: string[];
 }
 
@@ -57,9 +56,13 @@ const emptyMonths = (): string[] => Array.from({ length: MONTH_COUNT }, () => ""
  * Modal "Thêm mới HS điều chỉnh NLDM" — bespoke cho danh mục HS điều
  * chỉnh NLĐM (HS_DIEU_CHINH_NLDM), một trong 4 lưới dùng chung
  * (`MatrixDefinition`/`MatrixCell` qua `matrixService`, giống cách Năng
- * suất xe đã làm). Chọn Năm + Khu vực xúc, sau đó nhập hệ số cho từng
- * dòng (Chủng loại xe + Hạng + Phân loại) × 12 tháng — cột "HSNL điều
- * chỉnh" tự tính TRUNG BÌNH 12 tháng, cập nhật ngay khi gõ.
+ * suất xe đã làm). Chọn Năm + NHÓM khu vực (CS/KC), sau đó nhập hệ số cho
+ * từng dòng (Chủng loại xe (NL) + Hạng + Phân loại) × 12 tháng — cột "HSNL
+ * điều chỉnh" tự tính TRUNG BÌNH 12 tháng, cập nhật ngay khi gõ.
+ *
+ * <p>Khoá cột mang cả THÁNG lẫn nhóm khu vực ({@code T6.CS}) theo QĐ-12, nên
+ * một lượt nhập chỉ ghi cho MỘT nhóm khu vực; muốn đủ cả hai thì mở lại và
+ * chọn nhóm còn lại — cột mới tự nối vào cùng phiên bản lưới của năm đó.
  */
 export function FuelAdjustAddModal({
   open,
@@ -71,7 +74,7 @@ export function FuelAdjustAddModal({
   onSaved: () => void;
 }) {
   const [year, setYear] = useState(currentYear);
-  const [areaCode, setAreaCode] = useState("");
+  const [areaGroup, setAreaGroup] = useState<AreaGroup>("CS");
   const [rows, setRows] = useState<Row[]>([]);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -84,8 +87,8 @@ export function FuelAdjustAddModal({
     if (!open) return;
     setError(null);
     setYear(currentYear);
-    setAreaCode("");
-    setRows([{ id: nextId(), vehicleCode: "", rankCode: "", classificationCode: "", months: emptyMonths() }]);
+    setAreaGroup("CS");
+    setRows([{ id: nextId(), vehicleCode: "", rankCode: "", classification: "", months: emptyMonths() }]);
   }, [open]);
 
   const { data: vehicles = [] } = useQuery({
@@ -106,23 +109,9 @@ export function FuelAdjustAddModal({
     enabled: open,
   });
 
-  const { data: classifications = [] } = useQuery({
-    queryKey: ["classifications-options"],
-    queryFn: async () => {
-      const res = await api.get("/classifications", { params: { size: 500 } });
-      return (res.data?.data?.content ?? res.data?.data ?? []) as ClassificationOption[];
-    },
-    enabled: open,
-  });
-
-  const { data: areas = [] } = useQuery({
-    queryKey: ["excavation-areas-options"],
-    queryFn: async () => {
-      const res = await api.get("/excavation-areas", { params: { size: 500 } });
-      return (res.data?.data?.content ?? res.data?.data ?? []) as ExcavationAreaOption[];
-    },
-    enabled: open,
-  });
+  // Không nạp danh mục "Phân loại" và "Khu vực xúc" ở đây: Phân loại là giá
+  // trị TỰ SUY DAT/Than (QĐ-10), còn khu vực chỉ vào khoá dưới dạng NHÓM
+  // CS/KC (QĐ-13) — chọn từng khu vực cụ thể sẽ sinh cột sai.
 
   const { data: versions = [] } = useQuery({
     queryKey: ["matrix-versions", CODE],
@@ -133,21 +122,27 @@ export function FuelAdjustAddModal({
   if (!open) return null;
 
   const addRow = () =>
-    setRows((prev) => [...prev, { id: nextId(), vehicleCode: "", rankCode: "", classificationCode: "", months: emptyMonths() }]);
+    setRows((prev) => [...prev, { id: nextId(), vehicleCode: "", rankCode: "", classification: "", months: emptyMonths() }]);
   const removeRow = (id: number) => setRows((prev) => (prev.length === 1 ? prev : prev.filter((r) => r.id !== id)));
-  const setRowField = (id: number, field: "vehicleCode" | "rankCode" | "classificationCode", value: string) =>
+  const setRowField = (id: number, field: "vehicleCode" | "rankCode" | "classification", value: string) =>
     setRows((prev) => prev.map((r) => (r.id !== id ? r : { ...r, [field]: value })));
+
+  /** Khoá dòng — dùng chung cho kiểm tra trùng, tạo dòng và ghi ô. */
+  const keyOf = (r: Row) =>
+    rowKeyOf(r.vehicleCode, r.rankCode, r.classification as FuelAdjustClassification);
   const setMonthValue = (id: number, monthIdx: number, value: string) =>
     setRows((prev) =>
       prev.map((r) => (r.id !== id ? r : { ...r, months: r.months.map((m, i) => (i === monthIdx ? value : m)) })),
     );
 
   const validate = (): string | null => {
-    if (!areaCode) return "Chọn Khu vực xúc.";
-    if (rows.some((r) => !r.vehicleCode || !r.rankCode || !r.classificationCode))
-      return "Có dòng chưa chọn đủ Chủng loại xe + Hạng + Phân loại.";
-    const keys = rows.map((r) => rowKeyOf(r.vehicleCode, r.rankCode, r.classificationCode, areaCode));
-    if (new Set(keys).size !== keys.length) return "Có dòng bị trùng nhau (cùng Chủng loại xe + Hạng + Phân loại).";
+    if (rows.some((r) => !r.vehicleCode || !r.rankCode || !r.classification))
+      return "Có dòng chưa chọn đủ Chủng loại xe (NL) + Hạng + Phân loại.";
+    const keys = rows.map(keyOf);
+    // Khoá chỉ lấy CHỮ ĐẦU của mã hạng, nên "C" và "C1" cho ra cùng một dòng
+    // — báo trùng ở đây thay vì để hai dòng âm thầm đè lên nhau khi lưu.
+    if (new Set(keys).size !== keys.length)
+      return "Có dòng bị trùng nhau (cùng Chủng loại xe + chữ đầu Hạng xe + Phân loại).";
     const hasAnyValue = rows.some((r) => r.months.some((m) => m.trim()));
     if (!hasAnyValue) return "Chưa nhập hệ số tháng nào.";
     return null;
@@ -176,35 +171,36 @@ export function FuelAdjustAddModal({
           });
 
       const existingRowKeys = new Set(grid.rows.map((r) => r.key));
-      const newRowKeys = rows
-        .map((r) => rowKeyOf(r.vehicleCode, r.rankCode, r.classificationCode, areaCode))
-        .filter((k) => !existingRowKeys.has(k));
+      const newRowKeys = rows.map(keyOf).filter((k) => !existingRowKeys.has(k));
       if (newRowKeys.length > 0) {
         grid = await matrixService.addRows(CODE, grid.versionId, [...new Set(newRowKeys)].map((k) => ({ key: k, label: k })));
       }
 
+      // Cột mang cả tháng lẫn nhóm khu vực (QĐ-12); lượt này chỉ tạo 12 cột
+      // của nhóm đang chọn + cột hệ số năm của nhóm đó.
+      const monthColKeys = Array.from({ length: MONTH_COUNT }, (_, i) => monthColumnKeyOf(i + 1, areaGroup));
+      const yearlyColKey = yearlyColumnKeyOf(areaGroup);
       const existingColKeys = new Set(grid.cols.map((c) => c.key));
-      const neededColKeys = [...MONTH_KEYS, YEARLY_COL_KEY];
-      const newColKeys = neededColKeys.filter((k) => !existingColKeys.has(k));
+      const newColKeys = [...monthColKeys, yearlyColKey].filter((k) => !existingColKeys.has(k));
       if (newColKeys.length > 0) {
-        const labels: Record<string, string> = { [YEARLY_COL_KEY]: YEARLY_COL_LABEL };
-        MONTH_KEYS.forEach((k, i) => (labels[k] = MONTH_LABELS[i]));
+        const labels: Record<string, string> = { [yearlyColKey]: `${YEARLY_COL_LABEL} — ${areaGroup}` };
+        monthColKeys.forEach((k, i) => (labels[k] = `Tháng ${i + 1} — ${areaGroup}`));
         grid = await matrixService.addCols(CODE, grid.versionId, newColKeys.map((k) => ({ key: k, label: labels[k] ?? k })));
       }
 
       const cellPayload: MatrixCellUpsert[] = [];
       for (const r of rows) {
-        const rowKey = rowKeyOf(r.vehicleCode, r.rankCode, r.classificationCode, areaCode);
+        const rowKey = keyOf(r);
         r.months.forEach((m, i) => {
           const raw = m.trim();
           if (!raw) return;
           const num = Number(raw.replace(",", "."));
           if (Number.isNaN(num)) return;
-          cellPayload.push({ rowKey, colKey: MONTH_KEYS[i], value: num });
+          cellPayload.push({ rowKey, colKey: monthColKeys[i], value: num });
         });
         const avg = averageOf(r.months);
         if (avg !== null) {
-          cellPayload.push({ rowKey, colKey: YEARLY_COL_KEY, value: Math.round(avg * 1e6) / 1e6 });
+          cellPayload.push({ rowKey, colKey: yearlyColKey, value: Math.round(avg * 1e6) / 1e6 });
         }
       }
       if (cellPayload.length > 0) {
@@ -271,15 +267,15 @@ export function FuelAdjustAddModal({
               </Select>
             </div>
             <div className="flex flex-col gap-1">
-              <span className="text-xs font-medium text-gray-600 dark:text-gray-400">Khu vực xúc *</span>
-              <Select value={areaCode} onValueChange={setAreaCode}>
-                <SelectTrigger className="h-9 w-56 text-sm">
-                  <SelectValue placeholder="Chọn khu vực xúc" />
+              <span className="text-xs font-medium text-gray-600 dark:text-gray-400">Nhóm khu vực *</span>
+              <Select value={areaGroup} onValueChange={(v) => setAreaGroup(v as AreaGroup)}>
+                <SelectTrigger className="h-9 w-40 text-sm">
+                  <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="z-[120]">
-                  {areas.map((a) => (
-                    <SelectItem key={a.id} value={a.code}>
-                      {a.code} — {a.name}
+                  {AREA_GROUPS.map((a) => (
+                    <SelectItem key={a.value} value={a.value}>
+                      {a.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -295,7 +291,7 @@ export function FuelAdjustAddModal({
                     STT
                   </th>
                   <th colSpan={3} className="border-b border-r border-gray-200 bg-gray-100 px-3 py-2 text-center font-bold dark:border-gray-700 dark:bg-gray-900">
-                    Chủng loại xe + Chất lượng + Phân loại
+                    Chủng loại xe (NL) + Hạng xe + Phân loại
                   </th>
                   <th colSpan={MONTH_COUNT} className="border-b border-r border-gray-200 bg-gray-100 px-3 py-2 text-center font-bold dark:border-gray-700 dark:bg-gray-900">
                     Hệ số theo tháng
@@ -307,11 +303,11 @@ export function FuelAdjustAddModal({
                 </tr>
                 <tr>
                   <th className="min-w-[150px] border-b border-r border-gray-200 bg-gray-50 px-2 py-1.5 dark:border-gray-700 dark:bg-gray-900/60">Chủng loại xe</th>
-                  <th className="min-w-[110px] border-b border-r border-gray-200 bg-gray-50 px-2 py-1.5 dark:border-gray-700 dark:bg-gray-900/60">Chất lượng</th>
+                  <th className="min-w-[110px] border-b border-r border-gray-200 bg-gray-50 px-2 py-1.5 dark:border-gray-700 dark:bg-gray-900/60">Hạng xe</th>
                   <th className="min-w-[130px] border-b border-r border-gray-200 bg-gray-50 px-2 py-1.5 dark:border-gray-700 dark:bg-gray-900/60">Phân loại</th>
-                  {MONTH_LABELS.map((label) => (
-                    <th key={label} className="min-w-[80px] border-b border-r border-gray-200 bg-gray-50 px-1 py-1.5 text-center text-xs dark:border-gray-700 dark:bg-gray-900/60">
-                      {label}
+                  {Array.from({ length: MONTH_COUNT }, (_, i) => i + 1).map((m) => (
+                    <th key={m} className="min-w-[80px] border-b border-r border-gray-200 bg-gray-50 px-1 py-1.5 text-center text-xs dark:border-gray-700 dark:bg-gray-900/60">
+                      {`Tháng ${m}`}
                     </th>
                   ))}
                 </tr>
@@ -351,14 +347,15 @@ export function FuelAdjustAddModal({
                         </Select>
                       </td>
                       <td className="border-b border-r border-gray-200 px-1.5 py-1.5 dark:border-gray-700">
-                        <Select value={r.classificationCode} onValueChange={(v) => setRowField(r.id, "classificationCode", v)}>
+                        <Select value={r.classification} onValueChange={(v) => setRowField(r.id, "classification", v)}>
                           <SelectTrigger className="h-8 w-full text-xs">
-                            <SelectValue placeholder="OAT" />
+                            <SelectValue placeholder="DAT" />
                           </SelectTrigger>
                           <SelectContent className="z-[120]">
-                            {classifications.map((c) => (
-                              <SelectItem key={c.id} value={c.code}>
-                                {c.code}
+                            {/* Hai giá trị tự suy từ SPNT, không phải danh mục (QĐ-10). */}
+                            {FUEL_ADJUST_CLASSIFICATIONS.map((c) => (
+                              <SelectItem key={c.value} value={c.value}>
+                                {c.label}
                               </SelectItem>
                             ))}
                           </SelectContent>

@@ -155,7 +155,7 @@ public class TransportReportService {
         trip.setCargoGroup(cargoType.getCargoGroup());
 
         trip.setReceivingFloorGroup(
-                floorGroupCalculator.calculate(excavationArea.getName(), tripReq.getReceivingFloor()));
+                floorGroupCalculator.calculate(excavationArea, tripReq.getReceivingFloor()));
 
         LoadLevel loadLevel = new LoadLevel();
         loadLevel.setType(tripReq.getLoadLevelType());
@@ -312,7 +312,7 @@ public class TransportReportService {
         trip.setUnloadingPoint(getOrThrow(unloadingPointRepository, request.getUnloadingPointId(), "Nơi dỡ tải"));
 
         trip.setReceivingFloor(request.getReceivingFloor());
-        trip.setReceivingFloorGroup(floorGroupCalculator.calculate(trip.getExcavationArea().getName(), request.getReceivingFloor()));
+        trip.setReceivingFloorGroup(floorGroupCalculator.calculate(trip.getExcavationArea(), request.getReceivingFloor()));
         trip.setUnloadingFloor(request.getUnloadingFloor());
         trip.setTotalRouteDistanceKm(request.getTotalRouteDistanceKm());
         trip.setTotalRouteLiftM(request.getTotalRouteLiftM());
