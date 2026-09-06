@@ -551,6 +551,24 @@ nhận để không nhầm là của các thay đổi DMNL ở trên.
    chủ dự án đã tự nhập trước đó) hoặc đơn giản là ghi đè khi nhập liệu
    thật (ô đã có giá trị demo vẫn ghi đè bình thường qua UI/Excel).
 
+10. **Modal "Thêm bộ định mức" đánh dấu xe đã có + hiện cung độ đã có**
+    (commit `8d05b24`) — chủ dự án thấy modal (screenshot) không phân
+    biệt được chủng loại xe nào đã có bộ dữ liệu trong lưới. Sửa
+    `FuelNormBulkAddModal.tsx`: đổi prop từ `existingColumnKeys: Set`
+    sang `existingDatasets: FuelNormDataset[]` (đủ thông tin để suy ra
+    cả badge "đã có" trên checkbox VÀ danh sách cung độ hiện có khi tổ
+    hợp xe+hậu tố đang chọn trùng bộ đã có) — hiện luôn danh sách đó
+    kèm nút xoá từng cung độ / xoá cả bộ (tái dùng đúng
+    `removeColumnMutation`/`removeDatasetMutation` đã có sẵn trong
+    `FuelNormAddPage.tsx`, không viết logic xoá mới).
+11. Cùng lượt, 2 việc nhỏ từ ảnh chụp màn "Thêm mới": (a) nút "Lưu" bị
+    disable khi chưa sửa ô nào — xác nhận đây là ĐÚNG hành vi (Lưu chỉ
+    dành cho giá trị ô, thêm cột/dòng tự lưu ngay qua API riêng), chỉ
+    thêm `title` tooltip giải thích tránh hiểu nhầm là lỗi; (b) bảng
+    nhập trực tiếp 1 bộ dữ liệu thiếu tiêu đề "Cung độ" cho hàng số liệu
+    cột — thêm hàng tiêu đề "Cung độ (km)" span trên các cột, giống cấu
+    trúc 2 tầng đã dùng ở bảng tổng hợp Quản lý.
+
 ## Việc cần làm tiếp (ưu tiên theo thứ tự)
 
 0. **ĐÃ CÓ THIẾT KẾ → `docs/DESIGN_SANLUONG.md`** (2026-08-30). Mô hình dữ
