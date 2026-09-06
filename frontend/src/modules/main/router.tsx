@@ -56,6 +56,7 @@ const VehicleCategoryClassesPage = lazy(() => import("@/modules/catalog/pages/Ve
 const CoefficientsPage = lazy(() => import("@/modules/catalog/pages/Coefficients"));
 const ReportPeriodsPage = lazy(() => import("@/modules/catalog/pages/ReportPeriods"));
 const ModelMatrixPage = lazy(() => import("@/modules/catalog/pages/ModelMatrix"));
+const ModelPeriodsPage = lazy(() => import("@/modules/catalog/model/ModelPeriodsPage"));
 const FuelNormMatrixPage = lazy(() => import("@/modules/catalog/pages/FuelNormMatrix"));
 const FuelNormOverviewPage = lazy(() => import("@/modules/catalog/fuelnorm/FuelNormOverviewPage"));
 const FuelNormAddPage = lazy(() => import("@/modules/catalog/fuelnorm/FuelNormAddPage"));
@@ -326,15 +327,26 @@ export const mainRoutes = (
         }
       />
 
-      {/* 4 danh mục dạng LƯỚI (bảng tra hai chiều) */}
+      {/* Mô hình — mỗi dòng lưu riêng, xem ModelPeriodsPage. Lưới cũ (dạng
+          MatrixDefinition dùng chung) giữ lại ở MO_HINH_LUOI làm fallback,
+          đúng cách DMNL đã chuyển trước đó. */}
       <Route
         path={ROUTES.DANH_MUC.MO_HINH}
+        element={
+          <Suspense fallback={<PageLoader />}>
+            <ModelPeriodsPage />
+          </Suspense>
+        }
+      />
+      <Route
+        path={ROUTES.DANH_MUC.MO_HINH_LUOI}
         element={
           <Suspense fallback={<PageLoader />}>
             <ModelMatrixPage />
           </Suspense>
         }
       />
+      {/* Định mức nhiên liệu — bespoke, có lưới cũ fallback (như trên) */}
       <Route
         path={ROUTES.DANH_MUC.DINH_MUC_NHIEN_LIEU}
         element={
