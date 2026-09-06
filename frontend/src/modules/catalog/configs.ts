@@ -13,7 +13,21 @@ export const excavationAreaConfig: CatalogConfig = {
   nounPhrase: "khu vực xúc",
   breadcrumb: ["Danh mục", "Khai thác"],
   searchPlaceholder: "Tìm kiếm theo mã khu vực xúc, tên khu vực xúc",
-  fields: placeFields("khu vực xúc"),
+  // "Nhóm khu vực" (CS/KC) là chiều mà MỌI công thức sản lượng so sánh —
+  // bảng tính so `D5="CS"`/`"KC"` trong khi danh mục thật có nhiều khu.
+  // Xem QĐ-13. Không khai nhóm thì engine không tính được chuyến đó.
+  fields: [
+    { key: "code", label: "Mã khu vực xúc", required: true, type: "text", width: "min-w-[160px]" },
+    { key: "name", label: "Khu vực xúc", required: true, type: "text", width: "min-w-[180px]" },
+    {
+      key: "areaGroup",
+      label: "Nhóm khu vực (CS/KC)",
+      type: "select",
+      optionsFrom: "area-groups",
+      width: "min-w-[170px]",
+    },
+    { key: "note", label: "Ghi chú", type: "text", width: "min-w-[200px]" },
+  ],
 };
 
 export const receivingPointConfig: CatalogConfig = {
@@ -354,13 +368,20 @@ export const vehicleProductionAttrConfig: CatalogConfig = {
     "- File nhập THAY THẾ toàn bộ thuộc tính sản lượng của thiết bị, không phải bổ sung.",
     "- Vì vậy phải giữ ĐỦ các cột: cột nào bị xoá khỏi file thì giá trị cũ của cột đó sẽ bị xoá theo.",
     "- Cách an toàn: chọn dòng trong bảng rồi Tải xuống, sửa trên chính file đó, rồi Tải lên.",
+    "- \"Hạng xe\" nay lấy theo danh mục Hạng xe (nhập ĐÚNG mã hạng), không còn gõ tự do.",
   ],
   fields: [
     ...deviceIdentityFields,
     { key: "vehicleNumber", label: "Số xe", type: "text", readOnly: true, width: "min-w-[120px]" },
-    { key: "fuelClassId", label: "Chủng loại xe + DMNL", type: "select", optionsPath: "/vehicle-fuel-classes", width: "min-w-[190px]" },
+    // Ba khoá dưới đây là BA danh mục KHÁC NHAU, không phải ba tên gọi của một
+    // thứ (QĐ-11) — cùng một chiếc xe có thể xếp khác nhau ở từng lưới:
+    //   • Chủng loại xe (NL) → gốc khoá cột lưới Định mức nhiên liệu (cột DQ)
+    //   • Chủng loại xe      → gốc khoá cột lưới Mô hình và Năng suất xe (cột DA)
+    //   • Hạng xe            → ghép với Chủng loại xe thành khoá DC
+    { key: "fuelClassId", label: "Chủng loại xe (NL)", type: "select", optionsPath: "/vehicle-fuel-classes", width: "min-w-[190px]" },
+    { key: "vehicleTypeId", label: "Chủng loại xe", type: "select", optionsPath: "/vehicle-types", width: "min-w-[180px]" },
+    { key: "vehicleRankId", label: "Hạng xe", type: "select", optionsPath: "/vehicle-ranks", width: "min-w-[130px]" },
     { key: "categoryClassId", label: "Chủng loại xe + Phân loại", type: "select", optionsPath: "/vehicle-category-classes", width: "min-w-[200px]" },
-    { key: "vehicleClass", label: "Hạng xe", type: "text", placeholder: "A / B / C1 / khác", width: "min-w-[130px]" },
     { key: "qualityLevel", label: "Chất lượng", type: "text", width: "min-w-[140px]" },
     { key: "carRenovation", label: "Cải tạo toa", type: "text", width: "min-w-[140px]" },
   ],

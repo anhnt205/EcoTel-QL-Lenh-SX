@@ -35,9 +35,16 @@ public class ExcavationAreaService {
         return mapper.toResponse(find(id));
     }
 
+    /** Hai nhóm khu vực hợp lệ — giao diện lấy qua đây, không cắm cứng (QĐ-13). */
+    @Transactional(readOnly = true)
+    public List<String> getAreaGroups() {
+        return ExcavationArea.GROUPS;
+    }
+
     @Transactional
     public ExcavationAreaResponse create(ExcavationAreaRequest request) {
         ensureCodeAvailable(request.getCode(), null);
+        ensureAreaGroupValid(request.getAreaGroup());
         return mapper.toResponse(repository.save(mapper.toEntity(request)));
     }
 
@@ -50,7 +57,10 @@ public class ExcavationAreaService {
         if (codes.stream().distinct().count() != codes.size()) {
             throw new BadRequestException("Có mã khu vực xúc bị trùng nhau trong danh sách gửi lên");
         }
-        requests.forEach(r -> ensureCodeAvailable(r.getCode(), null));
+        requests.forEach(r -> {
+            ensureCodeAvailable(r.getCode(), null);
+            ensureAreaGroupValid(r.getAreaGroup());
+        });
         return repository.saveAll(requests.stream().map(mapper::toEntity).toList())
                 .stream().map(mapper::toResponse).toList();
     }
@@ -59,6 +69,7 @@ public class ExcavationAreaService {
     public ExcavationAreaResponse update(Long id, ExcavationAreaRequest request) {
         ExcavationArea entity = find(id);
         ensureCodeAvailable(request.getCode(), id);
+        ensureAreaGroupValid(request.getAreaGroup());
         mapper.updateEntity(entity, request);
         return mapper.toResponse(repository.save(entity));
     }
@@ -81,6 +92,22 @@ public class ExcavationAreaService {
     private ExcavationArea find(Long id) {
         return repository.findById(id).orElseThrow(
                 () -> new ResourceNotFoundException("Không tìm thấy khu vực xúc với id: " + id));
+    }
+
+    /**
+     * Nhóm khu vực chỉ nhận {@code CS} / {@code KC} (QĐ-13). Để TRỐNG vẫn
+     * cho lưu — dữ liệu cũ chưa phân nhóm phải nhập dần, không chặn ngay;
+     * nhưng khi engine tính mà gặp khu vực chưa phân nhóm thì báo lỗi
+     * nghiệp vụ rõ ràng, không đoán bừa một nhóm.
+     */
+    private void ensureAreaGroupValid(String areaGroup) {
+        if (areaGroup == null || areaGroup.isBlank()) return;
+        String v = areaGroup.trim();
+        if (ExcavationArea.GROUPS.stream().noneMatch(g -> g.equalsIgnoreCase(v))) {
+            throw new BadRequestException(
+                    "Nhóm khu vực chỉ nhận " + String.join(" hoặc ", ExcavationArea.GROUPS)
+                            + " — nhận được: \"" + areaGroup + "\"");
+        }
     }
 
     private void ensureCodeAvailable(String code, Long selfId) {

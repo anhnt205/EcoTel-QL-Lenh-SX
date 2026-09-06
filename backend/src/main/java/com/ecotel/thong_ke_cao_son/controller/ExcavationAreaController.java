@@ -33,6 +33,12 @@ public class ExcavationAreaController {
         return ApiResponse.success(service.getAll(keyword, pageable));
     }
 
+    /** Hai nhóm khu vực hợp lệ (CS/KC) — để giao diện không phải cắm cứng (QĐ-13). */
+    @GetMapping("/area-groups")
+    public ApiResponse<List<String>> areaGroups() {
+        return ApiResponse.success(service.getAreaGroups());
+    }
+
     @GetMapping("/{id}")
     public ApiResponse<ExcavationAreaResponse> getById(@PathVariable Long id) {
         return ApiResponse.success(service.getById(id));

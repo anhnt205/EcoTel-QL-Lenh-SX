@@ -17,5 +17,8 @@ public class ExcavationAreaRequest {
     @NotBlank(message = "Tên khu vực xúc là bắt buộc")
     String name;
 
+    /** Nhóm khu vực — {@code CS} hoặc {@code KC}; xem QĐ-13. */
+    String areaGroup;
+
     String note;
 }

@@ -23,9 +23,16 @@ public class DeviceProductionAttributesRequest {
     String code;
 
     String carRenovation;
+    /** @deprecated dùng {@link #vehicleRankId} — giữ để nhập file cũ vẫn chạy. */
+    @Deprecated
     String vehicleClass;
     String qualityLevel;
+    /** Chủng loại xe (NL) — gốc khoá cột ĐMNL (QĐ-11). */
     Long fuelClassId;
+    /** Chủng loại xe — gốc khoá cột Mô hình và Năng suất xe (QĐ-11). */
+    Long vehicleTypeId;
+    /** Hạng xe — thay cho chuỗi {@link #vehicleClass}. */
+    Long vehicleRankId;
     Long categoryClassId;
     BigDecimal bucketCapacity;
 }

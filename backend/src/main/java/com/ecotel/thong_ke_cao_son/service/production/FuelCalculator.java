@@ -148,7 +148,7 @@ public class FuelCalculator {
 
     /** BC5 — hạng xe A/B/C1/khác. */
     private BigDecimal vehicleClassFactor(Device vehicle) {
-        String cls = trim(vehicle.getVehicleClass());
+        String cls = vehicleRankCode(vehicle);
         if ("A".equalsIgnoreCase(cls)) return new BigDecimal("0.97");
         if ("B".equalsIgnoreCase(cls)) return BigDecimal.ONE;
         if ("C1".equalsIgnoreCase(cls)) return new BigDecimal("1.04");
@@ -241,7 +241,7 @@ public class FuelCalculator {
                                         String classification, String areaCode,
                                         TransportReportTrip trip, List<String> warnings) {
         if (grid == null) return null;
-        String vehicleClass = trim(vehicle.getVehicleClass());
+        String vehicleClass = vehicleRankCode(vehicle);
         String rowKey = vehicleModel(vehicle) + "_"
                 + (vehicleClass.isEmpty() ? "" : vehicleClass.substring(0, 1))
                 + "_" + classification;
@@ -296,6 +296,22 @@ public class FuelCalculator {
     /** DQ5 — Chủng loại xe, lưu ở {@code Device.category.name}. */
     private static String vehicleModel(Device vehicle) {
         return vehicle.getCategory() != null ? trim(vehicle.getCategory().getName()) : "";
+    }
+
+    /**
+     * DB5 — Hạng xe.
+     *
+     * <p>Ưu tiên khoá ngoại tới danh mục Hạng xe (QĐ-13); chỉ lùi về chuỗi tự
+     * do {@code vehicle_class} cho những thiết bị chưa kịp khai lại theo danh
+     * mục. Không lùi ngược lại: khai theo danh mục là nguồn đúng.
+     */
+    private static String vehicleRankCode(Device vehicle) {
+        if (vehicle.getVehicleRank() != null) {
+            return trim(vehicle.getVehicleRank().getCode());
+        }
+        @SuppressWarnings("deprecation")
+        String legacy = vehicle.getVehicleClass();
+        return trim(legacy);
     }
 
     private static boolean isRoda(TransportReportTrip trip) {

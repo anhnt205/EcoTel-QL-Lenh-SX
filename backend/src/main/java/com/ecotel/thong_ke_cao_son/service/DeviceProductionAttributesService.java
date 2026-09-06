@@ -10,9 +10,13 @@ import com.ecotel.thong_ke_cao_son.mapper.DeviceMapper;
 import com.ecotel.thong_ke_cao_son.model.Device;
 import com.ecotel.thong_ke_cao_son.model.VehicleCategoryClass;
 import com.ecotel.thong_ke_cao_son.model.VehicleFuelClass;
+import com.ecotel.thong_ke_cao_son.model.VehicleRank;
+import com.ecotel.thong_ke_cao_son.model.VehicleType;
 import com.ecotel.thong_ke_cao_son.repository.DeviceRepository;
 import com.ecotel.thong_ke_cao_son.repository.VehicleCategoryClassRepository;
 import com.ecotel.thong_ke_cao_son.repository.VehicleFuelClassRepository;
+import com.ecotel.thong_ke_cao_son.repository.VehicleRankRepository;
+import com.ecotel.thong_ke_cao_son.repository.VehicleTypeRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -38,6 +42,8 @@ public class DeviceProductionAttributesService {
     private final DeviceRepository deviceRepository;
     private final VehicleFuelClassRepository fuelClassRepository;
     private final VehicleCategoryClassRepository categoryClassRepository;
+    private final VehicleTypeRepository vehicleTypeRepository;
+    private final VehicleRankRepository vehicleRankRepository;
     private final DeviceMapper deviceMapper;
 
     @Transactional(readOnly = true)
@@ -93,7 +99,14 @@ public class DeviceProductionAttributesService {
 
     private void apply(Device device, DeviceProductionAttributesRequest r) {
         device.setCarRenovation(r.getCarRenovation());
-        device.setVehicleClass(r.getVehicleClass());
+        // NGOẠI LỆ có chủ ý với ngữ nghĩa "thay thế" nói ở javadoc lớp: trường
+        // `vehicleClass` đang được KHAI TỬ (thay bằng `vehicleRank`) nên đã bị
+        // gỡ khỏi giao diện và khỏi file Excel. Nếu vẫn ghi đè vô điều kiện thì
+        // mọi lần lưu sẽ âm thầm xoá trắng dữ liệu hạng xe cũ chưa kịp chuyển
+        // sang khoá ngoại. Chỉ ghi khi yêu cầu có gửi giá trị.
+        if (r.getVehicleClass() != null) {
+            device.setVehicleClass(r.getVehicleClass());
+        }
         device.setQualityLevel(r.getQualityLevel());
         device.setBucketCapacity(r.getBucketCapacity());
 
@@ -112,5 +125,21 @@ public class DeviceProductionAttributesService {
                             "Không tìm thấy chủng loại xe + phân loại id: " + r.getCategoryClassId()));
         }
         device.setCategoryClass(categoryClass);
+
+        VehicleType vehicleType = null;
+        if (r.getVehicleTypeId() != null) {
+            vehicleType = vehicleTypeRepository.findById(r.getVehicleTypeId()).orElseThrow(
+                    () -> new ResourceNotFoundException(
+                            "Không tìm thấy chủng loại xe id: " + r.getVehicleTypeId()));
+        }
+        device.setVehicleType(vehicleType);
+
+        VehicleRank vehicleRank = null;
+        if (r.getVehicleRankId() != null) {
+            vehicleRank = vehicleRankRepository.findById(r.getVehicleRankId()).orElseThrow(
+                    () -> new ResourceNotFoundException(
+                            "Không tìm thấy hạng xe id: " + r.getVehicleRankId()));
+        }
+        device.setVehicleRank(vehicleRank);
     }
 }

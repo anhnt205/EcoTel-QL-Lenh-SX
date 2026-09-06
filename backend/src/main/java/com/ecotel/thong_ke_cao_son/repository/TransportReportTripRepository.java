@@ -47,6 +47,8 @@ public interface TransportReportTripRepository extends JpaRepository<TransportRe
         JOIN FETCH t.transportReport r
         LEFT JOIN FETCH r.vehicle v
         LEFT JOIN FETCH v.fuelClass
+        LEFT JOIN FETCH v.vehicleType
+        LEFT JOIN FETCH v.vehicleRank
         LEFT JOIN FETCH t.excavationArea
         LEFT JOIN FETCH t.excavator
         LEFT JOIN FETCH t.loadingPoint

@@ -13,6 +13,8 @@ public interface VehicleRankMapper {
     // Bảng hiển thị TÊN nhóm hạng xe; chỉ biểu mẫu mới cần id.
     @Mapping(target = "vehicleRankGroupId", source = "vehicleRankGroup.id")
     @Mapping(target = "vehicleRankGroupName", source = "vehicleRankGroup.name")
+    // Danh mục này không có trường tên riêng — xem javadoc `name` ở response.
+    @Mapping(target = "name", source = "code")
     VehicleRankResponse toResponse(VehicleRank entity);
 
     /** Nhóm hạng xe do service tự resolve từ vehicleRankGroupId. */

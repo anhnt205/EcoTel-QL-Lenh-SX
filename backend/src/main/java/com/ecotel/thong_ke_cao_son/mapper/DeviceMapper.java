@@ -19,6 +19,11 @@ public interface DeviceMapper {
     @Mapping(target = "categoryGroup", source = "category.group")
     @Mapping(target = "fuelClassId", source = "fuelClass.id")
     @Mapping(target = "fuelClassName", source = "fuelClass.name")
+    @Mapping(target = "vehicleTypeId", source = "vehicleType.id")
+    @Mapping(target = "vehicleTypeName", source = "vehicleType.name")
+    // Danh mục Hạng xe không có trường `name` — hiển thị bằng chính mã hạng.
+    @Mapping(target = "vehicleRankId", source = "vehicleRank.id")
+    @Mapping(target = "vehicleRankName", source = "vehicleRank.code")
     @Mapping(target = "categoryClassId", source = "categoryClass.id")
     @Mapping(target = "categoryClassName", source = "categoryClass.name")
     @Mapping(target = "materialId", source = "material.id")
