@@ -1026,3 +1026,75 @@ Lượt này: 22/22 PASS. `contextLoads` VẪN fail độc lập như cũ — đ
 Công thức nay đã đúng theo bảng tính, nhưng danh mục xe gần như trống
 (`vehicle_types` 0 dòng) nên engine chưa ra được con số nào để đối chiếu
 với Excel. Nhập dữ liệu thật rồi mới biết bước 6 cần hiện thêm cột nào.
+
+---
+
+## Lượt 9 (2026-09-07) — dữ liệu mẫu đầu-cuối, xác nhận sống 4 họ khoá + kỳ 102 ra số
+
+### Đọc trước tiên
+
+Đã dựng **bộ dữ liệu mẫu đầu-cuối** để chủ dự án xem toàn cảnh mà không
+cần chờ nhập liệu thật. Chạy đủ **4 file theo đúng thứ tự** (mỗi file chạy
+lại nhiều lần được, không phá dữ liệu thật):
+
+```bash
+docker exec -i thongke-caoson-preview-postgres-1 psql -U postgres -d thong_ke < backend/seed-mau-sanluong-0-taikhoan.sql
+docker exec -i thongke-caoson-preview-postgres-1 psql -U postgres -d thong_ke < backend/seed-mau-sanluong-1-danhmuc.sql
+docker exec -i thongke-caoson-preview-postgres-1 psql -U postgres -d thong_ke < backend/seed-mau-sanluong-2-luoi.sql
+docker exec -i thongke-caoson-preview-postgres-1 psql -U postgres -d thong_ke < backend/seed-mau-sanluong-3-chuyen.sql
+```
+
+Sau đó đăng nhập (`xemthu` / `XemThu@2026` — tài khoản RIÊNG cho preview,
+không đụng `admin`) và gọi:
+
+```
+POST /api/production/calculate?periodId=102&tkeMode=false
+```
+
+Lượt đầu sẽ ra ~20 cảnh báo "Chưa khai báo STD cho khoá …" — đó là vì khoá
+STD (`Nhóm vỉa_Nhóm tầng_Máy xúc_Khu vực`) do ENGINE TỰ DỰNG từ dữ liệu
+chuyến, không đoán trước được. Chạy tiếp:
+
+```bash
+docker exec -i thongke-caoson-preview-postgres-1 psql -U postgres -d thong_ke < backend/seed-mau-sanluong-4-std.sql
+```
+
+rồi gọi lại `POST /api/production/calculate?periodId=102` lần hai —
+**0 cảnh báo, 21 chuyến, ra đủ số**. Xem tóm tắt: `GET /api/production/summary?periodId=102`.
+
+### Nội dung 5 file seed
+
+| File | Nội dung |
+|---|---|
+| `seed-mau-sanluong-0-taikhoan.sql` | Tài khoản `xemthu` (ADMIN, mật khẩu `XemThu@2026`) — dùng `pgcrypto` sinh BCrypt. **CHỈ DÙNG PREVIEW**, không chạy ở staging/production. |
+| `seed-mau-sanluong-1-danhmuc.sql` | 3 xe/3 danh mục xe (Chủng loại xe, Chủng loại xe NL, Hạng xe) với mã THẬT trong Excel (`CAT777E`, `HD465-7R`, `HM400-2R`); gắn cho 9 xe tải + gầu xúc cho 4 máy xúc; nhóm khu vực CS/KC cho 10 khu vực xúc; gán lại SPNT THẬT (`Dat_SX`/`Dat_CN`/`Than_SX`/`Than_CN`) cho các chủng loại hàng dùng trong mẫu — **AC5 (Thể trọng TĐ) chỉ nhận đúng 4 tên này**, để nguyên "SP than sạch" mô tả sẽ ra thể trọng = 0. |
+| `seed-mau-sanluong-2-luoi.sql` | Dựng lại **cả 4 lưới tra bảng** (Mô hình, Năng suất xe, ĐMNL, HS điều chỉnh) theo ĐÚNG 4 họ khoá của `ProductionKeys` (xem `docs/BAO_CAO_TONG_HOP_LOGIC.md` §B). Gắn nhãn phiên bản `MAU-2026`. **Xoá luôn lưới DEMO GIẢ id=155** nạp ở lượt 7 (chiếm đúng khoảng hiệu lực `2026-01-01`, chặn ràng buộc `(code, effective_from)`). |
+| `seed-mau-sanluong-3-chuyen.sql` | 21 chuyến vận tải kỳ 01/8→07/8/2026, đặt CÓ CHỦ Ý để đi qua **đủ bốn nhánh** của quy tắc hậu tố ĐMNL (`DE5`) — xem cột ghi chú trong từng dòng `tmp_trip`. Kèm tỷ trọng mặc định cho mọi chủng loại hàng. |
+| `seed-mau-sanluong-4-std.sql` | Sinh STD (số trắc địa) từ CHÍNH khoá mà engine vừa tự dựng ở `survey_coefficients`, lệch ±5% so với số thống kê để hệ số ra khác 1 (không phải luôn = 1). |
+
+### Ba bẫy vấp phải khi dựng, đã ghi chú ngay trong file seed
+
+1. **`FuelNormInterpolator.trimZeros()` dùng `stripTrailingZeros()`.** Khoá
+   cột ĐMNL là `..._2` chứ KHÔNG phải `..._2,0`/`..._2.0`. Seed sai định
+   dạng này thì cung độ tròn số tra hụt, cung độ lẻ vẫn chạy — rất khó
+   phát hiện qua mắt thường, phải đọc log cảnh báo.
+2. **STD tra theo `(loại danh mục, khoá, ngày)` — KHÔNG theo sản phẩm
+   nghiệm thu.** Một khoá chỉ được có ĐÚNG MỘT dòng STD, và dòng đó phải
+   điền CẢ cột Đất lẫn cột Than cùng lúc, vì cùng một khoá (nhóm vỉa+tầng+
+   máy xúc+khu vực) có thể phục vụ cả chuyến đất lẫn chuyến than trong
+   cùng kỳ — engine chọn cột theo sản phẩm của TỪNG CHUYẾN
+   (`resolveBulkDensity`/`isCoalProduct`), không theo STD.
+3. **Một khoá phục vụ HAI sản phẩm nghiệm thu khác nhau thì số trắc địa bị
+   CHIA CHUNG cho cả hai** — sản lượng trắc địa của nhóm nhỏ hơn sẽ vọt cao
+   vô lý (tan_td > tan). Gặp phải khi hai chuyến (Than_CN và Than_SX) tình
+   cờ cùng rơi vào một khoá `Nhóm vỉa_Tầng_Máy xúc_Khu vực` — phải đổi Nơi
+   nhận tải của một trong hai chuyến để tách khoá.
+
+### Trạng thái sau lượt 9
+
+- Preview đang có đủ 21 chuyến kỳ 102 (01/8→07/8/2026) với `production_results`
+  tính đủ, 0 cảnh báo — dùng để chủ dự án xem giao diện báo cáo/danh mục.
+- **Không sửa mã nguồn** trong lượt này — chỉ 5 file SQL mới, commit riêng.
+- Việc bước 2/4/5 của kế hoạch 8 bước KHÔNG đổi so với lượt 8 — vẫn còn
+  bước 3 (4 ô nhập báo chuyến), 6 (mở rộng báo cáo), 7 (dữ liệu thật), 8
+  (quyết định nhóm cột "bùn").
