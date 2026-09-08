@@ -1,6 +1,8 @@
 # Context — THONGKE-CAOSON
 
-Cập nhật lần cuối: 2026-09-08 (lượt 14 — Đối chiếu: workflow đỏ/vàng/
+Cập nhật lần cuối: 2026-09-08 (lượt 15 — tháng chưa khai Kỳ nào thì tự
+động = 1 kỳ cả tháng, quy tắc hệ thống áp dụng mọi tháng tương lai, xem
+"Lượt 15"). Trước đó cùng ngày (lượt 14 — Đối chiếu: workflow đỏ/vàng/
 trắng + gate duyệt cho sản lượng, dùng Plan Mode do độ phức tạp cao,
 xem "Lượt 14"). Trước đó cùng ngày (lượt 13 — checkbox lọc trạng thái
 thay tab + đổi nhãn nút "Lưu và gửi", xem "Lượt 13"). Trước đó cùng
@@ -1508,3 +1510,57 @@ rollback đúng (không còn dữ liệu mồ côi trong `production_results`/
 liệu Khai thác/Vận tải (`EntryStatusFilter.tsx`) — "Tất cả (N)", "Đã
 gửi (N)"... tính từ TOÀN BỘ `tripRows` (không phải phần đã lọc hiển
 thị) để số không co lại khi đang lọc.
+
+## Lượt 15 (2026-09-08) — tháng chưa khai Kỳ nào thì tự động = 1 kỳ cả tháng, commit `c597394`
+
+Chủ dự án báo ngay sau lượt 14: có chuyến đã duyệt đối chiếu nhưng "Báo
+cáo thống kê" tháng 9 không ra số liệu. Điều tra xác nhận: **không liên
+quan gì tới gate duyệt vừa thêm ở lượt 14** — nguyên nhân thật là tháng
+9/2026 **chưa từng được khai Kỳ báo cáo nào** (combobox "Kỳ" rỗng
+"— chưa có kỳ nào —"). Không có kỳ thì không có gì để tính, dù dữ liệu
+chuyến đã duyệt đúng.
+
+Hỏi chủ dự án nên tạo kỳ tháng 9 theo mẫu tuần cũ (như tháng 8) hay để
+tự khai — chủ dự án trả lời **"Nếu kỳ bỏ trống thì coi như tính toàn
+tháng"**. Hỏi làm rõ thêm (vì đổi cách chia kỳ ảnh hưởng cách tính hệ
+số trắc địa dồn theo TỪNG KỲ — đổi kiến trúc, không phải chuyện riêng
+tháng 9) — chủ dự án xác nhận muốn đổi **QUY TẮC HỆ THỐNG**: tháng nào
+không khai Kỳ thì tự động hiểu là 1 Kỳ = cả tháng, áp dụng cho MỌI
+tháng tương lai.
+
+**Đã làm** (chỉ 1 file, không đụng schema, không đụng
+`ProductionCalculationService`): `ReportPeriodService.getByMonth`
+(hàm đứng sau endpoint `GET /report-periods/by-month`, đúng nguồn dữ
+liệu combobox "Kỳ" ở `ProductionReportPage.tsx`) gọi hàm mới
+`ensureMonthHasPeriod(year, month)` — nếu tháng đó chưa có BẤT KỲ kỳ
+nào (`existsByYearAndMonth=false`) thì tự tạo đúng 1 `ReportPeriod`
+trùm cả tháng (ngày 1 → ngày cuối tháng, `periodIndex=1`, ghi `note`
+"Tự động tạo..." để phân biệt kỳ khai tay). Bắt
+`DataIntegrityViolationException` làm lưới chặn race hiếm gặp (2
+request cùng lúc mở combobox cho cùng 1 tháng chưa khai), dựa vào
+unique constraint `(year, month, periodIndex)` có sẵn.
+
+**Không đụng tháng đã có bất kỳ kỳ nào** (kể cả khai dở/hở ngày) — đó
+là lựa chọn CHỦ ĐỘNG của người dùng tách kỳ theo tuần, vẫn phải qua
+đúng kiểm tra "không hở" (QĐ-05) như trước.
+
+**Vì sao không cần sửa `ProductionCalculationService`**:
+`calculatePeriod(periodId,...)` luôn đòi `periodId` trỏ tới 1 kỳ ĐÃ TỒN
+TẠI (fetch bằng `findById`) — không có đường nào gọi tính toán cho 1
+tháng còn 0 kỳ mà không đi qua combobox "Kỳ" ở giao diện, chính là nơi
+gọi `ensureMonthHasPeriod`. Đây là hook DUY NHẤT cần thiết.
+
+Verify sống: mở "Báo cáo thống kê" tháng 9/2026 (trước đó combobox
+rỗng) → tự động hiện "Kỳ 01, 1/9 đến 30/9 (30 ngày)"; xác nhận CSDL
+thật có dòng `report_periods` mới (id 152) với `note` đúng. Bấm "Tính
+lại kỳ" → **qua được** gate duyệt đối chiếu thêm ở lượt 14 (chuyến xe
+468 đã duyệt), đi tiếp đến bước kiểm tra kế tiếp trong chuỗi tra danh
+mục bắt buộc — báo thiếu "STD cho khoá Vỉa 14_P17_KVX009 / SP đất đá".
+
+**Đã báo lại cho chủ dự án**: đây là khoảng trống DANH MỤC KHÁC, không
+liên quan gì tới 2 lượt sửa vừa qua — chuyến test tháng 9 dùng tổ hợp
+Vỉa/Máy xúc/Khu vực xúc chưa có "Số trắc địa" (STD) khai trong danh
+mục Áp Trắc Địa (`/danh-muc/ap-tracdia`). Cần khai bổ sung STD cho tổ
+hợp đó (hoặc dùng dữ liệu test khác đã có STD) thì mới tính ra số thật
+được — việc này cần người có số liệu trắc địa thật, không tự đoán/tự
+điền được.
