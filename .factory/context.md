@@ -1,7 +1,9 @@
 # Context — THONGKE-CAOSON
 
-Cập nhật lần cuối: 2026-09-07 (lượt 8 — sửa nốt cùng lỗi combobox che
-hàng tiêu đề bảng ở màn Tỷ trọng, xem mục 17). Trước đó 2026-09-05
+Cập nhật lần cuối: 2026-09-08 (lượt 9 — sửa 8 lỗi Quality Gate của Codex
+trên nhánh `claude-dev`, xem mục 18). Trước đó 2026-09-07 (lượt 8 — sửa
+nốt cùng lỗi combobox che hàng tiêu đề bảng ở màn Tỷ trọng, xem mục 17).
+Trước đó nữa 2026-09-05
 (lượt 7 — chủ dự án đã tự đăng nhập và
 click-through thật DMNL, báo 2 lỗi cụ thể + 1 yêu cầu redesign, cả 3 đã
 sửa/dựng lại và build+deploy sạch; xem mục "Đã làm — lượt 7"). Lượt 6
@@ -1098,3 +1100,94 @@ rồi gọi lại `POST /api/production/calculate?periodId=102` lần hai —
 - Việc bước 2/4/5 của kế hoạch 8 bước KHÔNG đổi so với lượt 8 — vẫn còn
   bước 3 (4 ô nhập báo chuyến), 6 (mở rộng báo cáo), 7 (dữ liệu thật), 8
   (quyết định nhóm cột "bùn").
+
+---
+
+## Lượt 9 (2026-09-08) — sửa 8 lỗi Quality Gate của Codex, commit `cd85bc1`
+
+### Bối cảnh: Codex Desktop chạy Quality Gate riêng, độc lập phiên này
+
+Chủ dự án dùng Codex (Desktop app, model GPT-6) chạy **Quality Gate
+review** trên `dev...claude-dev` tại `REVIEWED_COMMIT a0cfa0d` — kết luận
+**FAIL**, giao cho một session Codex khác sửa. Session đó bị giới hạn
+**chỉ đọc file** (không ghi/build/commit được), nên nó chỉ đọc code rồi
+báo lại "cần escalation" — KHÔNG sửa gì. Toàn bộ việc sửa 8 lỗi dưới đây
+do lượt 9 của phiên Claude này làm, đọc log review từ file JSONL của
+Codex tại `~/.codex/sessions/2026/09/07/rollout-...-01a07a84-dfd3-....jsonl`
+(tìm bằng `grep -rl "Quality Gate"`).
+
+### 18. Tám lỗi Quality Gate — 1 BLOCKING + 7 MAJOR, tất cả đã sửa
+
+**Phần lớn ĐÃ ĐƯỢC SỬA SẴN** trong cây làm việc từ một lượt trước đó của
+chính phiên Claude này mà bị **nén khỏi ngữ cảnh** (compact) — lượt 9 chỉ
+review kỹ từng diff, viết thêm test còn thiếu, TỰ PHÁT HIỆN một bug migration
+nghiêm trọng, rồi build+test+commit+deploy+verify sống. Bài học: nếu thấy
+`git status` có nhiều thay đổi "lạ" không nhớ đã làm, ĐỪNG cho là rác —
+review kỹ trước, rất có thể là việc thật từ trước khi bị nén.
+
+| # | Lỗi | Mức | Đã sửa |
+|---|---|---|---|
+| 1 | `PermissionFilter` cho qua endpoint không có `@RequirePermission` — **0/32** controller từng gắn annotation này | BLOCKING | `@RequirePermission` cho đủ 32 controller, `PermissionFilter` đổi mặc định sang **từ chối** (fail-closed), `RESOURCES` trong `LocalAuthService` mở rộng khớp đủ |
+| 2 | `ProductionCalculationService` biến tra trượt STD/ĐMNL/Năng suất xe/HS điều chỉnh thành CẢNH BÁO rồi vẫn lưu hệ số 0 — trái QĐ-04/QĐ-06 | MAJOR | Gom hết vào `warnings`, ném MỘT lỗi tổng hợp + không lưu gì nếu còn thiếu (transaction rollback tự nhiên) |
+| 3 | QĐ-03 (khoá/chốt kỳ) chưa tồn tại | MAJOR | `ReportPeriod.locked/stale` + `ReportPeriodAudit` (LOCK/UNLOCK, snapshot, bắt buộc lý do khi mở khoá) + endpoint `/lock` `/unlock` (quyền riêng, action `"a"`) `/audits` + UI nút Chốt/Mở khoá + banner |
+| 4 | `LocalAuthService.refresh()` không kiểm tra `user.active` | MAJOR | Kiểm tra lại y hệt `login()` |
+| 5 | `MiningBatchEntryModal.tsx` import Excel nối sau dòng trống mặc định, không lưu được | MAJOR | Phát hiện dòng đầu "nguyên vẹn" thì tái dùng thay vì nối thêm |
+| 6 | `MiningEntryPage.tsx` — "Tầng xúc" gom từ trang đã phân trang, tầng ở trang chưa xem không chọn được | MAJOR | Endpoint mới `GET /api/excavation-reports/excavation-floors` độc lập phân trang |
+| 7 | QĐ-05 "không hở" chưa từng được kiểm tra lúc tính (`requirePeriodOf` là dead code) | MAJOR | `assertNoGapInMonth()` trong `calculatePeriod()`, chặn TRƯỚC khi đụng dữ liệu chuyến |
+| 8 | Test coverage chỉ có `ProductionKeysTest` | MAJOR | + `ReportPeriodServiceLockTest` (6) + `ProductionCalculationServiceLockTest` (5, có sẵn) + **`LocalAuthServiceTest` (8, viết mới lượt 9)** — refresh khi inactive, bộ quyền theo vai trò giải mã từ JWT thật |
+
+**Chi tiết đầy đủ (lý do kỹ thuật, số dòng, trích dẫn công thức) nằm trong
+commit message của `cd85bc1` — đọc `git show cd85bc1` thay vì hỏi lại.**
+
+### Bug TỰ PHÁT HIỆN trong lượt 9 (Codex không nêu, phát sinh từ chính fix #3)
+
+**Hibernate `ddl-auto: update` không tự thêm được cột `locked`/`stale`**
+vào `report_periods` vì bảng ĐÃ CÓ DỮ LIỆU THẬT và hai cột khai `NOT NULL`
+không có default ở tầng JPA — PostgreSQL từ chối `ALTER TABLE ADD COLUMN
+NOT NULL` khi không điền được giá trị cho dòng cũ. Hibernate chỉ log
+**WARN** rồi bỏ qua — ứng dụng "khởi động thành công" nhưng hai cột **hoàn
+toàn không tồn tại**, khiến MỌI truy vấn đọc `ReportPeriod` (kể cả
+`GET /api/report-periods` bình thường) vỡ ở tầng SQL với "column locked
+does not exist". Chỉ phát hiện được vì lượt này rebuild + chạy thật trên
+DB preview có sẵn dữ liệu — nếu chỉ chạy `mvn test` (mock, không đụng DB
+thật) sẽ không bao giờ thấy.
+
+**Sửa:** `backend/migration-2026-09-07-report-period-lock.sql`
+(`ALTER TABLE ... ADD COLUMN IF NOT EXISTS ... DEFAULT false`), đã chạy
+thật vào preview, verify `\d report_periods` thấy đủ cột.
+
+**Bài học chung cho các lượt sau:** thêm cột `NOT NULL` vào Entity của một
+bảng ĐÃ CÓ DỮ LIỆU luôn cần migration tay kèm `DEFAULT`, không thể tin
+`ddl-auto: update` tự lo được — nó chỉ xử lý tốt bảng rỗng hoặc thêm cột
+nullable.
+
+### Kiểm chứng — LẦN ĐẦU TIÊN click-through UI thật thành công
+
+Trước đây mọi lượt đều bị chặn ở "chưa có mật khẩu Portal" (quy tắc dự án
+mục 8). Lượt 8 đã tạo tài khoản `xemthu`/`XemThu@2026` (ADMIN, chỉ dùng
+cho preview — xem `backend/seed-mau-sanluong-0-taikhoan.sql`), nên lượt
+9 là lượt ĐẦU TIÊN thật sự bấm qua giao diện:
+
+1. Đăng nhập `xemthu` → vào Báo cáo thống kê → chọn Kỳ 01 (1/8-7/8) →
+   bấm **Chốt kỳ** → nút đổi thành **Mở khoá**, banner vàng "đã chốt"
+   hiện, "Tính lại kỳ" bị vô hiệu hoá, dropdown kỳ hiện "— đã chốt".
+2. Bấm **Mở khoá**, nhập lý do → banner đỏ "lỗi thời" hiện.
+3. **Tính lại kỳ** → **Chốt kỳ** lần nữa → cả hai banner biến mất, đúng
+   thiết kế 100%.
+4. Danh mục "Chủng loại xe" vẫn hoạt động bình thường cho tài khoản ADMIN
+   sau khi khoá quyền — không hồi quy.
+5. `curl` không token / token giả → vẫn `401` đồng nhất.
+
+### Kiểm tra hồi quy
+
+`mvn test` (loại `ThongKeCaoSonApplicationTests.contextLoads` — vốn đã
+fail độc lập từ trước, quy tắc dự án mục 3): **41/41 PASS**. Build backend
++ frontend qua Docker sạch. Backend khởi động 0 lỗi SAU KHI chạy migration
+(trước khi chạy: 2 dòng `WARN` DDL, không phải lỗi khởi động nhưng là dấu
+hiệu của bug trên).
+
+### Việc chưa làm (ngoài phạm vi, Codex không bắt buộc)
+
+Chưa có màn xem lịch sử chốt/mở khoá — endpoint `GET /api/report-periods/
+{id}/audits` đã có và trả đúng dữ liệu (đã verify qua curl), chỉ chưa có
+UI danh sách. Làm khi chủ dự án cần.
