@@ -34,6 +34,7 @@ import { ReconciliationComparisonTables } from "../components/ReconciliationComp
 import { RequestChangeModal } from "../components/RequestChangeModal";
 import { excelService } from "@/modules/report/utils/excel-exporter";
 import { toast } from "sonner";
+import { currentMonthRange } from "@/lib/utils";
 import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 
 import { useMasterData } from "@/modules/dataentry/hooks/useMasterData";
@@ -69,8 +70,12 @@ export const ReconciliationPage: React.FC = () => {
   const masterData = useMasterData();
   const { rawShifts = [], rawVehicles = [] } = masterData;
 
-  const [startDate, setStartDate] = useState("2026-08-01");
-  const [endDate, setEndDate] = useState("2026-08-31");
+  // Mặc định = tháng hiện tại (trước đây cứng "2026-08-01".."2026-08-31" —
+  // dữ liệu ở tháng khác "biến mất" khỏi màn đối chiếu; cùng lỗi thật vừa
+  // gặp ở màn Khai thác, 2026-09-08).
+  const defaultDateRange = currentMonthRange();
+  const [startDate, setStartDate] = useState(defaultDateRange.from);
+  const [endDate, setEndDate] = useState(defaultDateRange.to);
   const [selectedShifts, setSelectedShifts] = useState<string[]>([]);
   const [selectedVehicles, setSelectedVehicles] = useState<string[]>([]);
   const [searchKeyword, setSearchKeyword] = useState("");

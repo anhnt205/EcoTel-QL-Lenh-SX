@@ -61,6 +61,7 @@ import {
   Truck,
 } from "lucide-react";
 import { toast } from "sonner";
+import { currentMonthRange } from "@/lib/utils";
 import { excelService } from "@/modules/report/utils/excel-exporter";
 import { ApprovalStatusBadge } from "@/modules/dataentry/components/ApprovalStatusBadge";
 import type { ApprovalStatus } from "@/modules/dataentry/types/thong-ke";
@@ -98,8 +99,12 @@ export interface StandardTripReport {
 }
 
 export const StandardTripReportPage: React.FC = () => {
-  const [startDate, setStartDate] = useState("2026-08-01");
-  const [endDate, setEndDate] = useState("2026-08-31");
+  // Mặc định = tháng hiện tại (trước đây cứng "2026-08-01".."2026-08-31" —
+  // dữ liệu ở tháng khác "biến mất" khỏi màn này; cùng lỗi thật vừa gặp ở
+  // màn Khai thác, 2026-09-08).
+  const defaultDateRange = currentMonthRange();
+  const [startDate, setStartDate] = useState(defaultDateRange.from);
+  const [endDate, setEndDate] = useState(defaultDateRange.to);
   const [reports, setReports] = useState<StandardTripReport[]>([]);
   const [selectedShifts, setSelectedShifts] = useState<string[]>([]);
   const [selectedVehicles, setSelectedVehicles] = useState<string[]>([]);

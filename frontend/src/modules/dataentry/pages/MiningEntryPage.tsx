@@ -37,6 +37,7 @@ import {
 import { DatePickerString } from "@/components/common/DatePickerString";
 import { Search, Truck, Fuel, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
+import { currentMonthRange } from "@/lib/utils";
 
 export const MiningEntryPage: React.FC = () => {
   const role = "ROLE_MINING";
@@ -46,8 +47,15 @@ export const MiningEntryPage: React.FC = () => {
   const benchAnchorRef = useComboboxAnchor();
 
   // ── Filters state ────────────────────────────────────────────────────────
-  const [startDate, setStartDate] = useState("2026-08-01");
-  const [endDate, setEndDate] = useState("2026-08-31");
+  // Mặc định = tháng hiện tại (trước đây cứng "2026-08-01".."2026-08-31" —
+  // bản ghi nhập ở tháng khác "biến mất" khỏi danh sách mặc định, hiểu nhầm
+  // thành lưu thất bại; sự cố thật ngày 2026-09-08). `useState` chỉ đọc giá
+  // trị khởi tạo Ở LẦN RENDER ĐẦU, nên tháng không tự nhảy khi đồng hồ máy
+  // khách sang ngày mới giữa phiên làm việc — người dùng tự đổi lại nếu cần
+  // xem tháng khác.
+  const defaultDateRange = currentMonthRange();
+  const [startDate, setStartDate] = useState(defaultDateRange.from);
+  const [endDate, setEndDate] = useState(defaultDateRange.to);
   const [selectedShifts, setSelectedShifts] = useState<string[]>([]);
   const [selectedExcavators, setSelectedExcavators] = useState<string[]>([]);
   const [selectedPickupLocations, setSelectedPickupLocations] = useState<
