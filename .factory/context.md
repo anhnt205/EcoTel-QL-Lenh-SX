@@ -1,8 +1,10 @@
 # Context — THONGKE-CAOSON
 
-Cập nhật lần cuối: 2026-09-08 (lượt 11 — sửa lỗi Đối chiếu bị tách 2
-dòng do khoá ghép cặp dùng nhầm Loại hàng, xem "Lượt 11"). Trước đó
-cùng ngày (lượt 10 — sửa lỗi "Nơi chất tải" của Nhập liệu Khai thác
+Cập nhật lần cuối: 2026-09-08 (lượt 12 — thêm tab "Cần sửa" lọc nhanh +
+nút bút chì sửa từng dòng ở Nhập liệu Khai thác/Vận tải, xem "Lượt
+12"). Trước đó cùng ngày (lượt 11 — sửa lỗi Đối chiếu bị tách 2 dòng do
+khoá ghép cặp dùng nhầm Loại hàng, xem "Lượt 11"). Trước đó cùng ngày
+(lượt 10 — sửa lỗi "Nơi chất tải" của Nhập liệu Khai thác
 dùng nhầm danh mục khiến Lưu luôn 404 + bộ lọc ngày mặc định cứng
 tháng 8/2026, xem mục 19). Trước đó cùng ngày (lượt 9 — sửa 8 lỗi
 Quality Gate của Codex trên nhánh `claude-dev`, xem mục 18). Trước đó
@@ -1327,3 +1329,38 @@ khoá ghép cặp che mất, không cần sửa gì thêm.
 gộp thành **1 dòng**, cột Vận tải ghi "Bùn nhão" 6 chuyến, cột Khai thác
 ghi "Bùn dượt" 12 chuyến, cùng Người nhập chuyến "Phạm Văn Dũng", đánh
 dấu đúng "Sai lệch" (1/100%).
+
+## Lượt 12 (2026-09-08) — tab "Cần sửa" lọc nhanh + nút bút chì sửa từng dòng, commit `eb1dd29`
+
+Chủ dự án gửi ảnh chụp `/nhap-lieu/khai-thac` (badge tĩnh "1 bản ghi cần
+sửa" cạnh BẢNG BÁO CHUYẾN) kèm yêu cầu: (1) "Phần báo chuyến khai thác
+và báo chuyến vận tải khi nhận được yêu cầu chỉnh sửa cần có tab để gom
+các yêu cầu đó lại. Ấn vào đó thì vào thẳng các yêu cầu chỉnh sửa."
+(2) "cho thêm nút chỉnh sửa mỗi dòng ở đầu dòng (cái icon bút) ấn cho
+chỉnh sửa."
+
+**Đã làm** (chỉ frontend, không đụng backend/DB):
+1. **Tab "Tất cả" / "Cần sửa"** (component mới dùng chung
+   `components/EntryStatusTabs.tsx`) thay cho badge tĩnh cũ — bấm "Cần
+   sửa" lọc thẳng Bảng báo chuyến xuống chỉ còn các dòng
+   `REVISION_REQUESTED`. Chỉ lọc phần HIỂN THỊ (`displayedTripRows`
+   truyền vào DataTable), KHÔNG đụng logic chọn dòng (`tripSelection`
+   vẫn giữ nguyên toàn bộ `tripRows` như cũ) — tránh đổi hành vi "chọn
+   tất cả" đã có sẵn.
+2. **Nút bút chì đầu mỗi dòng** (cột `rowActions` ngay sau cột
+   checkbox) — bấm là mở thẳng modal sửa ĐÚNG dòng đó, không cần tick
+   checkbox trước như luồng cũ. Tái cấu trúc `useEntryPageLogic.ts`:
+   tách phần sửa 1 chuyến ra hàm dùng chung `editTripByRow(row)`, dùng
+   lại cho cả `handleEditSelected` (giữ nguyên hành vi cũ khi chọn qua
+   checkbox) và `handleEditRow(row)` mới (sửa nhanh theo dòng).
+
+Áp dụng đồng thời cho cả `MiningEntryPage.tsx` (Khai thác) và
+`TransportEntryPage.tsx` (Vận tải) — 2 trang có cấu trúc y hệt nhau
+trong dự án này.
+
+Đã build sạch qua container (`tsc -b && vite build`, không lỗi type).
+Verify sống cả 2 trang qua Browser pane: bấm tab "Cần sửa" lọc đúng
+xuống 1 dòng REVISION_REQUESTED; bấm nút bút chì (dùng `find` lấy đúng
+ref phần tử — toạ độ ước lượng lúc đầu bị lệch nhẹ, không phải lỗi code)
+mở đúng modal "Chỉnh sửa bản ghi" với dữ liệu đúng dòng đã bấm, cho cả
+Khai thác (xe 468/P17) lẫn Vận tải (xe 468).
