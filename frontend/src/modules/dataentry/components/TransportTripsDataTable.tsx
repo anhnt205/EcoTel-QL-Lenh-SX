@@ -46,11 +46,18 @@ interface TransportTripsDataTableProps {
   selectedIds: Set<string>;
   onToggleSelectAll: (checked: boolean) => void;
   onToggleSelectRow: (id: string) => void;
+  onEditRow: (row: TransportRecord) => void;
 }
 
 export const TransportTripsDataTable: React.FC<
   TransportTripsDataTableProps
-> = ({ data, selectedIds, onToggleSelectAll, onToggleSelectRow }) => {
+> = ({
+  data,
+  selectedIds,
+  onToggleSelectAll,
+  onToggleSelectRow,
+  onEditRow,
+}) => {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
 
@@ -60,8 +67,9 @@ export const TransportTripsDataTable: React.FC<
         selectedIds,
         onToggleSelectAll,
         onToggleSelectRow,
+        onEditRow,
       ),
-    [selectedIds, onToggleSelectAll, onToggleSelectRow],
+    [selectedIds, onToggleSelectAll, onToggleSelectRow, onEditRow],
   );
 
   const table = useReactTable({

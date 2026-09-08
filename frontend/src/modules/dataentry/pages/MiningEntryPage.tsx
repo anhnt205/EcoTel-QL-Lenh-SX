@@ -18,6 +18,7 @@ import { BatchEntryModal } from "@/modules/dataentry/components/BatchEntryModal.
 import { MiningTripsDataTable } from "@/modules/dataentry/components/MiningTripsDataTable";
 import { MiningFuelDataTable } from "@/modules/dataentry/components/MiningFuelDataTable";
 import { EntryPageHeader } from "@/modules/dataentry/components/EntryPageHeader";
+import { EntryStatusTabs } from "@/modules/dataentry/components/EntryStatusTabs";
 import { FilterResetButton } from "@/modules/dataentry/components/FilterResetButton";
 import { useEntryPageLogic } from "@/modules/dataentry/hooks/useEntryPageLogic";
 import { useMasterData } from "@/modules/dataentry/hooks/useMasterData";
@@ -35,7 +36,7 @@ import {
   useComboboxAnchor,
 } from "@/components/ui/combobox";
 import { DatePickerString } from "@/components/common/DatePickerString";
-import { Search, Truck, Fuel, AlertTriangle } from "lucide-react";
+import { Search, Truck, Fuel } from "lucide-react";
 import { toast } from "sonner";
 import { currentMonthRange } from "@/lib/utils";
 
@@ -324,6 +325,14 @@ export const MiningEntryPage: React.FC = () => {
     return tripRows.filter((r) => r.status === "REVISION_REQUESTED").length;
   }, [tripRows]);
 
+  // Tab "Cần sửa" — chỉ lọc phần HIỂN THỊ của Bảng báo chuyến, không đụng gì
+  // tới selection (tripSelection vẫn giữ nguyên toàn bộ tripRows như trước).
+  const [showOnlyRevisions, setShowOnlyRevisions] = useState(false);
+  const displayedTripRows = useMemo(() => {
+    if (!showOnlyRevisions) return tripRows;
+    return tripRows.filter((r) => r.status === "REVISION_REQUESTED");
+  }, [tripRows, showOnlyRevisions]);
+
   // ── Table 2 Data: Báo nhiên liệu ──────────────────────────────────────────
   // Deduplicate records for Table 2 by (date, shift, pickupLocation, mineCode, operatorBadgeNo)
   const fuelRows = useMemo(() => {
@@ -347,6 +356,7 @@ export const MiningEntryPage: React.FC = () => {
     setIsEntryModalOpen,
     handleAddNew,
     handleEditSelected,
+    handleEditRow,
     handleDeleteSelected,
     tripSelection,
     fuelSelection,
@@ -664,25 +674,26 @@ export const MiningEntryPage: React.FC = () => {
       {/* ══ BẢNG: BẢNG BÁO CHUYẾN ══════════════════════════════════════ */}
       <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm overflow-hidden space-y-3 p-4">
         {/* Table Title */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-2.5 text-sm font-bold text-gray-900 dark:text-gray-100">
             <Truck className="w-4 h-4 text-blue-600 dark:text-blue-400" />
             <span>BẢNG BÁO CHUYẾN</span>
-            {changesRequestedCount > 0 && (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-300 dark:bg-rose-950/60 dark:text-rose-300 dark:border-rose-800 animate-pulse">
-                <AlertTriangle className="w-3 h-3 text-rose-600" />
-                <span>{changesRequestedCount} bản ghi cần sửa</span>
-              </span>
-            )}
           </div>
+          <EntryStatusTabs
+            totalCount={tripRows.length}
+            revisionCount={changesRequestedCount}
+            showOnlyRevisions={showOnlyRevisions}
+            onChange={setShowOnlyRevisions}
+          />
         </div>
 
         {/* Table 1 Content using TanStack DataTable */}
         <MiningTripsDataTable
-          data={tripRows}
+          data={displayedTripRows}
           selectedIds={tripSelection.selectedIds}
           onToggleSelectAll={tripSelection.toggleSelectAll}
           onToggleSelectRow={tripSelection.toggleSelect}
+          onEditRow={handleEditRow}
         />
       </div>
 

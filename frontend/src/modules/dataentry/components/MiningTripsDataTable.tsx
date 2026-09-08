@@ -46,6 +46,7 @@ interface MiningTripsDataTableProps {
   selectedIds: Set<string>;
   onToggleSelectAll: (checked: boolean) => void;
   onToggleSelectRow: (id: string) => void;
+  onEditRow: (row: MiningRecord) => void;
 }
 
 export const MiningTripsDataTable: React.FC<MiningTripsDataTableProps> = ({
@@ -53,14 +54,20 @@ export const MiningTripsDataTable: React.FC<MiningTripsDataTableProps> = ({
   selectedIds,
   onToggleSelectAll,
   onToggleSelectRow,
+  onEditRow,
 }) => {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
 
   const columns = React.useMemo(
     () =>
-      getMiningTripsColumns(selectedIds, onToggleSelectAll, onToggleSelectRow),
-    [selectedIds, onToggleSelectAll, onToggleSelectRow],
+      getMiningTripsColumns(
+        selectedIds,
+        onToggleSelectAll,
+        onToggleSelectRow,
+        onEditRow,
+      ),
+    [selectedIds, onToggleSelectAll, onToggleSelectRow, onEditRow],
   );
 
   const table = useReactTable({

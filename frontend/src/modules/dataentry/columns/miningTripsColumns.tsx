@@ -2,13 +2,14 @@ import type { ColumnDef } from "@tanstack/react-table";
 import type { MiningRecord } from "@/modules/dataentry/types/thong-ke";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
-import { ArrowUpDown } from "lucide-react";
+import { ArrowUpDown, Pencil } from "lucide-react";
 import { ApprovalStatusBadge } from "@/modules/dataentry/components/ApprovalStatusBadge";
 
 export const getMiningTripsColumns = (
   selectedIds: Set<string>,
   onToggleSelectAll: (checked: boolean) => void,
   onToggleSelectRow: (id: string) => void,
+  onEditRow: (row: MiningRecord) => void,
 ): ColumnDef<MiningRecord>[] => [
   {
     id: "select",
@@ -47,6 +48,26 @@ export const getMiningTripsColumns = (
       );
     },
     size: 70,
+    enableSorting: false,
+    enableHiding: false,
+  },
+  {
+    id: "rowActions",
+    header: "",
+    cell: ({ row }) => (
+      <div className="flex justify-center">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-6 w-6 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-950/40"
+          onClick={() => onEditRow(row.original)}
+          title="Chỉnh sửa chuyến"
+        >
+          <Pencil className="w-3.5 h-3.5" />
+        </Button>
+      </div>
+    ),
+    size: 44,
     enableSorting: false,
     enableHiding: false,
   },
