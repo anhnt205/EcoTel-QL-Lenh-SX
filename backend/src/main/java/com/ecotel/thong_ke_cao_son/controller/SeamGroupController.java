@@ -1,5 +1,6 @@
 package com.ecotel.thong_ke_cao_son.controller;
 
+import com.ecotel.thong_ke_cao_son.annotation.RequirePermission;
 import com.ecotel.thong_ke_cao_son.dto.request.BulkDeleteRequest;
 import com.ecotel.thong_ke_cao_son.dto.request.SeamGroupRequest;
 import com.ecotel.thong_ke_cao_son.dto.response.ApiResponse;
@@ -20,6 +21,7 @@ import java.util.List;
 /** Danh mục Nhóm vỉa. */
 @RestController
 @RequestMapping("/api/seam-groups")
+@RequirePermission(resource = "seam-groups")
 @RequiredArgsConstructor
 public class SeamGroupController {
 

@@ -62,9 +62,20 @@ public class PermissionFilter extends OncePerRequestFilter {
                 action   = resolveActionFromMethod(request.getMethod());
             }
 
-            // 3. Không có annotation nào → bỏ qua (endpoint chưa được config)
+            // 3. Không có annotation nào → TỪ CHỐI (fail-closed).
+            //
+            // Trước đây nhánh này cho qua ("endpoint chưa được config"), và vì
+            // KHÔNG controller nào từng gắn @RequirePermission, hiệu lực thật
+            // là: filter phân quyền này không chặn bất cứ điều gì — mọi user
+            // đã đăng nhập (kể cả EMPLOYEE) CRUD được mọi danh mục và gọi được
+            // /api/production/calculate. Phát hiện qua Quality Gate của Codex
+            // (2026-09-07), khắc phục bằng cách gắn @RequirePermission cho đủ
+            // 32 controller nghiệp vụ (giữ lại @PublicApi ở AuthController) và
+            // đổi mặc định ở đây sang từ chối — endpoint mới thêm sau này mà
+            // quên gắn annotation sẽ bị chặn ngay thay vì âm thầm mở toang.
             if (resource == null || action == null) {
-                chain.doFilter(request, response);
+                response.sendError(HttpServletResponse.SC_FORBIDDEN,
+                        "Endpoint chưa khai @RequirePermission — mặc định từ chối.");
                 return;
             }
 

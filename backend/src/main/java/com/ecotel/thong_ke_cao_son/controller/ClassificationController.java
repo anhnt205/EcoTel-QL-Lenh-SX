@@ -1,5 +1,6 @@
 package com.ecotel.thong_ke_cao_son.controller;
 
+import com.ecotel.thong_ke_cao_son.annotation.RequirePermission;
 import com.ecotel.thong_ke_cao_son.dto.request.BulkDeleteRequest;
 import com.ecotel.thong_ke_cao_son.dto.request.ClassificationRequest;
 import com.ecotel.thong_ke_cao_son.dto.response.ApiResponse;
@@ -20,6 +21,7 @@ import java.util.List;
 /** Danh mục Phân loại. */
 @RestController
 @RequestMapping("/api/classifications")
+@RequirePermission(resource = "classifications")
 @RequiredArgsConstructor
 public class ClassificationController {
 

@@ -1,5 +1,6 @@
 package com.ecotel.thong_ke_cao_son.controller;
 
+import com.ecotel.thong_ke_cao_son.annotation.RequirePermission;
 import com.ecotel.thong_ke_cao_son.dto.request.BulkDeleteRequest;
 import com.ecotel.thong_ke_cao_son.dto.request.CoefficientItemRequest;
 import com.ecotel.thong_ke_cao_son.dto.response.ApiResponse;
@@ -20,6 +21,7 @@ import java.util.List;
 /** Danh mục Hệ số. */
 @RestController
 @RequestMapping("/api/coefficients")
+@RequirePermission(resource = "coefficients")
 @RequiredArgsConstructor
 public class CoefficientItemController {
 

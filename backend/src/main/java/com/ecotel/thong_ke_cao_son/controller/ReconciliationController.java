@@ -1,5 +1,6 @@
 package com.ecotel.thong_ke_cao_son.controller;
 
+import com.ecotel.thong_ke_cao_son.annotation.RequirePermission;
 import com.ecotel.thong_ke_cao_son.dto.request.ReconciliationDecisionBulkRequest;
 import com.ecotel.thong_ke_cao_son.dto.request.ReconciliationDecisionRequest;
 import com.ecotel.thong_ke_cao_son.dto.request.ReconciliationSearchRequest;
@@ -20,6 +21,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/reconciliation")
+@RequirePermission(resource = "reconciliation")
 @RequiredArgsConstructor
 public class ReconciliationController {
 

@@ -1,5 +1,6 @@
 package com.ecotel.thong_ke_cao_son.controller;
 
+import com.ecotel.thong_ke_cao_son.annotation.RequirePermission;
 import com.ecotel.thong_ke_cao_son.dto.request.BulkDeleteRequest;
 import com.ecotel.thong_ke_cao_son.dto.request.CargoTypeRequest;
 import com.ecotel.thong_ke_cao_son.dto.response.ApiResponse;
@@ -20,6 +21,7 @@ import java.util.List;
 /** Danh mục Chủng loại hàng. */
 @RestController
 @RequestMapping("/api/cargo-types")
+@RequirePermission(resource = "cargo-types")
 @RequiredArgsConstructor
 public class CargoTypeController {
 

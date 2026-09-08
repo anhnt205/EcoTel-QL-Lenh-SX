@@ -10,6 +10,7 @@ import {
   useBulkDeleteExcavationTripsMutation,
   importExcavationReports,
   exportExcavationReports,
+  fetchDistinctExcavationFloors,
   type ExcavationReportResponse,
 } from "@/modules/dataentry/services/excavationTripReportService";
 import { useMiningDraftStore } from "@/modules/dataentry/store/useMiningDraftStore";
@@ -207,33 +208,43 @@ export const MiningEntryPage: React.FC = () => {
     ).sort();
   }, [rawLocations]);
 
-  // "Tầng xúc" là chuỗi tự do, không có danh mục — phải gom từ dữ liệu trả về.
-  // Nhưng từ khi lọc chuyển xuống Backend, dữ liệu trả về ĐÃ bị lọc theo chính
-  // tầng xúc đang chọn: nếu lấy trực tiếp thì danh sách sẽ co lại còn đúng
-  // tầng vừa chọn và không chọn thêm được tầng khác. Vì vậy tích luỹ dần các
-  // giá trị đã thấy, chỉ xoá khi đổi khoảng thời gian.
-  const [knownBenches, setKnownBenches] = useState<string[]>([]);
+  // "Tầng xúc" là chuỗi tự do, không có danh mục — phải gom từ dữ liệu.
+  //
+  // TRƯỚC ĐÂY gom bằng cách tích luỹ giá trị thấy được từ `records` (danh
+  // sách chuyến ĐÃ PHÂN TRANG từ backend, `search()` không truyền page/size
+  // nên chỉ đọc được trang đang xem). Hệ quả (phát hiện qua Quality Gate của
+  // Codex, 2026-09-07): tầng xúc chỉ xuất hiện ở những trang CHƯA từng xem
+  // không bao giờ vào được danh sách, nên không chọn được — người dùng phải
+  // lật hết mọi trang thì mới "tích luỹ" đủ, điều không ai làm trong thực tế.
+  //
+  // Sửa bằng nguồn RIÊNG, độc lập phân trang: `findDistinctExcavationFloors`
+  // (backend) chỉ lọc theo khoảng ngày, không lọc theo ca/máy xúc/nơi nhận
+  // tải/chính tầng xúc — giống hệt cách `pickupLocationOptions` ở trên lấy
+  // từ danh mục Vị trí thay vì từ `records`, để không bị co lại khi người
+  // dùng đã chọn bớt bộ lọc khác.
+  const [benchOptions, setBenchOptions] = useState<string[]>([]);
 
   useEffect(() => {
-    setKnownBenches([]);
+    let cancelled = false;
+    if (!startDate || !endDate) {
+      setBenchOptions([]);
+      return;
+    }
+    fetchDistinctExcavationFloors(startDate, endDate)
+      .then((res) => {
+        if (cancelled) return;
+        const floors = res.data ?? [];
+        setBenchOptions(
+          [...floors].sort((a, b) => Number(b) - Number(a) || a.localeCompare(b)),
+        );
+      })
+      .catch(() => {
+        if (!cancelled) setBenchOptions([]);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [startDate, endDate]);
-
-  useEffect(() => {
-    const seen = records
-      .map((r) => String(r.excavationBench ?? "").trim())
-      .filter(Boolean);
-    if (seen.length === 0) return;
-    setKnownBenches((prev) => {
-      const merged = new Set([...prev, ...seen]);
-      return merged.size === prev.length
-        ? prev
-        : Array.from(merged).sort(
-            (a, b) => Number(b) - Number(a) || a.localeCompare(b),
-          );
-    });
-  }, [records]);
-
-  const benchOptions = knownBenches;
 
   // ── Filtered Records ─────────────────────────────────────────────────────
   const filteredRecords = useMemo(() => {

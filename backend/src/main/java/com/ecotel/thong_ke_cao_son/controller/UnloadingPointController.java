@@ -1,5 +1,6 @@
 package com.ecotel.thong_ke_cao_son.controller;
 
+import com.ecotel.thong_ke_cao_son.annotation.RequirePermission;
 import com.ecotel.thong_ke_cao_son.dto.request.BulkDeleteRequest;
 import com.ecotel.thong_ke_cao_son.dto.request.UnloadingPointRequest;
 import com.ecotel.thong_ke_cao_son.dto.response.ApiResponse;
@@ -20,6 +21,7 @@ import java.util.List;
 /** Danh mục Nơi dỡ tải. */
 @RestController
 @RequestMapping("/api/unloading-points")
+@RequirePermission(resource = "unloading-points")
 @RequiredArgsConstructor
 public class UnloadingPointController {
 

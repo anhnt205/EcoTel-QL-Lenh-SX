@@ -1,5 +1,6 @@
 package com.ecotel.thong_ke_cao_son.controller;
 
+import com.ecotel.thong_ke_cao_son.annotation.RequirePermission;
 import com.ecotel.thong_ke_cao_son.dto.request.BulkDeleteRequest;
 import com.ecotel.thong_ke_cao_son.dto.request.DensityParameterReplaceRequest;
 import com.ecotel.thong_ke_cao_son.dto.request.DensityParameterRequest;
@@ -23,6 +24,7 @@ import java.util.List;
 /** Danh mục Tỷ trọng (QĐ-04). */
 @RestController
 @RequestMapping("/api/density-parameters")
+@RequirePermission(resource = "density-parameters")
 @RequiredArgsConstructor
 public class DensityParameterController {
 

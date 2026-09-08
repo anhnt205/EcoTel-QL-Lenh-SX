@@ -1,5 +1,6 @@
 package com.ecotel.thong_ke_cao_son.controller;
 
+import com.ecotel.thong_ke_cao_son.annotation.RequirePermission;
 import com.ecotel.thong_ke_cao_son.dto.request.BulkDeleteRequest;
 import com.ecotel.thong_ke_cao_son.dto.request.ModelPeriodReplaceRequest;
 import com.ecotel.thong_ke_cao_son.dto.request.ModelPeriodRequest;
@@ -23,6 +24,7 @@ import java.util.List;
 /** Danh mục Mô hình (m3/chuyến) — mirror {@code DensityParameterController}. */
 @RestController
 @RequestMapping("/api/model-periods")
+@RequirePermission(resource = "model-periods")
 @RequiredArgsConstructor
 public class ModelPeriodController {
 

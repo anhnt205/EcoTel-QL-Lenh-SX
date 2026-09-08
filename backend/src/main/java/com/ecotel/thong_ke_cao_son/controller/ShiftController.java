@@ -1,5 +1,6 @@
 package com.ecotel.thong_ke_cao_son.controller;
 
+import com.ecotel.thong_ke_cao_son.annotation.RequirePermission;
 import com.ecotel.thong_ke_cao_son.dto.response.ApiResponse;
 import com.ecotel.thong_ke_cao_son.dto.response.PageResponse;
 import com.ecotel.thong_ke_cao_son.dto.response.ShiftResponse;
@@ -14,6 +15,7 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/shifts")
+@RequirePermission(resource = "shifts")
 @RequiredArgsConstructor
 public class ShiftController {
 

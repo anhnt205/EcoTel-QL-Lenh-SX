@@ -49,11 +49,28 @@ public class LocalAuthService {
     @Value("${app.code:tkcs}")
     private String appCode;
 
-    /** Các resource mà ứng dụng đang có. Dùng để dựng claim permissions. */
+    /**
+     * Các resource mà ứng dụng đang có. Dùng để dựng claim {@code permissions}
+     * của token cục bộ — PHẢI khớp đúng {@code resource} khai ở
+     * {@code @RequirePermission} trên từng controller, nếu không
+     * {@link AppUserDetails#hasPermission} luôn trả {@code false} cho resource
+     * thiếu tên (chặn nhầm cả ADMIN).
+     *
+     * <p>{@code positions} và {@code device-types} chưa có controller tương
+     * ứng — giữ lại phòng khi thêm, không gây hại vì permission chỉ nằm trong
+     * JWT, không tự tạo ra endpoint nào.
+     */
     private static final List<String> RESOURCES = List.of(
             "users", "departments", "positions", "shifts", "locations",
             "devices", "device-types", "materials", "cargo-groups", "cargo-types",
-            "excavation-reports", "transport-reports", "reconciliation"
+            "excavation-reports", "transport-reports", "reconciliation",
+            "acceptance-products", "classifications", "coefficients",
+            "density-parameters", "device-production-attributes", "excavation-areas",
+            "matrix-catalogs", "model-periods", "pickup-points", "production",
+            "receiving-points", "report-periods", "seam-groups", "survey-standards",
+            "ttl-clh-items", "unloading-points", "vehicle-category-classes",
+            "vehicle-fuel-classes", "vehicle-rank-groups", "vehicle-ranks",
+            "vehicle-types"
     );
 
     public record TokenPair(String appToken, String refreshToken) {}
@@ -94,6 +111,16 @@ public class LocalAuthService {
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.UNAUTHORIZED, "Tài khoản không còn tồn tại"));
 
+        // Thiếu ở bản gốc: tài khoản bị khoá SAU khi đã có refresh token vẫn
+        // đổi được token mới vô thời hạn (refresh token sống tới 7 ngày, tự
+        // gia hạn mỗi lần gọi) — khoá tài khoản không thật sự chặn được người
+        // đó. Kiểm tra lại y hệt login(). Phát hiện qua Quality Gate của
+        // Codex (2026-09-07).
+        if (!Boolean.TRUE.equals(user.getActive())) {
+            throw new ResponseStatusException(
+                    HttpStatus.UNAUTHORIZED, "Tài khoản đã bị khoá");
+        }
+
         Instant now = Instant.now();
         return new TokenPair(
                 buildToken(user, now, accessTtlSeconds, "access"),
@@ -120,9 +147,11 @@ public class LocalAuthService {
     /**
      * Quy đổi {@code Role} sang bộ quyền theo resource.
      *
-     * <p>Lưu ý: hiện KHÔNG controller nào gắn {@code @RequirePermission} nên
-     * {@code PermissionFilter} cho qua hết; bộ quyền này mới chỉ để token có
-     * đủ hình dạng và để sẵn sàng cho lúc bắt đầu gate thật.
+     * <p>Từ 2026-09-07: {@code PermissionFilter} thật sự gate theo bộ quyền
+     * này — mọi controller nghiệp vụ đã gắn {@code @RequirePermission}, và
+     * endpoint thiếu annotation bị từ chối mặc định (fail-closed) thay vì
+     * cho qua. EMPLOYEE chỉ đọc (r); MANAGER thêm được tạo/sửa (c/u); xoá
+     * và quyền quản trị (d/a) chỉ ADMIN.
      */
     private Map<String, Map<String, Boolean>> permissionsFor(User user) {
         String role = user.getRole() != null ? user.getRole().name() : "EMPLOYEE";

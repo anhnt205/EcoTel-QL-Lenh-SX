@@ -1,5 +1,6 @@
 package com.ecotel.thong_ke_cao_son.controller;
 
+import com.ecotel.thong_ke_cao_son.annotation.RequirePermission;
 import com.ecotel.thong_ke_cao_son.dto.request.MatrixAxisEntryRequest;
 import com.ecotel.thong_ke_cao_son.dto.request.MatrixCellUpsertRequest;
 import com.ecotel.thong_ke_cao_son.dto.request.MatrixVersionRequest;
@@ -29,6 +30,7 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/api/matrix-catalogs")
+@RequirePermission(resource = "matrix-catalogs")
 @RequiredArgsConstructor
 public class MatrixCatalogController {
 

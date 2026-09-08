@@ -1,5 +1,6 @@
 package com.ecotel.thong_ke_cao_son.controller;
 
+import com.ecotel.thong_ke_cao_son.annotation.RequirePermission;
 import com.ecotel.thong_ke_cao_son.dto.response.ApiResponse;
 import com.ecotel.thong_ke_cao_son.dto.response.MaterialResponse;
 import com.ecotel.thong_ke_cao_son.dto.response.PageResponse;
@@ -13,6 +14,7 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/materials")
+@RequirePermission(resource = "materials")
 @RequiredArgsConstructor
 public class MaterialController {
 

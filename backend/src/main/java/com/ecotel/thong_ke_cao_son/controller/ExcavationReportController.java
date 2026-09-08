@@ -1,5 +1,6 @@
 package com.ecotel.thong_ke_cao_son.controller;
 
+import com.ecotel.thong_ke_cao_son.annotation.RequirePermission;
 import com.ecotel.thong_ke_cao_son.dto.request.BulkDeleteRequest;
 import com.ecotel.thong_ke_cao_son.dto.request.ExcavationReportRequest;
 import com.ecotel.thong_ke_cao_son.dto.request.ExcavationReportTripRequest;
@@ -29,6 +30,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/excavation-reports")
+@RequirePermission(resource = "excavation-reports")
 @RequiredArgsConstructor
 public class ExcavationReportController {
 
@@ -60,6 +62,17 @@ public class ExcavationReportController {
         return ApiResponse.success(
                 excavationReportService.search(fromDate, toDate, shiftIds, excavatorIds,
                         receivingLocationIds, excavationFloors, pageable));
+    }
+
+    /**
+     * Toàn bộ giá trị Tầng xúc trong khoảng ngày — ĐỘC LẬP phân trang và mọi
+     * bộ lọc khác, để làm tuỳ chọn cho ô lọc "Tầng xúc" (xem javadoc
+     * {@code ExcavationReportRepository.findDistinctExcavationFloors}).
+     */
+    @GetMapping("/excavation-floors")
+    public ApiResponse<List<String>> excavationFloors(
+            @RequestParam LocalDate fromDate, @RequestParam LocalDate toDate) {
+        return ApiResponse.success(excavationReportService.getDistinctExcavationFloors(fromDate, toDate));
     }
 
     @PutMapping("/{id}")

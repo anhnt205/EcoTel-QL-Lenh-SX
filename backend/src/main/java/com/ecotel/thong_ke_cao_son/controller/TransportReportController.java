@@ -1,5 +1,6 @@
 package com.ecotel.thong_ke_cao_son.controller;
 
+import com.ecotel.thong_ke_cao_son.annotation.RequirePermission;
 import com.ecotel.thong_ke_cao_son.dto.request.BulkDeleteRequest;
 import com.ecotel.thong_ke_cao_son.dto.request.TransportReportBulkUpdateItem;
 import com.ecotel.thong_ke_cao_son.dto.request.TransportReportRequest;
@@ -32,6 +33,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/transport-reports")
+@RequirePermission(resource = "transport-reports")
 @RequiredArgsConstructor
 public class TransportReportController {
 

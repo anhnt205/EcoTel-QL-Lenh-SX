@@ -447,6 +447,22 @@ export async function fetchExcavationReports(params: {
 }
 
 /**
+ * Gọi API GET /api/excavation-reports/excavation-floors — toàn bộ giá trị
+ * Tầng xúc trong khoảng ngày, ĐỘC LẬP phân trang và mọi bộ lọc khác. Dùng
+ * để dựng tuỳ chọn cho ô lọc "Tầng xúc": nếu gom từ danh sách chuyến đã
+ * phân trang, tầng chỉ xuất hiện ở trang chưa xem thì không chọn được.
+ */
+export async function fetchDistinctExcavationFloors(
+  fromDate: string,
+  toDate: string,
+): Promise<ApiResponse<string[]>> {
+  const res = await api.get("/excavation-reports/excavation-floors", {
+    params: { fromDate, toDate },
+  });
+  return res.data;
+}
+
+/**
  * Gọi API GET /api/excavation-reports/{id}
  */
 export async function fetchExcavationReportById(

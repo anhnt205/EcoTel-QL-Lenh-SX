@@ -3,11 +3,17 @@ package com.ecotel.thong_ke_cao_son.service;
 import com.ecotel.thong_ke_cao_son.dto.request.ReportPeriodRequest;
 import com.ecotel.thong_ke_cao_son.dto.response.BulkDeleteResponse;
 import com.ecotel.thong_ke_cao_son.dto.response.PageResponse;
+import com.ecotel.thong_ke_cao_son.dto.response.ReportPeriodAuditResponse;
 import com.ecotel.thong_ke_cao_son.dto.response.ReportPeriodResponse;
+import com.ecotel.thong_ke_cao_son.enums.ReportPeriodAuditAction;
 import com.ecotel.thong_ke_cao_son.exception.BadRequestException;
 import com.ecotel.thong_ke_cao_son.exception.ResourceNotFoundException;
 import com.ecotel.thong_ke_cao_son.mapper.ReportPeriodMapper;
+import com.ecotel.thong_ke_cao_son.model.ProductionResult;
 import com.ecotel.thong_ke_cao_son.model.ReportPeriod;
+import com.ecotel.thong_ke_cao_son.model.ReportPeriodAudit;
+import com.ecotel.thong_ke_cao_son.repository.ProductionResultRepository;
+import com.ecotel.thong_ke_cao_son.repository.ReportPeriodAuditRepository;
 import com.ecotel.thong_ke_cao_son.repository.ReportPeriodRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -15,11 +21,14 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Function;
 
 @Service
 @RequiredArgsConstructor
@@ -33,6 +42,8 @@ public class ReportPeriodService {
 
     private final ReportPeriodRepository repository;
     private final ReportPeriodMapper mapper;
+    private final ReportPeriodAuditRepository auditRepository;
+    private final ProductionResultRepository resultRepository;
 
     @Transactional(readOnly = true)
     public PageResponse<ReportPeriodResponse> getAll(String keyword, Pageable pageable) {
@@ -80,6 +91,7 @@ public class ReportPeriodService {
     @Transactional
     public ReportPeriodResponse update(Long id, ReportPeriodRequest request) {
         ReportPeriod entity = find(id);
+        rejectIfLocked(entity, "sửa");
         validate(request, id);
         mapper.updateEntity(entity, request);
         applyDefaultDisplayName(entity);
@@ -88,7 +100,22 @@ public class ReportPeriodService {
 
     @Transactional
     public void delete(Long id) {
-        repository.delete(find(id));
+        ReportPeriod entity = find(id);
+        rejectIfLocked(entity, "xoá");
+        repository.delete(entity);
+    }
+
+    /**
+     * Đổi ngày/xoá một kỳ ĐÃ CHỐT sẽ âm thầm làm sai kết quả đã đóng băng —
+     * kết quả được tính khớp đúng khoảng ngày cũ, đổi khoảng ngày là phá vỡ
+     * căn cứ đó mà không qua vòng mở khoá có ghi vết (QĐ-03). Chặn ở đây để
+     * bịt đường vòng: không sửa được calculatePeriod() bằng cách sửa period.
+     */
+    private void rejectIfLocked(ReportPeriod entity, String action) {
+        if (entity.isLocked()) {
+            throw new BadRequestException("Kỳ " + entity.getDisplayName()
+                    + " đã chốt — mở khoá trước khi " + action + ".");
+        }
     }
 
     @Transactional
@@ -199,5 +226,100 @@ public class ReportPeriodService {
     private ReportPeriod find(Long id) {
         return repository.findById(id).orElseThrow(
                 () -> new ResourceNotFoundException("Không tìm thấy kỳ báo cáo với id: " + id));
+    }
+
+    // ── chốt / mở khoá (QĐ-03) ────────────────────────────────────────────
+
+    /**
+     * Chốt kỳ — đóng băng kết quả hiện có, chặn tính lại cho tới khi mở
+     * khoá. Đòi kỳ đã tính ít nhất một lần: chốt một kỳ trống là vô nghĩa
+     * và dễ nhầm với "đã xong" trong khi thực ra chưa tính gì.
+     */
+    @Transactional
+    public ReportPeriodResponse lock(Long id, String username, String fullName) {
+        ReportPeriod period = find(id);
+        if (period.isLocked()) {
+            throw new BadRequestException("Kỳ " + period.getDisplayName() + " đã chốt rồi.");
+        }
+        List<ProductionResult> results = resultRepository.findAllByPeriod(id);
+        if (results.isEmpty()) {
+            throw new BadRequestException("Kỳ " + period.getDisplayName()
+                    + " chưa có kết quả tính nào — tính sản lượng trước khi chốt.");
+        }
+
+        period.setLocked(true);
+        period.setStale(false);
+        repository.save(period);
+
+        auditRepository.save(snapshot(period, ReportPeriodAuditAction.LOCK, username, fullName, null, results));
+        return mapper.toResponse(period);
+    }
+
+    /**
+     * Mở khoá — hành động RIÊNG, quyền RIÊNG (gate ở controller bằng action
+     * "a", khác quyền "sửa" thường dùng để chốt), bắt buộc lý do, và đánh
+     * dấu {@code stale} để giao diện biết báo cáo đang xem đã lỗi thời cho
+     * tới khi có bản chốt mới — đúng ba yêu cầu của QĐ-03.
+     */
+    @Transactional
+    public ReportPeriodResponse unlock(Long id, String reason, String username, String fullName) {
+        ReportPeriod period = find(id);
+        if (!period.isLocked()) {
+            throw new BadRequestException("Kỳ " + period.getDisplayName() + " chưa chốt, không cần mở khoá.");
+        }
+
+        List<ProductionResult> results = resultRepository.findAllByPeriod(id);
+        auditRepository.save(snapshot(period, ReportPeriodAuditAction.UNLOCK, username, fullName, reason, results));
+
+        period.setLocked(false);
+        period.setStale(true);
+        repository.save(period);
+        return mapper.toResponse(period);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ReportPeriodAuditResponse> getAudits(Long id) {
+        find(id); // 404 rõ ràng nếu id sai, thay vì trả mảng rỗng gây hiểu nhầm "chưa có vết nào".
+        return auditRepository.findByReportPeriodIdOrderByPerformedAtDesc(id).stream()
+                .map(ReportPeriodService::toAuditResponse)
+                .toList();
+    }
+
+    private ReportPeriodAudit snapshot(ReportPeriod period, ReportPeriodAuditAction action,
+                                       String username, String fullName, String reason,
+                                       List<ProductionResult> results) {
+        Boolean tkeMode = results.isEmpty() ? null : results.get(0).isTkeMode();
+        return ReportPeriodAudit.builder()
+                .reportPeriod(period)
+                .action(action)
+                .performedByUsername(username)
+                .performedByFullName(fullName)
+                .performedAt(LocalDateTime.now())
+                .reason(reason)
+                .tkeMode(tkeMode)
+                .totalM3(sum(results, ProductionResult::getTotalM3))
+                .totalTon(sum(results, ProductionResult::getTotalTon))
+                .totalTkm(sum(results, ProductionResult::getTotalTkm))
+                .build();
+    }
+
+    private static ReportPeriodAuditResponse toAuditResponse(ReportPeriodAudit a) {
+        return ReportPeriodAuditResponse.builder()
+                .id(a.getId())
+                .action(a.getAction())
+                .performedByUsername(a.getPerformedByUsername())
+                .performedByFullName(a.getPerformedByFullName())
+                .performedAt(a.getPerformedAt())
+                .reason(a.getReason())
+                .tkeMode(a.getTkeMode())
+                .totalM3(a.getTotalM3())
+                .totalTon(a.getTotalTon())
+                .totalTkm(a.getTotalTkm())
+                .build();
+    }
+
+    private static BigDecimal sum(List<ProductionResult> rows, Function<ProductionResult, BigDecimal> f) {
+        return rows.stream().map(f).filter(java.util.Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 }

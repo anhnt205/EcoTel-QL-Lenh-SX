@@ -1,5 +1,6 @@
 package com.ecotel.thong_ke_cao_son.controller;
 
+import com.ecotel.thong_ke_cao_son.annotation.RequirePermission;
 import com.ecotel.thong_ke_cao_son.dto.response.*;
 import com.ecotel.thong_ke_cao_son.model.SurveyCoefficient;
 import com.ecotel.thong_ke_cao_son.repository.SurveyCoefficientRepository;
@@ -22,6 +23,7 @@ import java.util.List;
  */
 @RestController
 @RequestMapping("/api/production")
+@RequirePermission(resource = "production")
 @RequiredArgsConstructor
 public class ProductionCalculationController {
 

@@ -1,5 +1,6 @@
 package com.ecotel.thong_ke_cao_son.controller;
 
+import com.ecotel.thong_ke_cao_son.annotation.RequirePermission;
 import com.ecotel.thong_ke_cao_son.dto.request.BulkDeleteRequest;
 import com.ecotel.thong_ke_cao_son.dto.request.VehicleFuelClassRequest;
 import com.ecotel.thong_ke_cao_son.dto.response.ApiResponse;
@@ -20,6 +21,7 @@ import java.util.List;
 /** Danh mục Chủng loại xe + DMNL. */
 @RestController
 @RequestMapping("/api/vehicle-fuel-classes")
+@RequirePermission(resource = "vehicle-fuel-classes")
 @RequiredArgsConstructor
 public class VehicleFuelClassController {
 

@@ -1,5 +1,6 @@
 package com.ecotel.thong_ke_cao_son.controller;
 
+import com.ecotel.thong_ke_cao_son.annotation.RequirePermission;
 import com.ecotel.thong_ke_cao_son.dto.request.BulkDeleteRequest;
 import com.ecotel.thong_ke_cao_son.dto.request.VehicleRankGroupRequest;
 import com.ecotel.thong_ke_cao_son.dto.response.ApiResponse;
@@ -20,6 +21,7 @@ import java.util.List;
 /** Danh mục Nhóm hạng xe. */
 @RestController
 @RequestMapping("/api/vehicle-rank-groups")
+@RequirePermission(resource = "vehicle-rank-groups")
 @RequiredArgsConstructor
 public class VehicleRankGroupController {
 

@@ -82,6 +82,23 @@ export interface ReportPeriodOption {
   toDate: string;
   displayName: string;
   dayCount: number;
+  /** Đã chốt — không tính lại được cho tới khi mở khoá (QĐ-03). */
+  locked: boolean;
+  /** Vừa mở khoá, kết quả đang hiện coi như lỗi thời cho tới khi chốt lại (QĐ-03). */
+  stale: boolean;
+}
+
+export interface ReportPeriodAudit {
+  id: number;
+  action: "LOCK" | "UNLOCK";
+  performedByUsername: string;
+  performedByFullName: string | null;
+  performedAt: string;
+  reason: string | null;
+  tkeMode: boolean | null;
+  totalM3: number | null;
+  totalTon: number | null;
+  totalTkm: number | null;
 }
 
 export interface SurveyCoefficientRow {
@@ -169,6 +186,17 @@ export const productionService = {
 
   calculate: async (periodId: number, tkeMode: boolean): Promise<CalculationSummary> =>
     unwrap(await api.post("/production/calculate", null, { params: { periodId, tkeMode } })),
+
+  /** Chốt kỳ (QĐ-03) — đóng băng kết quả, chặn "Tính lại" cho tới khi mở khoá. */
+  lockPeriod: async (periodId: number): Promise<ReportPeriodOption> =>
+    unwrap(await api.post(`/report-periods/${periodId}/lock`)),
+
+  /** Mở khoá kỳ đã chốt — bắt buộc lý do (QĐ-03), chỉ ADMIN. */
+  unlockPeriod: async (periodId: number, reason: string): Promise<ReportPeriodOption> =>
+    unwrap(await api.post(`/report-periods/${periodId}/unlock`, { reason })),
+
+  periodAudits: async (periodId: number): Promise<ReportPeriodAudit[]> =>
+    unwrap(await api.get(`/report-periods/${periodId}/audits`)) ?? [],
 
   apTracDia: async (
     year: number,

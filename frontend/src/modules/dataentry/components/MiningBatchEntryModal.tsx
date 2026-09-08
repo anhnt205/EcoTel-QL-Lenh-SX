@@ -240,10 +240,23 @@ export const MiningBatchEntryModal: React.FC<MiningBatchEntryModalProps> = ({
           return;
         }
 
-        // Thêm đủ số dòng trước, rồi điền theo chỉ số — Zustand set là đồng
-        // bộ nên chỉ số tính trước vẫn đúng.
-        const startIdx = sessions[activeIdx]?.trips?.length ?? 0;
-        parsed.forEach(() => addTripRow());
+        // Phiếu mới luôn có sẵn ĐÚNG MỘT dòng trống mặc định (xem
+        // createDefaultSession() trong useMiningDraftStore.ts) — nếu cứ nối
+        // thêm dòng sau nó thì dòng trống đó vẫn còn nguyên, và schema xác
+        // thực (miningSessionDraftSchema) chặn lưu vì dòng nào cũng phải có
+        // Số xe/Số chuyến/Loại hàng. Trước đây phải tự tay xoá dòng đó rồi
+        // mới lưu được. removeTripRow() lại từ chối xoá khi đó là dòng CUỐI
+        // CÙNG (không cho phiếu về 0 dòng), nên không xoá-trước-rồi-thêm
+        // được — thay vào đó TÁI DÙNG đúng dòng trống đó cho dòng Excel đầu
+        // tiên, chỉ thêm dòng mới cho phần còn lại.
+        const existingTrips = sessions[activeIdx]?.trips ?? [];
+        const isPristineEmptyRow = (r?: { vehicleNo: string; tripCount: number | ""; material: string }) =>
+          !!r && !r.vehicleNo && r.tripCount === "" && !r.material;
+        const reuseFirstRow = existingTrips.length === 1 && isPristineEmptyRow(existingTrips[0]);
+
+        const startIdx = reuseFirstRow ? 0 : existingTrips.length;
+        const rowsToAdd = reuseFirstRow ? parsed.length - 1 : parsed.length;
+        for (let i = 0; i < rowsToAdd; i++) addTripRow();
         parsed.forEach((r, i) => {
           const isOther =
             r.loadStatus && !/^(đủ tải|du tai|roda)/i.test(r.loadStatus);

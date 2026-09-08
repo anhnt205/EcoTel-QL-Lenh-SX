@@ -243,8 +243,12 @@ public class FuelCalculator {
         return coefficientRepository.findByCode(COEFFICIENT_MUD)
                 .map(CoefficientItem::getValue)
                 .orElseGet(() -> {
-                    warnings.add("Danh mục Hệ số chưa có mã \"" + COEFFICIENT_MUD
-                            + "\" (hệ số bùn) — khoản bù nhiên liệu cho bùn tính bằng 0.");
+                    // Chữ "tính bằng 0" ở đây từng đúng khi hàm này chỉ CẢNH
+                    // BÁO — từ QĐ-04/QĐ-06 (2026-09-07, sau Quality Gate của
+                    // Codex), `warnings` không còn là cảnh báo suông: dòng
+                    // này khiến `calculatePeriod` ném lỗi tổng hợp và KHÔNG
+                    // lưu gì hết, chứ không âm thầm cho hệ số bùn bằng 0 nữa.
+                    warnings.add("Danh mục Hệ số chưa có mã \"" + COEFFICIENT_MUD + "\" (hệ số bùn).");
                     return BigDecimal.ZERO;
                 });
     }

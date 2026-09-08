@@ -33,4 +33,26 @@ public interface ExcavationReportRepository extends JpaRepository<ExcavationRepo
 
     Optional<ExcavationReport> findByReportDateAndShiftIdAndExcavatorDeviceIdAndEmployeeId(
             LocalDate reportDate, Long shiftId, Long excavatorDeviceId, Long employeeId);
+
+    /**
+     * Toàn bộ giá trị Tầng xúc khác rỗng trong khoảng ngày — KHÔNG phân
+     * trang, KHÔNG lọc theo ca/máy xúc/nơi nhận tải/chính tầng xúc.
+     *
+     * <p>"Tầng xúc" là chuỗi tự do, không có danh mục riêng — màn nhập liệu
+     * phải tự gom giá trị từ dữ liệu để làm tuỳ chọn lọc. Trước đây gom từ
+     * kết quả TRANG ĐANG XEM của {@link #search}, nên tầng chỉ xuất hiện ở
+     * trang sau (hoặc bị chính bộ lọc khác giấu đi) không bao giờ chọn được.
+     * Truy vấn này ĐỘC LẬP với {@code Pageable} và mọi bộ lọc khác — chỉ còn
+     * phụ thuộc khoảng ngày, khớp đúng cách {@code knownBenches} phía
+     * frontend reset khi đổi khoảng ngày.
+     */
+    @Query("""
+        SELECT DISTINCT r.excavationFloor FROM ExcavationReport r
+        WHERE r.reportDate BETWEEN :fromDate AND :toDate
+          AND r.excavationFloor IS NOT NULL AND r.excavationFloor <> ''
+        ORDER BY r.excavationFloor
+        """)
+    List<String> findDistinctExcavationFloors(
+            @Param("fromDate") LocalDate fromDate,
+            @Param("toDate") LocalDate toDate);
 }

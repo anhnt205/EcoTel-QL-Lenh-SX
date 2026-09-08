@@ -5,11 +5,13 @@ import {
   Calculator,
   Columns3,
   Download,
+  Lock,
   LayoutGrid,
   Menu,
   RotateCcw,
   Search,
   TriangleAlert,
+  Unlock,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -66,6 +68,7 @@ export function ProductionReportPage() {
   const [tkeMode, setTkeMode] = useState(false);
   const [calculating, setCalculating] = useState(false);
   const [warnings, setWarnings] = useState<string[]>([]);
+  const [lockBusy, setLockBusy] = useState(false);
 
   // ── Lọc & tìm kiếm (chạy trên toàn bộ dòng của kỳ, không phải một trang) ──
   const [keyword, setKeyword] = useState("");
@@ -113,6 +116,11 @@ export function ProductionReportPage() {
     if (periodId && periods.some((p) => p.id === periodId)) return periodId;
     return periods[0]?.id ?? null;
   }, [periodId, periods]);
+
+  const effectivePeriod = useMemo(
+    () => periods.find((p) => p.id === effectivePeriodId) ?? null,
+    [periods, effectivePeriodId],
+  );
 
   const { data: summary } = useQuery({
     queryKey: ["production-summary", effectivePeriodId],
@@ -188,7 +196,11 @@ export function ProductionReportPage() {
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ["production-summary"] });
     queryClient.invalidateQueries({ queryKey: ["production-all-rows"] });
+    queryClient.invalidateQueries({ queryKey: ["report-periods"] });
   };
+
+  const apiErrorMessage = (e: unknown, fallback: string) =>
+    (e as { response?: { data?: { message?: string } } }).response?.data?.message ?? fallback;
 
   const handleCalculate = async () => {
     if (!effectivePeriodId) return;
@@ -202,10 +214,47 @@ export function ProductionReportPage() {
         `Đã tính ${res.tripCount} chuyến, sinh ${res.coefficientRowCount} dòng hệ số.`,
       );
     } catch (e: unknown) {
-      const r = (e as { response?: { data?: { message?: string } } }).response;
-      toast.error(r?.data?.message ?? "Tính sản lượng thất bại.");
+      toast.error(apiErrorMessage(e, "Tính sản lượng thất bại."));
     } finally {
       setCalculating(false);
+    }
+  };
+
+  /** Chốt kỳ (QĐ-03) — đóng băng kết quả hiện có, chặn "Tính lại kỳ" cho tới khi mở khoá. */
+  const handleLock = async () => {
+    if (!effectivePeriodId) return;
+    setLockBusy(true);
+    try {
+      await productionService.lockPeriod(effectivePeriodId);
+      refresh();
+      toast.success("Đã chốt kỳ.");
+    } catch (e: unknown) {
+      toast.error(apiErrorMessage(e, "Chốt kỳ thất bại."));
+    } finally {
+      setLockBusy(false);
+    }
+  };
+
+  /** Mở khoá kỳ đã chốt (QĐ-03) — bắt buộc lý do, chỉ ADMIN thao tác được. */
+  const handleUnlock = async () => {
+    if (!effectivePeriodId) return;
+    const reason = window.prompt(
+      "Lý do mở khoá kỳ đã chốt (bắt buộc — sẽ được ghi vết):",
+    );
+    if (reason === null) return; // Bấm Huỷ.
+    if (!reason.trim()) {
+      toast.error("Phải nhập lý do mở khoá.");
+      return;
+    }
+    setLockBusy(true);
+    try {
+      await productionService.unlockPeriod(effectivePeriodId, reason.trim());
+      refresh();
+      toast.success("Đã mở khoá kỳ — kết quả đang xem coi như lỗi thời cho tới khi chốt lại.");
+    } catch (e: unknown) {
+      toast.error(apiErrorMessage(e, "Mở khoá thất bại."));
+    } finally {
+      setLockBusy(false);
     }
   };
 
@@ -313,7 +362,7 @@ export function ProductionReportPage() {
             {periods.length === 0 && <option value="">— chưa có kỳ nào —</option>}
             {periods.map((p) => (
               <option key={p.id} value={p.id}>
-                {p.displayName} ({p.dayCount} ngày)
+                {p.displayName} ({p.dayCount} ngày){p.locked ? " — đã chốt" : ""}
               </option>
             ))}
           </select>
@@ -332,16 +381,58 @@ export function ProductionReportPage() {
         <Button
           size="sm"
           className="h-9 gap-1.5 bg-blue-600 text-white hover:bg-blue-700"
-          disabled={!effectivePeriodId || calculating}
+          disabled={!effectivePeriodId || calculating || !!effectivePeriod?.locked}
+          title={effectivePeriod?.locked ? "Kỳ đã chốt — mở khoá trước khi tính lại" : undefined}
           onClick={handleCalculate}
         >
           <Calculator className="h-4 w-4" />
           {calculating ? "Đang tính…" : "Tính lại kỳ"}
         </Button>
+
+        {/* Chốt/mở khoá — QĐ-03: kỳ đã chốt là bất biến cho tới khi mở khoá
+            (endpoint riêng, quyền riêng, bắt buộc lý do). */}
+        {effectivePeriod?.locked ? (
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-9 gap-1.5 border-amber-400 text-amber-700 hover:bg-amber-50 dark:text-amber-400"
+            disabled={lockBusy}
+            onClick={handleUnlock}
+          >
+            <Unlock className="h-4 w-4" />
+            Mở khoá
+          </Button>
+        ) : (
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-9 gap-1.5"
+            disabled={!effectivePeriodId || lockBusy || !summary || summary.rowCount === 0}
+            title={!summary || summary.rowCount === 0 ? "Tính sản lượng trước khi chốt" : undefined}
+            onClick={handleLock}
+          >
+            <Lock className="h-4 w-4" />
+            Chốt kỳ
+          </Button>
+        )}
+
         <Button variant="outline" size="sm" className="h-9 w-9 p-0" title="Làm mới" onClick={refresh}>
           <RotateCcw className="h-4 w-4" />
         </Button>
       </div>
+
+      {effectivePeriod?.locked && (
+        <div className="flex items-center gap-1.5 rounded-md border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-200">
+          <Lock className="h-3.5 w-3.5" />
+          Kỳ đã chốt — không tính lại được. Mở khoá nếu cần đổi chế độ hoặc tính lại.
+        </div>
+      )}
+      {effectivePeriod?.stale && (
+        <div className="flex items-center gap-1.5 rounded-md border border-red-300 bg-red-50 px-3 py-1.5 text-xs text-red-900 dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-200">
+          <TriangleAlert className="h-3.5 w-3.5" />
+          Kỳ vừa được mở khoá — kết quả đang xem có thể LỖI THỜI so với báo cáo đã chốt trước đó. Tính lại rồi chốt lại để xoá cảnh báo này.
+        </div>
+      )}
 
       {warnings.length > 0 && (
         <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-200">

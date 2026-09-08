@@ -93,6 +93,24 @@ public class ProductionCalculationService {
         ReportPeriod period = periodRepository.findById(periodId).orElseThrow(
                 () -> new ResourceNotFoundException("Không tìm thấy kỳ báo cáo id: " + periodId));
 
+        // QĐ-03: kỳ đã CHỐT là bất biến — không cho tính lại (dù cùng tkeMode
+        // hay đổi mode) cho tới khi mở khoá qua endpoint riêng, có quyền
+        // riêng, ghi vết. Trước 2026-09-07 hàm này chấp nhận đổi tkeMode và
+        // ghi đè kết quả một kỳ đã chốt bất cứ lúc nào, không ai ngăn, không
+        // ai biết. Phát hiện qua Quality Gate của Codex.
+        if (period.isLocked()) {
+            throw new BadRequestException("Kỳ " + period.getDisplayName()
+                    + " đã chốt — mở khoá trước khi tính lại (mục Kỳ báo cáo).");
+        }
+
+        // QĐ-05 ràng buộc 2 ("không hở") cố tình để kiểm tra Ở ĐÂY, không lúc
+        // khai báo danh mục — vì "lúc đang khai báo dở dang thì hở là chuyện
+        // bình thường". Trước 2026-09-07 hàm này chưa từng được gọi (dead
+        // code `requirePeriodOf`), nên chuyến rơi vào ngày chưa khai kỳ nào
+        // âm thầm biến mất khỏi mọi báo cáo — không kỳ nào (kể cả kỳ liền kề)
+        // từng đọc tới nó. Phát hiện qua Quality Gate của Codex.
+        assertNoGapInMonth(period);
+
         List<TransportReportTrip> trips = tripRepository.findByReportDateBetween(
                 period.getFromDate(), period.getToDate());
         if (trips.isEmpty()) {
@@ -104,6 +122,15 @@ public class ProductionCalculationService {
         resultRepository.deleteByPeriod(periodId);
         coefficientRepository.deleteByPeriod(periodId);
 
+        // Tên gọi "warnings" giữ nguyên vì đã lan khắp FuelCalculator và các
+        // hàm dưới đây, nhưng NGỮ NGHĨA đã đổi (2026-09-07, sau Quality Gate
+        // của Codex): mọi dòng thêm vào đây là TRA TRƯỢT MỘT THAM SỐ ĐỊNH MỨC
+        // BẮT BUỘC (STD, Tỷ trọng, Thể trọng, ĐMNL, Năng suất xe, HS điều
+        // chỉnh, hệ số bùn…). QĐ-04 và QĐ-06 đều nói rõ: tra trượt phải "báo
+        // lỗi nghiệp vụ rõ ràng, tuyệt đối không âm thầm lấy 0" — nên list
+        // này không còn là "cảnh báo rồi vẫn lưu" nữa. Cuối hàm, nếu list còn
+        // phần tử thì NÉM LỖI TỔNG HỢP thay vì lưu — xem khối kiểm tra ngay
+        // trước `coefficientRepository.saveAll(...)`.
         List<String> warnings = new ArrayList<>();
 
         // ── LƯỢT 1 ──────────────────────────────────────────────────────────
@@ -127,7 +154,7 @@ public class ProductionCalculationService {
         List<Stage2> stage2 = new ArrayList<>();
         for (TripBaseResult r : base) {
             GroupKey gk = new GroupKey(r.getSeamGroupExcavatorKey(), r.getAcceptanceProduct());
-            stage2.add(applyStage2(r, apTdia.get(gk), tkeMode));
+            stage2.add(applyStage2(r, apTdia.get(gk), tkeMode, warnings));
         }
 
         // ── RÀO CHẮN 2: gộp lần hai → Ap Tkm ────────────────────────────────
@@ -140,7 +167,7 @@ public class ProductionCalculationService {
 
         Map<GroupKey, SurveyCoefficient> apTkm = new LinkedHashMap<>();
         for (Map.Entry<GroupKey, List<Stage2>> e : groups2.entrySet()) {
-            apTkm.put(e.getKey(), buildApTkm(period, e.getKey(), e.getValue(), tkeMode));
+            apTkm.put(e.getKey(), buildApTkm(period, e.getKey(), e.getValue(), tkeMode, warnings));
         }
 
         // ── Nhánh nhiên liệu: nạp ba lưới MỘT LẦN cho cả kỳ ─────────────────
@@ -160,6 +187,18 @@ public class ProductionCalculationService {
             results.add(result);
         }
 
+        // Tra trượt tham số bắt buộc ở BẤT KỲ chuyến/nhóm nào → KHÔNG lưu gì
+        // hết, ném MỘT lỗi tổng hợp liệt kê đủ các chỗ thiếu (QĐ-04/QĐ-06:
+        // "tuyệt đối không âm thầm lấy 0"). @Transactional cuộn lại cả hai
+        // deleteByPeriod ở trên, nên kết quả kỳ trước đó vẫn nguyên vẹn.
+        //
+        // Cố tình gom hết rồi báo MỘT LẦN thay vì dừng ở lỗi đầu tiên: người
+        // dùng cần biết TOÀN BỘ danh sách còn thiếu để đi khai đủ trong một
+        // lượt, không phải sửa-chạy-lại từng cái một.
+        if (!warnings.isEmpty()) {
+            throw new BadRequestException(buildAggregateError(warnings));
+        }
+
         coefficientRepository.saveAll(apTdia.values());
         coefficientRepository.saveAll(apTkm.values());
         resultRepository.saveAll(results);
@@ -170,14 +209,72 @@ public class ProductionCalculationService {
         return new CalculationSummary(results.size(), apTdia.size() + apTkm.size(), tkeMode, warnings);
     }
 
+    private static final int MAX_ERRORS_IN_MESSAGE = 15;
+
+    /** Gộp danh sách tra trượt thành một thông báo lỗi — cắt bớt nếu quá dài. */
+    private String buildAggregateError(List<String> issues) {
+        List<String> distinct = issues.stream().distinct().toList();
+        StringBuilder sb = new StringBuilder("Chưa tính được kỳ này vì còn ")
+                .append(distinct.size()).append(" chỗ thiếu khai báo:\n");
+        distinct.stream().limit(MAX_ERRORS_IN_MESSAGE).forEach(w -> sb.append("- ").append(w).append("\n"));
+        if (distinct.size() > MAX_ERRORS_IN_MESSAGE) {
+            sb.append("… và ").append(distinct.size() - MAX_ERRORS_IN_MESSAGE).append(" chỗ khác.");
+        }
+        return sb.toString();
+    }
+
+    /**
+     * QĐ-05 ràng buộc 2 — mọi ngày trong tháng của {@code period} phải thuộc
+     * ĐÚNG MỘT kỳ đã khai, không hở. Không kiểm tra chồng lấn ở đây: đã chặn
+     * lúc khai báo (xem {@code ReportPeriodService.validate}); ở đây chỉ lo
+     * phần còn lại — khoảng trống mà lúc khai báo không thể tự phát hiện
+     * (vd người dùng xoá bớt kỳ giữa tháng sau khi đã khai đủ).
+     */
+    private void assertNoGapInMonth(ReportPeriod period) {
+        List<ReportPeriod> monthPeriods = periodRepository
+                .findByYearAndMonthOrderByPeriodIndexAsc(period.getYear(), period.getMonth())
+                .stream()
+                .sorted(Comparator.comparing(ReportPeriod::getFromDate))
+                .toList();
+
+        java.time.YearMonth ym = java.time.YearMonth.of(period.getYear(), period.getMonth());
+        java.time.LocalDate cursor = ym.atDay(1);
+        for (ReportPeriod p : monthPeriods) {
+            if (p.getFromDate().isAfter(cursor)) {
+                throw gapError(period, cursor, p.getFromDate().minusDays(1));
+            }
+            // fromDate < cursor nghĩa là chồng lấn với kỳ trước — đã bị chặn
+            // lúc khai báo, không lặp lại kiểm tra ở đây; chỉ đẩy cursor tới
+            // biên xa nhất đã phủ được để dò tiếp phần còn lại của tháng.
+            if (p.getToDate().plusDays(1).isAfter(cursor)) {
+                cursor = p.getToDate().plusDays(1);
+            }
+        }
+        java.time.LocalDate monthEnd = ym.atEndOfMonth();
+        if (!cursor.isAfter(monthEnd)) {
+            throw gapError(period, cursor, monthEnd);
+        }
+    }
+
+    private BadRequestException gapError(ReportPeriod period, java.time.LocalDate from, java.time.LocalDate to) {
+        String range = from.equals(to) ? ("ngày " + from) : ("từ " + from + " đến " + to);
+        return new BadRequestException("Tháng " + period.getMonth() + "/" + period.getYear()
+                + " đang HỞ " + range + " — chưa có Kỳ báo cáo nào phủ khoảng này, nên chuyến vận tải"
+                + " rơi vào đó sẽ không bao giờ được tính bởi kỳ nào cả. Khai đủ Kỳ báo cáo cho"
+                + " khoảng này rồi tính lại (không phải riêng kỳ đang chọn).");
+    }
+
     // ── nhánh nhiên liệu ────────────────────────────────────────────────────
 
     /**
      * Nạp ba lưới của nhánh nhiên liệu.
      *
-     * <p>Lưới chưa khai báo thì bỏ qua kèm cảnh báo, KHÔNG ném lỗi: sản lượng
-     * tính được mà không cần nhiên liệu, nên chặn cả kỳ vì thiếu một lưới phụ
-     * là làm hỏng luôn phần vốn chạy đúng.
+     * <p>Lưới chưa khai báo thì KHÔNG ném lỗi ngay tại đây — chỉ ghi vào
+     * {@code warnings} — để một lượt chạy báo được ĐỦ mọi chỗ thiếu cùng lúc
+     * (STD, ĐMNL, Năng suất xe, HS điều chỉnh…) thay vì dừng ở lỗi đầu tiên.
+     * Nhưng {@code warnings} không còn "chỉ cảnh báo": {@link #calculatePeriod}
+     * ném lỗi tổng hợp và KHÔNG lưu gì nếu list này còn phần tử sau khi tính
+     * xong cả kỳ (QĐ-04/QĐ-06 — DE/EA là hai khoá được QĐ-06 nêu đích danh).
      */
     private Map<String, MatrixGridResponse> loadFuelGrids(java.time.LocalDate date, List<String> warnings) {
         Map<String, MatrixGridResponse> grids = new LinkedHashMap<>();
@@ -237,11 +334,13 @@ public class ProductionCalculationService {
 
         Optional<SurveyStandard> std = findStandard(key, period);
         if (std.isEmpty()) {
-            // Không có số trắc địa thì hệ số bằng 0 — đúng docx dòng 253–255
-            // ("Tổng m3 = 0 > Đất CN = 0 và HS = 0"). Nhưng phải BÁO cho người
-            // dùng, vì lặng lẽ nhân 0 sẽ xoá sạch sản lượng của cả nhóm.
+            // Không có số trắc địa: docx dòng 253–255 nói "Tổng m3 = 0 > Đất
+            // CN = 0 và HS = 0", nhưng QĐ-04 chốt rõ hơn — tra trượt tham số
+            // định mức phải BÁO LỖI NGHIỆP VỤ, "tuyệt đối không âm thầm lấy
+            // 0". Ghi vào `warnings`; `calculatePeriod` ném lỗi tổng hợp và
+            // không lưu gì nếu list này còn phần tử sau khi tính xong cả kỳ.
             warnings.add("Chưa khai báo STD cho khoá \"" + key.key()
-                    + "\" / " + key.product() + " — hệ số của nhóm này bằng 0.");
+                    + "\" / " + key.product() + ".");
             c.setHsM3(BigDecimal.ZERO);
             c.setHsTon(BigDecimal.ZERO);
             c.setHsTkm(BigDecimal.ZERO);
@@ -266,7 +365,8 @@ public class ProductionCalculationService {
     private record Stage2(TripBaseResult base, BigDecimal ds, BigDecimal dw,
                           BigDecimal dx, BigDecimal bulkDensity) {}
 
-    private Stage2 applyStage2(TripBaseResult r, SurveyCoefficient apTdia, boolean tkeMode) {
+    private Stage2 applyStage2(TripBaseResult r, SurveyCoefficient apTdia, boolean tkeMode,
+                               List<String> warnings) {
         TransportReportTrip trip = r.getTrip();
         boolean ctnb = isCtnb(trip);
 
@@ -279,7 +379,7 @@ public class ProductionCalculationService {
                 ? r.getTotalM3().multiply(ctnbFactor)
                 : r.getTotalM3().multiply(hsM3);
 
-        BigDecimal bulkDensity = resolveBulkDensity(r, tkeMode);
+        BigDecimal bulkDensity = resolveBulkDensity(r, tkeMode, warnings);
 
         // DW5 = IF(TCN, AM5*AF5, DS5*AC5)
         BigDecimal dw = ctnb
@@ -303,7 +403,7 @@ public class ProductionCalculationService {
      * chính Tỷ trọng thường; {@code Dat_SX}/{@code Than_SX}/{@code Dat_CN}
      * thì lấy cột Thể trọng tương ứng trong danh mục STD; còn lại bằng 0.
      */
-    private BigDecimal resolveBulkDensity(TripBaseResult r, boolean tkeMode) {
+    private BigDecimal resolveBulkDensity(TripBaseResult r, boolean tkeMode, List<String> warnings) {
         String product = r.getAcceptanceProduct();
         if (equalsAny(product, "Dat_TCN", "Than_CN")) {
             return r.getDensity();
@@ -314,11 +414,21 @@ public class ProductionCalculationService {
             return r.getDensity();
         }
         if (!equalsAny(product, "Dat_SX", "Than_SX", "Dat_CN")) {
+            // KHÔNG phải tra trượt — đây là quy tắc nghiệp vụ thật (docx dòng
+            // 269–273): thể trọng chỉ có nghĩa với 4 sản phẩm liệt kê ở trên,
+            // sản phẩm khác thì 0 là giá trị ĐÚNG, không phải thiếu khai báo.
             return BigDecimal.ZERO;
         }
         Optional<SurveyStandard> std = surveyStandardRepository.findEffective(
                 standardTypeOf(product), r.getSeamGroupExcavatorKey(), r.getProductionDate());
-        if (std.isEmpty()) return BigDecimal.ZERO;
+        if (std.isEmpty()) {
+            // Đây MỚI là tra trượt thật (QĐ-04) — trước 2026-09-07 hàm này
+            // âm thầm trả 0 mà không hề báo, im lặng hơn cả hai chỗ kia cùng
+            // tra STD trong file này. Phát hiện qua Quality Gate của Codex.
+            warnings.add("Chưa khai báo STD (Thể trọng) cho khoá \""
+                    + r.getSeamGroupExcavatorKey() + "\" / " + product + ".");
+            return BigDecimal.ZERO;
+        }
 
         SurveyStandard s = std.get();
         BigDecimal value = "Than_SX".equalsIgnoreCase(product)
@@ -330,7 +440,7 @@ public class ProductionCalculationService {
     // ── rào chắn 2 ──────────────────────────────────────────────────────────
 
     private SurveyCoefficient buildApTkm(ReportPeriod period, GroupKey key,
-                                         List<Stage2> rows, boolean tkeMode) {
+                                         List<Stage2> rows, boolean tkeMode, List<String> warnings) {
         BigDecimal totalTon = rows.stream().map(Stage2::dw)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal totalTkm = rows.stream().map(Stage2::dx)
@@ -354,6 +464,11 @@ public class ProductionCalculationService {
 
         Optional<SurveyStandard> std = findStandard(key, period);
         if (std.isEmpty()) {
+            // Cùng khoá STD với AP_TDIA (rào chắn 1) ở trên — nếu thiếu đã bị
+            // báo ở đó rồi, nhưng ghi lại đây để không phụ thuộc thứ tự gọi
+            // hai hàm; `warnings` khử trùng lặp trước khi ném lỗi tổng hợp.
+            warnings.add("Chưa khai báo STD cho khoá \"" + key.key()
+                    + "\" / " + key.product() + ".");
             c.setHsTon(BigDecimal.ZERO);
             c.setHsTkm(BigDecimal.ZERO);
             return c;

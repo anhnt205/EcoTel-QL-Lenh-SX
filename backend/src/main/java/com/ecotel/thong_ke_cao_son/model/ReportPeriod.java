@@ -26,6 +26,16 @@ import java.time.LocalDateTime;
  *   <li><b>Không hở</b> — kiểm tra khi tính sản lượng, vì lúc đang khai báo
  *       dở dang thì hở là chuyện bình thường.</li>
  * </ol>
+ *
+ * <p><b>Chốt/mở khoá (QĐ-03, bổ sung 2026-08-30):</b> kỳ {@code locked} thì
+ * {@code ProductionCalculationService.calculatePeriod} từ chối tính lại —
+ * phải mở khoá trước (endpoint riêng, quyền riêng, bắt buộc lý do, xem
+ * {@link ReportPeriodAudit}). {@code stale} bật lên khi mở khoá và tắt khi
+ * chốt lại — đánh dấu "báo cáo đã xuất trước đó trở thành lỗi thời" cho tới
+ * khi có bản chốt mới. KHÔNG có trường {@code tkeMode} riêng ở đây: chế độ
+ * đang áp dụng đọc thẳng từ {@code ProductionResult.tkeMode} của dòng bất kỳ
+ * trong kỳ (mọi dòng cùng kỳ luôn cùng chế độ) — thêm một bản sao ở đây chỉ
+ * tạo thêm một chỗ có thể lệch nhau.
  */
 @Entity
 @Table(
@@ -73,6 +83,14 @@ public class ReportPeriod {
 
     @Column(name = "note", columnDefinition = "TEXT")
     private String note;
+
+    /** Kỳ đã chốt — {@code ProductionCalculationService} từ chối tính lại khi true (QĐ-03). */
+    @Column(name = "locked", nullable = false)
+    private boolean locked = false;
+
+    /** true = vừa mở khoá, kết quả đang hiển thị coi như lỗi thời, tắt lại khi chốt lần nữa (QĐ-03). */
+    @Column(name = "stale", nullable = false)
+    private boolean stale = false;
 
     @CreatedDate
     @Column(name = "created_at", updatable = false)

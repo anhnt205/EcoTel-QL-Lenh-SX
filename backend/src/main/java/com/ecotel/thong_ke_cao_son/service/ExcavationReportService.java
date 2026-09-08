@@ -100,6 +100,12 @@ public class ExcavationReportService {
                 .map(excavationReportMapper::toResponse));
     }
 
+    /** Toàn bộ giá trị Tầng xúc trong khoảng ngày — xem javadoc repository. */
+    @Transactional(readOnly = true)
+    public List<String> getDistinctExcavationFloors(LocalDate fromDate, LocalDate toDate) {
+        return excavationReportRepository.findDistinctExcavationFloors(fromDate, toDate);
+    }
+
     @Transactional
     public void delete(Long id) {
         ExcavationReport report = excavationReportRepository.findById(id)

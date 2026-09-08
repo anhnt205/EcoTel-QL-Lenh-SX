@@ -1,5 +1,6 @@
 package com.ecotel.thong_ke_cao_son.controller;
 
+import com.ecotel.thong_ke_cao_son.annotation.RequirePermission;
 import com.ecotel.thong_ke_cao_son.dto.request.BulkDeleteRequest;
 import com.ecotel.thong_ke_cao_son.dto.request.SeamGroupKeyRequest;
 import com.ecotel.thong_ke_cao_son.dto.request.SurveyStandardReplaceRequest;
@@ -29,6 +30,7 @@ import java.util.List;
  */
 @RestController
 @RequestMapping("/api/survey-standards")
+@RequirePermission(resource = "survey-standards")
 @RequiredArgsConstructor
 public class SurveyStandardController {
 
