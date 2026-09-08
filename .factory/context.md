@@ -1564,3 +1564,49 @@ mục Áp Trắc Địa (`/danh-muc/ap-tracdia`). Cần khai bổ sung STD cho t
 hợp đó (hoặc dùng dữ liệu test khác đã có STD) thì mới tính ra số thật
 được — việc này cần người có số liệu trắc địa thật, không tự đoán/tự
 điền được.
+
+### Bổ sung ngay sau đó cùng ngày — điền STD chạy thử theo yêu cầu chủ dự án (không phải code, là DỮ LIỆU thật qua API)
+
+Chủ dự án yêu cầu tự điền 1 dòng STD chạy thử để kiểm tra luôn cả Áp
+Trắc Địa lẫn Báo cáo thống kê ra số đúng chưa. Đã tạo qua đúng API ứng
+dụng (không raw SQL, để đi qua validate + hiện đúng trên UI danh mục
+"STD (Đất SX/Than SX)"):
+
+- Xác nhận khoá ghép đúng bằng cách gọi thẳng `POST
+  /api/survey-standards/build-key` với dữ liệu THẬT của chuyến (Nhóm vỉa
+  "Vỉa 14" từ `receiving_points.seam_group_id` của nơi nhận tải, Máy xúc
+  "P17", Khu vực xúc "KVX009") — ra đúng khoá lỗi báo `"Vỉa 14_P17_KVX009"`.
+- Tạo 1 dòng STD (id `6552`, `catalogType=DAT_SX_THAN_SX`) qua `POST
+  /api/survey-standards` với số liệu MẪU (không phải trắc địa thật):
+  `earthM3=1500, earthTon=2700, earthTkm=6750, earthBulkDensity=1.8`,
+  hiệu lực cả năm 2026, `note` ghi rõ "Dữ liệu chạy thử".
+- Tính lại kỳ 09/2026 → HS m3 ra đúng (5,05 = 1500/296,82) nhưng HS
+  tấn/tkm vẫn ra 0 — **phát hiện thêm 1 lỗ hổng danh mục THẬT (không
+  phải do STD mẫu)**: công thức "Thể trọng (TĐ)" cho tấn/tkm chỉ nhận
+  đúng 4 mã Sản phẩm nghiệm thu `Dat_SX/Dat_CN/Than_SX/Than_CN` (quy
+  tắc thật từ docx gốc, đã ghi nhận từ lượt trước — xem seed script
+  cũ). Loại hàng "Bùn nhão" (chuyến xe 468 test, `cargo_type_id=81`)
+  đang gắn Sản phẩm nghiệm thu = "SP đất đá" (1 trong 4 tên HIỂN THỊ
+  cũ, không khớp mã công thức) → thể trọng ra 0 đúng thiết kế, không
+  phải bug.
+- Hỏi chủ dự án, được xác nhận: đổi `cargo_types.id=81` (Bùn nhão)
+  sang Sản phẩm nghiệm thu **`Dat_SX`** (id 5, thay cho "SP đất đá" id
+  2) qua đúng `PUT /api/cargo-types/81` — **đây là dữ liệu THẬT, không
+  phải throwaway, ảnh hưởng mọi chuyến "Bùn nhão" sau này**, không tự ý
+  đổi mà đã hỏi trước.
+- Tính lại lần 2 → cả 3 cột ra số đúng, khớp tay tính lại được:
+  `HS m3=5,053568, HS tấn=1,000000 (=2700 STD ÷ 2700 DW), HS tkm=1,250000`,
+  `Tấn cuối cùng=2.700,0`, `Tkm cuối cùng=6.750,0`. Trang "Áp Trắc Địa"
+  (`/danh-muc/ap-tracdia`, khối "Đất SX") cũng khớp đúng: Số TĐ
+  (m3/tấn/tkm) = 1.500/2.700/6.750, HS (m3/tấn/tkm) = 5,054/6,497/8,122
+  (đây là hệ số "lượt 1" tính bằng tỷ lệ đơn giản STD÷tổng thô, khác
+  với hệ số "lượt 2" 1,0/1,25 dùng trong kết quả cuối — hai loại hệ số
+  khác nhau theo đúng thiết kế 2 "rào chắn" của engine, không phải lệch
+  số liệu).
+
+**Lưu ý cho phiên sau**: dòng STD id `6552` và việc đổi SPNT của "Bùn
+nhão" là **dữ liệu chạy thử theo yêu cầu chủ dự án**, không phải số
+liệu trắc địa thật — nếu sau này chủ dự án có số liệu STD thật cho khoá
+"Vỉa 14_P17_KVX009", cần SỬA lại dòng STD này (không phải thêm dòng
+mới chồng khoảng ngày, vì `SurveyStandardService` chặn overlap cùng
+khoá).
