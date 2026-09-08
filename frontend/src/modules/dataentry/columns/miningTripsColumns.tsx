@@ -38,36 +38,25 @@ export const getMiningTripsColumns = (
     cell: ({ row }) => {
       const rowId = row.original.id;
       return (
-        <div className="flex justify-center">
+        <div className="flex items-center justify-center gap-1.5">
           <Checkbox
             checked={!!(rowId && selectedIds.has(rowId))}
             onCheckedChange={() => rowId && onToggleSelectRow(rowId)}
             aria-label="Select row"
           />
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-950/40"
+            onClick={() => onEditRow(row.original)}
+            title="Chỉnh sửa chuyến"
+          >
+            <Pencil className="w-3.5 h-3.5" />
+          </Button>
         </div>
       );
     },
-    size: 70,
-    enableSorting: false,
-    enableHiding: false,
-  },
-  {
-    id: "rowActions",
-    header: "",
-    cell: ({ row }) => (
-      <div className="flex justify-center">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-6 w-6 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-950/40"
-          onClick={() => onEditRow(row.original)}
-          title="Chỉnh sửa chuyến"
-        >
-          <Pencil className="w-3.5 h-3.5" />
-        </Button>
-      </div>
-    ),
-    size: 44,
+    size: 95,
     enableSorting: false,
     enableHiding: false,
   },
