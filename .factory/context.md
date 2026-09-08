@@ -1,9 +1,11 @@
 # Context — THONGKE-CAOSON
 
-Cập nhật lần cuối: 2026-09-08 (lượt 9 — sửa 8 lỗi Quality Gate của Codex
-trên nhánh `claude-dev`, xem mục 18). Trước đó 2026-09-07 (lượt 8 — sửa
-nốt cùng lỗi combobox che hàng tiêu đề bảng ở màn Tỷ trọng, xem mục 17).
-Trước đó nữa 2026-09-05
+Cập nhật lần cuối: 2026-09-08 (lượt 10 — sửa lỗi "Nơi chất tải" của
+Nhập liệu Khai thác dùng nhầm danh mục, khiến Lưu luôn 404, xem mục 19).
+Trước đó cùng ngày (lượt 9 — sửa 8 lỗi Quality Gate của Codex trên nhánh
+`claude-dev`, xem mục 18). Trước đó 2026-09-07 (lượt 8 — sửa nốt cùng
+lỗi combobox che hàng tiêu đề bảng ở màn Tỷ trọng, xem mục 17). Trước
+đó nữa 2026-09-05
 (lượt 7 — chủ dự án đã tự đăng nhập và
 click-through thật DMNL, báo 2 lỗi cụ thể + 1 yêu cầu redesign, cả 3 đã
 sửa/dựng lại và build+deploy sạch; xem mục "Đã làm — lượt 7"). Lượt 6
@@ -1191,3 +1193,75 @@ hiệu của bug trên).
 Chưa có màn xem lịch sử chốt/mở khoá — endpoint `GET /api/report-periods/
 {id}/audits` đã có và trả đúng dữ liệu (đã verify qua curl), chỉ chưa có
 UI danh sách. Làm khi chủ dự án cần.
+
+---
+
+## Lượt 10 (2026-09-08) — "Nơi chất tải" Nhập liệu Khai thác dùng nhầm danh mục
+
+### 19. Lưu báo chuyến Khai thác luôn 404 — dùng nhầm `/api/locations` thay vì `/api/pickup-points`
+
+**Chủ dự án báo:** "Khi nhập liệu khai thác xong ấn lưu thì lỗi không
+lưu được dữ liệu và phần mềm crash." Tái hiện qua Browser pane thật (lần
+đầu tiên có thể click-through, dùng tài khoản `xemthu`) + xác nhận bằng
+`psql`: request lưu trả 404 kèm message `"Nơi chất tải không tồn tại:
+11"`, VÀ giao diện vẫn hiện toast "thành công" dù request đã fail thật —
+hai lỗi trùng lúc khiến người dùng không biết gì sai.
+
+**Nguyên nhân gốc:** dropdown "Nơi chất tải" trong `MiningBatchEntryModal.tsx`
+(và bộ lọc cùng tên ở `MiningEntryPage.tsx`) lấy dữ liệu từ
+`fetchLocations()` (`GET /api/locations` — danh mục "Locations" CHUNG,
+7 dòng: Kho A/B, Văn phòng, KX1..KX4) thay vì từ danh mục **Pickup
+Point** (`GET /api/pickup-points`, 14 dòng) mà backend THẬT SỰ dùng để
+xác thực `receivingLocationId`
+(`ExcavationReportService.create() → pickupPointRepository`, xem
+`PickupPointController`).
+
+Hai bảng **tình cờ có dòng trùng TÊN** (cả hai đều có "KX1".."KX4",
+chắc do di trú dữ liệu cũ) nhưng **ID khác hẳn**:
+`locations.id=11` vs `pickup_points.id=210` cho cùng "KX1". Dropdown chỉ
+hiện TÊN nên người dùng không thể biết mình đang chọn nhầm danh mục —
+chọn "KX1" nhìn hoàn toàn bình thường, nhưng ID sai bị gửi lên, backend
+từ chối đúng nhưng frontend không dịch được lỗi đó thành cảnh báo rõ.
+
+Đáng chú ý: module **Vận tải** (`transportTripReportService.ts`) từng
+vấp đúng loại lỗi này và đã có comment cảnh báo rõ "KHÔNG phải
+`rawLocations`" cho các trường FK thật (`loading_point_id`,
+`unloading_point_id`) — nhưng module **Khai thác** thì không, và danh
+mục Pickup Point trước đó chưa hề có hàm fetch riêng trong
+`masterDataService.ts`.
+
+**Sửa** (commit `ef2f219`) — CHỈ THÊM MỚI, không đụng
+`rawLocations`/`locationValues` hiện có (tránh ảnh hưởng module Vận tải
+đang dùng đúng):
+- `api-endpoint.ts`: thêm `PICKUP_POINTS: "/pickup-points"`.
+- `masterDataService.ts`: thêm `PickupPointApiItem` + `fetchPickupPoints()`.
+- `useMasterData.ts`: thêm query + `rawPickupPoints`/`pickupPointOptions`/
+  `pickupPointValues`.
+- `MiningBatchEntryModal.tsx`: dropdown "Nơi chất tải" + payload builder
+  đổi sang `pickupPointValues`/`rawPickupPoints`.
+- `MiningEntryPage.tsx`: bộ lọc "Nơi chất tải" (cả options lẫn
+  `receivingLocationIds`) đổi sang `rawPickupPoints`.
+
+**Kiểm chứng SỐNG** qua browser + psql + API (không chỉ build sạch):
+trước fix → lưu ra 404 đúng như báo cáo; sau fix (rebuild qua Docker,
+khoá Redis đúng quy trình) → lưu ra 200, `excavation_reports` có dòng
+mới `receiving_location_id=210` (đúng ID pickup_points của KX1), gọi lại
+`GET /api/excavation-reports` xác nhận `receivingLocationName="KX1"`
+đúng như đã chọn. Đã xoá bản ghi test trước khi bàn giao.
+
+### Bài học cho các lượt sau
+
+**Khi hai danh mục có khả năng trùng TÊN dòng dữ liệu (ví dụ do di trú
+từ hệ cũ), luôn kiểm tra ID có khớp không, đừng tin vào tên hiển thị
+giống nhau.** Cách phát hiện: nếu dropdown ở FE gọi endpoint khác với
+endpoint mà backend dùng để validate FK tương ứng, đó gần như chắc chắn
+là bug — tìm bằng cách grep chú thích kiểu "KHÔNG phải X" đã có sẵn ở
+module khác cùng codebase (dấu hiệu ai đó đã vấp lỗi này trước và ghi
+lại), rồi audit xem module hiện tại có tránh được lỗi tương tự không.
+
+### Trạng thái dữ liệu
+
+`backend/reset-du-lieu-giao-dich.sql` (từ lượt 9→10, giữ lại làm script
+tiện ích) đã chạy trước khi phát hiện bug này — mọi bảng giao dịch đang
+= 0, danh mục giữ nguyên. Bản ghi test của lượt này đã xoá, không để
+lại rác.
