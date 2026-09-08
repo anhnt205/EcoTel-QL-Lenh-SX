@@ -54,9 +54,13 @@ export const ModalFooterActions: React.FC<ModalFooterActionsProps> = ({
         <Save className="w-4 h-4" />
         {isSaving
           ? "Đang lưu..."
-          : sessionsCount > 1
-            ? `Lưu (${sessionsCount} bản ghi) (F5)`
-            : "Lưu bản ghi (F5)"}
+          : mode === "add"
+            ? sessionsCount > 1
+              ? `Lưu và gửi (${sessionsCount} bản ghi) (F5)`
+              : "Lưu và gửi (F5)"
+            : sessionsCount > 1
+              ? `Lưu (${sessionsCount} bản ghi) (F5)`
+              : "Lưu bản ghi (F5)"}
       </Button>
     </>
   );

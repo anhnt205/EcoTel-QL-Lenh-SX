@@ -9,8 +9,12 @@ import {
   type SortingState,
   type VisibilityState,
 } from "@tanstack/react-table";
-import type { TransportRecord } from "@/modules/dataentry/types/thong-ke";
+import type {
+  ApprovalStatus,
+  TransportRecord,
+} from "@/modules/dataentry/types/thong-ke";
 import { getTransportTripsColumns } from "@/modules/dataentry/columns/transportTripsColumns";
+import { EntryStatusFilter } from "@/modules/dataentry/components/EntryStatusFilter";
 import {
   Table,
   TableBody,
@@ -47,6 +51,8 @@ interface TransportTripsDataTableProps {
   onToggleSelectAll: (checked: boolean) => void;
   onToggleSelectRow: (id: string) => void;
   onEditRow: (row: TransportRecord) => void;
+  statusFilterValue: Set<ApprovalStatus>;
+  onStatusFilterChange: (next: Set<ApprovalStatus>) => void;
 }
 
 export const TransportTripsDataTable: React.FC<
@@ -57,6 +63,8 @@ export const TransportTripsDataTable: React.FC<
   onToggleSelectAll,
   onToggleSelectRow,
   onEditRow,
+  statusFilterValue,
+  onStatusFilterChange,
 }) => {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
@@ -95,6 +103,14 @@ export const TransportTripsDataTable: React.FC<
 
   return (
     <div className="space-y-3">
+      {/* Bộ lọc trạng thái (checkbox) — nằm trên toolbar "Hiển thị cột" */}
+      <div className="flex justify-end">
+        <EntryStatusFilter
+          value={statusFilterValue}
+          onChange={onStatusFilterChange}
+        />
+      </div>
+
       {/* Top Toolbar (Column visibility toggle) */}
       <div className="flex items-center justify-between">
         <span className="text-xs font-semibold text-gray-500">

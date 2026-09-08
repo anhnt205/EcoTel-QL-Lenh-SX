@@ -1,5 +1,8 @@
 import React, { useState, useMemo } from "react";
-import type { TransportRecord } from "@/modules/dataentry/types/thong-ke";
+import type {
+  ApprovalStatus,
+  TransportRecord,
+} from "@/modules/dataentry/types/thong-ke";
 import {
   useTransportReportsQuery,
   fetchTransportReportById,
@@ -17,7 +20,6 @@ import { BatchEntryModal } from "@/modules/dataentry/components/BatchEntryModal.
 import { TransportTripsDataTable } from "@/modules/dataentry/components/TransportTripsDataTable";
 import { TransportFuelDataTable } from "@/modules/dataentry/components/TransportFuelDataTable";
 import { EntryPageHeader } from "@/modules/dataentry/components/EntryPageHeader";
-import { EntryStatusTabs } from "@/modules/dataentry/components/EntryStatusTabs";
 import { FilterResetButton } from "@/modules/dataentry/components/FilterResetButton";
 import { useEntryPageLogic } from "@/modules/dataentry/hooks/useEntryPageLogic";
 import { useMasterData } from "@/modules/dataentry/hooks/useMasterData";
@@ -294,18 +296,19 @@ export const TransportEntryPage: React.FC = () => {
   // ── Table 1 Rows (Báo chuyến) ────────────────────────────────────────────
   const tripRows = filteredRecords;
 
-  // ── Số lượng bản ghi cần sửa ────────────────────────────────────────────
-  const changesRequestedCount = useMemo(() => {
-    return tripRows.filter((r) => r.status === "REVISION_REQUESTED").length;
-  }, [tripRows]);
-
-  // Tab "Cần sửa" — chỉ lọc phần HIỂN THỊ của Bảng báo chuyến, không đụng gì
-  // tới selection (tripSelection vẫn giữ nguyên toàn bộ tripRows như trước).
-  const [showOnlyRevisions, setShowOnlyRevisions] = useState(false);
+  // Bộ lọc trạng thái dạng checkbox (Tất cả/Đã gửi/Chờ duyệt/Cần sửa) — chỉ
+  // lọc phần HIỂN THỊ của Bảng báo chuyến, không đụng gì tới selection
+  // (tripSelection vẫn giữ nguyên toàn bộ tripRows như trước). Set rỗng =
+  // đang xem "Tất cả".
+  const [statusFilter, setStatusFilter] = useState<Set<ApprovalStatus>>(
+    new Set(),
+  );
   const displayedTripRows = useMemo(() => {
-    if (!showOnlyRevisions) return tripRows;
-    return tripRows.filter((r) => r.status === "REVISION_REQUESTED");
-  }, [tripRows, showOnlyRevisions]);
+    if (statusFilter.size === 0) return tripRows;
+    return tripRows.filter((r) =>
+      statusFilter.has((r.status || "PENDING") as ApprovalStatus),
+    );
+  }, [tripRows, statusFilter]);
 
   // ── Table 2 Rows (Báo nhiên liệu - deduplicated by date, shift, vehicleNo) ──
   const fuelRows = useMemo(() => {
@@ -537,17 +540,9 @@ export const TransportEntryPage: React.FC = () => {
       {/* ══ BẢNG: BẢNG BÁO CHUYẾN ══════════════════════════════════════ */}
       <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm overflow-hidden space-y-3 p-4">
         {/* Table Title */}
-        <div className="flex items-center justify-between flex-wrap gap-2">
-          <div className="flex items-center gap-2.5 text-sm font-bold text-gray-900 dark:text-gray-100">
-            <Truck className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-            <span>BẢNG BÁO CHUYẾN</span>
-          </div>
-          <EntryStatusTabs
-            totalCount={tripRows.length}
-            revisionCount={changesRequestedCount}
-            showOnlyRevisions={showOnlyRevisions}
-            onChange={setShowOnlyRevisions}
-          />
+        <div className="flex items-center gap-2.5 text-sm font-bold text-gray-900 dark:text-gray-100">
+          <Truck className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+          <span>BẢNG BÁO CHUYẾN</span>
         </div>
 
         {/* Table 1 Content */}
@@ -557,6 +552,8 @@ export const TransportEntryPage: React.FC = () => {
           onToggleSelectAll={tripSelection.toggleSelectAll}
           onToggleSelectRow={tripSelection.toggleSelect}
           onEditRow={handleEditRow}
+          statusFilterValue={statusFilter}
+          onStatusFilterChange={setStatusFilter}
         />
       </div>
 

@@ -9,8 +9,12 @@ import {
   type SortingState,
   type VisibilityState,
 } from "@tanstack/react-table";
-import type { MiningRecord } from "@/modules/dataentry/types/thong-ke";
+import type {
+  ApprovalStatus,
+  MiningRecord,
+} from "@/modules/dataentry/types/thong-ke";
 import { getMiningTripsColumns } from "@/modules/dataentry/columns/miningTripsColumns";
+import { EntryStatusFilter } from "@/modules/dataentry/components/EntryStatusFilter";
 import {
   Table,
   TableBody,
@@ -47,6 +51,8 @@ interface MiningTripsDataTableProps {
   onToggleSelectAll: (checked: boolean) => void;
   onToggleSelectRow: (id: string) => void;
   onEditRow: (row: MiningRecord) => void;
+  statusFilterValue: Set<ApprovalStatus>;
+  onStatusFilterChange: (next: Set<ApprovalStatus>) => void;
 }
 
 export const MiningTripsDataTable: React.FC<MiningTripsDataTableProps> = ({
@@ -55,6 +61,8 @@ export const MiningTripsDataTable: React.FC<MiningTripsDataTableProps> = ({
   onToggleSelectAll,
   onToggleSelectRow,
   onEditRow,
+  statusFilterValue,
+  onStatusFilterChange,
 }) => {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
@@ -93,6 +101,14 @@ export const MiningTripsDataTable: React.FC<MiningTripsDataTableProps> = ({
 
   return (
     <div className="space-y-3">
+      {/* Bộ lọc trạng thái (checkbox) — nằm trên toolbar "Hiển thị cột" */}
+      <div className="flex justify-end">
+        <EntryStatusFilter
+          value={statusFilterValue}
+          onChange={onStatusFilterChange}
+        />
+      </div>
+
       {/* Top Toolbar (Column visibility toggle) */}
       <div className="flex items-center justify-between">
         <span className="text-xs font-semibold text-gray-500">
