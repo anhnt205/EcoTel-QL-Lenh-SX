@@ -53,6 +53,7 @@ interface MiningTripsDataTableProps {
   onEditRow: (row: MiningRecord) => void;
   statusFilterValue: Set<ApprovalStatus>;
   onStatusFilterChange: (next: Set<ApprovalStatus>) => void;
+  statusCounts: { all: number; APPROVED: number; PENDING: number; REVISION_REQUESTED: number };
 }
 
 export const MiningTripsDataTable: React.FC<MiningTripsDataTableProps> = ({
@@ -63,6 +64,7 @@ export const MiningTripsDataTable: React.FC<MiningTripsDataTableProps> = ({
   onEditRow,
   statusFilterValue,
   onStatusFilterChange,
+  statusCounts,
 }) => {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
@@ -106,6 +108,7 @@ export const MiningTripsDataTable: React.FC<MiningTripsDataTableProps> = ({
         <EntryStatusFilter
           value={statusFilterValue}
           onChange={onStatusFilterChange}
+          counts={statusCounts}
         />
       </div>
 

@@ -36,6 +36,13 @@ const STATUS_OPTIONS: StatusOption[] = [
 interface EntryStatusFilterProps {
   value: Set<ApprovalStatus>;
   onChange: (next: Set<ApprovalStatus>) => void;
+  /** Số bản ghi tương ứng mỗi trạng thái — hiện cạnh nhãn, ví dụ "Đã gửi (5)". */
+  counts: {
+    all: number;
+    APPROVED: number;
+    PENDING: number;
+    REVISION_REQUESTED: number;
+  };
 }
 
 /**
@@ -47,6 +54,7 @@ interface EntryStatusFilterProps {
 export const EntryStatusFilter: React.FC<EntryStatusFilterProps> = ({
   value,
   onChange,
+  counts,
 }) => {
   const isAll = value.size === 0;
 
@@ -66,7 +74,7 @@ export const EntryStatusFilter: React.FC<EntryStatusFilterProps> = ({
           className="data-[state=checked]:bg-gray-900 data-[state=checked]:border-gray-900 dark:data-[state=checked]:bg-gray-100 dark:data-[state=checked]:border-gray-100"
         />
         <span className="font-semibold text-gray-900 dark:text-gray-100">
-          Tất cả
+          Tất cả ({counts.all})
         </span>
       </label>
 
@@ -83,7 +91,7 @@ export const EntryStatusFilter: React.FC<EntryStatusFilterProps> = ({
             className={opt.checkboxClass}
           />
           <span className={`font-semibold ${opt.textClass}`}>
-            {opt.label}
+            {opt.label} ({counts[opt.status]})
           </span>
         </label>
       ))}

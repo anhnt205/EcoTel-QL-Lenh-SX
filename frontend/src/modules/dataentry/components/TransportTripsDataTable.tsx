@@ -53,6 +53,7 @@ interface TransportTripsDataTableProps {
   onEditRow: (row: TransportRecord) => void;
   statusFilterValue: Set<ApprovalStatus>;
   onStatusFilterChange: (next: Set<ApprovalStatus>) => void;
+  statusCounts: { all: number; APPROVED: number; PENDING: number; REVISION_REQUESTED: number };
 }
 
 export const TransportTripsDataTable: React.FC<
@@ -65,6 +66,7 @@ export const TransportTripsDataTable: React.FC<
   onEditRow,
   statusFilterValue,
   onStatusFilterChange,
+  statusCounts,
 }) => {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
@@ -108,6 +110,7 @@ export const TransportTripsDataTable: React.FC<
         <EntryStatusFilter
           value={statusFilterValue}
           onChange={onStatusFilterChange}
+          counts={statusCounts}
         />
       </div>
 

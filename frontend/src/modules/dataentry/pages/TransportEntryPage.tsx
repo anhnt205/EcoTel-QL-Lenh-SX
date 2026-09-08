@@ -310,6 +310,17 @@ export const TransportEntryPage: React.FC = () => {
     );
   }, [tripRows, statusFilter]);
 
+  // Đếm theo trạng thái từ TOÀN BỘ tripRows (không phải displayedTripRows đã
+  // lọc) — để số đếm cạnh mỗi nhãn luôn ổn định, không co lại khi đang lọc.
+  const statusCounts = useMemo(() => {
+    const counts = { all: tripRows.length, APPROVED: 0, PENDING: 0, REVISION_REQUESTED: 0 };
+    tripRows.forEach((r) => {
+      const status = (r.status || "PENDING") as ApprovalStatus;
+      counts[status] = (counts[status] ?? 0) + 1;
+    });
+    return counts;
+  }, [tripRows]);
+
   // ── Table 2 Rows (Báo nhiên liệu - deduplicated by date, shift, vehicleNo) ──
   const fuelRows = useMemo(() => {
     const map = new Map<string, TransportRecord>();
@@ -554,6 +565,7 @@ export const TransportEntryPage: React.FC = () => {
           onEditRow={handleEditRow}
           statusFilterValue={statusFilter}
           onStatusFilterChange={setStatusFilter}
+          statusCounts={statusCounts}
         />
       </div>
 
