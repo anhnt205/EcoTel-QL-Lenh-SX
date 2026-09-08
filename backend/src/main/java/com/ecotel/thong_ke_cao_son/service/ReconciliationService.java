@@ -99,18 +99,36 @@ public class ReconciliationService {
         return PageResponse.from(page);
     }
 
+    /**
+     * Khoá ghép cặp một chuyến Vận tải với một chuyến Khai thác — CHỈ theo
+     * (Thời gian, Ca, Máy xúc, Số xe), đúng yêu cầu nghiệp vụ (chủ dự án
+     * chốt 2026-09-08): đây là bốn thứ PHẢI giống nhau để coi là "cùng một
+     * chuyến xe" được ghi hai lần ở hai phân xưởng khác nhau.
+     *
+     * <p><b>KHÔNG được đưa {@code cargoType} (Loại hàng) vào khoá này</b> —
+     * trước đây có, và đó chính là lỗi: Loại hàng là một trong những thứ
+     * đối chiếu PHẢI SO SÁNH xem hai bên có ghi lệch nhau không (cùng với
+     * Số chuyến, Tải trọng, Số thẻ lương — xem {@link #isMatched}), không
+     * phải điều kiện để được phép ghép cặp. Đưa vào khoá khiến hai chuyến
+     * chỉ lệch đúng Loại hàng (ví dụ Vận tải ghi "Bùn nhão", Khai thác ghi
+     * "Bùn dượt" cho CÙNG MỘT xe/máy xúc/ca) không bao giờ ghép được — mỗi
+     * bên rơi vào MỘT DÒNG RIÊNG, làm mất hẳn mục đích đối chiếu (không
+     * còn gì để so sánh trên cùng một dòng). Phát hiện qua ảnh chụp thật
+     * của chủ dự án: Ca 2, xe 468, Máy xúc P17 bị tách thành 2 dòng vì
+     * Vận tải ghi "Bùn nhão" (6 chuyến) còn Khai thác ghi "Bùn dượt" (12
+     * chuyến) — đúng loại lệch mà đối chiếu phải BẮT ĐƯỢC, không phải né.
+     */
     private String buildTransportKey(TransportReportTrip tt) {
         TransportReport header = tt.getTransportReport();
         return header.getReportDate() + "_" + header.getShift().getId() + "_"
-                + header.getVehicle().getId() + "_" + tt.getExcavator().getId() + "_"
-                + tt.getCargoType().getId();
+                + header.getVehicle().getId() + "_" + tt.getExcavator().getId();
     }
 
+    /** Xem javadoc {@link #buildTransportKey} — cùng bốn thành phần, cùng thứ tự. */
     private String buildExcavationKey(ExcavationReportTrip et) {
         ExcavationReport header = et.getExcavationReport();
         return header.getReportDate() + "_" + header.getShift().getId() + "_"
-                + et.getVehicle().getId() + "_" + header.getExcavatorDevice().getId() + "_"
-                + et.getCargoType().getId();
+                + et.getVehicle().getId() + "_" + header.getExcavatorDevice().getId();
     }
 
     private ReconciliationRowResponse buildRow(TransportReportTrip tt, ExcavationReportTrip et) {
@@ -179,6 +197,15 @@ public class ReconciliationService {
         return builder.build();
     }
 
+    /**
+     * "Khớp số liệu" — bốn thứ Vận tải và Khai thác PHẢI ghi giống nhau cho
+     * cùng một chuyến xe (đã ghép cặp theo Thời gian/Ca/Máy xúc/Số xe ở
+     * {@link #buildTransportKey}): Số chuyến, Loại hàng, Tải trọng, và
+     * NHÂN VIÊN (Số thẻ lương / Người nhập chuyến — cùng một trường
+     * {@code Report.employee}, nên so một lần là đủ cho cả hai cột hiển
+     * thị). Thiếu so nhân viên là lỗ hổng thật: hai bên ghi khác tài xế/
+     * người vận hành cho cùng chuyến vẫn báo "khớp" nếu ba thứ kia trùng.
+     */
     private boolean isMatched(TransportReportTrip tt, ExcavationReportTrip et) {
         if (tt == null || et == null) {
             return false;
@@ -187,7 +214,10 @@ public class ReconciliationService {
         boolean tripCountSame = Objects.equals(tt.getTripCount(), et.getTripCount());
         boolean loadLevelSame = tt.getLoadLevel().getType() == et.getLoadLevel().getType()
                 && Objects.equals(tt.getLoadLevel().getCustomValue(), et.getLoadLevel().getCustomValue());
-        return cargoTypeSame && tripCountSame && loadLevelSame;
+        boolean employeeSame = Objects.equals(
+                tt.getTransportReport().getEmployee().getId(),
+                et.getExcavationReport().getEmployee().getId());
+        return cargoTypeSame && tripCountSame && loadLevelSame && employeeSame;
     }
 
     private ReconciliationDecisionResponse toDecisionResponse(ReconciliationDecision decision) {
