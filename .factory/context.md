@@ -1,8 +1,9 @@
 # Context — THONGKE-CAOSON
 
-Cập nhật lần cuối: 2026-09-08 (lượt 12 — thêm tab "Cần sửa" lọc nhanh +
-nút bút chì sửa từng dòng ở Nhập liệu Khai thác/Vận tải, xem "Lượt
-12"). Trước đó cùng ngày (lượt 11 — sửa lỗi Đối chiếu bị tách 2 dòng do
+Cập nhật lần cuối: 2026-09-08 (lượt 13 — checkbox lọc trạng thái thay
+tab + đổi nhãn nút "Lưu và gửi", xem "Lượt 13"). Trước đó cùng ngày
+(lượt 12 — thêm tab "Cần sửa" lọc nhanh + nút bút chì sửa từng dòng ở
+Nhập liệu Khai thác/Vận tải, xem "Lượt 12"). Trước đó cùng ngày (lượt 11 — sửa lỗi Đối chiếu bị tách 2 dòng do
 khoá ghép cặp dùng nhầm Loại hàng, xem "Lượt 11"). Trước đó cùng ngày
 (lượt 10 — sửa lỗi "Nơi chất tải" của Nhập liệu Khai thác
 dùng nhầm danh mục khiến Lưu luôn 404 + bộ lọc ngày mặc định cứng
@@ -1371,3 +1372,44 @@ nút Pencil vào chung cell với Checkbox trong cột "select" (đầu dòng),
 xoá hẳn cột `rowActions` riêng vừa thêm. Bảng không còn thêm cột mới
 nào so với trước. Verify sống lại: nút bút chì nằm cạnh checkbox, bấm
 vẫn mở đúng modal sửa đúng bản ghi.
+
+## Lượt 13 (2026-09-08) — checkbox lọc trạng thái thay tab + đổi nhãn nút "Lưu và gửi", commit `4d603fd`
+
+Chủ dự án yêu cầu tiếp 2 việc:
+1. "Phần thêm mới bản ghi cả khai thác và vận tải: Lưu bản ghi (F5) đổi
+   thành Lưu và gửi (F5)."
+2. "Phần danh sách báo chuyến cả khai thác và vận tải. Thêm checkbox
+   thay cho tab (bên trên Hiển thị cột) thành: Tất cả (đen), đã gửi
+   (xanh lá cây), chờ duyệt (xanh blue), cần sửa (cam). Ấn vào checkbox
+   sẽ lọc theo trạng thái các bản ghi trong bảng."
+
+**Đã làm:**
+1. `ModalFooterActions.tsx` (dùng chung cho cả 2 modal Khai thác/Vận
+   tải) — nút Lưu chính đổi nhãn thành "Lưu và gửi (F5)" khi
+   `mode === "add"`; giữ nguyên "Lưu bản ghi (F5)" ở mode sửa vì yêu cầu
+   chỉ nói rõ phạm vi "thêm mới".
+2. `EntryStatusFilter.tsx` (component mới, THAY THẾ hẳn
+   `EntryStatusTabs.tsx` của Lượt 12 — đã xoá file đó): 4 checkbox "Tất
+   cả/Đã gửi/Chờ duyệt/Cần sửa" ánh xạ đúng 3 giá trị enum có sẵn
+   (`APPROVED`→Đã gửi xanh lá, `PENDING`→Chờ duyệt xanh dương,
+   `REVISION_REQUESTED`→Cần sửa cam) + "Tất cả" = bỏ lọc. Set rỗng =
+   xem hết; tick 1 hay nhiều trạng thái cụ thể lọc OR xuống đúng các
+   dòng đó; bỏ tick hết hoặc tick lại "Tất cả" thì quay về xem toàn bộ.
+3. `MiningTripsDataTable.tsx`/`TransportTripsDataTable.tsx`: render
+   `EntryStatusFilter` NGAY TRÊN hàng "Tổng số bản ghi... / Hiển thị
+   cột" (đúng vị trí yêu cầu "bên trên Hiển thị cột").
+4. `MiningEntryPage.tsx`/`TransportEntryPage.tsx`: thay state
+   `showOnlyRevisions` (boolean, tab cũ) bằng `statusFilter`
+   (`Set<ApprovalStatus>`), bỏ hẳn hàng tiêu đề có badge/tab cũ ở trên
+   bảng (tiêu đề "BẢNG BÁO CHUYẾN" giờ chỉ còn dòng chữ đơn giản).
+
+Đã build sạch qua container, verify sống cả 2 trang. Lưu ý phát hiện
+trong lúc verify: bản ghi khai thác test (xe 468/P17) mà lượt trước
+đang REVISION_REQUESTED nay đã chuyển PENDING + `trip_count` đổi
+12→6 — đây là do CHỦ DỰ ÁN đã tự sửa và lưu lại qua UI thật trong lúc
+tôi đang code (không phải do tôi thao tác), không phải bug — đã verify
+lại bằng cách tick "Chờ duyệt" (ra đúng 1 dòng PENDING) và "Cần sửa" ở
+Vận tải (ra đúng 1 dòng REVISION_REQUESTED còn tồn) đều đúng logic.
+Cũng gặp lại hiện tượng list rỗng thoáng qua ngay sau lần fetch đầu
+tiên sau rebuild (đã ghi nhận từ Lượt 10) — F5 lại là hết, không phải
+lỗi mới.
