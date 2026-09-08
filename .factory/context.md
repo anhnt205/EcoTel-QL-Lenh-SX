@@ -1364,3 +1364,10 @@ xuống 1 dòng REVISION_REQUESTED; bấm nút bút chì (dùng `find` lấy đ�
 ref phần tử — toạ độ ước lượng lúc đầu bị lệch nhẹ, không phải lỗi code)
 mở đúng modal "Chỉnh sửa bản ghi" với dữ liệu đúng dòng đã bấm, cho cả
 Khai thác (xe 468/P17) lẫn Vận tải (xe 468).
+
+**Bổ sung ngay sau đó cùng lượt** (commit `889eb9c`): chủ dự án yêu cầu
+"Cho nút bút chì bên cạnh checkbox để không phải thêm 1 cột nữa" — gộp
+nút Pencil vào chung cell với Checkbox trong cột "select" (đầu dòng),
+xoá hẳn cột `rowActions` riêng vừa thêm. Bảng không còn thêm cột mới
+nào so với trước. Verify sống lại: nút bút chì nằm cạnh checkbox, bấm
+vẫn mở đúng modal sửa đúng bản ghi.
