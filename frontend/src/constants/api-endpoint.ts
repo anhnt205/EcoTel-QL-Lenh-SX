@@ -37,6 +37,8 @@ export const API = {
     DECISIONS: "/reconciliation/decisions",
     DECISIONS_BULK: "/reconciliation/decisions/bulk",
     TRIPS_BULK: "/reconciliation/trips/bulk",
+    TRIPS_RESUBMIT: "/reconciliation/trips/resubmit",
+    HISTORY: "/reconciliation/history",
     REPORT_STATUS: "/reconciliation/report-status",
     REPORT_STATUS_BATCH: "/reconciliation/report-status/batch",
     PRODUCTION: {

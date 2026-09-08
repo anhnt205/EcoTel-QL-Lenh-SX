@@ -1,5 +1,6 @@
 package com.ecotel.thong_ke_cao_son.service.production;
 
+import com.ecotel.thong_ke_cao_son.enums.ApprovalStatus;
 import com.ecotel.thong_ke_cao_son.exception.BadRequestException;
 import com.ecotel.thong_ke_cao_son.exception.ResourceNotFoundException;
 import com.ecotel.thong_ke_cao_son.model.*;
@@ -119,6 +120,29 @@ public class ProductionCalculationService {
                     + ") chưa có chuyến vận tải nào để tính.");
         }
 
+        // Chủ dự án chốt trực tiếp (2026-09-08): CHỈ dữ liệu ĐÃ ĐƯỢC THỐNG KÊ
+        // DUYỆT qua màn Đối chiếu mới là "chuẩn" để tính sản lượng — trước đây
+        // engine tính từ MỌI chuyến bất kể trạng thái duyệt, không đúng nghiệp
+        // vụ (dữ liệu tạm dùng để đối chiếu sai lệch không được coi là chuẩn).
+        // Đúng phong cách QĐ-04/QĐ-06 đã có trong file này: báo lỗi TỔNG HỢP rõ
+        // ràng, không âm thầm tính thiếu chuyến chưa duyệt. Áp dụng ngay cho MỌI
+        // kỳ kể cả kỳ cũ — chủ dự án đã xác nhận chấp nhận rủi ro kỳ cũ tạm
+        // không tính lại được cho tới khi duyệt bù qua Đối chiếu.
+        List<String> notApprovedIssues = trips.stream()
+                .filter(t -> t.getStatus() != ApprovalStatus.APPROVED)
+                .map(t -> "Chuyến #" + t.getId() + " ngày " + t.getTransportReport().getReportDate()
+                        + ", xe " + t.getTransportReport().getVehicle().getCode()
+                        + " — trạng thái đối chiếu: " + t.getStatus())
+                .distinct()
+                .toList();
+        if (!notApprovedIssues.isEmpty()) {
+            throw new BadRequestException(buildAggregateError(
+                    "Kỳ " + period.getDisplayName() + " chưa thể tính vì còn "
+                            + notApprovedIssues.size() + " chuyến VẬN TẢI CHƯA ĐƯỢC DUYỆT ĐỐI CHIẾU"
+                            + " (chỉ dữ liệu đã duyệt mới là \"chuẩn\" để tính sản lượng):",
+                    notApprovedIssues));
+        }
+
         resultRepository.deleteByPeriod(periodId);
         coefficientRepository.deleteByPeriod(periodId);
 
@@ -196,7 +220,9 @@ public class ProductionCalculationService {
         // dùng cần biết TOÀN BỘ danh sách còn thiếu để đi khai đủ trong một
         // lượt, không phải sửa-chạy-lại từng cái một.
         if (!warnings.isEmpty()) {
-            throw new BadRequestException(buildAggregateError(warnings));
+            throw new BadRequestException(buildAggregateError(
+                    "Chưa tính được kỳ này vì còn " + warnings.stream().distinct().count()
+                            + " chỗ thiếu khai báo:", warnings));
         }
 
         coefficientRepository.saveAll(apTdia.values());
@@ -211,11 +237,10 @@ public class ProductionCalculationService {
 
     private static final int MAX_ERRORS_IN_MESSAGE = 15;
 
-    /** Gộp danh sách tra trượt thành một thông báo lỗi — cắt bớt nếu quá dài. */
-    private String buildAggregateError(List<String> issues) {
+    /** Gộp danh sách lỗi thành một thông báo dưới {@code header} — cắt bớt nếu quá dài. */
+    private String buildAggregateError(String header, List<String> issues) {
         List<String> distinct = issues.stream().distinct().toList();
-        StringBuilder sb = new StringBuilder("Chưa tính được kỳ này vì còn ")
-                .append(distinct.size()).append(" chỗ thiếu khai báo:\n");
+        StringBuilder sb = new StringBuilder(header).append("\n");
         distinct.stream().limit(MAX_ERRORS_IN_MESSAGE).forEach(w -> sb.append("- ").append(w).append("\n"));
         if (distinct.size() > MAX_ERRORS_IN_MESSAGE) {
             sb.append("… và ").append(distinct.size() - MAX_ERRORS_IN_MESSAGE).append(" chỗ khác.");

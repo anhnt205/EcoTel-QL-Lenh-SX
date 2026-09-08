@@ -8,7 +8,11 @@ import type {
   ProductionFilters,
   ProductionReconciliationResponse,
 } from '@/modules/reconciliation/types/reconciliation.types';
-import type { ApprovalStatus, ReconciliationItem } from '@/modules/dataentry/types/thong-ke';
+import type {
+  ApprovalStatus,
+  ReconcileWorkflowStatus,
+  ReconciliationItem,
+} from '@/modules/dataentry/types/thong-ke';
 
 // ─── Types cho API Đối chiếu Báo chuyến mới ──────────────────────────────────
 export interface ReconciliationSearchParams {
@@ -63,8 +67,33 @@ export interface ReconciliationRowResponse {
   excavationData?: ReconciliationTripDataResponse;
   matched: boolean;
   decision?: ReconciliationDecisionResponse;
-  status?: ApprovalStatus;
+  status?: ReconcileWorkflowStatus;
   resolvedData?: ReconciliationTripDataResponse;
+  // Trạng thái THẬT của từng bên — dùng để biết chính xác bên nào đang bị yêu
+  // cầu sửa (1 decision chỉ có 1 status chung, không phân biệt được bên).
+  transportStatus?: ApprovalStatus;
+  excavationStatus?: ApprovalStatus;
+  // Có lịch sử để xem qua icon "i" hay không.
+  transportHistoryAvailable?: boolean;
+  excavationHistoryAvailable?: boolean;
+}
+
+export interface ReconciliationHistoryEntry {
+  id: number;
+  side: 'TRANSPORT' | 'EXCAVATION';
+  cargoTypeName?: string;
+  tripCount?: number;
+  loadLevelType?: string;
+  loadLevelCustomValue?: string;
+  employeeSalaryCode?: string;
+  employeeFullName?: string;
+  note?: string;
+  createdAt?: string;
+}
+
+export interface ReconciliationResubmitRequest {
+  transportReportTripId?: number;
+  excavationReportTripId?: number;
 }
 
 export interface ReconciliationDecisionRequest {
@@ -182,6 +211,21 @@ export const reconciliationService = {
     );
   },
 
+  // POST /api/reconciliation/trips/resubmit (Gửi lại đúng theo bên đang chờ sửa)
+  resubmitTrips: async (payload: ReconciliationResubmitRequest): Promise<void> => {
+    await axiosInstance.post(API.RECONCILIATION.TRIPS_RESUBMIT, payload);
+  },
+
+  // GET /api/reconciliation/history (Xem lịch sử các lần yêu cầu sửa trước)
+  getHistory: async (params: {
+    transportReportTripId?: number;
+    excavationReportTripId?: number;
+  }): Promise<ReconciliationHistoryEntry[]> => {
+    const response = await axiosInstance.get(API.RECONCILIATION.HISTORY, { params });
+    const res = response.data as any;
+    return res?.data || res?.result || res || [];
+  },
+
   // PUT /api/reconciliation/report-status (Duyệt 1 báo cáo ca)
   updateReportStatus: async (
     payload: ReportStatusUpdateRequest
@@ -291,6 +335,29 @@ export function useUpdateReconciliationTripsBulkMutation() {
   });
 }
 
+// Gửi lại đúng theo bên đang chờ sửa (KHÔNG đụng decision.status trực tiếp)
+export function useResubmitReconciliationTripsMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: ReconciliationResubmitRequest) => reconciliationService.resubmitTrips(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [RECONCILIATION_QUERY_KEY] });
+    },
+  });
+}
+
+// Xem lịch sử các lần yêu cầu sửa trước — chỉ fetch khi popover mở (enabled).
+export function useReconciliationHistoryQuery(
+  params: { transportReportTripId?: number; excavationReportTripId?: number },
+  enabled: boolean
+) {
+  return useQuery({
+    queryKey: ['reconciliation-history', params],
+    queryFn: () => reconciliationService.getHistory(params),
+    enabled: enabled && Boolean(params.transportReportTripId || params.excavationReportTripId),
+  });
+}
+
 // Duyệt 1 báo cáo ca (report level)
 export function useUpdateReportStatusMutation() {
   const queryClient = useQueryClient();
@@ -381,7 +448,7 @@ export function mapRowResponseToReconciliationItem(
       ? 'TRANSPORT_ONLY'
       : 'MINING_ONLY';
 
-  const reconciliationStatus: ApprovalStatus =
+  const reconciliationStatus: ReconcileWorkflowStatus =
     row.status ||
     row.decision?.status ||
     (row.transportData?.status === 'APPROVED' || row.excavationData?.status === 'APPROVED' ? 'APPROVED' : undefined) ||
@@ -421,11 +488,15 @@ export function mapRowResponseToStandardTripReport(
     return 'Khác';
   };
 
-  const status: ApprovalStatus =
+  // Trang "Báo chuyến" luôn lọc status=APPROVED ở tầng API (StandardTripReportPage),
+  // nên row.status thực tế chỉ có thể là APPROVED ở đây — ép kiểu về ApprovalStatus
+  // (3 giá trị) vì AWAITING_REAPPROVAL chỉ có ý nghĩa ở màn Đối chiếu.
+  const status = (
     row.status ||
     row.decision?.status ||
     (row.transportData?.status === 'APPROVED' || row.excavationData?.status === 'APPROVED' ? 'APPROVED' : undefined) ||
-    'PENDING';
+    'PENDING'
+  ) as ApprovalStatus;
   const finalOptionLabel =
     status === 'APPROVED'
       ? 'Đã duyệt'

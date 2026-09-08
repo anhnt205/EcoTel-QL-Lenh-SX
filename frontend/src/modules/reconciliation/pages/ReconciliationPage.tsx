@@ -44,6 +44,7 @@ import {
   useSaveReconciliationDecisionMutation,
   useSaveReconciliationDecisionsBulkMutation,
   useUpdateReconciliationTripsBulkMutation,
+  useResubmitReconciliationTripsMutation,
   mapRowResponseToReconciliationItem,
 } from "../services/reconciliation.service";
 import {
@@ -93,6 +94,7 @@ export const ReconciliationPage: React.FC = () => {
   const saveDecisionsBulkMutation =
     useSaveReconciliationDecisionsBulkMutation();
   const updateTripsBulkMutation = useUpdateReconciliationTripsBulkMutation();
+  const resubmitTripsMutation = useResubmitReconciliationTripsMutation();
 
   // Map selected Shift names to Shift IDs for API
   const shiftIds = useMemo(() => {
@@ -188,8 +190,14 @@ export const ReconciliationPage: React.FC = () => {
 
   const displayItems = useMemo(() => {
     if (cardFilter === "pending") {
+      // "Chờ đối soát" gộp cả AWAITING_REAPPROVAL (vàng nhạt — đã gửi lại,
+      // đang chờ thống kê viên xem lại) vào chung nhóm "cần thống kê viên
+      // xử lý", không tách card riêng.
       return baseFilteredItems.filter(
-        (i) => !i.reconciliationStatus || i.reconciliationStatus === "PENDING",
+        (i) =>
+          !i.reconciliationStatus ||
+          i.reconciliationStatus === "PENDING" ||
+          i.reconciliationStatus === "AWAITING_REAPPROVAL",
       );
     }
     if (cardFilter === "approved") {
@@ -215,7 +223,10 @@ export const ReconciliationPage: React.FC = () => {
 
   const pendingCount = useMemo(() => {
     return baseFilteredItems.filter(
-      (i) => !i.reconciliationStatus || i.reconciliationStatus === "PENDING",
+      (i) =>
+        !i.reconciliationStatus ||
+        i.reconciliationStatus === "PENDING" ||
+        i.reconciliationStatus === "AWAITING_REAPPROVAL",
     ).length;
   }, [baseFilteredItems]);
 
@@ -503,33 +514,36 @@ export const ReconciliationPage: React.FC = () => {
 
   const handleResubmitItem = async (rowId: string) => {
     const targetItem = rawItems.find((i) => i.id === rowId);
-    setRawItems((prev) =>
-      prev.map((item) => {
-        if (item.id === rowId) {
-          return {
-            ...item,
-            reconciliationStatus: "PENDING",
-          };
-        }
-        return item;
-      }),
-    );
+    if (!targetItem) return;
 
-    if (targetItem) {
-      const bRow =
-        (targetItem as any).backendRow ||
-        rawItems.find((i) => i.id === rowId)?.backendRow;
-      if (bRow) {
-        try {
-          await saveDecisionMutation.mutateAsync({
-            transportReportTripId: bRow.transportReportTripId,
-            excavationReportTripId: bRow.excavationReportTripId,
-            status: "PENDING",
-          });
-        } catch (err: any) {
-          console.error("Lỗi khi gửi lại chuyến:", err);
-        }
-      }
+    const bRow = (targetItem as any).backendRow;
+    if (!bRow) return;
+
+    // CHỈ gửi id của ĐÚNG BÊN vai trò đang đăng nhập, VÀ chỉ khi bên đó thật
+    // sự đang REVISION_REQUESTED. Hai điều kiện đều bắt buộc — xác nhận thật
+    // qua kiểm thử sống (2026-09-08): nếu chỉ lọc theo trạng thái mà không
+    // lọc theo vai trò, bấm "Gửi lại" bên Vận tải khi CẢ 2 bên đang đỏ sẽ vô
+    // tình gửi lại LUÔN cả bên Khai thác — sai, vì người bấm không hề chạm gì
+    // tới dữ liệu Khai thác. Không gửi cả 2 id với status:PENDING như code cũ
+    // (lỗi gốc: làm sai decision.status, xoá tín hiệu "đang chờ duyệt lại"
+    // của bên kia). Không optimistic-update reconciliationStatus ở đây — kết
+    // quả thật (đỏ/vàng/trắng) phụ thuộc CẢ 2 bên, để React Query
+    // invalidate/refetch tự cập nhật đúng ngay sau khi mutation thành công.
+    try {
+      await resubmitTripsMutation.mutateAsync({
+        transportReportTripId:
+          currentRole === "ROLE_TRANSPORT" &&
+          bRow.transportStatus === "REVISION_REQUESTED"
+            ? bRow.transportReportTripId
+            : undefined,
+        excavationReportTripId:
+          currentRole === "ROLE_MINING" &&
+          bRow.excavationStatus === "REVISION_REQUESTED"
+            ? bRow.excavationReportTripId
+            : undefined,
+      });
+    } catch (err: any) {
+      console.error("Lỗi khi gửi lại chuyến:", err);
     }
   };
 

@@ -1,11 +1,14 @@
 package com.ecotel.thong_ke_cao_son.service;
 
 import com.ecotel.thong_ke_cao_son.dto.request.ReconciliationDecisionRequest;
+import com.ecotel.thong_ke_cao_son.dto.request.ReconciliationResubmitRequest;
 import com.ecotel.thong_ke_cao_son.dto.request.ReconciliationSearchRequest;
 import com.ecotel.thong_ke_cao_son.dto.request.ReconciliationTripUpdateRequest;
 import com.ecotel.thong_ke_cao_son.dto.response.*;
 import com.ecotel.thong_ke_cao_son.enums.ApprovalStatus;
 import com.ecotel.thong_ke_cao_son.enums.LoadLevelType;
+import com.ecotel.thong_ke_cao_son.enums.ReconciliationRowStatus;
+import com.ecotel.thong_ke_cao_son.enums.ReconciliationSide;
 import com.ecotel.thong_ke_cao_son.exception.BadRequestException;
 import com.ecotel.thong_ke_cao_son.exception.ResourceNotFoundException;
 import com.ecotel.thong_ke_cao_son.model.*;
@@ -27,6 +30,7 @@ public class ReconciliationService {
     private final TransportReportTripRepository transportReportTripRepository;
     private final ExcavationReportTripRepository excavationReportTripRepository;
     private final ReconciliationDecisionRepository reconciliationDecisionRepository;
+    private final ReconciliationDataHistoryRepository reconciliationDataHistoryRepository;
     private final CargoTypeRepository cargoTypeRepository;
     private final UserRepository userRepository;
     private final TransportReportRepository transportReportRepository;
@@ -56,29 +60,50 @@ public class ReconciliationService {
             excavationByKey.computeIfAbsent(buildExcavationKey(et), k -> new ArrayDeque<>()).add(et);
         }
 
+        // Batch tra decision + cờ "có lịch sử" MỘT LẦN cho cả trang — tránh N+1
+        // (trước đây buildRow tự query riêng cho từng dòng).
+        List<Long> transportTripIds = transportTrips.stream().map(TransportReportTrip::getId).toList();
+        List<Long> excavationTripIds = excavationTrips.stream().map(ExcavationReportTrip::getId).toList();
+
+        Map<Long, ReconciliationDecision> decisionByTransportTripId =
+                reconciliationDecisionRepository.findByTransportReportTrip_IdIn(transportTripIds).stream()
+                        .collect(Collectors.toMap(d -> d.getTransportReportTrip().getId(), d -> d));
+        Map<Long, ReconciliationDecision> decisionByExcavationTripId =
+                reconciliationDecisionRepository.findByExcavationReportTrip_IdIn(excavationTripIds).stream()
+                        .collect(Collectors.toMap(d -> d.getExcavationReportTrip().getId(), d -> d));
+
+        Set<Long> transportIdsWithHistory = new HashSet<>(
+                reconciliationDataHistoryRepository.findDistinctTripIdBySideAndTripIdIn(
+                        ReconciliationSide.TRANSPORT, transportTripIds));
+        Set<Long> excavationIdsWithHistory = new HashSet<>(
+                reconciliationDataHistoryRepository.findDistinctTripIdBySideAndTripIdIn(
+                        ReconciliationSide.EXCAVATION, excavationTripIds));
+
         List<ReconciliationRowResponse> rows = new ArrayList<>();
 
         for (TransportReportTrip tt : transportTrips) {
             Deque<ExcavationReportTrip> candidates = excavationByKey.get(buildTransportKey(tt));
             ExcavationReportTrip matchedExcavation =
                     (candidates != null && !candidates.isEmpty()) ? candidates.poll() : null;
-            rows.add(buildRow(tt, matchedExcavation));
+            rows.add(buildRow(tt, matchedExcavation, decisionByTransportTripId, decisionByExcavationTripId,
+                    transportIdsWithHistory, excavationIdsWithHistory));
         }
 
         for (Deque<ExcavationReportTrip> remaining : excavationByKey.values()) {
             for (ExcavationReportTrip et : remaining) {
-                rows.add(buildRow(null, et));
+                rows.add(buildRow(null, et, decisionByTransportTripId, decisionByExcavationTripId,
+                        transportIdsWithHistory, excavationIdsWithHistory));
             }
         }
 
-        // Lọc theo trạng thái duyệt của chuyến (status trên trip)
+        // Lọc theo trạng thái duyệt của chuyến (status trên trip) — đọc thẳng từ
+        // row đã dựng (buildRow đã gán transportStatus/excavationStatus), không
+        // tự query lại từng dòng như trước.
         if (request.getStatus() != null) {
             ApprovalStatus filterStatus = request.getStatus();
             rows = rows.stream().filter(row -> {
-                boolean transportMatch = row.getTransportReportTripId() != null
-                        && getTripStatus(row.getTransportReportTripId(), true) == filterStatus;
-                boolean excavationMatch = row.getExcavationReportTripId() != null
-                        && getTripStatus(row.getExcavationReportTripId(), false) == filterStatus;
+                boolean transportMatch = row.getTransportStatus() == filterStatus;
+                boolean excavationMatch = row.getExcavationStatus() == filterStatus;
                 return transportMatch || excavationMatch;
             }).collect(Collectors.toList());
         }
@@ -131,8 +156,15 @@ public class ReconciliationService {
                 + et.getVehicle().getId() + "_" + header.getExcavatorDevice().getId();
     }
 
-    private ReconciliationRowResponse buildRow(TransportReportTrip tt, ExcavationReportTrip et) {
+    private ReconciliationRowResponse buildRow(
+            TransportReportTrip tt, ExcavationReportTrip et,
+            Map<Long, ReconciliationDecision> decisionByTransportTripId,
+            Map<Long, ReconciliationDecision> decisionByExcavationTripId,
+            Set<Long> transportIdsWithHistory, Set<Long> excavationIdsWithHistory) {
         var builder = ReconciliationRowResponse.builder();
+
+        ApprovalStatus transportStatus = tt != null ? tt.getStatus() : null;
+        ApprovalStatus excavationStatus = et != null ? et.getStatus() : null;
 
         if (tt != null) {
             TransportReport header = tt.getTransportReport();
@@ -151,15 +183,20 @@ public class ReconciliationService {
                     .localSlopeM(tt.getLocalSlopeM())
                     .unloadingPointName(tt.getUnloadingPoint().getName())
                     .rainyDay(tt.getRainyDay())
-                    .supplementaryVehicle(tt.getSupplementaryVehicle())
-                    .transportData(ReconciliationTripDataResponse.builder()
-                            .cargoTypeName(tt.getCargoType().getName())
-                            .tripCount(tt.getTripCount())
-                            .loadLevelType(tt.getLoadLevel().getType())
-                            .loadLevelCustomValue(tt.getLoadLevel().getCustomValue())
-                            .employeeSalaryCode(header.getEmployee().getSalaryCode())
-                            .employeeFullName(header.getEmployee().getFullName())
-                            .build());
+                    .supplementaryVehicle(tt.getSupplementaryVehicle());
+            // Đang chờ Vận tải sửa lại -> ẨN dữ liệu ở bảng (KHÔNG đụng CSDL thật,
+            // xem lịch sử qua icon "i" — dữ liệu snapshot lúc yêu cầu sửa).
+            if (transportStatus != ApprovalStatus.REVISION_REQUESTED) {
+                builder.transportData(ReconciliationTripDataResponse.builder()
+                        .cargoTypeName(tt.getCargoType().getName())
+                        .tripCount(tt.getTripCount())
+                        .loadLevelType(tt.getLoadLevel().getType())
+                        .loadLevelCustomValue(tt.getLoadLevel().getCustomValue())
+                        .employeeSalaryCode(header.getEmployee().getSalaryCode())
+                        .employeeFullName(header.getEmployee().getFullName())
+                        .build());
+            }
+            builder.transportHistoryAvailable(transportIdsWithHistory.contains(tt.getId()));
         } else {
             ExcavationReport header = et.getExcavationReport();
             builder.reportDate(header.getReportDate())
@@ -170,31 +207,60 @@ public class ReconciliationService {
 
         if (et != null) {
             ExcavationReport header = et.getExcavationReport();
-            builder.excavationReportTripId(et.getId())
-                    .excavationData(ReconciliationTripDataResponse.builder()
-                            .cargoTypeName(et.getCargoType().getName())
-                            .tripCount(et.getTripCount())
-                            .loadLevelType(et.getLoadLevel().getType())
-                            .loadLevelCustomValue(et.getLoadLevel().getCustomValue())
-                            .employeeSalaryCode(header.getEmployee().getSalaryCode())
-                            .employeeFullName(header.getEmployee().getFullName())
-                            .build());
+            builder.excavationReportTripId(et.getId());
+            if (excavationStatus != ApprovalStatus.REVISION_REQUESTED) {
+                builder.excavationData(ReconciliationTripDataResponse.builder()
+                        .cargoTypeName(et.getCargoType().getName())
+                        .tripCount(et.getTripCount())
+                        .loadLevelType(et.getLoadLevel().getType())
+                        .loadLevelCustomValue(et.getLoadLevel().getCustomValue())
+                        .employeeSalaryCode(header.getEmployee().getSalaryCode())
+                        .employeeFullName(header.getEmployee().getFullName())
+                        .build());
+            }
+            builder.excavationHistoryAvailable(excavationIdsWithHistory.contains(et.getId()));
         }
 
         builder.matched(isMatched(tt, et));
+        builder.transportStatus(transportStatus);
+        builder.excavationStatus(excavationStatus);
 
         ReconciliationDecision decision = null;
         if (tt != null) {
-            decision = reconciliationDecisionRepository.findByTransportReportTrip_Id(tt.getId()).orElse(null);
+            decision = decisionByTransportTripId.get(tt.getId());
         }
         if (decision == null && et != null) {
-            decision = reconciliationDecisionRepository.findByExcavationReportTrip_Id(et.getId()).orElse(null);
+            decision = decisionByExcavationTripId.get(et.getId());
         }
         if (decision != null) {
             builder.decision(toDecisionResponse(decision));
         }
 
+        builder.status(computeRowStatus(transportStatus, excavationStatus,
+                decision != null ? decision.getStatus() : null));
+
         return builder.build();
+    }
+
+    /**
+     * Đỏ nhạt = còn ít nhất 1 bên đang chờ sửa. Vàng nhạt = cả 2 bên đã hết
+     * chờ sửa NHƯNG decision vẫn còn REVISION_REQUESTED (đang giữa chu kỳ,
+     * chờ thống kê viên duyệt lại — xem {@link #syncTripStatusToPending}).
+     * Trắng = đã duyệt, hoặc chưa từng có vấn đề gì.
+     */
+    private ReconciliationRowStatus computeRowStatus(
+            ApprovalStatus transportStatus, ApprovalStatus excavationStatus, ApprovalStatus decisionStatus) {
+        if (transportStatus == ApprovalStatus.REVISION_REQUESTED
+                || excavationStatus == ApprovalStatus.REVISION_REQUESTED) {
+            return ReconciliationRowStatus.REVISION_REQUESTED;
+        }
+        if (decisionStatus == ApprovalStatus.REVISION_REQUESTED) {
+            return ReconciliationRowStatus.AWAITING_REAPPROVAL;
+        }
+        if (decisionStatus == ApprovalStatus.APPROVED) {
+            return ReconciliationRowStatus.APPROVED;
+        }
+        return ReconciliationRowStatus.PENDING;
     }
 
     /**
@@ -281,20 +347,77 @@ public class ReconciliationService {
 
         List<ReconciliationDecision> saved = reconciliationDecisionRepository.saveAll(toSave);
 
-        // Sync trip status theo decision
-        for (ReconciliationDecision decision : saved) {
+        // Sync trip status — CHỈ bên request THỰC SỰ nhắm tới (request.getXxxTripId(),
+        // KHÔNG phải decision.getXxx() sau merge). Lý do: buildDecision (đúng) không
+        // null hoá FK cũ khi request chỉ gửi 1 bên (không được xoá liên kết ghép cặp),
+        // nên 1 decision từng gắn cả 2 bên (vd sau khi duyệt chung) vẫn còn nguyên cả 2
+        // FK dù yêu cầu sửa lần này chỉ nhắm 1 bên — đọc decision.getXxx() ở đây sẽ đổi
+        // NHẦM trạng thái sang cả bên không được nhắm tới. Bug thật, chặn đúng luồng
+        // "ẩn dữ liệu + đỏ/vàng theo từng bên" (chốt 2026-09-08).
+        // `toSave` tương ứng 1:1 theo index với `requests` (chỉ append khi build không
+        // lỗi, và hàm đã throw sớm ở trên nếu có lỗi).
+        List<ReconciliationDataHistory> historyToSave = new ArrayList<>();
+        for (int i = 0; i < requests.size(); i++) {
+            ReconciliationDecisionRequest request = requests.get(i);
+            ReconciliationDecision decision = toSave.get(i);
             ApprovalStatus newStatus = decision.getStatus();
-            if (decision.getTransportReportTrip() != null) {
-                decision.getTransportReportTrip().setStatus(newStatus);
-                transportReportTripRepository.save(decision.getTransportReportTrip());
+
+            if (request.getTransportReportTripId() != null) {
+                TransportReportTrip trip = transportTripById.get(request.getTransportReportTripId());
+                if (newStatus == ApprovalStatus.REVISION_REQUESTED
+                        && trip.getStatus() != ApprovalStatus.REVISION_REQUESTED) {
+                    historyToSave.add(snapshotTransport(decision, trip, request.getNote()));
+                }
+                trip.setStatus(newStatus);
+                transportReportTripRepository.save(trip);
             }
-            if (decision.getExcavationReportTrip() != null) {
-                decision.getExcavationReportTrip().setStatus(newStatus);
-                excavationReportTripRepository.save(decision.getExcavationReportTrip());
+            if (request.getExcavationReportTripId() != null) {
+                ExcavationReportTrip trip = excavationTripById.get(request.getExcavationReportTripId());
+                if (newStatus == ApprovalStatus.REVISION_REQUESTED
+                        && trip.getStatus() != ApprovalStatus.REVISION_REQUESTED) {
+                    historyToSave.add(snapshotExcavation(decision, trip, request.getNote()));
+                }
+                trip.setStatus(newStatus);
+                excavationReportTripRepository.save(trip);
             }
+        }
+        if (!historyToSave.isEmpty()) {
+            reconciliationDataHistoryRepository.saveAll(historyToSave);
         }
 
         return saved.stream().map(this::toDecisionResponse).toList();
+    }
+
+    private ReconciliationDataHistory snapshotTransport(
+            ReconciliationDecision decision, TransportReportTrip trip, String note) {
+        ReconciliationDataHistory h = new ReconciliationDataHistory();
+        h.setReconciliationDecision(decision);
+        h.setSide(ReconciliationSide.TRANSPORT);
+        h.setTripId(trip.getId());
+        h.setCargoTypeName(trip.getCargoType().getName());
+        h.setTripCount(trip.getTripCount());
+        h.setLoadLevelType(trip.getLoadLevel().getType());
+        h.setLoadLevelCustomValue(trip.getLoadLevel().getCustomValue());
+        h.setEmployeeSalaryCode(trip.getTransportReport().getEmployee().getSalaryCode());
+        h.setEmployeeFullName(trip.getTransportReport().getEmployee().getFullName());
+        h.setNote(note);
+        return h;
+    }
+
+    private ReconciliationDataHistory snapshotExcavation(
+            ReconciliationDecision decision, ExcavationReportTrip trip, String note) {
+        ReconciliationDataHistory h = new ReconciliationDataHistory();
+        h.setReconciliationDecision(decision);
+        h.setSide(ReconciliationSide.EXCAVATION);
+        h.setTripId(trip.getId());
+        h.setCargoTypeName(trip.getCargoType().getName());
+        h.setTripCount(trip.getTripCount());
+        h.setLoadLevelType(trip.getLoadLevel().getType());
+        h.setLoadLevelCustomValue(trip.getLoadLevel().getCustomValue());
+        h.setEmployeeSalaryCode(trip.getExcavationReport().getEmployee().getSalaryCode());
+        h.setEmployeeFullName(trip.getExcavationReport().getEmployee().getFullName());
+        h.setNote(note);
+        return h;
     }
 
     private ReconciliationDecision buildDecision(
@@ -468,6 +591,13 @@ public class ReconciliationService {
                 applyLoadLevel(trip.getLoadLevel(), req.getLoadLevelType(), req.getLoadLevelCustomValue());
             }
 
+            // Sửa dữ liệu ngay ở màn Đối chiếu (nút "Lưu") trước đây KHÔNG đụng
+            // status — nếu bên này đang REVISION_REQUESTED (đỏ nhạt), sửa xong
+            // vẫn không tự "gửi lại" được. Đưa về PENDING + đồng bộ decision,
+            // đúng luồng gửi lại như mọi đường sửa dữ liệu khác. Chốt 2026-09-08.
+            trip.setStatus(ApprovalStatus.PENDING);
+            syncTripStatusToPending(trip.getId(), true);
+
             TransportReport oldReport = trip.getTransportReport();
             transportReportsTouched.add(oldReport);
 
@@ -523,6 +653,10 @@ public class ReconciliationService {
                 applyLoadLevel(trip.getLoadLevel(), req.getLoadLevelType(), req.getLoadLevelCustomValue());
             }
 
+            // Xem chú thích ở nhánh Vận tải phía trên — cùng lý do.
+            trip.setStatus(ApprovalStatus.PENDING);
+            syncTripStatusToPending(trip.getId(), false);
+
             ExcavationReport oldReport = trip.getExcavationReport();
             excavationReportsTouched.add(oldReport);
 
@@ -563,18 +697,6 @@ public class ReconciliationService {
         }
     }
 
-    private ApprovalStatus getTripStatus(Long tripId, boolean isTransport) {
-        if (isTransport) {
-            return transportReportTripRepository.findById(tripId)
-                    .map(TransportReportTrip::getStatus)
-                    .orElse(null);
-        } else {
-            return excavationReportTripRepository.findById(tripId)
-                    .map(ExcavationReportTrip::getStatus)
-                    .orElse(null);
-        }
-    }
-
     private void applyLoadLevel(LoadLevel loadLevel, LoadLevelType type, String customValue) {
         loadLevel.setType(type);
         if (type == LoadLevelType.OTHER) {
@@ -592,6 +714,15 @@ public class ReconciliationService {
     /**
      * Khi report trip chuyển về PENDING (do bị update), đồng bộ reconciliation decision về PENDING.
      * Gọi từ TransportReportService / ExcavationReportService sau khi trip được update.
+     *
+     * <p>CHỈ đưa {@code decision.status} về PENDING khi nó CHƯA phải
+     * REVISION_REQUESTED — nếu đang giữa 1 chu kỳ yêu cầu sửa (decision vẫn
+     * REVISION_REQUESTED trong khi CHÍNH trip này vừa được sửa xong, tức
+     * người dùng vừa "gửi lại"), phải GIỮ NGUYÊN decision.status để
+     * {@link #computeRowStatus} còn nhận biết "đang chờ duyệt lại" (vàng
+     * nhạt) một khi CẢ 2 bên đã hết REVISION_REQUESTED. Trước đây set vô
+     * điều kiện — xoá mất tín hiệu này ngay khi 1 bên vừa gửi lại, khiến
+     * dòng nhảy thẳng về trắng dù bên kia còn chưa sửa. Chốt 2026-09-08.
      */
     public void syncTripStatusToPending(Long tripId, boolean isTransport) {
         ReconciliationDecision decision = null;
@@ -600,9 +731,78 @@ public class ReconciliationService {
         } else {
             decision = reconciliationDecisionRepository.findByExcavationReportTrip_Id(tripId).orElse(null);
         }
-        if (decision != null) {
+        if (decision != null && decision.getStatus() != ApprovalStatus.REVISION_REQUESTED) {
             decision.setStatus(ApprovalStatus.PENDING);
             reconciliationDecisionRepository.save(decision);
         }
+    }
+
+    // ================= GỬI LẠI (đúng theo từng bên đang chờ sửa) =================
+
+    /**
+     * Đưa từng bên có mặt trong request về PENDING NẾU bên đó thật sự đang
+     * REVISION_REQUESTED — dùng cho nút "Gửi lại" ở màn Đối chiếu. KHÔNG đụng
+     * decision.status trực tiếp (khác {@link #saveDecisions}, vốn dùng cho
+     * hành động của thống kê viên) — tái dùng đúng
+     * {@link #syncTripStatusToPending} để mọi đường "gửi lại" (nút này, và
+     * sửa dữ liệu qua nhập liệu bình thường) đi qua đúng 1 điểm chốt.
+     */
+    @Transactional
+    public void resubmitTrips(ReconciliationResubmitRequest request) {
+        if (request.getTransportReportTripId() == null && request.getExcavationReportTripId() == null) {
+            throw new BadRequestException("Cần ít nhất 1 trong 2: chuyến Vận tải hoặc chuyến Khai thác");
+        }
+        if (request.getTransportReportTripId() != null) {
+            TransportReportTrip trip = transportReportTripRepository.findById(request.getTransportReportTripId())
+                    .orElseThrow(() -> new ResourceNotFoundException(
+                            "Không tìm thấy chuyến Vận tải: " + request.getTransportReportTripId()));
+            if (trip.getStatus() == ApprovalStatus.REVISION_REQUESTED) {
+                trip.setStatus(ApprovalStatus.PENDING);
+                transportReportTripRepository.save(trip);
+                syncTripStatusToPending(trip.getId(), true);
+            }
+        }
+        if (request.getExcavationReportTripId() != null) {
+            ExcavationReportTrip trip = excavationReportTripRepository.findById(request.getExcavationReportTripId())
+                    .orElseThrow(() -> new ResourceNotFoundException(
+                            "Không tìm thấy chuyến Khai thác: " + request.getExcavationReportTripId()));
+            if (trip.getStatus() == ApprovalStatus.REVISION_REQUESTED) {
+                trip.setStatus(ApprovalStatus.PENDING);
+                excavationReportTripRepository.save(trip);
+                syncTripStatusToPending(trip.getId(), false);
+            }
+        }
+    }
+
+    // ================= LỊCH SỬ (xem qua icon "i" ở cột Sai lệch) =================
+
+    public List<ReconciliationHistoryEntryResponse> getHistory(Long transportReportTripId, Long excavationReportTripId) {
+        if (transportReportTripId == null && excavationReportTripId == null) {
+            throw new BadRequestException("Cần ít nhất 1 trong 2: chuyến Vận tải hoặc chuyến Khai thác");
+        }
+        List<ReconciliationDataHistory> entries = new ArrayList<>();
+        if (transportReportTripId != null) {
+            entries.addAll(reconciliationDataHistoryRepository
+                    .findByTripIdAndSideOrderByCreatedAtDesc(transportReportTripId, ReconciliationSide.TRANSPORT));
+        }
+        if (excavationReportTripId != null) {
+            entries.addAll(reconciliationDataHistoryRepository
+                    .findByTripIdAndSideOrderByCreatedAtDesc(excavationReportTripId, ReconciliationSide.EXCAVATION));
+        }
+        return entries.stream()
+                .sorted(Comparator.comparing(ReconciliationDataHistory::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
+                .map(h -> ReconciliationHistoryEntryResponse.builder()
+                        .id(h.getId())
+                        .side(h.getSide())
+                        .cargoTypeName(h.getCargoTypeName())
+                        .tripCount(h.getTripCount())
+                        .loadLevelType(h.getLoadLevelType())
+                        .loadLevelCustomValue(h.getLoadLevelCustomValue())
+                        .employeeSalaryCode(h.getEmployeeSalaryCode())
+                        .employeeFullName(h.getEmployeeFullName())
+                        .note(h.getNote())
+                        .createdAt(h.getCreatedAt())
+                        .build())
+                .toList();
     }
 }

@@ -397,16 +397,22 @@ export const ReconciliationComparisonTables: React.FC<
               table.getRowModel().rows.map((row) => {
                 const item = row.original;
                 const isSelected = row.getIsSelected();
-                const isChangesRequested =
-                  item.reconciliationStatus === "REVISION_REQUESTED" ||
-                  Boolean(item.requestNote);
+                // 3 trạng thái màu (chốt 2026-09-08): đỏ nhạt = còn bên đang
+                // chờ sửa; vàng nhạt = cả 2 bên đã gửi lại, chờ thống kê viên
+                // duyệt lại; trắng = đã duyệt hoặc chưa từng có vấn đề.
+                const isRevisionRequested =
+                  item.reconciliationStatus === "REVISION_REQUESTED";
+                const isAwaitingReapproval =
+                  item.reconciliationStatus === "AWAITING_REAPPROVAL";
 
                 let rowBg = "";
                 let rowBorder = "";
                 if (isSelected) {
                   rowBg = "bg-blue-100/80 hover:bg-blue-100 dark:bg-blue-900/50 dark:hover:bg-blue-900/60";
-                } else if (isChangesRequested) {
-                  // ponytail: viền nổi bật cho các dòng có yêu cầu chỉnh sửa
+                } else if (isRevisionRequested) {
+                  rowBg = "bg-red-50/60 hover:bg-red-100/70 dark:bg-red-950/40 dark:hover:bg-red-900/50";
+                  rowBorder = "border-l-4 border-l-red-500 dark:border-l-red-400";
+                } else if (isAwaitingReapproval) {
                   rowBg = "bg-amber-50/60 hover:bg-amber-100/70 dark:bg-amber-950/40 dark:hover:bg-amber-900/50";
                   rowBorder = "border-l-4 border-l-amber-500 dark:border-l-amber-400";
                 } else {

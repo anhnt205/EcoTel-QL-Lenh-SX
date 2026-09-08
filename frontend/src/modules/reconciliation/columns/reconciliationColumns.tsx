@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { CustomNoteTooltip } from "@/modules/reconciliation/components/CustomNoteTooltip";
+import { ReconciliationHistoryPopover } from "@/modules/reconciliation/components/ReconciliationHistoryPopover";
 import {
   Check,
   AlertTriangle,
@@ -816,15 +817,29 @@ export function createReconciliationColumns(
         {
           id: "mismatched",
           header: "Sai lệch",
-          cell: ({ row }) =>
-            !meta().isMatched(row.original) ? (
-              <div className="w-5 h-5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-400 flex items-center justify-center mx-auto">
-                <AlertTriangle className="w-3.5 h-3.5 fill-amber-500 text-amber-100" />
+          cell: ({ row }) => {
+            const bRow = row.original.backendRow;
+            const hasHistory =
+              bRow?.transportHistoryAvailable || bRow?.excavationHistoryAvailable;
+            return (
+              <div className="flex items-center justify-center gap-1">
+                {!meta().isMatched(row.original) ? (
+                  <div className="w-5 h-5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-400 flex items-center justify-center">
+                    <AlertTriangle className="w-3.5 h-3.5 fill-amber-500 text-amber-100" />
+                  </div>
+                ) : (
+                  <span className="text-gray-400">-</span>
+                )}
+                {hasHistory && (
+                  <ReconciliationHistoryPopover
+                    transportReportTripId={bRow?.transportReportTripId}
+                    excavationReportTripId={bRow?.excavationReportTripId}
+                  />
+                )}
               </div>
-            ) : (
-              <span className="text-gray-400">-</span>
-            ),
-          size: 65,
+            );
+          },
+          size: 90,
         },
       ],
     },
@@ -851,6 +866,18 @@ export function createReconciliationColumns(
             const item = row.original;
             const status: ReconcileWorkflowStatus =
               item.reconciliationStatus || "PENDING";
+            const bRow = (item as any).backendRow;
+            // Trạng thái ĐÚNG BÊN của vai trò đang đăng nhập — KHÔNG dùng
+            // `status` (trạng thái gộp cả dòng) để quyết định vai trò đơn vị
+            // có "Gửi lại" hay không: 2 bên có trạng thái ĐỘC LẬP, nếu chỉ 1
+            // bên bị yêu cầu sửa thì bên còn lại không nên thấy/động vào nút
+            // "Gửi lại" (tránh gửi lại NHẦM sang bên không liên quan).
+            const ownSideStatus =
+              currentRole === "ROLE_TRANSPORT"
+                ? bRow?.transportStatus
+                : currentRole === "ROLE_MINING"
+                  ? bRow?.excavationStatus
+                  : undefined;
 
             // ── Vai trò THỐNG KÊ: Người Điều Hành (Gộp Duyệt, Sửa, Xóa thành icon) ──
             if (currentRole === "ROLE_STATISTICIAN") {
@@ -993,7 +1020,7 @@ export function createReconciliationColumns(
               );
             }
 
-            if (status === "REVISION_REQUESTED") {
+            if (ownSideStatus === "REVISION_REQUESTED") {
               const noteIcon = (
                 <div
                   className="h-7 w-7 inline-flex items-center justify-center text-blue-600 dark:text-blue-400 bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/50 dark:hover:bg-blue-900/50 border border-blue-200 dark:border-blue-800 rounded-lg transition-colors cursor-help shadow-2xs"
@@ -1023,6 +1050,16 @@ export function createReconciliationColumns(
                   >
                     <Send className="w-3 h-3" /> Gửi lại
                   </Button>
+                </div>
+              );
+            }
+
+            if (status === "AWAITING_REAPPROVAL") {
+              return (
+                <div className="flex items-center justify-center">
+                  <Badge className="bg-amber-500 hover:bg-amber-600 text-white gap-1 h-7.5 py-1 px-3 rounded-lg font-semibold">
+                    <Send className="w-3.5 h-3.5" /> Đã gửi lại — chờ Thống kê duyệt
+                  </Badge>
                 </div>
               );
             }
