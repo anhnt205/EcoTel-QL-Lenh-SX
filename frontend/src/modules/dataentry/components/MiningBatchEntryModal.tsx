@@ -102,7 +102,7 @@ export const MiningBatchEntryModal: React.FC<MiningBatchEntryModalProps> = ({
 }) => {
   const {
     shiftOptions,
-    locationValues,
+    pickupPointValues,
     excavatorValues,
     vehicleValues,
     cargoTypeValues,
@@ -111,7 +111,7 @@ export const MiningBatchEntryModal: React.FC<MiningBatchEntryModalProps> = ({
     getExcavatorDetails,
     getOperatorDetails,
     rawShifts,
-    rawLocations,
+    rawPickupPoints,
     rawExcavators,
     rawVehicles,
     rawUsers,
@@ -345,7 +345,7 @@ export const MiningBatchEntryModal: React.FC<MiningBatchEntryModalProps> = ({
       try {
         const payload = buildExcavationReportRequest(sess, {
           rawShifts,
-          rawLocations,
+          rawLocations: rawPickupPoints,
           rawExcavators,
           rawVehicles,
           rawUsers,
@@ -570,7 +570,7 @@ export const MiningBatchEntryModal: React.FC<MiningBatchEntryModalProps> = ({
                 Nơi chất tải <span className="text-red-500">*</span>
               </label>
               <ComboboxInput
-                options={locationValues}
+                options={pickupPointValues}
                 value={sess.pickupLocation}
                 onChange={(v) => handleUpdateSession({ pickupLocation: v })}
                 placeholder="Chọn nơi chất tải"

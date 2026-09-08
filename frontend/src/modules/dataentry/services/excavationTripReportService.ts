@@ -204,6 +204,14 @@ export function buildExcavationReportRequest(
   sess: MiningSessionDraft,
   masterData: {
     rawShifts: any[];
+    /**
+     * Danh mục "Nơi chất tải" — PHẢI là dữ liệu từ `/api/pickup-points`
+     * (`rawPickupPoints` của `useMasterData`), KHÔNG PHẢI `/api/locations`.
+     * Hai bảng tình cờ trùng tên vài dòng (KX1..KX4) nhưng ID khác hẳn —
+     * backend xác thực `receivingLocationId` qua `pickupPointRepository`,
+     * nên nhầm sang `/api/locations` sẽ khiến LƯU LUÔN 404 "Nơi chất tải
+     * không tồn tại: <id sai>" (bug thật, vá ngày 2026-09-08).
+     */
     rawLocations: any[];
     rawExcavators: any[];
     rawVehicles: any[];

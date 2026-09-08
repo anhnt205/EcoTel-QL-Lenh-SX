@@ -57,7 +57,16 @@ export const MiningEntryPage: React.FC = () => {
   const [searchKeyword, setSearchKeyword] = useState("");
 
   const masterData = useMasterData();
-  const { rawShifts = [], rawExcavators = [], rawLocations = [] } = masterData;
+  const {
+    rawShifts = [],
+    rawExcavators = [],
+    // "Nơi chất tải" của Khai thác PHẢI dùng danh mục Pickup Point
+    // (/api/pickup-points), KHÔNG PHẢI /api/locations — hai bảng tình cờ
+    // trùng tên vài dòng (KX1..KX4) nhưng ID khác hẳn; backend xác thực
+    // receivingLocationId qua pickupPointRepository (bug thật, vá 2026-09-08,
+    // xem masterDataService.ts).
+    rawPickupPoints = [],
+  } = masterData;
 
   // Map selected Shift names to Shift IDs for Backend API
   const shiftIds = useMemo(() => {
@@ -91,14 +100,14 @@ export const MiningEntryPage: React.FC = () => {
     return ids.length > 0 ? ids : undefined;
   }, [selectedExcavators, rawExcavators]);
 
-  // Map tên "Nơi chất tải" đã chọn sang Location ID cho Backend API
+  // Map tên "Nơi chất tải" đã chọn sang Pickup Point ID cho Backend API
   const receivingLocationIds = useMemo(() => {
     if (selectedPickupLocations.length === 0) return undefined;
-    const ids = rawLocations
+    const ids = rawPickupPoints
       .filter((l) => selectedPickupLocations.includes(String(l.name ?? "")))
       .map((l) => l.id);
     return ids.length > 0 ? ids : undefined;
-  }, [selectedPickupLocations, rawLocations]);
+  }, [selectedPickupLocations, rawPickupPoints]);
 
   // "Tầng xúc" là chuỗi tự do -> gửi thẳng giá trị
   const excavationFloors = useMemo(() => {
@@ -198,15 +207,15 @@ export const MiningEntryPage: React.FC = () => {
     return list;
   }, [reportsList]);
 
-  // "Nơi chất tải" lấy thẳng từ danh mục Vị trí — độc lập với kết quả lọc nên
-  // không bị co lại khi người dùng đã chọn.
+  // "Nơi chất tải" lấy thẳng từ danh mục Pickup Point — độc lập với kết quả
+  // lọc nên không bị co lại khi người dùng đã chọn.
   const pickupLocationOptions = useMemo(() => {
     return Array.from(
       new Set(
-        rawLocations.map((l) => String(l.name ?? "").trim()).filter(Boolean),
+        rawPickupPoints.map((l) => String(l.name ?? "").trim()).filter(Boolean),
       ),
     ).sort();
-  }, [rawLocations]);
+  }, [rawPickupPoints]);
 
   // "Tầng xúc" là chuỗi tự do, không có danh mục — phải gom từ dữ liệu.
   //

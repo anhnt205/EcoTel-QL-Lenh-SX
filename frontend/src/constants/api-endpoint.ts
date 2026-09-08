@@ -30,6 +30,7 @@ export const API = {
     EXCAVATION_AREAS: "/excavation-areas",
     RECEIVING_POINTS: "/receiving-points",
     UNLOADING_POINTS: "/unloading-points",
+    PICKUP_POINTS: "/pickup-points",
   },
   RECONCILIATION: {
     SEARCH: "/reconciliation",
