@@ -1,8 +1,10 @@
 # Context — THONGKE-CAOSON
 
-Cập nhật lần cuối: 2026-09-08 (lượt 13 — checkbox lọc trạng thái thay
-tab + đổi nhãn nút "Lưu và gửi", xem "Lượt 13"). Trước đó cùng ngày
-(lượt 12 — thêm tab "Cần sửa" lọc nhanh + nút bút chì sửa từng dòng ở
+Cập nhật lần cuối: 2026-09-08 (lượt 14 — Đối chiếu: workflow đỏ/vàng/
+trắng + gate duyệt cho sản lượng, dùng Plan Mode do độ phức tạp cao,
+xem "Lượt 14"). Trước đó cùng ngày (lượt 13 — checkbox lọc trạng thái
+thay tab + đổi nhãn nút "Lưu và gửi", xem "Lượt 13"). Trước đó cùng
+ngày (lượt 12 — thêm tab "Cần sửa" lọc nhanh + nút bút chì sửa từng dòng ở
 Nhập liệu Khai thác/Vận tải, xem "Lượt 12"). Trước đó cùng ngày (lượt 11 — sửa lỗi Đối chiếu bị tách 2 dòng do
 khoá ghép cặp dùng nhầm Loại hàng, xem "Lượt 11"). Trước đó cùng ngày
 (lượt 10 — sửa lỗi "Nơi chất tải" của Nhập liệu Khai thác
@@ -1413,3 +1415,96 @@ Vận tải (ra đúng 1 dòng REVISION_REQUESTED còn tồn) đều đúng logi
 Cũng gặp lại hiện tượng list rỗng thoáng qua ngay sau lần fetch đầu
 tiên sau rebuild (đã ghi nhận từ Lượt 10) — F5 lại là hết, không phải
 lỗi mới.
+
+## Lượt 14 (2026-09-08) — Đối chiếu: workflow đỏ/vàng/trắng + gate duyệt cho sản lượng, commit `3c7c139` + `bb977c1`
+
+Yêu cầu lớn nhất từ trước tới nay trong dự án: khi thống kê viên yêu cầu
+sửa 1 dòng Đối chiếu → dòng bôi **đỏ nhạt**, dữ liệu Vận tải/Khai thác
+bên bị yêu cầu sửa **ẩn khỏi bảng** (không xoá thật, lưu lịch sử — xem
+qua icon "i" ở cột Sai lệch); bên đó sửa+gửi lại thì dữ liệu hiện lại;
+**cả 2 bên** đã gửi lại → dòng chuyển **vàng nhạt** (chờ thống kê viên
+duyệt lại); duyệt → **trắng**. Trước khi code đã dùng `EnterPlanMode`
+(vì độ phức tạp/rủi ro cao) + `AskUserQuestion` 2 vòng để chốt đúng
+2 quyết định kiến trúc quan trọng nhất — xem đầy đủ tại
+`C:\Users\HOME\.claude\plans\witty-wandering-kernighan.md`:
+
+1. **Ẩn dữ liệu = chỉ ẩn tầng hiển thị (API response), KHÔNG xoá CSDL
+   thật** — tránh đụng ràng buộc NOT NULL/unique-dedup của các cột
+   nghiệp vụ cốt lõi (`cargo_type_id`, `trip_count`...) mà engine tính
+   sản lượng phụ thuộc.
+2. **Chỉ dữ liệu ĐÃ DUYỆT đối chiếu mới được tính sản lượng** — chủ dự
+   án xác nhận trực tiếp đây là quy tắc nghiệp vụ ĐÚNG (trước đây
+   `ProductionCalculationService` tính từ MỌI chuyến Vận tải bất kể
+   trạng thái duyệt — SAI). Áp dụng ngay cho MỌI kỳ kể cả kỳ cũ — chủ
+   dự án đã xác nhận chấp nhận rủi ro: kỳ cũ tạm không tính lại được
+   cho tới khi duyệt bù qua Đối chiếu (mọi chuyến hiện có đang mặc định
+   PENDING, chưa từng qua tính năng duyệt/từ chối vừa build gần đây).
+
+**Phát hiện + sửa 3 lỗi có sẵn** chặn đúng luồng đỏ/vàng/trắng (tiền đề
+bắt buộc, không phải việc phát sinh ngoài phạm vi):
+1. `ReconciliationService.saveDecisions` đồng bộ trạng thái sang trip
+   bằng FK **đã lưu trên decision** thay vì FK **của chính request** —
+   decision từng gắn cả 2 bên (vd sau khi duyệt chung) vẫn bị đổi trạng
+   thái CẢ 2 bên dù yêu cầu sửa lần này chỉ nhắm 1 bên.
+2. `syncTripStatusToPending` luôn đưa `decision.status` về PENDING vô
+   điều kiện — xoá mất tín hiệu "đang giữa chu kỳ yêu cầu sửa" cần cho
+   màu vàng.
+3. `ReconciliationPage.handleResubmitItem` gửi cả 2 id với
+   `status:PENDING` bất kể bên nào thực sự cần gửi lại.
+4. **(Phát hiện qua kiểm thử sống, sửa bổ sung ngay trong lượt)**: nút
+   "Gửi lại" và handler của nó dùng TRẠNG THÁI GỘP CẢ DÒNG để quyết
+   định hiện/gửi — phải dùng đúng trạng thái CỦA BÊN theo VAI TRÒ đang
+   đăng nhập, nếu không 1 bên bấm "Gửi lại" khi cả 2 đang cùng đỏ sẽ vô
+   tình gửi lại LUÔN cả bên kia không liên quan. Bug này tự phát hiện
+   khi test sống (không có trong plan ban đầu) — verify lại bằng psql
+   xác nhận đúng chỉ 1 bên bị đổi sau khi vá.
+
+**Backend — file mới**: `enums/ReconciliationSide.java`,
+`ReconciliationRowStatus.java` (4 giá trị PENDING/APPROVED/
+REVISION_REQUESTED/AWAITING_REAPPROVAL — tách riêng khỏi `ApprovalStatus`
+thật, chỉ là giá trị TÍNH TOÁN hiển thị); `model/ReconciliationDataHistory.java`
+(bảng mới `reconciliation_data_history`, Hibernate tự tạo sạch — snapshot
+PHẲNG không FK, tránh vướng unique-dedup-constraint của bảng trip gốc);
+`repository/ReconciliationDataHistoryRepository.java`; DTO mới
+`ReconciliationResubmitRequest`/`ReconciliationHistoryEntryResponse`.
+
+**Backend — sửa**: `ReconciliationService` (saveDecisions sync theo
+request + snapshot lịch sử; `buildRow` batch decision+history 1
+lần/trang hết N+1, trả `transportStatus`/`excavationStatus`/`status`
+tính toán/cờ lịch sử; `syncTripStatusToPending` giữ nguyên decision khi
+đang REVISION_REQUESTED; thêm `resubmitTrips()`/`getHistory()`;
+`updateTrips` đưa status về PENDING sau khi sửa dữ liệu qua Đối chiếu);
+`ReconciliationController` (thêm `POST /trips/resubmit`,
+`GET /history`); `ProductionCalculationService.calculatePeriod` (gate
+mới ngay sau kiểm tra rỗng, TRƯỚC khi xoá kết quả cũ — lọc trip chưa
+APPROVED, ném lỗi tổng hợp đúng phong cách QĐ-04/QĐ-06 có sẵn; tổng
+quát hoá `buildAggregateError` nhận header tuỳ biến).
+
+**Frontend**: `reconciliation.service.ts` (type mới + `getHistory`/
+`resubmitTrips` + hook); `ReconciliationHistoryPopover.tsx` (component
+mới, icon "i" ở cột Sai lệch); `reconciliationColumns.tsx` (gắn icon
+lịch sử, badge riêng "Đã gửi lại — chờ Thống kê duyệt" cho
+AWAITING_REAPPROVAL, nút "Gửi lại" dùng đúng trạng thái CỦA BÊN theo vai
+trò); `ReconciliationComparisonTables.tsx` (3 màu dòng đỏ/vàng/trắng
+thay 2 màu cũ amber/trắng); `ReconciliationPage.tsx` (`handleResubmitItem`
+gọi endpoint mới, chỉ gửi đúng id + đúng vai trò; KPI "Chờ đối soát" gộp
+cả AWAITING_REAPPROVAL).
+
+**Verify sống đầy đủ chu kỳ** qua Browser pane (chuyển vai Thống kê/Vận
+tải/Khai thác thật, dùng tài khoản `xemthu`): yêu cầu sửa riêng 1 bên →
+đỏ nhạt + dữ liệu bên đó trống (xác nhận CSDL thật không đổi qua psql);
+gửi lại đúng 1 bên (KHÔNG đụng bên kia, xác nhận bằng psql) → vẫn còn
+đỏ vì bên kia chưa gửi; gửi lại nốt bên kia → vàng nhạt + dữ liệu hiện
+lại cả 2 bên, badge "Đã gửi lại — chờ Thống kê duyệt" đúng; duyệt →
+trắng, xuất hiện đúng trong "Báo chuyến". Verify gate sản lượng bằng
+dữ liệu throwaway tự tạo (đã dọn sạch sau test): gọi API tính lại kỳ có
+1 chuyến PENDING → lỗi tổng hợp đúng liệt kê chuyến đó; duyệt chuyến →
+qua gate, đi tiếp đến bước kiểm tra kế (thiếu STD) — xác nhận transaction
+rollback đúng (không còn dữ liệu mồ côi trong `production_results`/
+`survey_coefficients`).
+
+**Việc phụ trong cùng lượt** (yêu cầu chen ngang, đã làm luôn, commit
+`bb977c1`): thêm số đếm cạnh mỗi nhãn checkbox lọc trạng thái ở Nhập
+liệu Khai thác/Vận tải (`EntryStatusFilter.tsx`) — "Tất cả (N)", "Đã
+gửi (N)"... tính từ TOÀN BỘ `tripRows` (không phải phần đã lọc hiển
+thị) để số không co lại khi đang lọc.
