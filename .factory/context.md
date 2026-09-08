@@ -1265,3 +1265,31 @@ lại), rồi audit xem module hiện tại có tránh được lỗi tương t�
 tiện ích) đã chạy trước khi phát hiện bug này — mọi bảng giao dịch đang
 = 0, danh mục giữ nguyên. Bản ghi test của lượt này đã xoá, không để
 lại rác.
+
+---
+
+## Lượt 10 (tiếp) — bổ sung ngay sau mục 19: bộ lọc ngày mặc định cứng tháng 8/2026
+
+Chủ dự án thử lại "Nhập liệu Khai thác" ngay sau khi mục 19 được sửa —
+lưu xong nhưng danh sách vẫn trống. Tra log thật: request lưu trả `200`
+(đúng), bản ghi có trong DB (`report_date=2026-09-08`) — **không phải
+lỗi lưu**. Nguyên nhân: bốn màn (`MiningEntryPage.tsx`,
+`TransportEntryPage.tsx`, `ReconciliationPage.tsx`,
+`StandardTripReportPage.tsx`) đều để CỨNG khoảng ngày mặc định
+`"2026-08-01".."2026-08-31"` — bản ghi nhập ở tháng bất kỳ khác tháng
+8/2026 "biến mất" khỏi danh sách mặc định, hiểu nhầm thành lưu thất bại.
+
+**Sửa** (commit `564fb28`): thêm `currentMonthRange()` dùng chung trong
+`lib/utils.ts` (tính THÁNG HIỆN TẠI theo đồng hồ máy khách, chỉ đọc một
+lần lúc mount qua `useState` initializer), áp dụng cho cả 4 màn.
+
+**Bài học:** khi thấy "lưu không được" mà log server báo `200`/dữ liệu
+có thật trong DB, luôn nghi ngờ TRƯỚC TIÊN ở bộ lọc hiển thị (khoảng
+ngày, trạng thái…) trước khi đào sâu vào luồng lưu — hai lớp lỗi này dễ
+gây hiểu nhầm chồng lên nhau (đúng những gì đã xảy ra ở lượt này: sự cố
+đầu — mục 19 — là lỗi lưu thật; sự cố thứ hai lại là lỗi hiển thị, xảy
+ra ngay sau khi sự cố đầu vừa được sửa, khiến ai không xem log dễ tưởng
+vẫn cùng một lỗi).
+
+Đã kiểm chứng sống: `/nhap-lieu/khai-thac` tự động lọc "01/09-30/09/2026",
+bản ghi thật của chủ dự án hiện đúng "Tổng số bản ghi: 1".
