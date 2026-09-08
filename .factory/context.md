@@ -1,11 +1,13 @@
 # Context — THONGKE-CAOSON
 
-Cập nhật lần cuối: 2026-09-08 (lượt 10 — sửa lỗi "Nơi chất tải" của
-Nhập liệu Khai thác dùng nhầm danh mục, khiến Lưu luôn 404, xem mục 19).
-Trước đó cùng ngày (lượt 9 — sửa 8 lỗi Quality Gate của Codex trên nhánh
-`claude-dev`, xem mục 18). Trước đó 2026-09-07 (lượt 8 — sửa nốt cùng
-lỗi combobox che hàng tiêu đề bảng ở màn Tỷ trọng, xem mục 17). Trước
-đó nữa 2026-09-05
+Cập nhật lần cuối: 2026-09-08 (lượt 11 — sửa lỗi Đối chiếu bị tách 2
+dòng do khoá ghép cặp dùng nhầm Loại hàng, xem "Lượt 11"). Trước đó
+cùng ngày (lượt 10 — sửa lỗi "Nơi chất tải" của Nhập liệu Khai thác
+dùng nhầm danh mục khiến Lưu luôn 404 + bộ lọc ngày mặc định cứng
+tháng 8/2026, xem mục 19). Trước đó cùng ngày (lượt 9 — sửa 8 lỗi
+Quality Gate của Codex trên nhánh `claude-dev`, xem mục 18). Trước đó
+2026-09-07 (lượt 8 — sửa nốt cùng lỗi combobox che hàng tiêu đề bảng ở
+màn Tỷ trọng, xem mục 17). Trước đó nữa 2026-09-05
 (lượt 7 — chủ dự án đã tự đăng nhập và
 click-through thật DMNL, báo 2 lỗi cụ thể + 1 yêu cầu redesign, cả 3 đã
 sửa/dựng lại và build+deploy sạch; xem mục "Đã làm — lượt 7"). Lượt 6
@@ -1293,3 +1295,35 @@ vẫn cùng một lỗi).
 
 Đã kiểm chứng sống: `/nhap-lieu/khai-thac` tự động lọc "01/09-30/09/2026",
 bản ghi thật của chủ dự án hiện đúng "Tổng số bản ghi: 1".
+
+## Lượt 11 (2026-09-08) — Đối chiếu bị tách 2 dòng do khoá ghép cặp sai, commit `d8b3f5d`
+
+Chủ dự án gửi ảnh chụp màn `/nhap-lieu/doi-chieu`: 1 chuyến Vận tải
+(Ca 2, xe 468, Máy xúc P17, "Bùn nhão" 6 chuyến) và 1 chuyến Khai thác
+CÙNG thời gian/ca/xe/máy xúc nhưng khác Loại hàng ("Bùn dượt" 12 chuyến)
+bị hiển thị thành **2 dòng riêng** thay vì 1 dòng để so sánh — mất hết
+tác dụng đối chiếu ("Hiện tại tôi thấy trùng các thông tin trên mà vẫn
+bị tách làm 2 dòng").
+
+**Nguyên nhân**: `ReconciliationService.buildTransportKey()`/
+`buildExcavationKey()` đưa `cargoType.getId()` vào khoá ghép cặp giữa 2
+nguồn — nhưng "Loại hàng" chính là một trong các trường CẦN được đối
+chiếu (cùng Số chuyến/Tải trọng/Nhân viên), không phải trường định danh
+chuyến. Dùng nó làm khoá khiến 2 chuyến "cùng chuyến, khác Loại hàng"
+bị coi là 2 chuyến khác nhau hoàn toàn thay vì 1 cặp bị sai lệch.
+
+**Sửa** (`backend/.../service/ReconciliationService.java`): khoá ghép
+cặp rút gọn chỉ còn 4 trường định danh — Thời gian, Ca, Máy xúc, Số xe
+(đúng yêu cầu chủ dự án chốt 2026-09-08: "1. Thời gian, ca, máy xúc, số
+xe thì để 2 phần số liệu... trên cùng 1 dòng"). `isMatched()` bổ sung
+so sánh Nhân viên (`Report.employee`, tức Số thẻ lương/Người nhập
+chuyến) bên cạnh Loại hàng/Số chuyến/Tải trọng đã có sẵn — đúng yêu cầu
+"đối chiếu... số thẻ lương, người nhập chuyến xem có lệch nhau không".
+Yêu cầu thứ 2 của chủ dự án ("Thông tin chung" lấy theo Vận tải) đã
+đúng sẵn từ trước trong `buildRow()` — chỉ không hiện ra được vì bị bug
+khoá ghép cặp che mất, không cần sửa gì thêm.
+
+Đã kiểm chứng sống đúng kịch bản trong ảnh chụp: Ca 2/xe 468/P17 giờ
+gộp thành **1 dòng**, cột Vận tải ghi "Bùn nhão" 6 chuyến, cột Khai thác
+ghi "Bùn dượt" 12 chuyến, cùng Người nhập chuyến "Phạm Văn Dũng", đánh
+dấu đúng "Sai lệch" (1/100%).
