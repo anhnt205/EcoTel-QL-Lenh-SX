@@ -16,6 +16,7 @@ import com.ecotel.thong_ke_cao_son.repository.ProductionResultRepository;
 import com.ecotel.thong_ke_cao_son.repository.ReportPeriodAuditRepository;
 import com.ecotel.thong_ke_cao_son.repository.ReportPeriodRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -169,10 +170,51 @@ public class ReportPeriodService {
         return repository.saveAll(periods).stream().map(mapper::toResponse).toList();
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public List<ReportPeriodResponse> getByMonth(int year, int month) {
+        ensureMonthHasPeriod(year, month);
         return repository.findByYearAndMonthOrderByPeriodIndexAsc(year, month)
                 .stream().map(mapper::toResponse).toList();
+    }
+
+    /**
+     * Chủ dự án chốt trực tiếp (2026-09-08): "nếu kỳ bỏ trống thì coi như
+     * tính toàn tháng" — tháng nào CHƯA khai bất kỳ kỳ nào thì tự động tạo
+     * đúng 1 kỳ trùm cả tháng (ngày 1 → ngày cuối tháng), để không bắt buộc
+     * phải vào "Kỳ báo cáo" khai tay trước mới tính được sản lượng. Đây
+     * cũng là hook DUY NHẤT cần thiết: {@code calculatePeriod(periodId,...)}
+     * luôn đòi periodId trỏ tới 1 kỳ ĐÃ TỒN TẠI (fetch bằng findById), nên
+     * không có đường nào gọi tính toán cho 1 tháng còn 0 kỳ mà không đi qua
+     * combobox "Kỳ" ở giao diện — chính là nơi gọi hàm này ({@code
+     * ReportPeriodController.getByMonth}, dùng cho combobox chọn kỳ).
+     *
+     * <p>KHÔNG đụng tới tháng đã có BẤT KỲ kỳ nào (kể cả khai dở/hở ngày) —
+     * đó là lựa chọn CHỦ ĐỘNG của người dùng tách kỳ theo tuần, vẫn phải
+     * qua đúng kiểm tra "không hở" (QĐ-05, {@code assertNoGapInMonth}) như
+     * trước, hệ thống không tự động vá hộ.
+     */
+    @Transactional
+    public void ensureMonthHasPeriod(int year, int month) {
+        if (repository.existsByYearAndMonth(year, month)) {
+            return;
+        }
+        YearMonth ym = YearMonth.of(year, month);
+        ReportPeriod p = new ReportPeriod();
+        p.setYear(year);
+        p.setMonth(month);
+        p.setPeriodIndex(1);
+        p.setFromDate(ym.atDay(1));
+        p.setToDate(ym.atEndOfMonth());
+        p.setNote("Tự động tạo — tháng này chưa khai kỳ riêng nên hệ thống coi cả tháng là 1 kỳ.");
+        applyDefaultDisplayName(p);
+        try {
+            repository.save(p);
+        } catch (DataIntegrityViolationException e) {
+            // Đụng race hiếm gặp: nơi khác vừa tạo xong đúng lúc mình đang
+            // tạo (2 request cùng lúc mở combobox cho cùng 1 tháng chưa
+            // khai) — unique constraint (year, month, periodIndex) đã chặn
+            // đúng, coi như đã có người tạo xong, không phải lỗi thật.
+        }
     }
 
     /**
