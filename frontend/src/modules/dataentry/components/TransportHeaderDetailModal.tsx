@@ -18,7 +18,7 @@ import {
   SelectValue,
 } from "../../../components/ui/select.tsx";
 import { ComboboxInput } from "../../../components/ui/combobox-input.tsx";
-import { Plus, Trash2, Truck, X } from "lucide-react";
+import { MessageSquare, Plus, Trash2, Truck, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { useMasterData } from "@/modules/dataentry/hooks/useMasterData.ts";
@@ -75,6 +75,9 @@ export interface TransportSessionDraft {
   _tempId: string;
   reportId?: number; // ID báo cáo khi chỉnh sửa từ API Backend
   singleTripId?: number; // ID chuyến đơn lẻ khi chỉnh sửa trực tiếp 1 chuyến
+  /** Ghi chú Thống kê gửi khi yêu cầu sửa — hiện lên đầu form để đơn vị biết
+   *  phải sửa cái gì, không phải quay lại màn Đối chiếu tra. */
+  revisionNote?: string;
 
   // === Header (Thông tin chung) ===
   workingDate: string; // YYYY-MM-DD
@@ -553,6 +556,22 @@ export const TransportHeaderDetailModal: React.FC<
           className="flex-1 overflow-y-auto px-5 py-4 space-y-5"
           onKeyDown={handleKeyDown}
         >
+          {/* Ghi chú Thống kê gửi kèm khi yêu cầu sửa — hiện ngay đầu form để
+              đơn vị biết phải sửa gì, không phải quay lại màn Đối chiếu tra. */}
+          {sessions[activeIdx]?.revisionNote && (
+            <div className="flex items-start gap-2.5 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 dark:border-amber-800 dark:bg-amber-950/40">
+              <MessageSquare className="mt-0.5 h-4 w-4 shrink-0 text-amber-700 dark:text-amber-400" />
+              <div className="min-w-0">
+                <div className="text-xs font-bold text-amber-900 dark:text-amber-300">
+                  Yêu cầu chỉnh sửa từ Thống kê
+                </div>
+                <div className="mt-0.5 text-sm font-semibold break-words text-amber-950 dark:text-amber-100">
+                  {sessions[activeIdx].revisionNote}
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* ── HÀNG THÔNG TIN CHUNG: Thời gian · Ca · Số xe · Đơn vị QLTB · Chủng loại ── */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
             {/* Thời gian */}

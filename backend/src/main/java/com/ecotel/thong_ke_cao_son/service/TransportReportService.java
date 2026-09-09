@@ -211,7 +211,16 @@ public class TransportReportService {
     public TransportReportTripResponse getTrip(Long tripId) {
         TransportReportTrip trip = transportReportTripRepository.findById(tripId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy chuyến: " + tripId));
-        return transportReportMapper.toTripResponse(trip);
+        TransportReportTripResponse response = transportReportMapper.toTripResponse(trip);
+
+        // Chuyến đang bị yêu cầu sửa thì kèm luôn ghi chú Thống kê đã gửi, để
+        // form sửa chuyến hiện ngay lý do — trước đây đơn vị phải quay lại màn
+        // Đối chiếu mới đọc được. Chốt 2026-09-09.
+        if (trip.getStatus() == ApprovalStatus.REVISION_REQUESTED) {
+            reconciliationDecisionRepository.findByTransportReportTrip_Id(tripId)
+                    .ifPresent(d -> response.setRevisionNote(d.getNote()));
+        }
+        return response;
     }
 
     @Transactional

@@ -185,7 +185,14 @@ public class ExcavationReportService {
     public ExcavationReportTripResponse getTrip(Long tripId) {
         ExcavationReportTrip trip = excavationReportTripRepository.findById(tripId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy chuyến: " + tripId));
-        return excavationReportMapper.toTripResponse(trip);
+        ExcavationReportTripResponse response = excavationReportMapper.toTripResponse(trip);
+
+        // Xem chú thích bên TransportReportService.getTrip — cùng lý do.
+        if (trip.getStatus() == ApprovalStatus.REVISION_REQUESTED) {
+            reconciliationDecisionRepository.findByExcavationReportTrip_Id(tripId)
+                    .ifPresent(d -> response.setRevisionNote(d.getNote()));
+        }
+        return response;
     }
 
     @Transactional

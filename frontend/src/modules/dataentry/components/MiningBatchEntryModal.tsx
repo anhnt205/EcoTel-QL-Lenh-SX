@@ -18,7 +18,15 @@ import {
 } from "../../../components/ui/select.tsx";
 import { ComboboxInput } from "../../../components/ui/combobox-input.tsx";
 
-import { Plus, Trash2, Pickaxe, X, Upload, Download } from "lucide-react";
+import {
+  Plus,
+  Trash2,
+  Pickaxe,
+  X,
+  Upload,
+  Download,
+  MessageSquare,
+} from "lucide-react";
 import * as XLSX from "xlsx";
 
 import { toast } from "sonner";
@@ -61,6 +69,8 @@ export interface MiningSessionDraft {
   _tempId: string;
   reportId?: number; // ID bản ghi trên Backend (nếu đang ở chế độ Chỉnh sửa)
   singleTripId?: number; // ID chuyến đơn lẻ khi chỉnh sửa trực tiếp 1 chuyến
+  /** Ghi chú Thống kê gửi khi yêu cầu sửa — hiện lên đầu form (xem bản Vận tải). */
+  revisionNote?: string;
 
   // === Header (nhập 1 lần / ca / máy xúc) ===
   workingDate: string; // Thời gian (YYYY-MM-DD)
@@ -541,6 +551,21 @@ export const MiningBatchEntryModal: React.FC<MiningBatchEntryModalProps> = ({
           className="flex-1 overflow-y-auto px-5 py-4 space-y-5"
           onKeyDown={handleKeyDown}
         >
+          {/* Ghi chú Thống kê gửi kèm khi yêu cầu sửa — xem bản Vận tải. */}
+          {sessions[activeIdx]?.revisionNote && (
+            <div className="flex items-start gap-2.5 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 dark:border-amber-800 dark:bg-amber-950/40">
+              <MessageSquare className="mt-0.5 h-4 w-4 shrink-0 text-amber-700 dark:text-amber-400" />
+              <div className="min-w-0">
+                <div className="text-xs font-bold text-amber-900 dark:text-amber-300">
+                  Yêu cầu chỉnh sửa từ Thống kê
+                </div>
+                <div className="mt-0.5 text-sm font-semibold break-words text-amber-950 dark:text-amber-100">
+                  {sessions[activeIdx].revisionNote}
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* ── HÀNG THÔNG TIN CHUNG ──────────────────────────────────────
               Hàng 1: Thời gian · Ca          (cột 1-2, cột 3-5 để trống)
               Hàng 2: Nơi chất tải · Máy xúc · Tầng xúc  (cột 1-3)

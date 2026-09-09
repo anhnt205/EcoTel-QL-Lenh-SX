@@ -103,6 +103,8 @@ export interface TransportReportTripResponse {
   id: number;
   status?: "PENDING" | "APPROVED" | "REVISION_REQUESTED";
   note?: string;
+  /** Ghi chú Thống kê gửi kèm khi yêu cầu sửa — chỉ có khi đang REVISION_REQUESTED. */
+  revisionNote?: string | null;
   vehicleId?: number;
   vehicleCode?: string;
   vehicleName?: string;
@@ -494,6 +496,7 @@ export function mapTransportTripResponseToDraft(
     _tempId: `sess_trip_${tripRes.id}_${Date.now()}`,
     reportId: baseRecord?.reportId,
     singleTripId: tripRes.id,
+    revisionNote: tripRes.revisionNote || undefined,
     workingDate,
     shift: cleanShift || "1",
     department: baseRecord?.departmentName || "",
