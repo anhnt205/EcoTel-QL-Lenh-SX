@@ -397,13 +397,19 @@ export const ReconciliationComparisonTables: React.FC<
               table.getRowModel().rows.map((row) => {
                 const item = row.original;
                 const isSelected = row.getIsSelected();
-                // 3 trạng thái màu (chốt 2026-09-08): đỏ nhạt = còn bên đang
-                // chờ sửa; vàng nhạt = cả 2 bên đã gửi lại, chờ thống kê viên
-                // duyệt lại; trắng = đã duyệt hoặc chưa từng có vấn đề.
+                // Màu dòng theo luồng chủ dự án chốt 2026-09-09:
+                //   ĐỎ   = đang chờ ĐƠN VỊ sửa (còn ít nhất 1 bên bị yêu cầu sửa)
+                //   VÀNG = đang chờ THỐNG KÊ xử lý, gồm CẢ HAI tình huống:
+                //          (a) cả 2 bên vừa gửi lần đầu, chờ đối chiếu;
+                //          (b) cả 2 bên đã sửa xong gửi lại, chờ duyệt lại.
+                //   TRẮNG = đã duyệt xong, hoặc dòng mới có 1 bên (chưa đủ cặp
+                //           để đối chiếu nên chưa tính là "chờ Thống kê").
                 const isRevisionRequested =
                   item.reconciliationStatus === "REVISION_REQUESTED";
                 const isAwaitingReapproval =
-                  item.reconciliationStatus === "AWAITING_REAPPROVAL";
+                  item.reconciliationStatus === "AWAITING_REAPPROVAL" ||
+                  (item.reconciliationStatus === "PENDING" &&
+                    item.status === "BOTH");
 
                 let rowBg = "";
                 if (isSelected) {
