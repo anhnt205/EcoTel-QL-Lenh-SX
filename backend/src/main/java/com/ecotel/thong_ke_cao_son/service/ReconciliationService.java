@@ -99,11 +99,27 @@ public class ReconciliationService {
         // Lọc theo trạng thái duyệt của chuyến (status trên trip) — đọc thẳng từ
         // row đã dựng (buildRow đã gán transportStatus/excavationStatus), không
         // tự query lại từng dòng như trước.
+        //
+        // Riêng lọc APPROVED (dùng bởi "Báo chuyến" — StandardTripReportPage,
+        // nơi DUY NHẤT gọi tham số này): chốt 2026-09-09, phải đòi CẢ HAI bên
+        // cùng APPROVED khi dòng có đủ cả 2 bên. Trước đây dùng OR — chỉ cần 1
+        // bên duyệt là đủ hiện dòng, dẫn tới lỗ hổng có thật đã tái hiện được:
+        // duyệt lệch 1 bên (qua đường "Yêu cầu chỉnh sửa" chỉ nhắm 1 bên, hoặc
+        // gọi API trực tiếp) khiến dòng hiện "Đã duyệt" ở Báo chuyến dù bên kia
+        // CHƯA TỪNG được ai duyệt — sai đúng nguyên tắc QĐ-16 "chỉ dữ liệu đã
+        // duyệt đối chiếu mới được coi là chuẩn". Dòng chỉ có 1 bên (chưa ghép
+        // cặp — bên kia null) thì vẫn chỉ cần đúng bên đó APPROVED, không đòi
+        // ghép cặp giả. Các trạng thái lọc khác (PENDING, REVISION_REQUESTED)
+        // giữ nguyên OR — "còn ít nhất 1 bên ở trạng thái đó" vẫn đúng ý nghĩa.
         if (request.getStatus() != null) {
             ApprovalStatus filterStatus = request.getStatus();
             rows = rows.stream().filter(row -> {
                 boolean transportMatch = row.getTransportStatus() == filterStatus;
                 boolean excavationMatch = row.getExcavationStatus() == filterStatus;
+                if (filterStatus == ApprovalStatus.APPROVED
+                        && row.getTransportStatus() != null && row.getExcavationStatus() != null) {
+                    return transportMatch && excavationMatch;
+                }
                 return transportMatch || excavationMatch;
             }).collect(Collectors.toList());
         }

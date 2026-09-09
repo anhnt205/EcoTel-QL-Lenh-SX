@@ -29,8 +29,12 @@ export function TabBar() {
     }
   };
 
+  // Kiểu tab trình duyệt: dải nền XÁM ĐẬM hơn hẳn vùng nội dung, tab đang xem
+  // màu nền sáng nổi bật lên khỏi dải. Tab đang xem kéo xuống 1px (`-mb-px`) và
+  // tô cạnh dưới cùng màu nền nội dung để "nuốt" đường kẻ chân dải — nhờ vậy
+  // tab dính liền vào vùng nội dung đúng như tab Chrome.
   return (
-    <div className="flex shrink-0 items-stretch gap-1 overflow-x-auto border-b border-gray-200 bg-gray-50 px-2 pt-1 dark:border-gray-800 dark:bg-gray-900/60">
+    <div className="flex shrink-0 items-end gap-0.5 overflow-x-auto border-b border-gray-400 bg-gray-300 px-2 pt-1.5 dark:border-gray-800 dark:bg-gray-900">
       {tabs.map((tab) => {
         const isActive = tab.path === pathname;
         return (
@@ -39,10 +43,10 @@ export function TabBar() {
             type="button"
             onClick={() => navigate(tab.path)}
             title={mainTabTitle(tab.path)}
-            className={`group flex max-w-[220px] items-center gap-2 whitespace-nowrap rounded-t-lg border border-b-0 px-3 py-1.5 text-xs font-semibold transition-colors ${
+            className={`group -mb-px flex max-w-[230px] items-center gap-2 whitespace-nowrap rounded-t-lg border px-3.5 py-2 text-xs font-semibold transition-colors ${
               isActive
-                ? "border-gray-200 bg-white text-blue-700 dark:border-gray-800 dark:bg-gray-950 dark:text-blue-400"
-                : "border-transparent bg-transparent text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
+                ? "border-gray-300 border-b-background bg-background text-blue-700 dark:border-gray-800 dark:text-blue-400"
+                : "border-transparent bg-gray-200 text-gray-700 hover:bg-gray-100 dark:bg-gray-800/70 dark:text-gray-300 dark:hover:bg-gray-800"
             }`}
           >
             <span className="truncate">{mainTabTitle(tab.path)}</span>
@@ -51,7 +55,9 @@ export function TabBar() {
               tabIndex={-1}
               aria-label={`Đóng ${mainTabTitle(tab.path)}`}
               onClick={(e) => handleClose(e, tab.path)}
-              className="rounded p-0.5 text-gray-400 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-gray-200 hover:text-red-600 dark:hover:bg-gray-700"
+              className={`rounded p-0.5 text-gray-500 transition-opacity hover:bg-gray-300 hover:text-red-600 dark:hover:bg-gray-700 ${
+                isActive ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+              }`}
             >
               <X className="h-3 w-3" />
             </span>
