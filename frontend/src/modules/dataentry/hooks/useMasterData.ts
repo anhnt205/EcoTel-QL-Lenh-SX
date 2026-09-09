@@ -165,7 +165,12 @@ export function useMasterData(options: UseMasterDataOptions = {}) {
       rawData: s,
     };
   });
-  const shiftOptions = deduplicateOptions(rawShiftOptions);
+  // Luôn sắp Ca tăng dần (Ca 1 → Ca 4), KHÔNG phụ thuộc thứ tự API trả về:
+  // form nhập liệu dùng phần tử đầu tiên làm giá trị mặc định, nên nếu API đổi
+  // thứ tự là form âm thầm điền sai Ca (đã xảy ra thật — xem ShiftController).
+  const shiftOptions = deduplicateOptions(rawShiftOptions).sort(
+    (a, b) => Number(a.value) - Number(b.value),
+  );
   if (shiftOptions.length === 0) {
     shiftOptions.push(
       { value: "1", label: "Ca 1", rawData: { id: 1, name: "1" } },

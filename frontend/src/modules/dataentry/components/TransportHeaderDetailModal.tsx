@@ -206,13 +206,16 @@ export const TransportHeaderDetailModal: React.FC<
     [],
   );
 
-  const firstShift = shiftOptions[0]?.value || "1";
-
+  // Ca để TRỐNG, bắt người nhập chọn rõ ràng — giống hệt form Khai thác
+  // (useMiningDraftStore cũng để ""). Trước đây tự điền sẵn shiftOptions[0], mà
+  // API trả Ca giảm dần nên mặc định thành "Ca 4": người nhập không để ý là lưu
+  // sai ca, chuyến hai bên không ghép cặp được ở Đối chiếu. Ca là trường bắt
+  // buộc (zod), để trống thì validate chặn ngay chứ không lưu nhầm. Chốt 2026-09-09.
   const createDefaultSession = useCallback((): TransportSessionDraft => {
     return {
       _tempId: `sess_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
       workingDate: todayStr(),
-      shift: firstShift,
+      shift: "",
       department: "",
       vehicleNo: "",
       equipmentUnit: "",
@@ -225,7 +228,7 @@ export const TransportHeaderDetailModal: React.FC<
       operatorName: "",
       operatorUnit: "",
     };
-  }, [firstShift, createDefaultTripRow]);
+  }, [createDefaultTripRow]);
 
   const tableBottomRef = useRef<HTMLDivElement>(null);
 
