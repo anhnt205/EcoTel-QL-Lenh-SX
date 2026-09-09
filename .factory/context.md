@@ -1610,3 +1610,126 @@ liệu trắc địa thật — nếu sau này chủ dự án có số liệu ST
 "Vỉa 14_P17_KVX009", cần SỬA lại dòng STD này (không phải thêm dòng
 mới chồng khoảng ngày, vì `SurveyStandardService` chặn overlap cùng
 khoá).
+
+## Lượt 16 (2026-09-09) — nhập 1 dòng THẬT từ Excel (Tháng 5 đổi tên xe, dòng 1250) để đối chiếu app vs Excel
+
+Chủ dự án yêu cầu kiểm tra 1 dòng ĐẦY ĐỦ, THẬT (không phải dữ liệu mẫu)
+từ file Excel gốc `Tháng 5 đổi tên xe.xlsx` (sheet `tinh toan`, dòng
+1250) — nhập đúng dòng đó qua UI thật của app rồi so số báo cáo sản
+lượng của app với số Excel tự tính cho đúng dòng đó.
+
+**Trích xuất công thức thật** (đọc `docs/_source/tools/README.md` trước
+khi viết tool đọc `.xlsx` mới, tránh 2 bẫy đã ghi — xem file đó): viết 2
+script PowerShell scratch (`xl2-shared.ps1`, `xl-range.ps1`, dùng
+`FileStream(..., FileShare.ReadWrite)` để đọc được cả khi Excel đang mở
+file) để trích công thức MASTER dòng 5 sheet `tinh toan`. Phát hiện quan
+trọng: **`Tổng m3/KLVC(tấn)/Tkm` (AL/AM/AN) KHÔNG phụ thuộc STD** — chỉ
+phụ thuộc Mô hình (AJ, tra từ `Mohinh_TheTrong( ko dk xoa)`) × Số
+chuyến, và Tỷ trọng (AI, tra cùng sheet đó). STD (`STD(Dat+thanSX)`,
+tra theo khoá `AC`) chỉ nạp vào giai đoạn "Áp Trắc Địa" (hệ số HS) —
+một tầng tính RIÊNG, sau tầng Tổng m3/KLVC/Tkm.
+
+**Dựng đủ danh mục còn thiếu để nhập được dòng 1250 thật** (chủ dự án
+đã duyệt qua AskUserQuestion): 2 phòng ban, 2 thiết bị (Máy xúc P30, Xe
+950 — `Device` không có API tạo/sửa/xoá, phải chèn SQL thô theo đúng
+tiền lệ các lượt trước), 1 loại hàng "Nomin." (gắn Sản phẩm nghiệm thu
+`Dat_SX`), 2 địa điểm (nơi nhận tải, nơi dỡ tải), 1 dòng Tỷ trọng, 1
+dòng/ô lưới Mô hình (`MO_HINH` matrix, khoá `CAT777E.CS`), 1 dòng STD —
+đa số qua đúng API ứng dụng (`/api/survey-standards`,
+`/api/density-parameters/*`, `/api/matrix-catalogs/*`), riêng Device
+qua SQL vì không có endpoint. Kỳ báo cáo 05/2026 tự động sinh (id
+`202`) qua cơ chế `ensureMonthHasPeriod` (lượt 15) vì tháng 5/2026 chưa
+khai kỳ nào.
+
+**Lần 1** (Tỷ trọng/STD dùng số back-solve tạm để test luồng tính) →
+khớp CHÍNH XÁC `Tổng m3=37 / Tổng KLVC=96,829 / Tổng Tkm=382,4746` với
+Excel dòng 1250 thật (`AL1250/AM1250/AN1250`) — xác nhận đúng công thức
+B5 app cài đặt khớp Excel.
+
+**Lần 2 — thay bằng số THẬT trích từ chính các sheet danh mục Excel**
+(theo yêu cầu chủ dự án "làm luôn cả Tỷ trọng lẫn STD"): Tỷ trọng đã
+ĐÚNG SẴN (2,617, khớp `Mohinh_TheTrong!E5`, không cần sửa). STD thay
+bằng `STD(Dat+thanSX)!row399` (khoá `"11._-225_p30._CS_BK"` — CÓ hậu tố
+`_BK`): `earthM3=58639, earthDesignVolume=59798, earthDeviation=-1159,
+earthTon=154690, earthHaulDistance=3.902, earthBulkDensity=2.638,
+earthTkm=603599`, qua `PUT /api/survey-standards/batch`.
+
+**Phát hiện + xử lý 1 lỗi thật khi tính lại lần 2**: tính lại báo lỗi
+thiếu STD cho khoá KHÔNG có `_BK` (`Vỉa 11_-225_P30_KVX001`), khác khoá
+vừa nạp (`..._BK`). Nguyên nhân: ở lượt nhập liệu trước, đã "sửa"
+`unloading_point_id` của chuyến từ 1 bản ghi mới tạo (`"Băng tải"`
+không dấu chấm) sang bản ghi CÓ SẴN từ trước (`"Băng tải."` — id `210`,
+CÓ dấu chấm ở cuối, đúng y hệt cách Excel ghi `I1250`). Đọc
+`SeamGroupExcavatorKeys.equalsLoose()` xác nhận: hàm này so khớp
+CHÍNH XÁC (chỉ trim+lowercase, KHÔNG bỏ dấu chấm cuối) với literal
+`"Băng tải"` để bật hậu tố `_BK` — `"Băng tải."` (có dấu chấm) KHÔNG
+khớp, dù đó là giá trị Excel THẬT dùng và Excel tự tính khoá `CR1250`
+CÓ `_BK`. **Đây là 1 lệch thật giữa app và Excel** (Excel matching lỏng
+hơn app), CHƯA sửa code — xem "Việc còn tồn" bên dưới.
+
+Khắc phục tạm bằng dữ liệu (không sửa code): tạo thêm 1 bản ghi
+`unloading_points` mới, id `310`, code `NDTT-BT2`, tên `"Băng tải"`
+(KHÔNG dấu chấm — khớp đúng literal `equalsLoose` cần), trỏ lại chuyến
+test (`transport_report_trips.id=5202`) sang id `310` này. Bản ghi cũ
+`"Băng tải."` (id `210`) giữ nguyên, không đụng — 2 bản ghi cùng nghĩa
+nhưng khác chữ, cùng tồn tại trong danh mục hiện tại.
+
+**Tính lại lần 2 → thành công, verify sống đầy đủ** qua API thật
+(`/api/production/calculate`, `/api/production/results/all`,
+`/api/production/ap-tracdia`) sau khi Docker Desktop của máy dùng
+chung bị treo/phải khởi động lại giữa chừng (ngoài phạm vi dự án, xem
+ghi chú hạ tầng cuối mục này):
+
+- `Tổng m3/tấn/tkm = 37 / 96,829 / 382,4746` — Y NGUYÊN, khớp Excel
+  (không phụ thuộc STD, đúng như phát hiện công thức ở trên).
+- Trang Áp Trắc Địa (`/danh-muc/ap-tracdia`, khoá
+  `Vỉa 11_-225_P30_KVX001_BK`, khối "Đất SX"): Số TĐ (m3/tấn/tkm) =
+  `58.639 / 154.690 / 603.599` — nay là SỐ THẬT 100% từ Excel (khớp
+  đúng `STD(Dat+thanSX)!row399`), không còn số back-solve tạm.
+- HS (m3/tấn/tkm) ở trang Áp Trắc Địa ra `1.584,84 / 1.597,56 /
+  1.578,14` — **rất lớn, ĐÚNG THIẾT KẾ chứ không phải lỗi**: đây là hệ
+  số "lượt 1" = STD (cả THÁNG thật theo Excel) ÷ Tổng thô (chỉ 1 chuyến
+  test 37 m3) — mẫu số quá nhỏ so với STD vì kỳ test hiện chỉ có ĐÚNG 1
+  chuyến, trong khi Excel STD phản ánh TOÀN BỘ chuyến thật tháng 5 cho
+  cùng khoá đó.
+- "Tấn cuối cùng"/"Tkm cuối cùng" ở Báo cáo thống kê (kết quả sau khi
+  áp hệ số "lượt 2") ra `≈154.690` / `≈603.599` — **HỘI TỤ VỀ ĐÚNG BẰNG
+  con số STD đã nhập**, không phải bản scale-up của 96,829/382,4746 của
+  riêng chuyến test. Đây LÀ hệ quả toán học đúng của thuật toán 2 tầng
+  khi mẫu số Tổng thô quá nhỏ so với STD — KHÔNG phải app tính sai cho
+  1 chuyến này. Muốn hệ số Áp Trắc Địa của app khớp đúng tỷ lệ thật của
+  Excel (`AE552/AF552/AG552 ≈ 0,9806/0,9885/0,9884`, trích từ
+  `AP Tdia(m3-tan-tkm)!row552`) thì cần nhập ĐỦ toàn bộ chuyến thật
+  tháng 5 cho khoá này (F552/G552/H552 = 59.797,8/156.490,84/610.686,63
+  m3/tấn/tkm thật) — việc lớn hơn nhiều, CHƯA làm, chỉ làm khi được yêu
+  cầu.
+
+**Việc còn tồn, chưa sửa code** — chủ dự án hỏi kiểm tra lại khu vực
+Đối chiếu (2 dòng lẽ ra gộp lại tách riêng); nghi ngờ chính là do đúng
+lỗi `equalsLoose` này (hoặc lỗi tương tự: 2 bản ghi danh mục trùng
+nghĩa khác ID cho "cùng 1" máy xúc/xe/địa điểm khiến khoá ghép cặp 4
+trường không khớp dù nhìn thấy tên giống nhau trên UI) — CHƯA xác nhận
+bằng dữ liệu thật cụ thể của chủ dự án (đang chờ chủ dự án cho ví dụ
+ngày/ca/xe/máy xúc cụ thể). Cân nhắc sửa `SeamGroupExcavatorKeys
+.equalsLoose()` để bỏ dấu chấm cuối trước khi so khớp — NHƯNG cần hỏi
+chủ dự án trước vì đây là code tính sản lượng đang chạy thật, đổi có
+thể ảnh hưởng các khoá `_BK` khác đã tính trước đó.
+
+**Ghi chú hạ tầng** (không phải lỗi dự án): giữa lượt này, Docker
+Desktop dùng chung của máy bị treo API (`docker ps`/`docker exec` trả
+500, network container không phản hồi) — có vẻ do nhiều phiên
+Claude Code khác chạy đồng thời trên cùng máy. Không tự khởi động lại
+Docker Desktop (ảnh hưởng phiên khác đang chạy) — chỉ chờ, rồi khi hồi
+phục xác nhận lại toàn bộ container khoẻ mạnh trước khi tiếp tục thao
+tác CSDL. Không có gì cần sửa trong dự án này.
+
+**Việc phụ trong cùng lượt**: đã commit + push `AGENTS.md` (bản mirror
+`CLAUDE.md` cho Codex CLI) và `.codex/config.toml` (trỏ Codex tới cùng
+MCP server `software-factory`) theo yêu cầu chủ dự án để Codex review
+được repo — commit `23a7c84`, không đụng code nghiệp vụ.
+
+**Dữ liệu tạo trong lượt này là dữ liệu xác thực THẬT** (không phải
+throwaway) — chuyến test id `5202` (kỳ 05/2026, id `202`) VÀ toàn bộ
+danh mục dựng theo (2 phòng ban, Device P30/950, loại hàng Nomin.,
+2 địa điểm, Tỷ trọng, Mô hình, STD, unloading_point id `310`) **được
+GIỮ LẠI có chủ đích** để chủ dự án tự kiểm tra trên UI, không tự dọn.
