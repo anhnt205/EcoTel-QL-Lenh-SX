@@ -32,6 +32,7 @@ riêng — cần kiểm lại khi implement.
 | QĐ-17 | Chuyến đã duyệt phải qua "yêu cầu sửa" mới được sửa |
 | QĐ-18 | Luồng trạng thái + màu dòng ở màn Đối chiếu |
 | QĐ-19 | Chuyển trang KHÔNG được mất việc đang làm dở (tab + giữ trang sống) |
+| QĐ-20 | Gom nhóm Danh mục + bỏ 6 danh mục không dùng/trùng lặp |
 | **TG-01** | **TẠM GÁC — ngoại lệ `+15` và biến thể công thức Nhóm tầng** |
 
 ---
@@ -699,3 +700,47 @@ trang cũ bị huỷ sạch.
 chạy nền. Hiện chấp nhận được vì `refetchOnWindowFocus` đã tắt và số trang giữ
 sống bị chặn trần. Nếu sau này thấy tải nặng thì chặn tiếp theo hướng tạm dừng
 truy vấn của tab đang ẩn, đừng quay lại kiểu huỷ trang.
+
+---
+
+## QĐ-20 (2026-09-09) — Gom nhóm Danh mục + bỏ 6 danh mục không dùng/trùng lặp
+
+**Bối cảnh:** 34 danh mục nằm phẳng một danh sách dài, phải cuộn mới tìm được;
+trong đó có những danh mục không còn dùng vào việc gì.
+
+### Quyết định 1 — gom thành 5 nhóm
+
+| Nhóm | Gồm |
+|---|---|
+| Vật liệu, hàng hoá | Chủng loại hàng, Nhóm chủng loại hàng, Sản phẩm nghiệm thu |
+| Vị trí | Nơi nhận tải, Nơi dỡ tải, Nơi chất tải, Khu vực xúc |
+| Thiết bị | Thông tin xe, Thông tin máy, Chủng loại xe, Nhóm hạng xe, Hạng xe |
+| Số trắc địa (STD) | STD (Đất CN), STD (Đất SX/Than SX) |
+| Danh mục khác | 14 mục còn lại |
+
+**Hệ quả:** cấu trúc menu để ở `frontend/src/layouts/catalog-menu.ts` dưới dạng
+DỮ LIỆU, không viết thẳng JSX — menu được render ở HAI chỗ (màn rộng và màn
+hẹp), trước đây chép tay riêng nên rất dễ sửa một nơi quên nơi kia. Muốn đổi
+nhóm/thứ tự/nhãn thì sửa đúng file đó.
+
+### Quyết định 2 — bỏ 6 danh mục (đã điều tra + kiểm chứng bằng SQL trước khi hỏi)
+
+| Bỏ | Bằng chứng |
+|---|---|
+| **Phân loại** | `classifications` 0 bản ghi, 0 khoá ngoại trỏ tới, backend không chỗ nào đọc. Engine TỰ SUY Phân loại từ Sản phẩm nghiệm thu — đúng QĐ-10 |
+| **Vật liệu** | `materials` 0 bản ghi; đã hợp nhất vào CargoType theo QĐ-09 |
+| **Vị trí** (điểm đổ tải) | `locations` 7 bản ghi nhưng 0 khoá ngoại trỏ tới, 0 service đọc — dữ liệu mồ côi, đã bị thay bằng 4 danh mục địa điểm chuyên biệt |
+| **Loại hàng** | Cùng bảng với "Chủng loại hàng", bản này chỉ XEM được |
+| **Nhóm hàng** | Cùng bảng với "Nhóm chủng loại hàng", bản này chỉ XEM được |
+| **Chủng loại xe + Phân loại** | Có ghi dữ liệu vào nhưng 0 nơi đọc ra; `FuelCalculator` tự dựng khoá riêng |
+
+**Phạm vi bỏ — quan trọng:** chỉ gỡ khỏi **menu + bảng định tuyến + hằng số
+route**, và xoá 6 component trang đã mất đường vào. **CỐ Ý KHÔNG đụng vào bảng
+CSDL, entity hay API backend** — xoá dữ liệu là không thể hoàn tác, mà để lại
+cũng không hại gì. Nếu sau này muốn dọn nốt phần CSDL thì làm riêng một lượt có
+backup.
+
+**Tạm gác:** **Mô hình** có hai bản song song — trang "Mô hình" mới (bảng
+`model_periods` rỗng, engine KHÔNG đọc) và "Mô hình (lưới đầy đủ)" cũ (101 ô dữ
+liệu thật, `TripBaseCalculator` đang đọc). Chủ dự án chốt **để nguyên, tính
+sau** vì đấu trang mới vào engine là việc lớn đụng thẳng vào tính sản lượng.
