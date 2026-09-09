@@ -821,9 +821,22 @@ export function createReconciliationColumns(
             const bRow = row.original.backendRow;
             const hasHistory =
               bRow?.transportHistoryAvailable || bRow?.excavationHistoryAvailable;
+            // Dòng đã duyệt thì coi như đã chốt xong: hiện dấu tích xanh thay
+            // cho cảnh báo lệch — thống kê viên đã xem và chấp nhận số liệu,
+            // để nguyên tam giác vàng sẽ gây hiểu nhầm là còn việc phải xử lý.
+            // Chốt 2026-09-09.
+            const isApproved =
+              row.original.reconciliationStatus === "APPROVED";
             return (
               <div className="flex items-center justify-center gap-1">
-                {!meta().isMatched(row.original) ? (
+                {isApproved ? (
+                  <div
+                    className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 flex items-center justify-center"
+                    title="Đã duyệt"
+                  >
+                    <Check className="w-3.5 h-3.5 stroke-[3]" />
+                  </div>
+                ) : !meta().isMatched(row.original) ? (
                   <div className="w-5 h-5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-400 flex items-center justify-center">
                     <AlertTriangle className="w-3.5 h-3.5 fill-amber-500 text-amber-100" />
                   </div>

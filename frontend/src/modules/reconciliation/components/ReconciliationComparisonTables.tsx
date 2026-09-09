@@ -406,15 +406,12 @@ export const ReconciliationComparisonTables: React.FC<
                   item.reconciliationStatus === "AWAITING_REAPPROVAL";
 
                 let rowBg = "";
-                let rowBorder = "";
                 if (isSelected) {
                   rowBg = "bg-blue-100/80 hover:bg-blue-100 dark:bg-blue-900/50 dark:hover:bg-blue-900/60";
                 } else if (isRevisionRequested) {
-                  rowBg = "bg-red-50/60 hover:bg-red-100/70 dark:bg-red-950/40 dark:hover:bg-red-900/50";
-                  rowBorder = "border-l-4 border-l-red-500 dark:border-l-red-400";
+                  rowBg = "bg-red-50 hover:bg-red-100/70 dark:bg-red-950/40 dark:hover:bg-red-900/50";
                 } else if (isAwaitingReapproval) {
-                  rowBg = "bg-amber-50/60 hover:bg-amber-100/70 dark:bg-amber-950/40 dark:hover:bg-amber-900/50";
-                  rowBorder = "border-l-4 border-l-amber-500 dark:border-l-amber-400";
+                  rowBg = "bg-amber-50 hover:bg-amber-100/70 dark:bg-amber-950/40 dark:hover:bg-amber-900/50";
                 } else {
                   rowBg = "hover:bg-gray-50/70 dark:hover:bg-gray-800/40";
                 }
@@ -422,10 +419,11 @@ export const ReconciliationComparisonTables: React.FC<
                 return (
                   <TableRow
                     key={row.id}
-                    className={`border-b border-gray-100 dark:border-gray-800 transition-colors ${rowBg} ${rowBorder}`}
+                    className={`border-b border-gray-100 dark:border-gray-800 transition-colors ${rowBg}`}
                   >
-                    {row.getVisibleCells().map((cell) => {
+                    {row.getVisibleCells().map((cell, cellIdx) => {
                       const colId = cell.column.id;
+                      const isFirstCell = cellIdx === 0;
                       const isCommonInfo = colId === "common_info_panel";
                       const isGroupTransport =
                         colId === "group_transport_data" ||
@@ -436,20 +434,40 @@ export const ReconciliationComparisonTables: React.FC<
                         cell.column.parent?.id === "group_mining_data" ||
                         colId.startsWith("mining");
 
+                      // Màu TRẠNG THÁI phải thắng màu NHÓM cột: nền tô ở <tr>
+                      // bị nền của từng ô (xanh lá cho nhóm Vận tải, xanh dương
+                      // cho nhóm Khai thác) phủ kín gần hết bề ngang, nên nhìn
+                      // vào bảng gần như không thấy dòng đỏ/vàng. Tô lại ngay ở
+                      // cấp ô mới ăn chắc. Chốt 2026-09-09.
                       let cellBg = "";
 
                       if (isSelected) {
                         cellBg = "bg-blue-100/80 dark:bg-blue-900/50";
+                      } else if (isRevisionRequested) {
+                        cellBg = "bg-red-50 dark:bg-red-950/40";
+                      } else if (isAwaitingReapproval) {
+                        cellBg = "bg-amber-50 dark:bg-amber-950/40";
                       } else if (isGroupTransport) {
                         cellBg = "bg-emerald-50/50 dark:bg-emerald-950/25";
                       } else if (isGroupMining) {
                         cellBg = "bg-sky-50/50 dark:bg-sky-950/25";
                       }
 
+                      // Vạch màu đầu dòng: đặt ở Ô ĐẦU TIÊN chứ không phải trên
+                      // <tr> — border của <tr> không được render (đo thật:
+                      // border-left-width = 0px), nên vạch cũ vô hình.
+                      const stripe = isFirstCell
+                        ? isRevisionRequested
+                          ? "border-l-4 border-l-red-500 dark:border-l-red-400"
+                          : isAwaitingReapproval
+                            ? "border-l-4 border-l-amber-500 dark:border-l-amber-400"
+                            : ""
+                        : "";
+
                       return (
                         <TableCell
                           key={cell.id}
-                          className={`text-center ${cellBg} ${
+                          className={`text-center ${cellBg} ${stripe} ${
                             isCommonInfo ? "p-0 overflow-hidden" : "px-2 py-2"
                           }`}
                           style={{
