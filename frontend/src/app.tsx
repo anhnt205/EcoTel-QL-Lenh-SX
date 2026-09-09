@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/sonner";
+import { MinimizedModalsTray } from "@/components/ui/minimized-modals-tray";
 import { authRoutes } from "@/modules/auth/router";
 import { mainRoutes } from "@/modules/main/router";
 import { NotFoundPage } from "@/components/not-found-page";
@@ -47,6 +48,7 @@ export default function App() {
         <BrowserRouter>
           <AppRoutes />
           <Toaster position="top-right" richColors />
+          <MinimizedModalsTray />
         </BrowserRouter>
       </AuthGate>
     </QueryClientProvider>
