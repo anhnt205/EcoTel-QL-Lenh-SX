@@ -22,6 +22,15 @@ riêng — cần kiểm lại khi implement.
 | QĐ-07 | Dòng chuẩn của bảng tính Excel |
 | QĐ-08 | Dùng `BigDecimal` cho mọi số liệu nghiệp vụ |
 | QĐ-09 | Hợp nhất `Material` vào `CargoType` |
+| QĐ-10 | "Phân loại" trong các bảng tra là DAT/Than |
+| QĐ-11 | Khoá cột ĐMNL dùng hậu tố theo quy tắc |
+| QĐ-12 | HS điều chỉnh NLĐM: 12 tháng × (KC và CS) |
+| QĐ-13 | Khu vực xúc: `CS`/`KC` là NHÓM |
+| QĐ-14 | Khoá ghép cặp Đối chiếu BỎ "Loại hàng" — *thay thế QĐ-01* |
+| QĐ-15 | Tháng chưa khai Kỳ nào = 1 Kỳ cả tháng — *bổ sung QĐ-05* |
+| QĐ-16 | Chỉ dữ liệu đã duyệt đối chiếu mới được tính sản lượng |
+| QĐ-17 | Chuyến đã duyệt phải qua "yêu cầu sửa" mới được sửa |
+| QĐ-18 | Luồng trạng thái + màu dòng ở màn Đối chiếu |
 | **TG-01** | **TẠM GÁC — ngoại lệ `+15` và biến thể công thức Nhóm tầng** |
 
 ---
@@ -125,6 +134,10 @@ dụng, các dòng khác chỉ trỏ về:
 ---
 
 ## QĐ-01 (2026-08-30) — Mức chi tiết đối soát CÓ Số xe
+
+> ⚠️ **Phần khoá ghép cặp bên dưới ĐÃ ĐƯỢC THAY THẾ bởi QĐ-14
+> (2026-09-08): bỏ `Loại hàng` khỏi khoá.** Nội dung gốc giữ nguyên để
+> tra cứu. Điểm "đối soát ở mức chi tiết, CÓ Số xe" vẫn còn hiệu lực.
 
 **Bối cảnh:** khoá ghép cặp chủ dự án nêu ban đầu (Ngày + Ca + Máy xúc +
 Loại hàng) không có Số xe, trong khi cả hai bên đều nhập Số xe và bước Đối
@@ -251,6 +264,10 @@ Hệ quả thiết kế:
 ---
 
 ## QĐ-05 (2026-08-30) — Thêm Danh mục Kỳ báo cáo
+
+> ℹ️ **Đã được NỚI bởi QĐ-15 (2026-09-08):** tháng **chưa khai kỳ nào** thì
+> tự động hiểu là 1 Kỳ = cả tháng, không báo lỗi. Quy tắc báo lỗi bên dưới
+> vẫn giữ nguyên cho tháng ĐÃ khai kỳ nhưng khai thiếu/hở ngày.
 
 **Bối cảnh:** cột `DL` trong sheet `tinh toan` chia tháng thành 5 kỳ:
 
@@ -508,3 +525,139 @@ so theo NHÓM, không so mã/tên khu vực.
 - Đá thải: tỷ lệ theo khu vực (`FK5`) và quy đổi m3 (`FJ5`: 2,625 cho KC /
   2,617 cho CS).
 - Khoá cột Mô hình (`.CS`/`.KC`) và khoá cột HS điều chỉnh.
+
+---
+
+## QĐ-14 (2026-09-08) — Khoá ghép cặp Đối chiếu BỎ "Loại hàng" — **thay thế QĐ-01**
+
+> **Thay thế phần khoá ghép cặp của QĐ-01.** QĐ-01 vẫn đúng ở điểm "đối
+> soát ở mức chi tiết, CÓ Số xe"; chỉ riêng thành phần `Loại hàng` bị loại
+> khỏi khoá.
+
+**Bối cảnh:** chủ dự án gửi ảnh chụp thật: Ca 2, xe 468, Máy xúc P17 bị
+tách thành **2 dòng riêng** vì Vận tải ghi "Bùn nhão" (6 chuyến) còn Khai
+thác ghi "Bùn dượt" (12 chuyến) — mất hẳn mục đích đối chiếu.
+
+**Quyết định:** khoá ghép cặp gồm **đúng 4 trường**:
+
+```
+Khoá ghép cặp = Thời gian + Ca + Máy xúc + Số xe
+```
+
+**Lý do:** `Loại hàng` là một trong những giá trị mà đối chiếu **PHẢI SO
+SÁNH xem hai bên có ghi lệch nhau không** (cùng với Số chuyến, Tải trọng,
+Số thẻ lương) — không phải điều kiện để được phép ghép cặp. Đưa vào khoá
+khiến đúng loại lệch mà đối chiếu cần bắt lại trở thành thứ khiến không
+ghép được.
+
+**Hệ quả:** `ReconciliationService.buildTransportKey`/`buildExcavationKey`
+chỉ dùng 4 trường trên. Hai bên lệch bất kỳ trường nào trong 4 trường này
+thì KHÔNG ghép — mỗi bên ra 1 dòng riêng (đúng, vì đó là 2 chuyến khác
+nhau).
+
+**Điểm cần lưu ý (đã xảy ra thật, 2026-09-09):** vì `Ca` nằm trong khoá,
+chỉ cần form nhập liệu điền sai Ca là hai bên vĩnh viễn không ghép được.
+Đã từng có lỗi API trả danh mục Ca giảm dần khiến form Vận tải tự điền sẵn
+"Ca 4" — xem `.factory/context.md` lượt 18.
+
+---
+
+## QĐ-15 (2026-09-08) — Tháng chưa khai Kỳ nào thì tự động hiểu là 1 Kỳ = cả tháng — **bổ sung QĐ-05**
+
+> **Nới quy tắc của QĐ-05.** QĐ-05 chốt "ngày rơi vào khoảng chưa khai báo
+> kỳ thì báo lỗi nghiệp vụ rõ ràng" — vẫn giữ nguyên cho tháng ĐÃ khai kỳ
+> (khai thiếu/hở ngày vẫn phải báo lỗi). Mục này chỉ xử lý tháng **chưa khai
+> kỳ nào**.
+
+**Bối cảnh:** chủ dự án báo tháng 9/2026 có chuyến đã duyệt nhưng "Báo cáo
+thống kê" không ra số liệu. Nguyên nhân: tháng đó chưa từng khai Kỳ báo cáo
+nào nên không có gì để tính.
+
+**Quyết định (áp dụng cho MỌI tháng về sau, không phải xử lý riêng tháng
+9):** tháng nào **không khai Kỳ nào** thì hệ thống **tự hiểu là 1 Kỳ trùm
+cả tháng** (ngày 1 → ngày cuối tháng).
+
+**Hệ quả:** `ReportPeriodService.getByMonth` gọi `ensureMonthHasPeriod` —
+tự tạo đúng 1 `ReportPeriod` (`periodIndex=1`, `note` ghi rõ là tự tạo) khi
+tháng đó chưa có kỳ nào. Tháng đã có **bất kỳ** kỳ nào thì KHÔNG đụng vào —
+đó là lựa chọn chủ động tách kỳ theo tuần, vẫn phải qua đúng kiểm tra
+"không hở" của QĐ-05.
+
+---
+
+## QĐ-16 (2026-09-08) — Chỉ dữ liệu ĐÃ DUYỆT đối chiếu mới được dùng tính sản lượng
+
+**Bối cảnh:** engine đang tính sản lượng từ MỌI chuyến Vận tải bất kể trạng
+thái duyệt. Chủ dự án xác nhận đây là SAI.
+
+**Quyết định:** `ProductionCalculationService.calculatePeriod` chỉ chấp nhận
+chuyến ở trạng thái `APPROVED`. Còn chuyến chưa duyệt thì **báo lỗi tổng
+hợp liệt kê rõ**, không âm thầm tính thiếu.
+
+**Áp dụng ngay cho MỌI kỳ, kể cả kỳ cũ** — chủ dự án chấp nhận rủi ro: kỳ
+cũ sẽ không tính lại được cho tới khi duyệt bù qua màn Đối chiếu.
+
+**Hệ quả:** gate đặt NGAY SAU khối kiểm tra rỗng và TRƯỚC khi xoá kết quả
+cũ, để lỗi chặn sớm chứ không xoá mất dữ liệu đã tính rồi mới báo lỗi.
+
+---
+
+## QĐ-17 (2026-09-09) — Chuyến ĐÃ DUYỆT phải qua "yêu cầu sửa" mới được chỉnh sửa
+
+**Bối cảnh:** trước đó sửa dữ liệu 1 chuyến đã duyệt ở màn nhập liệu khiến
+chuyến (và cả quyết định đối chiếu) **âm thầm rớt về `PENDING`** — không
+qua bước nào, không cảnh báo cho Thống kê rằng một dòng đã duyệt vừa bị đổi.
+
+**Quyết định:** chuyến ở trạng thái `APPROVED` **không được sửa trực tiếp**.
+Muốn sửa thì **Thống kê phải gửi yêu cầu sửa trước** (chuyển sang
+`REVISION_REQUESTED`), lúc đó đơn vị mới được sửa + gửi lại.
+
+**Hệ quả:** chặn ở CẢ 3 đường đổi dữ liệu chuyến, để không bypass được:
+`TransportReportService.updateTrip`/`bulkUpdateTrips`,
+`ExcavationReportService.updateTrip`/`bulkUpdateTrips`, và
+`ReconciliationService.applyTripUpdate` (nút "Lưu" ngay trong Đối chiếu).
+Đường Thống kê tự chuyển sang `REVISION_REQUESTED` (`saveDecisions`) KHÔNG
+bị chặn — phải luôn cho phép bất kể trạng thái hiện tại.
+
+**Chuyến `PENDING` thì vẫn sửa thoải mái** — sửa xong tự về `PENDING` và
+hiện ngay ở Đối chiếu, không cần thao tác "gửi lại" riêng.
+
+---
+
+## QĐ-18 (2026-09-09) — Luồng trạng thái + màu dòng ở màn Đối chiếu
+
+**Quyết định:** vòng đời một dòng đối chiếu và màu tương ứng:
+
+| # | Tình huống | Màu | Trạng thái dòng |
+|---|---|---|---|
+| 1 | Vận tải đã gửi **và** Khai thác đã gửi, chờ đối chiếu | **VÀNG** | `PENDING` (đủ 2 bên) |
+| 2 | Thống kê gửi yêu cầu sửa | **ĐỎ** | `REVISION_REQUESTED` |
+| 3 | Cả Vận tải và Khai thác **nhận được** yêu cầu sửa | ĐỎ | — |
+| 4 | Đã sửa + gửi lại **đủ cả 2 bên** | **VÀNG** | `AWAITING_REAPPROVAL` |
+| 5 | Thống kê duyệt xong | **TRẮNG** | `APPROVED` |
+
+**Quy ước gốc, dùng để suy ra mọi trường hợp khác:**
+- **VÀNG = đang chờ THỐNG KÊ xử lý** (cả lần gửi đầu lẫn sau khi sửa xong).
+- **ĐỎ = đang chờ ĐƠN VỊ sửa** — chỉ cần **1 trong 2 bên** còn
+  `REVISION_REQUESTED` là cả dòng vẫn đỏ (gửi lại 1 bên thôi chưa đủ).
+- **TRẮNG = đã duyệt xong**, hoặc dòng mới có 1 bên (chưa đủ cặp để đối
+  chiếu nên chưa tính là "chờ Thống kê").
+
+**Hệ quả thiết kế:**
+- Bên bị yêu cầu sửa thì **ẩn dữ liệu** của bên đó khỏi bảng (không xoá
+  CSDL, chỉ trả `null` ở API); sửa/gửi lại xong thì hiện lại. Lịch sử các
+  lần yêu cầu sửa xem qua icon "i" ở cột Sai lệch.
+- Dòng **đã duyệt** thì cột "Sai lệch" hiện **dấu tích xanh** thay cho tam
+  giác cảnh báo lệch — đã chốt xong thì không còn là việc phải xử lý.
+- Màu phải tô ở **cấp Ô**, không chỉ ở cấp dòng: mỗi ô tự tô nền theo nhóm
+  cột (xanh lá = Vận tải, xanh dương = Khai thác) sẽ **đè mất** nền tô ở
+  `<tr>`. Vạch màu đầu dòng cũng phải đặt ở ô đầu tiên — border trên `<tr>`
+  không render.
+- Đơn vị nhận yêu cầu sửa ở **2 nơi, đồng bộ cả Vận tải lẫn Khai thác**:
+  màn Đối chiếu (nút "Gửi lại" + icon xem ghi chú của Thống kê, ở cột
+  "Thao tác" ngoài cùng phải) và màn Nhập liệu (badge **"Cần sửa"** + bộ
+  lọc đếm số bản ghi cần sửa).
+
+**Điểm cần lưu ý:** nút lưu ở màn nhập liệu ghi **"Lưu và gửi (F5)"** cho
+cả thêm mới lẫn chỉnh sửa — vì mọi lần lưu đều đưa chuyến về "Chờ duyệt",
+tức là đã gửi đi đối chiếu, không có khái niệm lưu nháp.
