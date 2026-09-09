@@ -936,7 +936,11 @@ export function createReconciliationColumns(
               );
 
               if (status === "APPROVED") {
-                // ponytail: khi đã duyệt, ẩn nút yêu cầu chỉnh sửa, chỉ hiển thị biểu tượng đã duyệt và nút xóa
+                // Đã duyệt: hiện dấu tích + VẪN GIỮ nút "Yêu cầu chỉnh sửa".
+                // Trước đây ẩn nút này đi, thành ra dòng đã duyệt bị khoá chết:
+                // backend chặn sửa chuyến đã duyệt (QĐ-17) mà Thống kê lại
+                // không còn đường gửi yêu cầu sửa — không ai sửa lại được số
+                // liệu đã duyệt nữa. Chốt 2026-09-09.
                 return (
                   <div className="flex items-center justify-center gap-1.5">
                     <span
@@ -945,6 +949,7 @@ export function createReconciliationColumns(
                     >
                       <Check className="w-4 h-4 stroke-[2.5]" />
                     </span>
+                    {editButtonWithTooltip}
                     <Button
                       size="sm"
                       variant="ghost"

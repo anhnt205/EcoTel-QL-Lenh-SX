@@ -1012,12 +1012,11 @@ export const ReconciliationPage: React.FC = () => {
                     const eligible = rawItems.filter(
                       (i) =>
                         rowSelection[i.id] &&
-                        i.reconciliationStatus !== "REVISION_REQUESTED" &&
-                        i.reconciliationStatus !== "APPROVED",
+                        i.reconciliationStatus !== "REVISION_REQUESTED",
                     );
                     if (eligible.length === 0) {
                       toast.warning(
-                        "Tất cả các dòng đã chọn đều đã được duyệt hoặc đang chờ đơn vị chỉnh sửa lại!",
+                        "Tất cả các dòng đã chọn đều đang chờ đơn vị chỉnh sửa lại!",
                       );
                       return;
                     }
@@ -1053,15 +1052,16 @@ export const ReconciliationPage: React.FC = () => {
           onResubmitItem={handleResubmitItem}
         />
 
-        {/* Modal Yêu cầu sửa hàng loạt (chỉ áp dụng các dòng chưa ở trạng thái REVISION_REQUESTED hoặc APPROVED) */}
+        {/* Modal Yêu cầu sửa hàng loạt — bỏ qua các dòng ĐANG chờ đơn vị sửa
+            (gửi lại lần nữa là thừa). Dòng ĐÃ DUYỆT vẫn gửi được: theo QĐ-17
+            đó là con đường DUY NHẤT để sửa lại số liệu đã duyệt. */}
         <RequestChangeModal
           isOpen={isBulkRequestModalOpen}
           onClose={() => setIsBulkRequestModalOpen(false)}
           items={rawItems.filter(
             (i) =>
               rowSelection[i.id] &&
-              i.reconciliationStatus !== "REVISION_REQUESTED" &&
-              i.reconciliationStatus !== "APPROVED",
+              i.reconciliationStatus !== "REVISION_REQUESTED",
           )}
           onSubmit={handleBulkRequestChangeSubmit}
         />

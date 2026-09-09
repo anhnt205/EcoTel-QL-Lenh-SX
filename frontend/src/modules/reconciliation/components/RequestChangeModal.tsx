@@ -9,6 +9,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   FileEdit,
   Send,
@@ -231,48 +232,53 @@ export const RequestChangeModal: React.FC<RequestChangeModalProps> = ({
                         )}
                       </div>
 
-                      {/* Target department toggles - CHỦ ĐỀ BLUE-600 */}
-                      <div className="flex items-center gap-2 ml-auto">
+                      {/* Chọn bên nhận yêu cầu sửa — CHECKBOX (chủ dự án chốt
+                          2026-09-09): tick Vận tải, tick Khai thác, hoặc tick
+                          cả 2. Mặc định tick sẵn cả 2. Phải tick ít nhất 1 bên
+                          mới gửi được (xem isFormValid). */}
+                      <div className="flex items-center gap-3 ml-auto">
                     <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100 mr-1">
                       Gửi đến:
                     </span>
-                        <button
-                            type="button"
-                            onClick={() =>
-                                handleUpdateRecord(idx, (prev) => ({
-                                  ...prev,
-                                  targetTransport: !prev.targetTransport,
-                                }))
-                            }
-                            className={`h-8 px-3 rounded-lg text-xs sm:text-sm font-bold flex items-center gap-1.5 transition-all cursor-pointer border ${
-                                rec.targetTransport
-                                    ? "bg-blue-600 text-white border-blue-600 shadow-xs hover:bg-blue-700"
-                                    : "bg-slate-100 text-slate-900 border-slate-300 hover:bg-slate-200 dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700"
-                            }`}
+                        <label
+                            className="flex items-center gap-1.5 cursor-pointer select-none h-8 px-3 rounded-lg border border-slate-300 dark:border-gray-700 bg-slate-50 dark:bg-gray-800/60 hover:bg-slate-100 dark:hover:bg-gray-800 transition-colors"
                             title="Gửi yêu cầu cho Phân xưởng Vận tải"
                         >
-                          <Truck className="w-4 h-4" />
-                          <span>Vận tải</span>
-                        </button>
+                          <Checkbox
+                              checked={rec.targetTransport}
+                              onCheckedChange={(checked) =>
+                                  handleUpdateRecord(idx, (prev) => ({
+                                    ...prev,
+                                    targetTransport: !!checked,
+                                  }))
+                              }
+                              className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
+                          />
+                          <Truck className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                          <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100">
+                            Vận tải
+                          </span>
+                        </label>
 
-                        <button
-                            type="button"
-                            onClick={() =>
-                                handleUpdateRecord(idx, (prev) => ({
-                                  ...prev,
-                                  targetMining: !prev.targetMining,
-                                }))
-                            }
-                            className={`h-8 px-3 rounded-lg text-xs sm:text-sm font-bold flex items-center gap-1.5 transition-all cursor-pointer border ${
-                                rec.targetMining
-                                    ? "bg-blue-600 text-white border-blue-600 shadow-xs hover:bg-blue-700"
-                                    : "bg-slate-100 text-slate-900 border-slate-300 hover:bg-slate-200 dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700"
-                            }`}
+                        <label
+                            className="flex items-center gap-1.5 cursor-pointer select-none h-8 px-3 rounded-lg border border-slate-300 dark:border-gray-700 bg-slate-50 dark:bg-gray-800/60 hover:bg-slate-100 dark:hover:bg-gray-800 transition-colors"
                             title="Gửi yêu cầu cho Công trường Khai thác"
                         >
-                          <HardHat className="w-4 h-4" />
-                          <span>Khai thác</span>
-                        </button>
+                          <Checkbox
+                              checked={rec.targetMining}
+                              onCheckedChange={(checked) =>
+                                  handleUpdateRecord(idx, (prev) => ({
+                                    ...prev,
+                                    targetMining: !!checked,
+                                  }))
+                              }
+                              className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
+                          />
+                          <HardHat className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                          <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100">
+                            Khai thác
+                          </span>
+                        </label>
 
                         {records.length > 1 && (
                             <button
