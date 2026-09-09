@@ -53,18 +53,30 @@ export const getTransportTripsColumns = (
           >
             <Pencil className="w-3.5 h-3.5" />
           </Button>
-          {/* Trạng thái ngay cạnh bút chỉnh sửa — trước đây nằm cuối cùng
-              bảng, phải cuộn ngang hết mới thấy dòng nào đang chờ duyệt/cần
-              sửa. Chốt 2026-09-10 (gộp chung ô, không tách cột riêng). */}
-          <ApprovalStatusBadge
-            status={row.original.status}
-            note={row.original.changeRequestNote}
-          />
         </div>
       );
     },
-    size: 180,
+    size: 95,
     enableSorting: false,
+    enableHiding: false,
+  },
+  {
+    // Cột riêng ngay sau nút bút (đầu hàng) — trước đây nằm cuối cùng bảng,
+    // phải cuộn ngang hết mới thấy dòng nào đang chờ duyệt/cần sửa. Từng thử
+    // gộp chung 1 ô với checkbox+bút nhưng nhìn chật/xấu — quay lại tách cột
+    // riêng, chỉ đổi VỊ TRÍ lên đầu. Chốt 2026-09-10.
+    accessorKey: "status",
+    id: "status",
+    header: "Trạng thái",
+    cell: ({ row }) => (
+      <div className="flex justify-center">
+        <ApprovalStatusBadge
+          status={row.original.status}
+          note={row.original.changeRequestNote}
+        />
+      </div>
+    ),
+    size: 115,
     enableHiding: false,
   },
   {

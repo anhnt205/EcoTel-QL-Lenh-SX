@@ -53,17 +53,28 @@ export const getMiningTripsColumns = (
           >
             <Pencil className="w-3.5 h-3.5" />
           </Button>
-          {/* Trạng thái ngay cạnh bút chỉnh sửa — xem chú thích ở bản Vận
-              tải (transportTripsColumns.tsx), cùng lý do. Chốt 2026-09-10. */}
-          <ApprovalStatusBadge
-            status={row.original.status}
-            note={row.original.changeRequestNote}
-          />
         </div>
       );
     },
-    size: 180,
+    size: 95,
     enableSorting: false,
+    enableHiding: false,
+  },
+  {
+    // Cột riêng ngay sau nút bút (đầu hàng) — xem chú thích ở bản Vận tải
+    // (transportTripsColumns.tsx), cùng lý do. Chốt 2026-09-10.
+    accessorKey: "status",
+    id: "status",
+    header: "Trạng thái",
+    cell: ({ row }) => (
+      <div className="flex justify-center">
+        <ApprovalStatusBadge
+          status={row.original.status}
+          note={row.original.changeRequestNote}
+        />
+      </div>
+    ),
+    size: 115,
     enableHiding: false,
   },
   {
