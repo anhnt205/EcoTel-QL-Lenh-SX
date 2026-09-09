@@ -1733,3 +1733,62 @@ throwaway) — chuyến test id `5202` (kỳ 05/2026, id `202`) VÀ toàn bộ
 danh mục dựng theo (2 phòng ban, Device P30/950, loại hàng Nomin.,
 2 địa điểm, Tỷ trọng, Mô hình, STD, unloading_point id `310`) **được
 GIỮ LẠI có chủ đích** để chủ dự án tự kiểm tra trên UI, không tự dọn.
+
+## Lượt 17 (2026-09-09) — chặn sửa chuyến đã duyệt ở nhập liệu, bắt buộc qua "yêu cầu sửa" trước, commit `6f07889`
+
+Chủ dự án phát hiện qua hỏi đáp trực tiếp (không phải báo lỗi, là chốt
+quy tắc nghiệp vụ mới): trước đây sửa dữ liệu 1 chuyến ĐÃ DUYỆT (trạng
+thái `APPROVED`) ở màn nhập liệu Vận tải/Khai thác (hoặc "Lưu" ngay
+trong Đối chiếu) **âm thầm rớt thẳng chuyến (và cả quyết định đối
+chiếu) về `PENDING`** — không qua bước "yêu cầu sửa" nào, không có
+cảnh báo cho Thống kê viên. Test sống xác nhận đúng lỗ hổng này (sửa
+chuyến `5102` đang trắng/APPROVED → tự rớt về PENDING không cần ai yêu
+cầu). Chủ dự án chốt: **chuyến đã duyệt chỉ được sửa sau khi Thống kê
+gửi yêu cầu sửa** (chuyển `REVISION_REQUESTED`) — đúng bằng cơ chế "yêu
+cầu sửa + gửi lại" đã có (lượt 14).
+
+**Đã sửa 3 nơi** (đúng 3 đường thay đổi dữ liệu chuyến, tìm đủ bằng
+`grep setStatus(ApprovalStatus.PENDING)` toàn backend, không sót
+đường nào): `TransportReportService.updateTrip`/`bulkUpdateTrips`,
+`ExcavationReportService.updateTrip`/`bulkUpdateTrips`,
+`ReconciliationService.applyTripUpdate` (cả nhánh Vận tải lẫn Khai
+thác — đây là code đứng sau nút "Lưu" ở chính màn Đối chiếu). Ở đầu
+mỗi hàm, TRƯỚC khi áp field mới: nếu `trip.getStatus() ==
+ApprovalStatus.APPROVED` thì `throw BadRequestException` với thông
+báo rõ "... cần Thống kê gửi yêu cầu sửa trước khi được phép chỉnh sửa
+lại." — không đụng gì tới `saveDecisions` (đường Thống kê tự chuyển
+sang `REVISION_REQUESTED`, phải luôn cho phép bất kể trạng thái hiện
+tại).
+
+**Frontend không cần sửa gì** — đã kiểm tra `useEntryPageLogic.ts`
+(dùng chung cho nhập liệu Vận tải/Khai thác): đã có sẵn chặn phía
+client y hệt ý định này (`status === "APPROVED"` → toast "Không thể
+chỉnh sửa chuyến đã được duyệt!", chỉ chặn APPROVED, không chặn
+REVISION_REQUESTED — đúng ý). Và `ReconciliationPage.tsx` (nút "Lưu")
+đã sẵn `catch` hiển thị đúng `err.response.data.message` qua toast —
+nghĩa là thông báo lỗi mới từ backend tự động hiện ra, không cần thêm
+code. Lỗ hổng CHỈ nằm ở backend (bypass được qua gọi API trực tiếp
+hoặc qua đường "Lưu" ở Đối chiếu, vốn không có chặn client tương ứng).
+
+**Build + verify sống đầy đủ** (dùng đúng khoá Docker build dùng
+chung, chỉ build lại `backend-service`): dùng chuyến thật `5102`
+(APPROVED, đã duyệt từ lượt 14) làm ca test —
+1. Sửa qua API nhập liệu Vận tải khi đang APPROVED → `400`, đúng
+   thông báo, CSDL không đổi (`trip_count` vẫn `6`).
+2. Sửa qua API nhập liệu Khai thác (chuyến cặp `2063`, cũng APPROVED)
+   → `400` tương tự, CSDL không đổi.
+3. Sửa qua "Lưu" ở Đối chiếu (`PUT /trips/bulk`) khi đang APPROVED →
+   `400` tương tự ("Mục thứ 1: Chuyến Vận tải #5102 đã được duyệt...").
+4. Gọi `POST /decisions` chuyển `5102` sang `REVISION_REQUESTED` (mô
+   phỏng Thống kê gửi yêu cầu sửa) → sau đó sửa lại qua API nhập liệu
+   Vận tải → **thành công** (`200`), `trip.status` rớt về `PENDING`
+   đúng thiết kế, `decision.status` VẪN giữ `REVISION_REQUESTED` (đúng
+   — chờ bên Khai thác cũng gửi lại mới sang `AWAITING_REAPPROVAL`).
+5. Khôi phục đúng trạng thái gốc của cả 2 chuyến (`APPROVED`/
+   `APPROVED`, `trip_count` `6`/`6`) bằng SQL sau khi test xong — dữ
+   liệu demo lượt 14 không bị ảnh hưởng lâu dài.
+
+**Không đụng chức năng Xóa** — `useEntryPageLogic.ts` đã có chặn xoá
+bản ghi đã duyệt riêng (tách biệt khỏi phạm vi yêu cầu lần này, vốn
+chỉ nói "sửa"), chưa kiểm tra phía backend có chặn tương ứng hay không
+— để ngỏ cho lượt sau nếu chủ dự án yêu cầu.
