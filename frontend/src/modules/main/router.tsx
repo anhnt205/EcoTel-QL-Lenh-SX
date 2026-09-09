@@ -31,10 +31,6 @@ const StandardTripReportPage = lazy(() =>
 const DepartmentsPage = lazy(() => import("@/modules/departments/Departments"));
 const VehiclesPage = lazy(() => import("@/modules/vehicles/Vehicles"));
 const MachinePage = lazy(() => import("@/modules/machine/Machine"));
-const MaterialsPage = lazy(() => import("@/modules/materials/Materials"));
-const LocationsPage = lazy(() => import("@/modules/locations/Locations"));
-const CargoGroupsPage = lazy(() => import("@/modules/cargoGroups/CargoGroups"));
-const CargoTypesPage = lazy(() => import("@/modules/cargoTypes/CargoTypes"));
 const ShiftsPage = lazy(() => import("@/modules/shifts/Shifts"));
 const UsersPage = lazy(() => import("@/modules/users/Users"));
 
@@ -49,11 +45,9 @@ const AcceptanceProductsPage = lazy(() => import("@/modules/catalog/pages/Accept
 const TtlClhItemsPage = lazy(() => import("@/modules/catalog/pages/TtlClhItems"));
 const SeamGroupsPage = lazy(() => import("@/modules/catalog/pages/SeamGroups"));
 const VehicleTypesPage = lazy(() => import("@/modules/catalog/pages/VehicleTypes"));
-const ClassificationsPage = lazy(() => import("@/modules/catalog/pages/Classifications"));
 const VehicleRankGroupsPage = lazy(() => import("@/modules/catalog/pages/VehicleRankGroups"));
 const VehicleRanksPage = lazy(() => import("@/modules/catalog/pages/VehicleRanks"));
 const VehicleFuelClassesPage = lazy(() => import("@/modules/catalog/pages/VehicleFuelClasses"));
-const VehicleCategoryClassesPage = lazy(() => import("@/modules/catalog/pages/VehicleCategoryClasses"));
 const CoefficientsPage = lazy(() => import("@/modules/catalog/pages/Coefficients"));
 const ReportPeriodsPage = lazy(() => import("@/modules/catalog/pages/ReportPeriods"));
 const ModelMatrixPage = lazy(() => import("@/modules/catalog/pages/ModelMatrix"));
@@ -148,38 +142,6 @@ export const mainRoutes = (
         element={
           <Suspense fallback={<PageLoader />}>
             <MachinePage />
-          </Suspense>
-        }
-      />
-      <Route
-        path={ROUTES.DANH_MUC.VAT_LIEU}
-        element={
-          <Suspense fallback={<PageLoader />}>
-            <MaterialsPage />
-          </Suspense>
-        }
-      />
-      <Route
-        path={ROUTES.DANH_MUC.DIEM_DO_TAI}
-        element={
-          <Suspense fallback={<PageLoader />}>
-            <LocationsPage />
-          </Suspense>
-        }
-      />
-      <Route
-        path={ROUTES.DANH_MUC.NHOM_HANG}
-        element={
-          <Suspense fallback={<PageLoader />}>
-            <CargoGroupsPage />
-          </Suspense>
-        }
-      />
-      <Route
-        path={ROUTES.DANH_MUC.LOAI_HANG}
-        element={
-          <Suspense fallback={<PageLoader />}>
-            <CargoTypesPage />
           </Suspense>
         }
       />
@@ -280,26 +242,10 @@ export const mainRoutes = (
         }
       />
       <Route
-        path={ROUTES.DANH_MUC.PHAN_LOAI}
-        element={
-          <Suspense fallback={<PageLoader />}>
-            <ClassificationsPage />
-          </Suspense>
-        }
-      />
-      <Route
         path={ROUTES.DANH_MUC.CHUNG_LOAI_XE_DMNL}
         element={
           <Suspense fallback={<PageLoader />}>
             <VehicleFuelClassesPage />
-          </Suspense>
-        }
-      />
-      <Route
-        path={ROUTES.DANH_MUC.CHUNG_LOAI_XE_PHAN_LOAI}
-        element={
-          <Suspense fallback={<PageLoader />}>
-            <VehicleCategoryClassesPage />
           </Suspense>
         }
       />

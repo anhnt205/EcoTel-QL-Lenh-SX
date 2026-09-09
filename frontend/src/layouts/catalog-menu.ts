@@ -24,13 +24,9 @@ export const CATALOG_MENU: CatalogMenuGroup[] = [
   {
     label: "Vật liệu, hàng hoá",
     items: [
-      { label: "Nhóm hàng", to: ROUTES.DANH_MUC.NHOM_HANG },
       { label: "Chủng loại hàng", to: ROUTES.DANH_MUC.CHUNG_LOAI_HANG },
       { label: "Nhóm chủng loại hàng", to: ROUTES.DANH_MUC.NHOM_CHUNG_LOAI_HANG },
-      { label: "Phân loại", to: ROUTES.DANH_MUC.PHAN_LOAI },
       { label: "Sản phẩm nghiệm thu", to: ROUTES.DANH_MUC.SAN_PHAM_NGHIEM_THU },
-      { label: "Loại hàng", to: ROUTES.DANH_MUC.LOAI_HANG },
-      { label: "Vật liệu", to: ROUTES.DANH_MUC.VAT_LIEU },
     ],
   },
   {
@@ -40,7 +36,6 @@ export const CATALOG_MENU: CatalogMenuGroup[] = [
       { label: "Nơi dỡ tải", to: ROUTES.DANH_MUC.NOI_DO_TAI },
       { label: "Nơi chất tải", to: ROUTES.DANH_MUC.NOI_CHAT_TAI },
       { label: "Khu vực xúc", to: ROUTES.DANH_MUC.KHU_VUC_XUC },
-      { label: "Vị trí", to: ROUTES.DANH_MUC.DIEM_DO_TAI },
     ],
   },
   {
@@ -66,7 +61,6 @@ export const CATALOG_MENU: CatalogMenuGroup[] = [
       { label: "TTL CLH", to: ROUTES.DANH_MUC.TTL_CLH },
       { label: "Nhóm vỉa", to: ROUTES.DANH_MUC.NHOM_VIA },
       { label: "Chủng loại xe + DMNL", to: ROUTES.DANH_MUC.CHUNG_LOAI_XE_DMNL },
-      { label: "Chủng loại xe + Phân loại", to: ROUTES.DANH_MUC.CHUNG_LOAI_XE_PHAN_LOAI },
       { label: "Hệ số", to: ROUTES.DANH_MUC.HE_SO },
       { label: "Kỳ báo cáo", to: ROUTES.DANH_MUC.KY_BAO_CAO },
       { label: "Mô hình", to: ROUTES.DANH_MUC.MO_HINH },
