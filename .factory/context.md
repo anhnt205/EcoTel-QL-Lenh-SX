@@ -1852,4 +1852,75 @@ tự tăng dần.
 (`transport_reports.id=6153` đang Ca 4) vẫn còn nguyên vì chủ dự án nói
 sẽ **tự sửa lại Ca và gửi lại cho trùng**. Sửa xong Ca của bên Vận tải
 về Ca 2 là 2 dòng đó tự gộp thành 1 (đã chứng minh bằng phép thử ở
-bước 4).
+bước 4). *(Xem lượt 19: chủ dự án thử tự sửa thì lộ ra lỗi tiếp — sửa
+Ca ở form không ăn.)*
+
+## Lượt 19 (2026-09-09) — sửa chuyến đổi Ca/Ngày/Số xe/Số thẻ lương bị âm thầm bỏ qua, commit `ecb415e`
+
+Ngay sau lượt 18, chủ dự án tự vào sửa Ca 4 → Ca 2 theo đúng hướng dẫn
+thì báo: *"Ấn lưu và gửi nhưng dữ liệu vẫn không đổi vẫn là ca 4. Check
+nghiêm túc cho tôi."* — và đúng là còn **một lỗi thứ hai, độc lập**,
+nằm chồng lên lỗi lượt 18.
+
+**Gốc lỗi**: Ngày/Ca/Số xe/Số thẻ lương thuộc **PHIẾU**
+(`TransportReport`) chứ không thuộc **CHUYẾN**. Chế độ sửa 1 chuyến
+(nút bút chì) ở `TransportHeaderDetailModal.handleSave` chỉ gửi
+`buildTransportTripRequestItem` — payload cấp CHUYẾN, mà
+`TransportReportTripRequest` **không hề có `shiftId`**. Nên thay đổi Ca
+bị vứt đi, API vẫn trả `200` + toast "Đã cập nhật chuyến thành công!".
+Im lặng, không lỗi — loại tệ nhất.
+
+Còn **một lớp thứ hai** ở frontend: `updateTransportTrip` chạy
+`transportReportTripRequestSchema.parse(payload)`, mà **zod cắt bỏ mọi
+key không khai báo trong schema** — nên kể cả có nhét thêm `shiftId`
+vào object thì nó cũng bị loại sạch trước khi rời trình duyệt. Phải sửa
+cả hai lớp mới thông.
+
+Form **Khai thác dính y hệt** (`MiningBatchEntryModal` dòng 298, cùng
+luồng) — chủ dự án nhắc *"Đối soát cả bên khai thác nhé, vì 2 bên giống
+luồng nhau"*, đã làm đối xứng.
+
+**Đã sửa**:
+- DTO mới `TransportReportTripUpdateRequest` /
+  `ExcavationReportTripUpdateRequest` — kế thừa DTO cấp chuyến, thêm 4
+  trường cấp phiếu (đều tuỳ chọn; bỏ trống = giữ nguyên). Tách riêng để
+  payload TẠO MỚI (`TransportReportRequest.trips`) không bị lẫn trường
+  vô nghĩa.
+- Service: `moveTripToTargetReport()` — tìm phiếu đích đúng bộ khoá
+  (Vận tải: Ngày+Ca+Xe+Nhân viên; Khai thác: Ngày+Ca+**Máy xúc**+Nhân
+  viên), chưa có thì tạo mới + chép số liệu nhiên liệu, rồi chuyển
+  chuyến sang. **Không đụng các chuyến khác đang nằm chung phiếu cũ.**
+  Dùng lại đúng cách `ReconciliationService.applyTripUpdate` đã làm sẵn
+  cho trường hợp đổi nhân viên.
+- **Xoá phiếu cũ nếu rỗng sau khi chuyển** — ban đầu định để lại cho an
+  toàn, nhưng đọc `TransportReportExcelExporter` thấy nó **cố ý ghi 1
+  dòng cho phiếu không có chuyến** ⇒ để lại sẽ thành dòng rác khi xuất
+  Excel, kèm số liệu nhiên liệu đã chép sang phiếu mới nên bị đếm hai
+  lần. Xoá là đúng, và trùng đúng tiền lệ `deleteTrip` vẫn làm. Có
+  `saveAndFlush(trip)` trước khi xoá để khoá ngoại mới xuống DB trước,
+  tránh vi phạm FK lúc flush.
+- Frontend: schema update riêng (`...UpdateRequestSchema`, để zod không
+  cắt), 2 modal gửi kèm 4 trường (map id theo đúng logic
+  `mapSessionToRequest` sẵn có).
+- **Nhãn nút F5** theo yêu cầu chủ dự án: thống nhất **"Lưu và gửi
+  (F5)"** cho cả thêm mới lẫn chỉnh sửa (trước đây chế độ sửa ghi "Lưu
+  bản ghi (F5)", dễ hiểu nhầm là chỉ lưu nháp — trong khi thực chất mọi
+  lần lưu đều đưa chuyến về Chờ duyệt = gửi đi đối chiếu).
+
+**Verify sống** (build lại backend+frontend, dùng khoá Docker dùng
+chung): đổi Ca 4 → Ca 2 cho chuyến `5203` → chuyến **thật sự** sang
+phiếu Ca 2 mới; màn Đối chiếu **từ 3 dòng còn 2 dòng**, dòng 2+3 gộp
+làm một, hiện đúng sai lệch Số chuyến 8 vs 7 (đúng việc của đối chiếu).
+Test đối xứng bên Khai thác (chuyến `2112` sang Ca 3 rồi trả về Ca 2)
+cũng đúng. Test dọn phiếu rỗng: chuyển Ca 2→Ca 1→Ca 2, phiếu rỗng ở mỗi
+bước đều tự bị xoá, chỉ còn đúng 1 phiếu có chuyến. Kiểm tra trên UI
+thật: nút chế độ thêm mới = "Lưu & Thêm mới (F2)" + "Lưu và gửi (F5)",
+chế độ sửa = "Lưu và gửi (F5)", ô Ca hiện đúng giá trị thật của chuyến.
+
+**Đã dọn**: 2 phiếu rỗng sót lại từ lúc chưa có code dọn
+(`transport_reports.id=6153` Ca 4, `excavation_reports.id=1207` Ca 3).
+
+**Ghi chú hạ tầng**: Docker Desktop dùng chung lại sập API (lỗi 500)
+giữa lượt, đúng như lượt 16. Đã `TaskStop` vòng lặp chờ khoá đang quay
+vô ích (không để nó nện vào daemon hỏng), chờ hồi phục rồi build tiếp.
+Khoá Docker không bị kẹt vì lần đó chưa acquire được.
