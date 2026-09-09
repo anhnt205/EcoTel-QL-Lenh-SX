@@ -576,6 +576,13 @@ public class ReconciliationService {
                 throw new ResourceNotFoundException("Không tìm thấy chuyến Vận tải: " + req.getTransportReportTripId());
             }
 
+            // Chốt 2026-09-09: chuyến đã duyệt không được sửa qua "Lưu" ở Đối
+            // chiếu nữa — phải để Thống kê gửi yêu cầu sửa trước.
+            if (trip.getStatus() == ApprovalStatus.APPROVED) {
+                throw new BadRequestException(
+                        "Chuyến Vận tải #" + trip.getId() + " đã được duyệt đối chiếu — cần Thống kê gửi yêu cầu sửa trước khi được phép chỉnh sửa lại.");
+            }
+
             if (req.getCargoTypeId() != null) {
                 CargoType cargoType = cargoTypeById.get(req.getCargoTypeId());
                 if (cargoType == null) {
@@ -636,6 +643,12 @@ public class ReconciliationService {
             ExcavationReportTrip trip = excavationTripById.get(req.getExcavationReportTripId());
             if (trip == null) {
                 throw new ResourceNotFoundException("Không tìm thấy chuyến Khai thác: " + req.getExcavationReportTripId());
+            }
+
+            // Xem chú thích ở nhánh Vận tải phía trên — cùng lý do.
+            if (trip.getStatus() == ApprovalStatus.APPROVED) {
+                throw new BadRequestException(
+                        "Chuyến Khai thác #" + trip.getId() + " đã được duyệt đối chiếu — cần Thống kê gửi yêu cầu sửa trước khi được phép chỉnh sửa lại.");
             }
 
             if (req.getCargoTypeId() != null) {

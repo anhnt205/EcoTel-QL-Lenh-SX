@@ -9,6 +9,7 @@ import com.ecotel.thong_ke_cao_son.dto.response.ExcavationReportResponse;
 import com.ecotel.thong_ke_cao_son.dto.response.ExcavationReportTripResponse;
 import com.ecotel.thong_ke_cao_son.dto.response.PageResponse;
 import com.ecotel.thong_ke_cao_son.enums.LoadLevelType;
+import com.ecotel.thong_ke_cao_son.exception.BadRequestException;
 import com.ecotel.thong_ke_cao_son.exception.ResourceNotFoundException;
 import com.ecotel.thong_ke_cao_son.enums.ApprovalStatus;
 import com.ecotel.thong_ke_cao_son.mapper.ExcavationReportMapper;
@@ -191,6 +192,14 @@ public class ExcavationReportService {
         ExcavationReportTrip trip = excavationReportTripRepository.findById(tripId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy chuyến: " + tripId));
 
+        // Chốt 2026-09-09: chuyến đã duyệt đối chiếu không được sửa trực tiếp ở
+        // nhập liệu nữa — phải để Thống kê gửi yêu cầu sửa (chuyển trạng thái
+        // sang REVISION_REQUESTED) trước, mới được sửa + gửi lại.
+        if (trip.getStatus() == ApprovalStatus.APPROVED) {
+            throw new BadRequestException(
+                    "Chuyến đã được duyệt đối chiếu — cần Thống kê gửi yêu cầu sửa trước khi được phép chỉnh sửa lại.");
+        }
+
         updateTripFields(trip, request);
         trip.setStatus(ApprovalStatus.PENDING);
         excavationReportTripRepository.save(trip);
@@ -226,6 +235,11 @@ public class ExcavationReportService {
         for (ExcavationTripBulkUpdateItem item : items) {
             ExcavationReportTrip trip = excavationReportTripRepository.findById(item.getId())
                     .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy chuyến: " + item.getId()));
+
+            if (trip.getStatus() == ApprovalStatus.APPROVED) {
+                throw new BadRequestException(
+                        "Chuyến #" + item.getId() + " đã được duyệt đối chiếu — cần Thống kê gửi yêu cầu sửa trước khi được phép chỉnh sửa lại.");
+            }
 
             updateTripFields(trip, item.getData());
             trip.setStatus(ApprovalStatus.PENDING);
