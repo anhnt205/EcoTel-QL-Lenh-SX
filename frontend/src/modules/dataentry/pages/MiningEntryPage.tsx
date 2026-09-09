@@ -21,6 +21,7 @@ import { EntryPageHeader } from "@/modules/dataentry/components/EntryPageHeader"
 import { FilterResetButton } from "@/modules/dataentry/components/FilterResetButton";
 import { useEntryPageLogic } from "@/modules/dataentry/hooks/useEntryPageLogic";
 import { useMasterData } from "@/modules/dataentry/hooks/useMasterData";
+import { useLiveQueryInvalidation } from "@/hooks/useLiveQueryInvalidation";
 import { Input } from "@/components/ui/input";
 import {
   Combobox,
@@ -131,6 +132,11 @@ export const MiningEntryPage: React.FC = () => {
     receivingLocationIds,
     excavationFloors,
   });
+  // Đối chiếu yêu cầu chỉnh sửa (hoặc duyệt) 1 chuyến Khai thác thì trạng
+  // thái ở đây phải tự cập nhật ngay — chủ dự án chốt 2026-09-10 (lượt 2),
+  // trước đó chỉ áp cho màn Đối chiếu nên bên Khai thác phải tự tải lại
+  // trang mới thấy yêu cầu sửa mới.
+  useLiveQueryInvalidation([["excavationReports"]]);
 
   const bulkDeleteReportMutation = useBulkDeleteExcavationTripReportMutation();
   const bulkDeleteTripsMutation = useBulkDeleteExcavationTripsMutation();
