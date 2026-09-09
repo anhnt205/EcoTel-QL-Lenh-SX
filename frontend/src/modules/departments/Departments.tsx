@@ -1,8 +1,10 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
+import { toast } from "sonner";
 
 import DepartmentService from "./services/departmentService";
-import { columns } from "./columns";
+import { getDepartmentColumns } from "./columns";
+import { DepartmentFormModal } from "./DepartmentFormModal";
 import AppDataTable from "@/components/table/AppDataTable";
 import {
   Breadcrumb,
@@ -12,13 +14,15 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
+import type { Department } from "@/types";
 
 const Departments = () => {
   const [searchValue, setSearchValue] = useState("");
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editing, setEditing] = useState<Department | null>(null);
 
-  // 1. Fetch data
   const {
     data: pageData,
     isLoading,
@@ -39,25 +43,47 @@ const Departments = () => {
   const totalElements = pageData?.totalElements ?? 0;
   const totalPages = pageData?.totalPages ?? 0;
 
+  const handleDelete = async (department: Department) => {
+    if (!department.id) return;
+    if (!window.confirm(`Xóa phòng ban "${department.name}"?`)) return;
+    try {
+      await DepartmentService.delete(department.id);
+      toast.success("Đã xóa phòng ban");
+      refetch();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || "Xóa phòng ban thất bại");
+    }
+  };
+
+  const columns = useMemo(
+    () =>
+      getDepartmentColumns({
+        onEdit: (d) => {
+          setEditing(d);
+          setModalOpen(true);
+        },
+        onDelete: handleDelete,
+      }),
+    [],
+  );
+
   return (
     <div className="flex flex-col h-full gap-4 p-4 md:p-6">
-      {/* Breadcrumb */}
       <Breadcrumb>
         <BreadcrumbList>
           <BreadcrumbItem>
-            <BreadcrumbLink href="#">Danh mục</BreadcrumbLink>
+            <BreadcrumbLink href="#">Danh mục hệ thống</BreadcrumbLink>
           </BreadcrumbItem>
           <BreadcrumbSeparator />
           <BreadcrumbItem>
-            <BreadcrumbPage>Đơn vị</BreadcrumbPage>
+            <BreadcrumbPage>Phòng ban</BreadcrumbPage>
           </BreadcrumbItem>
         </BreadcrumbList>
       </Breadcrumb>
 
-      {/* Main Table */}
       <div className="flex-1 min-h-0">
         <AppDataTable
-          title="Danh sách Đơn vị / Phòng ban"
+          title="Danh sách Phòng ban"
           data={departments}
           columns={columns}
           loading={isLoading}
@@ -67,6 +93,10 @@ const Departments = () => {
             setPage(0);
           }}
           onRefresh={refetch}
+          onAdd={() => {
+            setEditing(null);
+            setModalOpen(true);
+          }}
           showColumnToggle
           stickyHeader
           manualPagination
@@ -81,6 +111,13 @@ const Departments = () => {
           }}
         />
       </div>
+
+      <DepartmentFormModal
+        open={modalOpen}
+        editing={editing}
+        onClose={() => setModalOpen(false)}
+        onSaved={refetch}
+      />
     </div>
   );
 };

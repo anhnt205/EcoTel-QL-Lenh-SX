@@ -69,9 +69,15 @@ export const CATALOG_MENU: CatalogMenuGroup[] = [
       { label: "Tỷ trọng", to: ROUTES.DANH_MUC.TY_TRONG },
       { label: "Thuộc tính SL — Xe", to: ROUTES.DANH_MUC.TTSL_XE },
       { label: "Thuộc tính SL — Máy xúc", to: ROUTES.DANH_MUC.TTSL_MAY },
-      { label: "Đơn vị", to: ROUTES.DANH_MUC.DON_VI },
       { label: "Ca làm việc", to: ROUTES.DANH_MUC.CA_LAM_VIEC },
-      { label: "Người dùng & Lái xe", to: ROUTES.DANH_MUC.NGUOI_DUNG },
+    ],
+  },
+  {
+    label: "Danh mục Hệ thống",
+    items: [
+      { label: "Phòng ban", to: ROUTES.DANH_MUC.DON_VI },
+      { label: "Chức vụ", to: ROUTES.DANH_MUC.CHUC_VU },
+      { label: "Tài khoản", to: ROUTES.DANH_MUC.NGUOI_DUNG },
     ],
   },
 ];

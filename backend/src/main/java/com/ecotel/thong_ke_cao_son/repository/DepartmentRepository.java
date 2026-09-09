@@ -15,6 +15,10 @@ public interface DepartmentRepository extends JpaRepository<Department, Long> {
 
     Optional<Department> findByMongoId(String mongoId);
 
+    Optional<Department> findByCode(String code);
+
+    boolean existsByCodeAndIdNot(String code, Long id);
+
     @Query("""
         SELECT d FROM Department d
         WHERE :keyword IS NULL OR :keyword = ''

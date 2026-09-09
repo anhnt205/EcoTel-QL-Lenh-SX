@@ -27,6 +27,7 @@ export const ROUTES = {
     THONG_TIN_MAY: '/danh-muc/thong-tin-may',
     CA_LAM_VIEC: '/danh-muc/ca-lam-viec',
     NGUOI_DUNG: '/danh-muc/nguoi-dung',
+    CHUC_VU: '/danh-muc/chuc-vu',
     KHU_VUC_XUC: '/danh-muc/khu-vuc-xuc',
     NOI_NHAN_TAI: '/danh-muc/noi-nhan-tai',
     NOI_DO_TAI: '/danh-muc/noi-do-tai',

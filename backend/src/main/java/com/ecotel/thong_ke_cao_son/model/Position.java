@@ -39,6 +39,17 @@ public class Position {
     @Column(name = "description")
     private String description;
 
+    /**
+     * Phòng ban chủ quản — quyết định TRẦN quyền của Chức vụ này: mỗi quyền
+     * gán ở {@code PositionPermission} phải nằm trong
+     * {@code department.allowedResources} (validate ở {@code PositionService}).
+     * Nullable vì các dòng seed cũ (trước 2026-09-10) chưa gán — Chức vụ chưa
+     * có phòng ban thì chưa set được quyền nào (không có trần để so).
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "department_id")
+    private Department department;
+
     @CreatedDate
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

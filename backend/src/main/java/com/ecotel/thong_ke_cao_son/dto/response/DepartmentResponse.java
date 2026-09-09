@@ -6,6 +6,7 @@ import lombok.Getter;
 import lombok.experimental.FieldDefaults;
 
 import java.time.LocalDateTime;
+import java.util.Set;
 
 @Getter
 @Builder
@@ -15,6 +16,7 @@ public class DepartmentResponse {
     String name;
     String code;
     String description;
+    Set<String> allowedResources;
     LocalDateTime createdAt;
     LocalDateTime updatedAt;
 }

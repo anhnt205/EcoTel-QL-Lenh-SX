@@ -33,6 +33,7 @@ const VehiclesPage = lazy(() => import("@/modules/vehicles/Vehicles"));
 const MachinePage = lazy(() => import("@/modules/machine/Machine"));
 const ShiftsPage = lazy(() => import("@/modules/shifts/Shifts"));
 const UsersPage = lazy(() => import("@/modules/users/Users"));
+const PositionsPage = lazy(() => import("@/modules/positions/Positions"));
 
 // 5 danh mục dùng chung CatalogPage (cấu hình trong modules/catalog/configs.ts)
 const ExcavationAreasPage = lazy(() => import("@/modules/catalog/pages/ExcavationAreas"));
@@ -158,6 +159,14 @@ export const mainRoutes = (
         element={
           <Suspense fallback={<PageLoader />}>
             <UsersPage />
+          </Suspense>
+        }
+      />
+      <Route
+        path={ROUTES.DANH_MUC.CHUC_VU}
+        element={
+          <Suspense fallback={<PageLoader />}>
+            <PositionsPage />
           </Suspense>
         }
       />

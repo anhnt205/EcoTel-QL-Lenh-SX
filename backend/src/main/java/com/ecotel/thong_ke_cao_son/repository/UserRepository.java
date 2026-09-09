@@ -35,4 +35,10 @@ public interface UserRepository extends JpaRepository<User, Long> {
     Page<User> search(@Param("keyword") String keyword, @Param("departmentId") Long departmentId, Pageable pageable);
 
     Optional<User> findBySalaryCode(String salaryCode);
+
+    boolean existsByPosition_Id(Long positionId);
+
+    boolean existsByUsernameAndIdNot(String username, Long id);
+
+    boolean existsBySalaryCodeAndIdNot(String salaryCode, Long id);
 }

@@ -31,17 +31,37 @@ export interface User {
 }
 
 export interface Department {
-  _id: string;
+  _id?: string;
+  id?: number;
   name: string;
   code: string;
   description?: string;
+  /** Danh sách resource (xem PositionPermissionKey) phòng ban được phép dùng. */
+  allowedResources?: string[];
   createdAt?: string;
   updatedAt?: string;
 }
+
+/** 1 dòng quyền C/R/U/D/A của Chức vụ trên 1 resource. */
+export interface PositionPermissionItem {
+  resource: string;
+  c: boolean;
+  r: boolean;
+  u: boolean;
+  d: boolean;
+  a: boolean;
+}
+
 export interface Position {
-  _id: string;
+  _id?: string;
+  id?: number;
+  code: string;
   name: string;
+  description?: string;
   note?: string;
+  departmentId?: number;
+  departmentName?: string;
+  permissions?: PositionPermissionItem[];
   createdAt?: string;
   updatedAt?: string;
 }

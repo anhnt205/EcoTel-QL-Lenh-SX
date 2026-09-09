@@ -1,6 +1,9 @@
 package com.ecotel.thong_ke_cao_son.security;
 
+import com.ecotel.thong_ke_cao_son.model.Position;
+import com.ecotel.thong_ke_cao_son.model.PositionPermission;
 import com.ecotel.thong_ke_cao_son.model.User;
+import com.ecotel.thong_ke_cao_son.repository.PositionPermissionRepository;
 import com.ecotel.thong_ke_cao_son.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -15,8 +18,8 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * Đăng nhập CỤC BỘ — chế độ chạy độc lập, không cần Portal.
@@ -35,6 +38,7 @@ import java.util.Map;
 public class LocalAuthService {
 
     private final UserRepository userRepository;
+    private final PositionPermissionRepository positionPermissionRepository;
     private final PasswordEncoder passwordEncoder;
 
     @Value("${app.auth.jwt-secret}")
@@ -48,30 +52,6 @@ public class LocalAuthService {
 
     @Value("${app.code:tkcs}")
     private String appCode;
-
-    /**
-     * Các resource mà ứng dụng đang có. Dùng để dựng claim {@code permissions}
-     * của token cục bộ — PHẢI khớp đúng {@code resource} khai ở
-     * {@code @RequirePermission} trên từng controller, nếu không
-     * {@link AppUserDetails#hasPermission} luôn trả {@code false} cho resource
-     * thiếu tên (chặn nhầm cả ADMIN).
-     *
-     * <p>{@code positions} và {@code device-types} chưa có controller tương
-     * ứng — giữ lại phòng khi thêm, không gây hại vì permission chỉ nằm trong
-     * JWT, không tự tạo ra endpoint nào.
-     */
-    private static final List<String> RESOURCES = List.of(
-            "users", "departments", "positions", "shifts", "locations",
-            "devices", "device-types", "materials", "cargo-groups", "cargo-types",
-            "excavation-reports", "transport-reports", "reconciliation",
-            "acceptance-products", "classifications", "coefficients",
-            "density-parameters", "device-production-attributes", "excavation-areas",
-            "matrix-catalogs", "model-periods", "pickup-points", "production",
-            "receiving-points", "report-periods", "seam-groups", "survey-standards",
-            "ttl-clh-items", "unloading-points", "vehicle-category-classes",
-            "vehicle-fuel-classes", "vehicle-rank-groups", "vehicle-ranks",
-            "vehicle-types"
-    );
 
     public record TokenPair(String appToken, String refreshToken) {}
 
@@ -145,28 +125,40 @@ public class LocalAuthService {
     }
 
     /**
-     * Quy đổi {@code Role} sang bộ quyền theo resource.
+     * Dựng bộ quyền theo resource TỪ CHỨC VỤ của user (data-driven, thay hẳn
+     * {@code Role} tĩnh cũ — chủ dự án chốt 2026-09-10: mọi tài khoản mới tạo
+     * chỉ chọn Chức vụ, không chọn Role; tài khoản {@code admin}/{@code xemthu}
+     * seed sẵn được gán Chức vụ "Quản trị hệ thống" có đủ quyền trên mọi
+     * resource — xem {@code seed-danh-muc-he-thong.sql} — để không bị khoá
+     * ngay khi đổi cơ chế này.
      *
      * <p>Từ 2026-09-07: {@code PermissionFilter} thật sự gate theo bộ quyền
      * này — mọi controller nghiệp vụ đã gắn {@code @RequirePermission}, và
      * endpoint thiếu annotation bị từ chối mặc định (fail-closed) thay vì
-     * cho qua. EMPLOYEE chỉ đọc (r); MANAGER thêm được tạo/sửa (c/u); xoá
-     * và quyền quản trị (d/a) chỉ ADMIN.
+     * cho qua.
+     *
+     * <p>User CHƯA được gán Chức vụ (Phòng Nhân sự chưa kịp cấu hình) chỉ
+     * được xem (r), không thao tác gì — an toàn hơn hẳn "chặn đăng nhập" mà
+     * không lộ ra lỗi khó hiểu cho người mới tạo tài khoản.
      */
     private Map<String, Map<String, Boolean>> permissionsFor(User user) {
-        String role = user.getRole() != null ? user.getRole().name() : "EMPLOYEE";
-        boolean all = "ADMIN".equals(role);
-        boolean write = all || "MANAGER".equals(role);
+        Position position = user.getPosition();
+        Map<String, PositionPermission> byResource = position == null
+                ? Map.of()
+                : positionPermissionRepository.findByPosition_Id(position.getId()).stream()
+                        .collect(Collectors.toMap(PositionPermission::getResource, p -> p));
 
         Map<String, Map<String, Boolean>> perms = new LinkedHashMap<>();
-        for (String resource : RESOURCES) {
-            perms.put(resource, Map.of(
-                    "c", write,
-                    "r", true,
-                    "u", write,
-                    "d", all,
-                    "a", all
-            ));
+        for (String resource : PermissionResources.ALL) {
+            PositionPermission p = byResource.get(resource);
+            perms.put(resource, p == null
+                    ? Map.of("c", false, "r", position == null, "u", false, "d", false, "a", false)
+                    : Map.of(
+                            "c", p.isCanCreate(),
+                            "r", p.isCanRead(),
+                            "u", p.isCanUpdate(),
+                            "d", p.isCanDelete(),
+                            "a", p.isCanApprove()));
         }
         return perms;
     }

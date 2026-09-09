@@ -1,7 +1,7 @@
 import type { ColumnDef } from "@tanstack/react-table";
 import type { User } from "@/types";
 import { Button } from "@/components/ui/button";
-import { Edit2, Shield, CheckCircle, XCircle } from "lucide-react";
+import { Edit2, CheckCircle, XCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 interface ColumnOptions {
@@ -56,16 +56,6 @@ export const getUserColumns = ({
     accessorKey: "email",
     header: "Email",
     cell: ({ row }) => row.original.email || "—",
-  },
-  {
-    accessorKey: "role",
-    header: "Vai trò",
-    cell: ({ row }) => (
-      <Badge variant="outline" className="gap-1 bg-slate-50 font-normal">
-        <Shield className="w-3 h-3 text-blue-600" />
-        {row.original.role || "USER"}
-      </Badge>
-    ),
   },
   {
     accessorKey: "active",
