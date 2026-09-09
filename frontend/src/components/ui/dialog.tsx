@@ -6,11 +6,24 @@ import { Dialog as DialogPrimitive } from "radix-ui"
 import { cn } from "@/utils/cn"
 import { Button } from "@/components/ui/button"
 import { XIcon } from "lucide-react"
+import { useIsTabActive } from "@/layouts/tab-active-context"
 
 function Dialog({
+  open,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Root>) {
-  return <DialogPrimitive.Root data-slot="dialog" {...props} />
+  // Trang bị ẩn (đang ở tab khác) thì tạm ẩn luôn modal của nó. Modal render ra
+  // thẳng document.body qua portal nên không bị CSS ẩn trang che — không chặn ở
+  // đây thì modal của tab cũ sẽ nổi đè lên tab đang xem.
+  //
+  // Chỉ can thiệp khi modal được điều khiển bằng prop `open`: ta ép hiển thị
+  // false chứ KHÔNG đụng vào state của trang, nên quay lại tab là modal hiện
+  // lại nguyên chỗ đang dở. Modal không truyền `open` (tự quản lý) giữ nguyên
+  // hành vi cũ.
+  const isTabActive = useIsTabActive()
+  const effectiveOpen = open === undefined ? undefined : open && isTabActive
+
+  return <DialogPrimitive.Root data-slot="dialog" open={effectiveOpen} {...props} />
 }
 
 function DialogTrigger({
