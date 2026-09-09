@@ -68,6 +68,25 @@ export const transportReportRequestSchema = z.object({
 export type TransportReportTripRequest = z.infer<
   typeof transportReportTripRequestSchema
 >;
+
+/**
+ * Payload sửa 1 chuyến: ngoài các trường cấp chuyến còn kèm 4 trường cấp PHIẾU
+ * (Ngày, Ca, Số xe, Số thẻ lương). Bắt buộc phải khai ở schema — `.parse()` của
+ * zod CẮT BỎ mọi key không khai báo, nên trước đây dù form có gửi kèm Ca thì
+ * cũng bị loại sạch trước khi ra khỏi trình duyệt. Backend nhận 4 trường này để
+ * chuyển chuyến sang phiếu đúng. Chốt 2026-09-09.
+ */
+export const transportReportTripUpdateRequestSchema =
+  transportReportTripRequestSchema.extend({
+    reportDate: z.string().optional(),
+    shiftId: z.number().optional(),
+    vehicleId: z.number().optional(),
+    employeeId: z.number().optional(),
+  });
+
+export type TransportReportTripUpdateRequest = z.infer<
+  typeof transportReportTripUpdateRequestSchema
+>;
 export type TransportReportRequest = z.infer<
   typeof transportReportRequestSchema
 >;
@@ -652,9 +671,9 @@ export interface TripBulkUpdateItem {
  */
 export async function updateTransportTrip(
   tripId: number,
-  payload: TransportReportTripRequest,
+  payload: TransportReportTripUpdateRequest,
 ): Promise<ApiResponse<TransportReportTripResponse>> {
-  const validatedPayload = transportReportTripRequestSchema.parse(payload);
+  const validatedPayload = transportReportTripUpdateRequestSchema.parse(payload);
   const res = await api.put(`/transport-reports/trips/${tripId}`, validatedPayload);
   return res.data;
 }
@@ -886,7 +905,7 @@ export function useUpdateTransportTripMutation() {
       payload,
     }: {
       tripId: number;
-      payload: TransportReportTripRequest;
+      payload: TransportReportTripUpdateRequest;
     }) => updateTransportTrip(tripId, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["transportReports"] });

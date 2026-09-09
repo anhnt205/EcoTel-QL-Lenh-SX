@@ -4,6 +4,7 @@ import com.ecotel.thong_ke_cao_son.annotation.RequirePermission;
 import com.ecotel.thong_ke_cao_son.dto.request.BulkDeleteRequest;
 import com.ecotel.thong_ke_cao_son.dto.request.ExcavationReportRequest;
 import com.ecotel.thong_ke_cao_son.dto.request.ExcavationReportTripRequest;
+import com.ecotel.thong_ke_cao_son.dto.request.ExcavationReportTripUpdateRequest;
 import com.ecotel.thong_ke_cao_son.dto.request.ExcavationTripBulkUpdateItem;
 import com.ecotel.thong_ke_cao_son.dto.response.*;
 import com.ecotel.thong_ke_cao_son.excel.ExcavationReportExcelExporter;
@@ -114,7 +115,7 @@ public class ExcavationReportController {
     @PutMapping("/trips/{tripId}")
     public ApiResponse<ExcavationReportTripResponse> updateTrip(
             @PathVariable Long tripId,
-            @Valid @RequestBody ExcavationReportTripRequest request) {
+            @Valid @RequestBody ExcavationReportTripUpdateRequest request) {
         return ApiResponse.success(excavationReportService.updateTrip(tripId, request));
     }
 

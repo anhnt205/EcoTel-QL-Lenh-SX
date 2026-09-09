@@ -310,9 +310,41 @@ export const TransportHeaderDetailModal: React.FC<
           rawReceivingPoints,
           rawUnloadingPoints,
         });
+
+        // Ngày/Ca/Số xe/Số thẻ lương nằm trên PHIẾU chứ không trên chuyến —
+        // phải gửi kèm thì backend mới chuyển chuyến sang phiếu đúng được.
+        // Thiếu chúng thì người dùng đổi Ca xong bấm lưu vẫn thấy Ca cũ, mà
+        // API vẫn báo thành công (lỗi thật đã gặp). Chốt 2026-09-09.
+        const shiftItem = rawShifts.find(
+          (s: any) =>
+            String(s.name) === String(sess.shift) ||
+            String(s.id) === String(sess.shift) ||
+            String(s.name).replace(/^ca\s+/i, "").trim() ===
+              String(sess.shift).replace(/^ca\s+/i, "").trim(),
+        );
+        const vehicleItem = rawVehicles.find(
+          (v: any) =>
+            v.code === sess.vehicleNo ||
+            v.vehicleNumber === sess.vehicleNo ||
+            v.name === sess.vehicleNo ||
+            String(v.id) === String(sess.vehicleNo),
+        );
+        const userItem = rawUsers.find(
+          (u: any) =>
+            u.salaryCode === sess.operatorBadgeNo ||
+            u.username === sess.operatorBadgeNo ||
+            String(u.id) === String(sess.operatorBadgeNo),
+        );
+
         await updateTransportTripMutation.mutateAsync({
           tripId: sess.singleTripId!,
-          payload: tripPayload,
+          payload: {
+            ...tripPayload,
+            reportDate: sess.workingDate || undefined,
+            shiftId: shiftItem ? Number(shiftItem.id) : undefined,
+            vehicleId: vehicleItem ? Number(vehicleItem.id) : undefined,
+            employeeId: userItem ? Number(userItem.id) : undefined,
+          },
         });
         toast.success("Đã cập nhật chuyến thành công!");
         onSuccess();

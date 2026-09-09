@@ -50,6 +50,24 @@ export const excavationTripReportRequestSchema = z.object({
 export type ExcavationTripReportTripRequest = z.infer<
   typeof excavationTripReportTripRequestSchema
 >;
+
+/**
+ * Payload sửa 1 chuyến Khai thác — xem javadoc bản Vận tải
+ * (`transportReportTripUpdateRequestSchema`) cho lý do đầy đủ. Phiếu Khai thác
+ * định danh bằng (Ngày, Ca, MÁY XÚC, Số thẻ lương); `vehicleId` đã có sẵn ở
+ * cấp chuyến nên không lặp lại ở đây.
+ */
+export const excavationTripReportTripUpdateRequestSchema =
+  excavationTripReportTripRequestSchema.extend({
+    reportDate: z.string().optional(),
+    shiftId: z.number().optional(),
+    excavatorDeviceId: z.number().optional(),
+    employeeId: z.number().optional(),
+  });
+
+export type ExcavationTripReportTripUpdateRequest = z.infer<
+  typeof excavationTripReportTripUpdateRequestSchema
+>;
 export type ExcavationTripReportRequest = z.infer<
   typeof excavationTripReportRequestSchema
 >;
@@ -539,9 +557,10 @@ export interface ExcavationTripBulkUpdateItem {
  */
 export async function updateExcavationTrip(
   tripId: number,
-  payload: ExcavationTripReportTripRequest,
+  payload: ExcavationTripReportTripUpdateRequest,
 ): Promise<ApiResponse<ExcavationReportTripResponse>> {
-  const validatedPayload = excavationTripReportTripRequestSchema.parse(payload);
+  const validatedPayload =
+    excavationTripReportTripUpdateRequestSchema.parse(payload);
   const res = await api.put(`/excavation-reports/trips/${tripId}`, validatedPayload);
   return res.data;
 }
@@ -762,7 +781,7 @@ export function useUpdateExcavationTripMutation() {
       payload,
     }: {
       tripId: number;
-      payload: ExcavationTripReportTripRequest;
+      payload: ExcavationTripReportTripUpdateRequest;
     }) => updateExcavationTrip(tripId, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["excavationReports"] });

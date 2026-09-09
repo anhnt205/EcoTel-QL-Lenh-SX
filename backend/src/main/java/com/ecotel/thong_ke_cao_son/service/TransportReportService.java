@@ -3,6 +3,7 @@ package com.ecotel.thong_ke_cao_son.service;
 import com.ecotel.thong_ke_cao_son.dto.request.TransportReportBulkUpdateItem;
 import com.ecotel.thong_ke_cao_son.dto.request.TransportReportRequest;
 import com.ecotel.thong_ke_cao_son.dto.request.TransportReportTripRequest;
+import com.ecotel.thong_ke_cao_son.dto.request.TransportReportTripUpdateRequest;
 import com.ecotel.thong_ke_cao_son.dto.request.TripBulkUpdateItem;
 import com.ecotel.thong_ke_cao_son.dto.response.BulkDeleteResponse;
 import com.ecotel.thong_ke_cao_son.dto.response.TransportReportResponse;
@@ -214,7 +215,7 @@ public class TransportReportService {
     }
 
     @Transactional
-    public TransportReportTripResponse updateTrip(Long tripId, TransportReportTripRequest request) {
+    public TransportReportTripResponse updateTrip(Long tripId, TransportReportTripUpdateRequest request) {
         TransportReportTrip trip = transportReportTripRepository.findById(tripId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy chuyến: " + tripId));
 
@@ -227,6 +228,7 @@ public class TransportReportService {
         }
 
         updateTripFields(trip, request);
+        moveTripToTargetReport(trip, request);
         trip.setStatus(ApprovalStatus.PENDING);
         transportReportTripRepository.save(trip);
 
@@ -234,6 +236,72 @@ public class TransportReportService {
         reconciliationService.syncTripStatusToPending(trip.getId(), true);
 
         return transportReportMapper.toTripResponse(trip);
+    }
+
+    /**
+     * Chuyển chuyến sang phiếu khác khi người dùng đổi Ngày/Ca/Số xe/Số thẻ
+     * lương ở form sửa chuyến. Bốn trường đó thuộc PHIẾU chứ không thuộc chuyến,
+     * nên không thể "sửa tại chỗ" — phải tìm phiếu đích đúng bộ khoá (chưa có
+     * thì tạo mới, chép lại số liệu nhiên liệu của phiếu cũ) rồi chuyển chuyến
+     * sang. Bỏ trống trường nào thì giữ nguyên giá trị hiện tại của trường đó.
+     *
+     * <p>Chuyển xong mà phiếu cũ không còn chuyến nào thì XOÁ phiếu cũ — đúng
+     * như {@code deleteTrip} vẫn làm khi xoá chuyến cuối cùng của một phiếu.
+     * Không xoá thì phiếu rỗng vẫn hiện thành một dòng rác khi xuất Excel
+     * ({@code TransportReportExcelExporter} cố ý ghi 1 dòng cho phiếu không có
+     * chuyến), kèm theo số liệu nhiên liệu đã được chép sang phiếu mới nên bị
+     * đếm hai lần.
+     */
+    private void moveTripToTargetReport(TransportReportTrip trip, TransportReportTripUpdateRequest request) {
+        TransportReport current = trip.getTransportReport();
+
+        LocalDate targetDate = request.getReportDate() != null
+                ? request.getReportDate() : current.getReportDate();
+        Long targetShiftId = request.getShiftId() != null
+                ? request.getShiftId() : current.getShift().getId();
+        Long targetVehicleId = request.getVehicleId() != null
+                ? request.getVehicleId() : current.getVehicle().getId();
+        Long targetEmployeeId = request.getEmployeeId() != null
+                ? request.getEmployeeId() : current.getEmployee().getId();
+
+        boolean unchanged = targetDate.equals(current.getReportDate())
+                && targetShiftId.equals(current.getShift().getId())
+                && targetVehicleId.equals(current.getVehicle().getId())
+                && targetEmployeeId.equals(current.getEmployee().getId());
+        if (unchanged) {
+            return;
+        }
+
+        TransportReport target = transportReportRepository
+                .findByReportDateAndShiftIdAndVehicleIdAndEmployeeId(
+                        targetDate, targetShiftId, targetVehicleId, targetEmployeeId)
+                .orElseGet(() -> {
+                    TransportReport created = new TransportReport();
+                    created.setReportDate(targetDate);
+                    created.setShift(shiftRepository.findById(targetShiftId)
+                            .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy ca: " + targetShiftId)));
+                    created.setVehicle(deviceRepository.findById(targetVehicleId)
+                            .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy xe: " + targetVehicleId)));
+                    created.setEmployee(userRepository.findById(targetEmployeeId)
+                            .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy nhân viên: " + targetEmployeeId)));
+                    created.setFuelBeginning(current.getFuelBeginning());
+                    created.setFuelEnding(current.getFuelEnding());
+                    created.setFuelReceived(current.getFuelReceived());
+                    created.recalculateFuelUsed();
+                    return transportReportRepository.save(created);
+                });
+
+        current.getTrips().remove(trip);
+        trip.setTransportReport(target);
+        target.getTrips().add(trip);
+        transportReportRepository.save(target);
+
+        // Đẩy khoá ngoại mới của chuyến xuống DB TRƯỚC khi xoá phiếu cũ, nếu
+        // không sẽ vi phạm ràng buộc khoá ngoại lúc flush.
+        transportReportTripRepository.saveAndFlush(trip);
+        if (current.getTrips().isEmpty()) {
+            transportReportRepository.delete(current);
+        }
     }
 
     @Transactional

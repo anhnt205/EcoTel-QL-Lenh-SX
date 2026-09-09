@@ -2,6 +2,7 @@ package com.ecotel.thong_ke_cao_son.service;
 
 import com.ecotel.thong_ke_cao_son.dto.request.ExcavationReportRequest;
 import com.ecotel.thong_ke_cao_son.dto.request.ExcavationReportTripRequest;
+import com.ecotel.thong_ke_cao_son.dto.request.ExcavationReportTripUpdateRequest;
 import com.ecotel.thong_ke_cao_son.dto.request.ExcavationTripBulkUpdateItem;
 import com.ecotel.thong_ke_cao_son.dto.response.BulkDeleteResponse;
 import com.ecotel.thong_ke_cao_son.dto.response.ExcavationReportBulkUpdateItem;
@@ -188,7 +189,7 @@ public class ExcavationReportService {
     }
 
     @Transactional
-    public ExcavationReportTripResponse updateTrip(Long tripId, ExcavationReportTripRequest request) {
+    public ExcavationReportTripResponse updateTrip(Long tripId, ExcavationReportTripUpdateRequest request) {
         ExcavationReportTrip trip = excavationReportTripRepository.findById(tripId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy chuyến: " + tripId));
 
@@ -201,6 +202,7 @@ public class ExcavationReportService {
         }
 
         updateTripFields(trip, request);
+        moveTripToTargetReport(trip, request);
         trip.setStatus(ApprovalStatus.PENDING);
         excavationReportTripRepository.save(trip);
 
@@ -208,6 +210,67 @@ public class ExcavationReportService {
         reconciliationService.syncTripStatusToPending(trip.getId(), false);
 
         return excavationReportMapper.toTripResponse(trip);
+    }
+
+    /**
+     * Bản đối xứng của {@code TransportReportService.moveTripToTargetReport} —
+     * xem javadoc bên đó. Phiếu Khai thác định danh bằng (Ngày, Ca, Máy xúc,
+     * Số thẻ lương); "Số xe" là trường cấp chuyến nên do
+     * {@code updateTripFields} xử lý, không liên quan tới việc chuyển phiếu.
+     */
+    private void moveTripToTargetReport(ExcavationReportTrip trip, ExcavationReportTripUpdateRequest request) {
+        ExcavationReport current = trip.getExcavationReport();
+
+        LocalDate targetDate = request.getReportDate() != null
+                ? request.getReportDate() : current.getReportDate();
+        Long targetShiftId = request.getShiftId() != null
+                ? request.getShiftId() : current.getShift().getId();
+        Long targetExcavatorId = request.getExcavatorDeviceId() != null
+                ? request.getExcavatorDeviceId() : current.getExcavatorDevice().getId();
+        Long targetEmployeeId = request.getEmployeeId() != null
+                ? request.getEmployeeId() : current.getEmployee().getId();
+
+        boolean unchanged = targetDate.equals(current.getReportDate())
+                && targetShiftId.equals(current.getShift().getId())
+                && targetExcavatorId.equals(current.getExcavatorDevice().getId())
+                && targetEmployeeId.equals(current.getEmployee().getId());
+        if (unchanged) {
+            return;
+        }
+
+        ExcavationReport target = excavationReportRepository
+                .findByReportDateAndShiftIdAndExcavatorDeviceIdAndEmployeeId(
+                        targetDate, targetShiftId, targetExcavatorId, targetEmployeeId)
+                .orElseGet(() -> {
+                    ExcavationReport created = new ExcavationReport();
+                    created.setReportDate(targetDate);
+                    created.setShift(shiftRepository.findById(targetShiftId)
+                            .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy ca: " + targetShiftId)));
+                    created.setExcavatorDevice(deviceRepository.findById(targetExcavatorId)
+                            .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy máy xúc: " + targetExcavatorId)));
+                    created.setEmployee(userRepository.findById(targetEmployeeId)
+                            .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy nhân viên: " + targetEmployeeId)));
+                    created.setExcavationFloor(current.getExcavationFloor());
+                    created.setReceivingLocation(current.getReceivingLocation());
+                    created.setFuelBeginning(current.getFuelBeginning());
+                    created.setFuelEnding(current.getFuelEnding());
+                    created.setFuelReceived(current.getFuelReceived());
+                    created.recalculateFuelUsed();
+                    return excavationReportRepository.save(created);
+                });
+
+        current.getTrips().remove(trip);
+        trip.setExcavationReport(target);
+        target.getTrips().add(trip);
+        excavationReportRepository.save(target);
+
+        // Xem chú thích bên TransportReportService: flush khoá ngoại mới trước,
+        // rồi mới xoá phiếu cũ nếu nó đã rỗng (tránh dòng rác khi xuất Excel và
+        // nhiên liệu bị đếm hai lần).
+        excavationReportTripRepository.saveAndFlush(trip);
+        if (current.getTrips().isEmpty()) {
+            excavationReportRepository.delete(current);
+        }
     }
 
     @Transactional

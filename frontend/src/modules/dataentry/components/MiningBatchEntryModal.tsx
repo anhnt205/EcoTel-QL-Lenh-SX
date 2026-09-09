@@ -307,9 +307,39 @@ export const MiningBatchEntryModal: React.FC<MiningBatchEntryModalProps> = ({
           rawVehicles,
           rawCargoTypes,
         });
+
+        // Ngày/Ca/Máy xúc/Số thẻ lương nằm trên PHIẾU chứ không trên chuyến —
+        // phải gửi kèm thì backend mới chuyển chuyến sang phiếu đúng được (bản
+        // đối xứng của form Vận tải, cùng lỗi, cùng cách sửa). Chốt 2026-09-09.
+        const shiftItem = rawShifts.find(
+          (s: any) =>
+            String(s.name) === String(sess.shift) ||
+            String(s.id) === String(sess.shift),
+        );
+        const excavatorItem = rawExcavators.find(
+          (d: any) =>
+            d.code === sess.excavator ||
+            d.name === sess.excavator ||
+            String(d.id) === String(sess.excavator),
+        );
+        const userItem = rawUsers.find(
+          (u: any) =>
+            u.salaryCode === sess.operatorBadgeNo ||
+            u.username === sess.operatorBadgeNo ||
+            String(u.id) === String(sess.operatorBadgeNo),
+        );
+
         await updateExcavationTripMutation.mutateAsync({
           tripId: sess.singleTripId!,
-          payload: tripPayload,
+          payload: {
+            ...tripPayload,
+            reportDate: sess.workingDate || undefined,
+            shiftId: shiftItem ? Number(shiftItem.id) : undefined,
+            excavatorDeviceId: excavatorItem
+              ? Number(excavatorItem.id)
+              : undefined,
+            employeeId: userItem ? Number(userItem.id) : undefined,
+          },
         });
         toast.success("Đã cập nhật chuyến thành công!");
         onSuccess();
