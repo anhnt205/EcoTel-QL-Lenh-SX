@@ -409,9 +409,9 @@ export const ReconciliationComparisonTables: React.FC<
                 if (isSelected) {
                   rowBg = "bg-blue-100/80 hover:bg-blue-100 dark:bg-blue-900/50 dark:hover:bg-blue-900/60";
                 } else if (isRevisionRequested) {
-                  rowBg = "bg-red-50 hover:bg-red-100/70 dark:bg-red-950/40 dark:hover:bg-red-900/50";
+                  rowBg = "bg-red-100 hover:bg-red-200/80 dark:bg-red-950/40 dark:hover:bg-red-900/50";
                 } else if (isAwaitingReapproval) {
-                  rowBg = "bg-amber-50 hover:bg-amber-100/70 dark:bg-amber-950/40 dark:hover:bg-amber-900/50";
+                  rowBg = "bg-amber-100 hover:bg-amber-200/80 dark:bg-amber-950/40 dark:hover:bg-amber-900/50";
                 } else {
                   rowBg = "hover:bg-gray-50/70 dark:hover:bg-gray-800/40";
                 }
@@ -444,9 +444,9 @@ export const ReconciliationComparisonTables: React.FC<
                       if (isSelected) {
                         cellBg = "bg-blue-100/80 dark:bg-blue-900/50";
                       } else if (isRevisionRequested) {
-                        cellBg = "bg-red-50 dark:bg-red-950/40";
+                        cellBg = "bg-red-100 dark:bg-red-950/40";
                       } else if (isAwaitingReapproval) {
-                        cellBg = "bg-amber-50 dark:bg-amber-950/40";
+                        cellBg = "bg-amber-100 dark:bg-amber-950/40";
                       } else if (isGroupTransport) {
                         cellBg = "bg-emerald-50/50 dark:bg-emerald-950/25";
                       } else if (isGroupMining) {
