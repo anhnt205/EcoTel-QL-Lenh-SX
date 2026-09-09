@@ -33,6 +33,7 @@ riêng — cần kiểm lại khi implement.
 | QĐ-18 | Luồng trạng thái + màu dòng ở màn Đối chiếu |
 | QĐ-19 | Chuyển trang KHÔNG được mất việc đang làm dở (tab + giữ trang sống) |
 | QĐ-20 | Gom nhóm Danh mục + bỏ 6 danh mục không dùng/trùng lặp |
+| QĐ-21 | "Báo chuyến" chỉ hiện dòng CẢ HAI bên đã duyệt xong |
 | **TG-01** | **TẠM GÁC — ngoại lệ `+15` và biến thể công thức Nhóm tầng** |
 
 ---
@@ -744,3 +745,39 @@ backup.
 `model_periods` rỗng, engine KHÔNG đọc) và "Mô hình (lưới đầy đủ)" cũ (101 ô dữ
 liệu thật, `TripBaseCalculator` đang đọc). Chủ dự án chốt **để nguyên, tính
 sau** vì đấu trang mới vào engine là việc lớn đụng thẳng vào tính sản lượng.
+
+---
+
+## QĐ-21 (2026-09-09) — "Báo chuyến" chỉ hiện dòng CẢ HAI bên đã duyệt xong
+
+**Bối cảnh:** chủ dự án báo sửa 1 chuyến Vận tải đã duyệt, "Lưu và gửi" xong
+không thấy hiện ở Báo chuyến. Soát toàn luồng (Vận tải/Khai thác → Đối chiếu →
+Duyệt → Sửa → Gửi lại → Báo chuyến → Báo cáo) phát hiện 2 tầng:
+
+1. Đúng thiết kế (QĐ-17): sửa chuyến đã duyệt đưa về `PENDING`, cần Thống kê
+   duyệt lại mới hiện lại ở Báo chuyến — không tự động.
+2. **Lỗ hổng thật, nghiêm trọng hơn:** `ReconciliationService.search()` lọc
+   `status=APPROVED` (nơi DUY NHẤT gọi là trang Báo chuyến) dùng **OR theo
+   từng bên riêng lẻ** — chỉ cần 1 trong 2 bên APPROVED là đủ hiện dòng, không
+   đòi cả cặp. Tái hiện được bằng dữ liệu thật: duyệt LỆCH chỉ 1 bên (qua
+   đường "Yêu cầu chỉnh sửa" chỉ nhắm 1 bên) khiến dòng hiện "Đã duyệt" ở Báo
+   chuyến dù bên kia **chưa từng được ai duyệt** — sai nguyên tắc QĐ-16.
+
+**Quyết định:** lọc APPROVED ở Báo chuyến đòi **CẢ HAI bên cùng APPROVED**
+khi dòng có đủ cả 2 bên. Dòng chỉ có 1 bên (chưa ghép cặp, bên kia null) vẫn
+chỉ cần đúng bên đó APPROVED, không đòi ghép cặp giả.
+
+**Hệ quả thiết kế:** sửa đúng 1 chỗ (`ReconciliationService.search()`), vì đây
+là nơi DUY NHẤT gọi tham số lọc này — không đụng bộ đếm/thẻ lọc ở màn Đối
+chiếu (tự tính client-side từ `reconciliationStatus`, không qua API này). Các
+trạng thái lọc khác (`PENDING`, `REVISION_REQUESTED`) giữ nguyên OR — "còn ít
+nhất 1 bên ở trạng thái đó" vẫn đúng ý nghĩa, và hiện không ai gọi filter đó
+ngoài APPROVED.
+
+**Điểm cần lưu ý:** gốc rễ sâu hơn vẫn còn — `saveDecisions`/`buildDecision`
+cho phép `decision.status = APPROVED` dù request chỉ gửi 1 bên, trong khi
+decision đã gắn cả 2 bên từ trước (giữ nguyên FK cũ). Nghĩa là **màu trắng
+"Đã duyệt" ở chính màn Đối chiếu** (không chỉ Báo chuyến) vẫn có thể sai lệch
+theo đúng cơ chế này nếu có đường gọi nào set APPROVED lệch 1 bên. Chưa sửa ở
+tầng này — phạm vi lượt này chỉ chốt đúng phần Báo chuyến đã hỏi chủ dự án.
+Cần bàn riêng nếu muốn chặn tận gốc ở `saveDecisions`.
