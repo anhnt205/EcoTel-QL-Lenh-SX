@@ -32,6 +32,7 @@ riêng — cần kiểm lại khi implement.
 | QĐ-17 | Chuyến đã duyệt phải qua "yêu cầu sửa" mới được sửa |
 | QĐ-18 | Luồng trạng thái + màu dòng ở màn Đối chiếu |
 | QĐ-19 | Chuyển trang KHÔNG được mất việc đang làm dở (tab + giữ trang sống) |
+| QĐ-22 | Đối chiếu tự cập nhật realtime qua WebSocket, không cần reload |
 | QĐ-20 | Gom nhóm Danh mục + bỏ 6 danh mục không dùng/trùng lặp |
 | QĐ-21 | "Báo chuyến" chỉ hiện dòng CẢ HAI bên đã duyệt xong |
 | **TG-01** | **TẠM GÁC — ngoại lệ `+15` và biến thể công thức Nhóm tầng** |
@@ -781,3 +782,46 @@ decision đã gắn cả 2 bên từ trước (giữ nguyên FK cũ). Nghĩa là
 theo đúng cơ chế này nếu có đường gọi nào set APPROVED lệch 1 bên. Chưa sửa ở
 tầng này — phạm vi lượt này chỉ chốt đúng phần Báo chuyến đã hỏi chủ dự án.
 Cần bàn riêng nếu muốn chặn tận gốc ở `saveDecisions`.
+
+---
+
+## QĐ-22 (2026-09-10) — Đối chiếu tự cập nhật realtime qua WebSocket, không cần reload
+
+**Bối cảnh:** chủ dự án: "khi thông tin được sửa ở vận tải hoặc khai thác sẽ
+tự động cập nhật luôn ở đối chiếu, màu thay đổi luôn. Hiện tại tôi phải reload
+lại trang mới lên." Kèm yêu cầu quan trọng: "làm sao để tôi deploy lên server
+sẽ chạy được luôn" — giải pháp phải tự chứa trong repo dự án, không phụ thuộc
+hạ tầng riêng của máy dev.
+
+**Quyết định:** dùng WebSocket (Spring STOMP), nhưng CHỈ làm kênh báo hiệu
+"có gì đó vừa đổi" — KHÔNG đẩy dữ liệu nghiệp vụ qua socket. Client nhận tín
+hiệu rồi tự gọi lại đúng API tìm kiếm đã có sẵn.
+
+**Lý do thiết kế này (quan trọng, đừng đổi sang đẩy dữ liệu qua socket sau
+này mà không cân nhắc lại):** màu dòng/trạng thái tính từ đúng MỘT chỗ duy
+nhất (`ReconciliationService.search`, đã test kỹ ở QĐ-18/QĐ-21). Nếu đẩy dữ
+liệu qua socket sẽ tạo ĐƯỜNG THỨ HAI phải tính lại cùng logic đó — hai đường
+dễ lệch nhau theo thời gian khi 1 bên được sửa mà quên sửa bên kia.
+
+**Hệ quả thiết kế:**
+- Mount ở `/api/ws` — CỐ Ý trùng tiền tố với REST, đi qua ĐÚNG block
+  `location /api/` đã có sẵn ở nginx (chỉ thêm 3 dòng nâng cấp giao thức),
+  không mở location mới. Deploy server thật không cần thêm cấu hình ngoài
+  2 file `nginx_preview.conf`/`nginx_staging.conf` đã sửa sẵn trong repo.
+- Xác thực JWT dời sang lúc client gửi frame STOMP `CONNECT` (không phải lúc
+  bắt tay HTTP — trình duyệt không cho gắn header `Authorization` vào
+  `WebSocket` constructor). Tái dùng đúng `JwtDecoder` bean có sẵn.
+- **Chỉ gửi tín hiệu SAU KHI transaction đã COMMIT** (`@TransactionalEventListener(AFTER_COMMIT)`).
+  Gửi sớm hơn sẽ khiến client refetch trước khi dữ liệu mới thật sự nằm trong
+  CSDL — đọc lại đúng số cũ, tín hiệu vô nghĩa và rất khó tái hiện khi gỡ lỗi
+  sau này.
+- Mọi đường có thể đổi dữ liệu ảnh hưởng Đối chiếu đều phải bắn tín hiệu:
+  `TransportReportService`/`ExcavationReportService` (mọi method ghi, cấp
+  phiếu lẫn cấp chuyến) và `ReconciliationService` (`saveDecisions`,
+  `resubmitTrips`, `updateTrips`).
+
+**Điểm cần lưu ý:** máy dev dùng chung 1 gateway nginx ngoài repo dự án
+(phục vụ mọi preview khác trên máy) — đã xin phép chủ dự án trước khi thêm
+3 dòng nâng cấp giao thức tương tự vào đó để test được ngay. File đó KHÔNG
+nằm trong repo này, không commit — khi deploy server thật không liên quan gì
+tới nó.
