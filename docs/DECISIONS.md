@@ -31,6 +31,7 @@ riêng — cần kiểm lại khi implement.
 | QĐ-16 | Chỉ dữ liệu đã duyệt đối chiếu mới được tính sản lượng |
 | QĐ-17 | Chuyến đã duyệt phải qua "yêu cầu sửa" mới được sửa |
 | QĐ-18 | Luồng trạng thái + màu dòng ở màn Đối chiếu |
+| QĐ-19 | Chuyển trang KHÔNG được mất việc đang làm dở (tab + giữ trang sống) |
 | **TG-01** | **TẠM GÁC — ngoại lệ `+15` và biến thể công thức Nhóm tầng** |
 
 ---
@@ -661,3 +662,40 @@ hiện ngay ở Đối chiếu, không cần thao tác "gửi lại" riêng.
 **Điểm cần lưu ý:** nút lưu ở màn nhập liệu ghi **"Lưu và gửi (F5)"** cho
 cả thêm mới lẫn chỉnh sửa — vì mọi lần lưu đều đưa chuyến về "Chờ duyệt",
 tức là đã gửi đi đối chiếu, không có khái niệm lưu nháp.
+
+---
+
+## QĐ-19 (2026-09-09) — Chuyển trang KHÔNG được mất việc đang làm dở
+
+**Bối cảnh:** đang nhập liệu Vận tải, muốn xem thông tin bên Khai thác thì phải
+tắt form đi; lúc quay lại phải nhập lại từ đầu. Mỗi lần đổi trang là toàn bộ
+trang cũ bị huỷ sạch.
+
+**Quyết định:**
+1. **7 màn làm việc chính có TAB** (Nhập liệu Khai thác, Nhập liệu Vận tải, Đối
+   chiếu, Báo chuyến, Báo cáo thống kê, Áp Trắc Địa, Định mức nhiên liệu) — mở
+   nhiều màn cùng lúc, bấm qua lại không mất việc đang làm, đóng được từng tab.
+2. **Các trang danh mục lẻ tuy KHÔNG lên thanh tab nhưng vẫn giữ dữ liệu đang
+   nhập dở** khi rời trang rồi quay lại.
+
+**Hệ quả thiết kế:**
+- Một cơ chế chung cho cả hai: `KeepAliveOutlet` thay `<Outlet/>` — giữ lại phần
+  tử React của từng trang đã vào, render tất cả và chỉ ẩn/hiện bằng CSS. Thanh
+  tab chỉ là phần NHÌN THẤY của cơ chế đó, lọc riêng 7 màn chính.
+- **Mỗi đường dẫn chỉ được chụp phần tử ĐÚNG MỘT LẦN** rồi tái sử dụng. Lấy phần
+  tử mới từ `useOutlet()` ở mỗi lần render sẽ khiến React dựng lại trang từ đầu
+  — mất sạch, đúng thứ đang muốn tránh.
+- Màn chính không bao giờ bị dọn; trang phụ chỉ giữ **3 trang gần nhất (LRU)** để
+  không phình bộ nhớ và không để truy vấn nền chạy vô tội vạ.
+- **Cái bẫy phải nhớ:** modal/dropdown của Radix render thẳng ra `document.body`
+  qua portal nên **CSS ẩn trang KHÔNG che được** — trang đang ẩn mà còn mở modal
+  thì modal đó nổi đè lên tab đang xem. Xử lý tại ĐÚNG MỘT CHỖ: component
+  `Dialog` dùng chung đọc `TabActiveContext` và tự ẩn khi tab của nó không hiện.
+  Chỉ ép hiển thị `false`, KHÔNG đụng vào state của trang, nên quay lại tab là
+  modal hiện lại đúng chỗ đang dở. Thêm loại overlay nào khác cũng phải theo
+  cách này.
+
+**Điểm cần lưu ý:** trang bị ẩn vẫn còn sống nên các truy vấn của nó vẫn có thể
+chạy nền. Hiện chấp nhận được vì `refetchOnWindowFocus` đã tắt và số trang giữ
+sống bị chặn trần. Nếu sau này thấy tải nặng thì chặn tiếp theo hướng tạm dừng
+truy vấn của tab đang ẩn, đừng quay lại kiểu huỷ trang.
