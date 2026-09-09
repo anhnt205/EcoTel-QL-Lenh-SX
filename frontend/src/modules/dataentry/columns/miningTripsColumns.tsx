@@ -61,7 +61,16 @@ export const getMiningTripsColumns = (
     enableHiding: false,
   },
   {
-    // Cột riêng ngay sau nút bút (đầu hàng) — xem chú thích ở bản Vận tải
+    id: "stt",
+    header: "STT",
+    cell: ({ row }) => (
+      <span className="text-gray-500">{row.index + 1}</span>
+    ),
+    size: 50,
+    enableSorting: false,
+  },
+  {
+    // Cột riêng, ngay sau STT (đầu hàng) — xem chú thích ở bản Vận tải
     // (transportTripsColumns.tsx), cùng lý do. Chốt 2026-09-10.
     accessorKey: "status",
     id: "status",
@@ -76,15 +85,6 @@ export const getMiningTripsColumns = (
     ),
     size: 115,
     enableHiding: false,
-  },
-  {
-    id: "stt",
-    header: "STT",
-    cell: ({ row }) => (
-      <span className="text-gray-500">{row.index + 1}</span>
-    ),
-    size: 50,
-    enableSorting: false,
   },
   {
     accessorFn: (row) => {

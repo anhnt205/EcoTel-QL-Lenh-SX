@@ -61,10 +61,18 @@ export const getTransportTripsColumns = (
     enableHiding: false,
   },
   {
-    // Cột riêng ngay sau nút bút (đầu hàng) — trước đây nằm cuối cùng bảng,
-    // phải cuộn ngang hết mới thấy dòng nào đang chờ duyệt/cần sửa. Từng thử
-    // gộp chung 1 ô với checkbox+bút nhưng nhìn chật/xấu — quay lại tách cột
-    // riêng, chỉ đổi VỊ TRÍ lên đầu. Chốt 2026-09-10.
+    id: "stt",
+    header: "STT",
+    cell: ({ row }) => (
+      <span className="text-gray-500">{row.index + 1}</span>
+    ),
+    size: 45,
+    enableSorting: false,
+  },
+  {
+    // Cột riêng, ngay sau STT (đầu hàng) — trước đây nằm cuối cùng bảng,
+    // phải cuộn ngang hết mới thấy dòng nào đang chờ duyệt/cần sửa. Chốt
+    // 2026-09-10.
     accessorKey: "status",
     id: "status",
     header: "Trạng thái",
@@ -78,15 +86,6 @@ export const getTransportTripsColumns = (
     ),
     size: 115,
     enableHiding: false,
-  },
-  {
-    id: "stt",
-    header: "STT",
-    cell: ({ row }) => (
-      <span className="text-gray-500">{row.index + 1}</span>
-    ),
-    size: 45,
-    enableSorting: false,
   },
   {
     accessorFn: (row) => {
