@@ -52,6 +52,7 @@ public class TransportReportService {
     private final CargoTypeRepository cargoTypeRepository;
     private final ReceivingFloorGroupCalculator floorGroupCalculator;
     private final TransportReportMapper transportReportMapper;
+    private final ReconciliationEventPublisher reconciliationEventPublisher;
     @Lazy
     private final ReconciliationService reconciliationService;
 
@@ -66,6 +67,7 @@ public class TransportReportService {
         }
 
         transportReportRepository.save(report);
+        reconciliationEventPublisher.publishChanged();
         return transportReportMapper.toResponse(report);
     }
 
@@ -85,6 +87,7 @@ public class TransportReportService {
         }
 
         transportReportRepository.save(report);
+        reconciliationEventPublisher.publishChanged();
         return transportReportMapper.toResponse(report);
     }
 
@@ -128,6 +131,7 @@ public class TransportReportService {
         TransportReport report = transportReportRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy báo cáo: " + id));
         transportReportRepository.delete(report);
+        reconciliationEventPublisher.publishChanged();
     }
 
     // ============ Phần resolve quan hệ — không thuộc trách nhiệm của Mapper ============
@@ -199,6 +203,7 @@ public class TransportReportService {
             throw new ResourceNotFoundException("Không tìm thấy báo cáo với ID: " + missingIds);
         }
         transportReportRepository.deleteAll(reports);
+        reconciliationEventPublisher.publishChanged();
         return BulkDeleteResponse.builder()
                 .requestedCount(ids.size())
                 .deletedCount(reports.size())
@@ -243,6 +248,7 @@ public class TransportReportService {
 
         // Sync reconciliation decision về PENDING
         reconciliationService.syncTripStatusToPending(trip.getId(), true);
+        reconciliationEventPublisher.publishChanged();
 
         return transportReportMapper.toTripResponse(trip);
     }
@@ -330,6 +336,7 @@ public class TransportReportService {
         } else {
             transportReportRepository.save(report);
         }
+        reconciliationEventPublisher.publishChanged();
     }
 
     @Transactional
@@ -355,6 +362,7 @@ public class TransportReportService {
         transportReportTripRepository.saveAll(results.stream()
                 .map(r -> transportReportTripRepository.findById(r.getId()).orElseThrow())
                 .toList());
+        reconciliationEventPublisher.publishChanged();
         return results;
     }
 
@@ -386,6 +394,7 @@ public class TransportReportService {
             }
         }
 
+        reconciliationEventPublisher.publishChanged();
         return BulkDeleteResponse.builder()
                 .requestedCount(tripIds.size())
                 .deletedCount(trips.size())

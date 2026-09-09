@@ -35,6 +35,7 @@ public class ReconciliationService {
     private final UserRepository userRepository;
     private final TransportReportRepository transportReportRepository;
     private final ExcavationReportRepository excavationReportRepository;
+    private final ReconciliationEventPublisher reconciliationEventPublisher;
 
     // ================= SEARCH (không đổi logic ghép cặp) =================
 
@@ -401,6 +402,7 @@ public class ReconciliationService {
             reconciliationDataHistoryRepository.saveAll(historyToSave);
         }
 
+        reconciliationEventPublisher.publishChanged();
         return saved.stream().map(this::toDecisionResponse).toList();
     }
 
@@ -566,6 +568,7 @@ public class ReconciliationService {
         // Xóa report rỗng SAU khi đã save report đích — đảm bảo trip đã có "nhà mới" trước khi report cũ bị xóa
         if (!transportToDelete.isEmpty()) transportReportRepository.deleteAll(transportToDelete);
         if (!excavationToDelete.isEmpty()) excavationReportRepository.deleteAll(excavationToDelete);
+        reconciliationEventPublisher.publishChanged();
     }
 
     private void applyTripUpdate(
@@ -801,6 +804,7 @@ public class ReconciliationService {
                 syncTripStatusToPending(trip.getId(), false);
             }
         }
+        reconciliationEventPublisher.publishChanged();
     }
 
     // ================= LỊCH SỬ (xem qua icon "i" ở cột Sai lệch) =================

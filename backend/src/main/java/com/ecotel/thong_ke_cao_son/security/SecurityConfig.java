@@ -36,7 +36,14 @@ public class SecurityConfig {
             // (không chỉ @PublicApi, vốn chỉ được PermissionFilter đọc SAU khi request
             // đã qua được .anyRequest().authenticated() bên dưới) — nếu không, không ai
             // đăng nhập lần đầu được vì lúc đó chưa hề có JWT để xác thực.
-            "/api/auth/**"
+            "/api/auth/**",
+            // Request bắt tay WebSocket ban đầu (GET nâng cấp giao thức) do
+            // trình duyệt tự gửi qua `new WebSocket(url)` — API này KHÔNG cho
+            // gắn header Authorization (giới hạn của trình duyệt). Xác thực
+            // JWT thật sự dời sang lúc client gửi frame STOMP CONNECT, xem
+            // WebSocketConfig — request bắt tay này KHÔNG mang dữ liệu nghiệp
+            // vụ nào, chỉ mở kết nối.
+            "/api/ws/**"
     };
 
 

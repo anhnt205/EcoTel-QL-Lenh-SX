@@ -39,6 +39,7 @@ import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 
 import { useMasterData } from "@/modules/dataentry/hooks/useMasterData";
 import { useRoleStore } from "@/stores/useRoleStore";
+import { useReconciliationLiveUpdates } from "../hooks/useReconciliationLiveUpdates";
 import {
   useReconciliationSearchQuery,
   useSaveReconciliationDecisionMutation,
@@ -65,6 +66,10 @@ const isMatchedItem = (item: ReconciliationItem) => {
 };
 
 export const ReconciliationPage: React.FC = () => {
+  // Tự cập nhật khi Vận tải/Khai thác sửa dữ liệu, hoặc khi Thống kê
+  // duyệt/yêu cầu sửa/gửi lại — không cần bấm tải lại trang (chốt 2026-09-10).
+  useReconciliationLiveUpdates();
+
   const shiftAnchorRef = useComboboxAnchor();
   const vehicleAnchorRef = useComboboxAnchor();
 

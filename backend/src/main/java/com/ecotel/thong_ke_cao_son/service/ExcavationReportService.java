@@ -49,6 +49,7 @@ public class ExcavationReportService {
     private final UserRepository userRepository;
     private final CargoTypeRepository cargoTypeRepository;
     private final ExcavationReportMapper excavationReportMapper;
+    private final ReconciliationEventPublisher reconciliationEventPublisher;
     @Lazy
     private final ReconciliationService reconciliationService;
 
@@ -63,6 +64,7 @@ public class ExcavationReportService {
         }
 
         excavationReportRepository.save(report);
+        reconciliationEventPublisher.publishChanged();
         return excavationReportMapper.toResponse(report);
     }
 
@@ -81,6 +83,7 @@ public class ExcavationReportService {
         }
 
         excavationReportRepository.save(report);
+        reconciliationEventPublisher.publishChanged();
         return excavationReportMapper.toResponse(report);
     }
 
@@ -113,6 +116,7 @@ public class ExcavationReportService {
         ExcavationReport report = excavationReportRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy báo cáo: " + id));
         excavationReportRepository.delete(report);
+        reconciliationEventPublisher.publishChanged();
     }
 
     private void applyRelations(ExcavationReport report, ExcavationReportRequest request) {
@@ -173,6 +177,7 @@ public class ExcavationReportService {
             throw new ResourceNotFoundException("Không tìm thấy báo cáo với ID: " + missingIds);
         }
         excavationReportRepository.deleteAll(reports);
+        reconciliationEventPublisher.publishChanged();
         return BulkDeleteResponse.builder()
                 .requestedCount(ids.size())
                 .deletedCount(reports.size())
@@ -215,6 +220,7 @@ public class ExcavationReportService {
 
         // Sync reconciliation decision về PENDING
         reconciliationService.syncTripStatusToPending(trip.getId(), false);
+        reconciliationEventPublisher.publishChanged();
 
         return excavationReportMapper.toTripResponse(trip);
     }
@@ -297,6 +303,7 @@ public class ExcavationReportService {
         } else {
             excavationReportRepository.save(report);
         }
+        reconciliationEventPublisher.publishChanged();
     }
 
     @Transactional
@@ -322,6 +329,7 @@ public class ExcavationReportService {
         excavationReportTripRepository.saveAll(results.stream()
                 .map(r -> excavationReportTripRepository.findById(r.getId()).orElseThrow())
                 .toList());
+        reconciliationEventPublisher.publishChanged();
         return results;
     }
 
@@ -353,6 +361,7 @@ public class ExcavationReportService {
             }
         }
 
+        reconciliationEventPublisher.publishChanged();
         return BulkDeleteResponse.builder()
                 .requestedCount(tripIds.size())
                 .deletedCount(trips.size())
