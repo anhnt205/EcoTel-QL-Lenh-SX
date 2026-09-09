@@ -1792,3 +1792,64 @@ chung, chỉ build lại `backend-service`): dùng chuyến thật `5102`
 bản ghi đã duyệt riêng (tách biệt khỏi phạm vi yêu cầu lần này, vốn
 chỉ nói "sửa"), chưa kiểm tra phía backend có chặn tương ứng hay không
 — để ngỏ cho lượt sau nếu chủ dự án yêu cầu.
+
+## Lượt 18 (2026-09-09) — Đối chiếu tách 2 dòng: form Vận tải tự điền sai "Ca 4", commit `b1f5eba`
+
+Chủ dự án báo (lần 2, sau khi lượt trước tôi trả lời chưa tới nơi): ở
+màn Đối chiếu, dòng 2 và dòng 3 đáng lẽ là CÙNG một chuyến phải gộp 1
+dòng thì lại tách làm 2 — *"Check thực sự cho tôi"*.
+
+**Quy trình truy nguyên** (không suy đoán, mỗi bước đều kiểm chứng
+sống):
+1. Đọc dữ liệu API `/api/reconciliation` → dòng 2: 09/09, **Ca 2**, xe
+   496, P30 (chỉ có Khai thác). Dòng 3: 09/09, **Ca 4**, xe 496, P30
+   (chỉ có Vận tải). ⇒ lệch đúng trường **Ca**.
+2. Nghi trùng bản ghi danh mục như vụ `"Băng tải"`/`"Băng tải."` → kiểm
+   tra bảng `shifts`: **KHÔNG trùng**, đúng 4 ca phân biệt (id 1..4,
+   name 1..4). Loại trừ giả thuyết này.
+3. Kiểm tra CSDL thô: `transport_reports.id=6153` có `shift_id=4`,
+   `excavation_reports.id=1107` có `shift_id=2` ⇒ dữ liệu lưu **thật
+   sự** lệch Ca, không phải lỗi hiển thị.
+4. Phép thử quyết định: tạo mới 2 bên (ngày 10/09) với **đúng 4 trường
+   giống hệt nhau** → `/api/reconciliation` trả **đúng 1 dòng,
+   `matched: true`** ⇒ **logic ghép cặp KHÔNG hỏng**, khoá 4 trường
+   chạy đúng. (Dữ liệu thử này đã xoá sạch ngay sau khi verify.)
+5. Vậy tại sao Ca lưu lệch? → đọc `mapSessionToRequest` (map Ca chuẩn,
+   khớp cả theo name/id/tiền tố "Ca ", không thể nhầm) → đọc tiếp
+   `TransportHeaderDetailModal`: `firstShift = shiftOptions[0]?.value`
+   dùng làm **Ca mặc định** cho mỗi phiếu Vận tải mới.
+6. Gọi thẳng `/api/shifts` → trả về **`[Ca 4, Ca 3, Ca 2, Ca 1]`** (!)
+   → `shiftOptions[0]` = **"4"**.
+
+**GỐC LỖI**: `ShiftController.getAll` để
+`@PageableDefault(sort = "id", direction = DESC)` ⇒ danh mục Ca trả
+NGƯỢC ⇒ form Vận tải **tự điền sẵn "Ca 4"** cho mọi phiếu mới, người
+nhập không để ý là lưu sai ca. Trong khi form Khai thác mặc định để
+TRỐNG (`useMiningDraftStore: shift: ""`) nên người nhập buộc phải chọn
+đúng (Ca 2). Khoá ghép cặp có Ca ⇒ hai bên vĩnh viễn không gộp được.
+**Đây là lỗi phần mềm, KHÔNG phải người dùng nhập sai.**
+
+**Đã sửa 3 chỗ**:
+- `ShiftController`: đổi `DESC` → `ASC` (Ca 1 → Ca 4). Đã grep 2 nơi
+  dùng `/shifts` (`masterDataService`, `shiftService` của màn danh mục
+  Ca) — không nơi nào truyền `sort` riêng, cả hai đều ăn theo mặc định
+  này nên đều được lợi, không nơi nào phụ thuộc thứ tự DESC.
+- `useMasterData.ts`: tự `.sort()` `shiftOptions` tăng dần theo số —
+  chống lệ thuộc thứ tự API trả về (form dùng phần tử đầu làm mặc định
+  nên thứ tự API mà đổi là lại âm thầm sai tiếp).
+- `TransportHeaderDetailModal.tsx`: bỏ hẳn mặc định tự điền, để Ca
+  **trống** bắt chọn rõ ràng — đồng bộ với form Khai thác. Ca là trường
+  bắt buộc (zod) nên để trống thì validate chặn ngay, không thể lưu
+  thiếu. (Dọn luôn biến `firstShift` không còn dùng + dependency array.)
+
+**Verify sống sau khi build lại cả backend + frontend** (dùng đúng khoá
+Docker dùng chung): `/api/shifts` trả `Ca 1..Ca 4` đúng thứ tự; mở
+modal "Thêm chuyến (F3)" thật trên UI → ô **Ca hiện "(trống)"** (không
+còn tự điền Ca 4), dropdown liệt kê **Ca 1, Ca 2, Ca 3, Ca 4** đúng thứ
+tự tăng dần.
+
+**Dữ liệu cũ của chủ dự án giữ nguyên, không tự sửa** — 2 dòng lệch Ca
+(`transport_reports.id=6153` đang Ca 4) vẫn còn nguyên vì chủ dự án nói
+sẽ **tự sửa lại Ca và gửi lại cho trùng**. Sửa xong Ca của bên Vận tải
+về Ca 2 là 2 dòng đó tự gộp thành 1 (đã chứng minh bằng phép thử ở
+bước 4).
