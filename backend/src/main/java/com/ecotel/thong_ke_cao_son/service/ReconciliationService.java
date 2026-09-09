@@ -20,6 +20,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -374,6 +375,12 @@ public class ReconciliationService {
         // `toSave` tương ứng 1:1 theo index với `requests` (chỉ append khi build không
         // lỗi, và hàm đã throw sớm ở trên nếu có lỗi).
         List<ReconciliationDataHistory> historyToSave = new ArrayList<>();
+        // Ngày báo cáo của các chuyến VỪA được duyệt (APPROVED) trong lần gọi
+        // này — dùng để tự động tính lại báo cáo sản lượng của (các) kỳ chứa
+        // những ngày đó, xem ReconciliationEventPublisher.publishApproved.
+        // Chỉ ngày, không phải mọi ngày bị đụng tới (yêu cầu sửa/gửi lại
+        // không cần kích hoạt tính lại — dữ liệu chưa "sạch" để tính).
+        Set<LocalDate> approvedReportDates = new LinkedHashSet<>();
         for (int i = 0; i < requests.size(); i++) {
             ReconciliationDecisionRequest request = requests.get(i);
             ReconciliationDecision decision = toSave.get(i);
@@ -387,6 +394,9 @@ public class ReconciliationService {
                 }
                 trip.setStatus(newStatus);
                 transportReportTripRepository.save(trip);
+                if (newStatus == ApprovalStatus.APPROVED) {
+                    approvedReportDates.add(trip.getTransportReport().getReportDate());
+                }
             }
             if (request.getExcavationReportTripId() != null) {
                 ExcavationReportTrip trip = excavationTripById.get(request.getExcavationReportTripId());
@@ -396,6 +406,9 @@ public class ReconciliationService {
                 }
                 trip.setStatus(newStatus);
                 excavationReportTripRepository.save(trip);
+                if (newStatus == ApprovalStatus.APPROVED) {
+                    approvedReportDates.add(trip.getExcavationReport().getReportDate());
+                }
             }
         }
         if (!historyToSave.isEmpty()) {
@@ -403,6 +416,7 @@ public class ReconciliationService {
         }
 
         reconciliationEventPublisher.publishChanged();
+        reconciliationEventPublisher.publishApproved(approvedReportDates);
         return saved.stream().map(this::toDecisionResponse).toList();
     }
 

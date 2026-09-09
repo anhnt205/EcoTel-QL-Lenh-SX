@@ -10,9 +10,18 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface ProductionResultRepository extends JpaRepository<ProductionResult, Long> {
+
+    /**
+     * 1 dòng bất kỳ của kỳ — chỉ để đọc {@code tkeMode} đang áp dụng (mọi
+     * dòng cùng kỳ luôn cùng chế độ, xem javadoc {@code ReportPeriod}). Dùng
+     * khi tự động tính lại (không có người dùng bấm nút chọn chế độ) —
+     * {@code ProductionAutoRecalculateListener}.
+     */
+    Optional<ProductionResult> findFirstByReportPeriod_Id(Long periodId);
 
     @Query("""
         SELECT r FROM ProductionResult r

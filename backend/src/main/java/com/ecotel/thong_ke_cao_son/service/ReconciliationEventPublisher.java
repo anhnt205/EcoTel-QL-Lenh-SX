@@ -1,9 +1,13 @@
 package com.ecotel.thong_ke_cao_son.service;
 
+import com.ecotel.thong_ke_cao_son.event.ReconciliationApprovedEvent;
 import com.ecotel.thong_ke_cao_son.event.ReconciliationChangedEvent;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
+
+import java.time.LocalDate;
+import java.util.Set;
 
 /**
  * Cổng DUY NHẤT để báo "dữ liệu ảnh hưởng tới Đối chiếu vừa đổi" — tiêm vào
@@ -27,5 +31,16 @@ public class ReconciliationEventPublisher {
 
     public void publishChanged() {
         applicationEventPublisher.publishEvent(new ReconciliationChangedEvent(this));
+    }
+
+    /**
+     * Báo "vừa duyệt xong ít nhất 1 chuyến của (các) ngày này" — kích hoạt tự
+     * động tính lại báo cáo sản lượng của (các) kỳ chứa những ngày đó, xem
+     * {@code ProductionAutoRecalculateListener}. Không gọi khi
+     * {@code reportDates} rỗng (không có gì mới được DUYỆT trong lần gọi này).
+     */
+    public void publishApproved(Set<LocalDate> reportDates) {
+        if (reportDates == null || reportDates.isEmpty()) return;
+        applicationEventPublisher.publishEvent(new ReconciliationApprovedEvent(this, reportDates));
     }
 }
