@@ -825,3 +825,97 @@ dễ lệch nhau theo thời gian khi 1 bên được sửa mà quên sửa bên
 3 dòng nâng cấp giao thức tương tự vào đó để test được ngay. File đó KHÔNG
 nằm trong repo này, không commit — khi deploy server thật không liên quan gì
 tới nó.
+
+## QĐ-23 (2026-09-10) — Phân quyền chuyển hẳn sang data-driven theo Chức vụ, bỏ Role tĩnh
+
+**Bối cảnh:** chủ dự án yêu cầu thêm màn "Danh mục Hệ thống": Phòng ban (tick
+chọn các chức năng được phép dùng), Chức vụ (thuộc 1 phòng ban, phân quyền
+C/R/U/D/A chi tiết theo từng chức năng), và Tạo tài khoản (chỉ chọn Chức vụ).
+Trước đó quyền tính tĩnh theo `Role` enum (EMPLOYEE/MANAGER/ADMIN, hard-code
+trong `LocalAuthService.permissionsFor`) — không có khái niệm "phòng ban này
+chỉ được dùng chức năng X, Y" hay "chức vụ này CRUD được gì".
+
+**Quyết định (hỏi trực tiếp chủ dự án, chọn phương án khuyến nghị cả 2 câu):**
+1. Bỏ hẳn Role khỏi việc tính quyền — không giữ Role làm lớp override song
+   song. Quyền của mọi tài khoản tính 100% từ Chức vụ (bảng
+   `position_permissions`). Tài khoản chưa gán Chức vụ → chỉ đọc (`r`) mọi
+   resource, không thao tác gì (an toàn hơn khoá hẳn tài khoản).
+2. Phòng ban là TRẦN quyền: `allowedResources` (bảng `department_resources`)
+   liệt kê chức năng phòng ban được phép đụng tới. Chức vụ thuộc phòng ban
+   chỉ được set C/R/U/D/A trong ĐÚNG tập đó — gửi lên resource ngoài tập bị
+   `PositionService` từ chối (400, liệt kê rõ resource nào ngoài phạm vi).
+
+**Bootstrap không khoá tài khoản admin:** tài khoản `admin`/`xemthu` seed sẵn
+(trước đây role=ADMIN, quyền tính tĩnh full) được gán vào 1 Chức vụ mới
+"Quản trị hệ thống" (`SUPERADMIN`, thuộc phòng ban kỹ thuật `ADMIN`) có đủ
+C/R/U/D/A trên toàn bộ resource — script `backend/seed-danh-muc-he-thong.sql`,
+CHẠY SAU khi backend đã boot ít nhất 1 lần (Hibernate `ddl-auto=update` tạo
+bảng/cột mới trước). Đã chạy trên preview, xác nhận đăng nhập lại vẫn đủ
+quyền như trước khi đổi cơ chế.
+
+**Đã dựng thử 4 vai trò thật qua chính màn hình mới (không phải chỉ code),
+đăng nhập từng tài khoản test xác nhận đúng phạm vi:**
+- **Admin** (Chức vụ Quản trị hệ thống): full mọi resource.
+- **Nhân viên vận tải**: đọc 12 danh mục phụ trợ (ca, đơn vị, vị trí, thiết
+  bị, vật tư, người dùng, loại/nhóm hàng, các điểm nhận/dỡ/chất tải) + CRUD
+  đủ `transport-reports`. Gọi `excavation-reports` → 403.
+- **Nhân viên khai thác**: y hệt 12 danh mục trên + CRUD đủ
+  `excavation-reports`. Gọi `transport-reports` → 403.
+- **Nhân viên thống kê**: 12 danh mục + `reconciliation` (r/c/u — không cần
+  `d`) + `production` (r/c — bấm "Tính lại kỳ" được) + `report-periods`
+  (r/c — KHÔNG có `a`, nên "Mở khoá kỳ" vẫn 403, cố ý chỉ dành cho Admin
+  theo đúng chủ ý gốc của QĐ-03). Gọi `transport-reports`/`excavation-reports`
+  → 403.
+
+**Lý do phải đọc kỹ 12 resource "danh mục phụ trợ" khi gán quyền cho 1 vai
+trò mới (dễ quên, gây lỗi khó hiểu "màn trắng dropdown" chứ không phải lỗi
+rõ ràng):** `useMasterData()` (`frontend/src/modules/dataentry/hooks/useMasterData.ts`)
+luôn gọi hết 13 API danh mục một lượt (ca, đơn vị, vị trí, thiết bị, vật tư,
+người dùng, loại/nhóm hàng, khu vực xúc, các điểm nhận/dỡ/chất tải) bất kể
+trang chỉ hiển thị vài trường — thiếu quyền đọc (`r`) 1 trong số đó không sập
+cả trang nhưng làm rỗng đúng dropdown liên quan, rất khó nhận ra là do thiếu
+quyền chứ không phải do thiếu dữ liệu.
+
+**Còn thiếu, NGOÀI phạm vi lần này:** `RoleGuard` phía frontend
+(`modules/auth/components/RoleGuard.tsx`) hiện là no-op có sẵn từ trước
+("Tạm thời chỉ kiểm tra authentication, bỏ qua phân quyền — TODO bật lại")
+— sidebar vẫn hiện đủ mọi mục menu cho mọi tài khoản, chỉ bị chặn thật ở
+tầng API (403). Muốn ẩn menu theo đúng quyền cần nối `RoleGuard`/sidebar với
+claim `permissions` trong JWT — chưa làm, cần chốt riêng vì đụng tới UX
+điều hướng của toàn app.
+
+## QĐ-24 (2026-09-10) — Duyệt xong ở Đối chiếu thì tự tính lại báo cáo sản lượng
+
+**Bối cảnh:** chủ dự án: "Khi dữ liệu đối chiếu được duyệt lưu sang báo
+chuyến đồng thời phần báo cáo thống kê cũng được tính luôn." Trước đó
+`ProductionCalculationService.calculatePeriod` chỉ được gọi thủ công qua nút
+"Tính lại kỳ" ở màn Báo cáo thống kê (nút này VẪN GIỮ NGUYÊN — dùng khi cần
+chủ động tính lại, ví dụ sau khi mở khoá kỳ hoặc đổi chế độ TKE).
+
+**Quyết định:** `ReconciliationService.saveDecisions` gom ngày báo cáo của
+các chuyến VỪA được duyệt (APPROVED) trong lần gọi, publish
+`ReconciliationApprovedEvent` (tách riêng khỏi `ReconciliationChangedEvent`
+dùng cho WebSocket QĐ-22 — event đó còn bắn từ `updateTrips`/`resubmitTrips`,
+không liên quan tới duyệt, bắn oan sẽ tính lại kỳ không cần thiết). Listener
+mới `ProductionAutoRecalculateListener` (`AFTER_COMMIT`, cùng pattern
+`ReconciliationWebSocketNotifier`) tra kỳ chứa ngày đó (`ReportPeriodRepository.findByDate`)
+rồi gọi `calculatePeriod` với đúng `tkeMode` kỳ đang dùng (đọc từ dòng
+`ProductionResult` bất kỳ đã có của kỳ, mặc định `false` nếu kỳ chưa từng
+tính lần nào).
+
+**"Chưa đủ điều kiện" là bình thường, không phải lỗi:** `calculatePeriod`
+đòi TOÀN BỘ chuyến trong kỳ phải APPROVED (QĐ-16) và kỳ chưa `locked` (QĐ-03)
+— duyệt từng dòng lẻ tẻ (không phải duyệt hết 1 kỳ cùng lúc) sẽ liên tục rơi
+vào `BadRequestException` "còn chuyến chưa duyệt". Listener CHỦ Ý chỉ log
+mức debug cho trường hợp này (không phải lỗi hệ thống, không có cách nào báo
+ngược cho người dùng vì đang chạy nền sau khi response đã trả về) — tính tự
+động sẽ thành công đúng ở lần duyệt cuối cùng khiến cả kỳ sạch.
+
+**Đã xác nhận:** backend khởi động sạch không lỗi wiring listener/event mới;
+gọi `POST /production/calculate` qua UI với tài khoản Chức vụ Thống kê trả
+về đúng 400 (không phải 403/500) ở kịch bản "còn chuyến chưa duyệt" — xác
+nhận nhánh bắt lỗi của listener khớp đúng loại exception thật sự được ném.
+Chưa test được đường tự động kích hoạt end-to-end (cần 1 kỳ có TẤT CẢ chuyến
+đã khớp + duyệt hết, dữ liệu mẫu hiện tại không có kỳ nào đủ điều kiện) —
+sẽ tự xác nhận khi có dữ liệu thật đủ điều kiện, logic đã review kỹ theo
+đúng pattern QĐ-22 đã test.

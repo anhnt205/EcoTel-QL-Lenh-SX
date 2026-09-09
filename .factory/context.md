@@ -1924,3 +1924,86 @@ chế độ sửa = "Lưu và gửi (F5)", ô Ca hiện đúng giá trị thật
 giữa lượt, đúng như lượt 16. Đã `TaskStop` vòng lặp chờ khoá đang quay
 vô ích (không để nó nện vào daemon hỏng), chờ hồi phục rồi build tiếp.
 Khoá Docker không bị kẹt vì lần đó chưa acquire được.
+
+## Lượt 20 (2026-09-10) — Cửa sổ modal (Thu nhỏ/Phóng to/Đóng), WS mở rộng, Danh mục Hệ thống, tự động tính sản lượng khi duyệt
+
+Lượt dài, 4 việc độc lập, mỗi việc build+deploy+verify sống riêng, đã commit:
+
+**1. Thu nhỏ/Phóng to/Đóng cho `DialogContent` dùng chung** (commit
+`866da00`) — áp tự động cho 3 modal chính (Vận tải, Khai thác, Đối chiếu
+"Yêu cầu chỉnh sửa") vì đều dùng `components/ui/dialog.tsx`. `DialogMinimizeContext`
+mới nối `DialogContent` (con) với `Dialog` (root, giữ `open` thật của Radix) —
+thu nhỏ = tắt `open` hiệu dụng nhưng KHÔNG unmount (`forceMount` + `hasOpenedOnce`
+chặn mount sớm trước lần mở đầu, `isVisible` chặn lớp vô hình còn sót sau khi
+đóng hẳn). **2 lỗi phát hiện qua test sống, đã sửa:**
+- Phóng to bị lệch hẳn ra góc trên-trái màn hình — Tailwind v4 biên dịch
+  `-translate-x-1/2 -translate-y-1/2` thành thuộc tính CSS `translate` RIÊNG
+  (không phải `transform`), nên `style={{transform:'none'}}` không huỷ được
+  nó. Phải set thêm `translate:'none'` trong `windowStyle`.
+- Đóng hẳn rồi mở lại modal bị kẹt nguyên trạng thái phóng to lần trước — do
+  `isMaximized` là state cục bộ của `DialogContent`, không tự reset khi
+  `Dialog` root chỉ reset `isMinimized`. Thêm `rawOpen` (prop `open` GỐC,
+  chưa gộp) vào context để `DialogContent` phân biệt được "đóng hẳn" (reset
+  `isMaximized`) với "thu nhỏ" (giữ nguyên).
+Còn thiếu: 8 modal danh mục kiểu `isFullscreen` (`DensityAddModal` và tương
+tự, không dùng Radix `Dialog`) chưa có Thu nhỏ thật.
+
+**2. WebSocket realtime mở rộng 2 chiều** (commit `826ae32`) — QĐ-22 (lượt
+trước) chỉ làm Đối chiếu tự cập nhật khi Vận tải/Khai thác sửa; chiều ngược
+lại (Đối chiếu yêu cầu sửa/duyệt → Vận tải/Khai thác phải tự thấy trạng thái
+mới) còn thiếu, chủ dự án tự phát hiện qua test tay. Tách hook dùng chung
+`useLiveQueryInvalidation` (`frontend/src/hooks/`), `useReconciliationLiveUpdates`
+giờ chỉ là lớp mỏng gọi lại nó; `TransportEntryPage`/`MiningEntryPage` gọi
+thêm với đúng query key của mình. Verify sống bằng 2 tab: yêu cầu sửa ở
+Đối chiếu (tab 1) → tab Vận tải (tab 2) tự chuyển "Chờ duyệt" → "Cần sửa"
+KHÔNG reload.
+
+**3. Danh mục Hệ thống — Phòng ban/Chức vụ/Tài khoản, phân quyền data-driven**
+(commit `1d42e68`, chi tiết đầy đủ ở QĐ-23 `docs/DECISIONS.md`) — việc lớn
+nhất lượt này. Tóm tắt kỹ thuật (đọc QĐ-23 để biết đầy đủ lý do):
+- Entity mới `PositionPermission` (bảng `position_permissions`, C/R/U/D/A
+  theo từng resource), `Department.allowedResources` (bảng
+  `department_resources`, `@ElementCollection<String>`), `Position.department`
+  (`@ManyToOne`, nullable — dòng seed cũ chưa gán).
+- `LocalAuthService.permissionsFor` viết lại HOÀN TOÀN — bỏ `Role` tĩnh, đọc
+  từ `PositionPermissionRepository`. `PermissionResources.ALL` (34 resource,
+  tách ra file riêng) là nguồn CHUẨN duy nhất, dùng chung bởi
+  `LocalAuthService`/`DepartmentService`/`PositionService`.
+- 3 module frontend mới: `modules/departments` (đã có, thêm CRUD + modal
+  checkbox resource), `modules/positions` (MỚI HẲN, modal có bảng ma trận
+  quyền C/R/U/D/A lọc theo resource phòng ban cho phép), `modules/users`
+  (thêm CRUD, bỏ cột/trường Role khỏi UI vì không còn dùng để tính quyền).
+  Route mới `/danh-muc/chuc-vu`, menu sidebar gộp thành nhóm "Danh mục Hệ
+  thống" (`layouts/catalog-menu.ts`).
+- `backend/seed-danh-muc-he-thong.sql` — gán `admin`/`xemthu` vào Chức vụ
+  "Quản trị hệ thống" full quyền, PHẢI chạy sau khi backend đã boot ít nhất
+  1 lần (Hibernate tạo bảng/cột mới trước). **Đã chạy trên preview** —
+  không chạy lại lần nữa nếu không cần (idempotent nhưng không cần thiết).
+- **Đã dựng thật 4 vai trò qua UI** (không chỉ code): Phòng ban+Chức vụ
+  `VANTAI`/`KHAITHAC`/`THONGKE` (mã), tài khoản test
+  `test_vantai`/`test_khaithac`/`test_thongke` (mật khẩu chung
+  `Test@2026`) — ĐANG CÒN TRÊN PREVIEW, chưa xoá (chủ dự án có thể tự đăng
+  nhập kiểm tra thêm). Đăng nhập từng cái xác nhận đọc đủ danh mục phụ trợ +
+  thao tác đúng phạm vi + 403 đúng khi chạm resource ngoài phạm vi (chi tiết
+  đầy đủ ở QĐ-23).
+
+**4. Tự động tính lại sản lượng khi Đối chiếu duyệt xong** (commit `6c530c8`,
+chi tiết ở QĐ-24) — `ReconciliationApprovedEvent` mới (tách khỏi
+`ReconciliationChangedEvent` dùng cho WS) mang theo ngày báo cáo của các
+chuyến VỪA duyệt; `ProductionAutoRecalculateListener`
+(`service/production/`, `AFTER_COMMIT`) tra kỳ rồi gọi `calculatePeriod`.
+Nút "Tính lại kỳ" ở Báo cáo thống kê VẪN GIỮ NGUYÊN (dùng khi chủ động).
+**CHƯA test được đường tự động kích hoạt end-to-end thật** (dữ liệu mẫu hiện
+tại không có kỳ nào đủ điều kiện "mọi chuyến đã khớp + đã duyệt hết cùng
+lúc") — chỉ xác nhận gián tiếp: backend khởi động sạch, và nhánh bắt
+`BadRequestException` khớp đúng lỗi thật (`POST /production/calculate` qua
+UI trả `400` đúng kịch bản "còn chuyến chưa duyệt", không phải 403/500).
+**Việc còn lại cho lượt sau nếu cần chắc chắn 100%:** dựng 1 kỳ nhỏ có đủ
+cặp Vận tải+Khai thác khớp nhau, duyệt hết, xác nhận `ProductionResult` tự
+sinh ra mà KHÔNG cần bấm "Tính lại kỳ".
+
+**Việc còn lại rõ ràng cho lượt sau (đã nêu trong QĐ-23):** `RoleGuard`
+frontend (`modules/auth/components/RoleGuard.tsx`) vẫn no-op — sidebar chưa
+lọc menu theo quyền thật, chỉ chặn ở tầng API. Muốn UX gọn (ẩn hẳn mục menu
+không có quyền) cần nối `RoleGuard`/sidebar với claim `permissions` trong
+JWT, đây là việc mới, chưa bắt đầu.
