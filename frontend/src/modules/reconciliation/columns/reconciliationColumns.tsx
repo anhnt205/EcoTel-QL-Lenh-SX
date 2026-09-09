@@ -966,15 +966,28 @@ export function createReconciliationColumns(
                 );
               }
 
+              // Chưa đủ dữ liệu 2 bên (1 bên chưa nhập) HOẶC dữ liệu 2 bên
+              // chưa khớp (Loại hàng/Số chuyến lệch nhau) thì KHÔNG cho
+              // duyệt — dùng đúng meta().isMatched, cùng logic đang quyết
+              // định tam giác cảnh báo ở cột "Sai lệch", để 2 chỗ không bao
+              // giờ lệch nhau. Chốt 2026-09-10.
+              const canApprove = meta().isMatched(item);
+
               return (
                 <div className="flex items-center justify-center gap-1.5">
                   <Button
                     size="sm"
+                    disabled={!canApprove}
                     onClick={() => {
+                      if (!canApprove) return;
                       onApproveItem?.(item.id);
                     }}
-                    className="h-7 w-7 p-0 bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-2xs transition-all"
-                    title="Duyệt bản ghi"
+                    className="h-7 w-7 p-0 bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-2xs transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-blue-600"
+                    title={
+                      canApprove
+                        ? "Duyệt bản ghi"
+                        : "Chưa đủ dữ liệu 2 bên hoặc dữ liệu chưa khớp — không thể duyệt"
+                    }
                   >
                     <Check className="w-3.5 h-3.5 stroke-[2.5]" />
                   </Button>

@@ -53,10 +53,17 @@ export const getTransportTripsColumns = (
           >
             <Pencil className="w-3.5 h-3.5" />
           </Button>
+          {/* Trạng thái ngay cạnh bút chỉnh sửa — trước đây nằm cuối cùng
+              bảng, phải cuộn ngang hết mới thấy dòng nào đang chờ duyệt/cần
+              sửa. Chốt 2026-09-10 (gộp chung ô, không tách cột riêng). */}
+          <ApprovalStatusBadge
+            status={row.original.status}
+            note={row.original.changeRequestNote}
+          />
         </div>
       );
     },
-    size: 95,
+    size: 180,
     enableSorting: false,
     enableHiding: false,
   },
@@ -361,19 +368,5 @@ export const getTransportTripsColumns = (
       </span>
     ),
     size: 130,
-  },
-  {
-    accessorKey: "status",
-    id: "status",
-    header: "Trạng thái",
-    cell: ({ row }) => (
-      <div className="flex justify-center">
-        <ApprovalStatusBadge
-          status={row.original.status}
-          note={row.original.changeRequestNote}
-        />
-      </div>
-    ),
-    size: 115,
   },
 ];

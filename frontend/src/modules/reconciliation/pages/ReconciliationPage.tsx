@@ -565,13 +565,28 @@ export const ReconciliationPage: React.FC = () => {
       return;
     }
 
-    const unapprovedItems = rawItems.filter(
+    // Chưa đủ dữ liệu 2 bên (1 bên chưa nhập) HOẶC dữ liệu 2 bên chưa khớp
+    // thì KHÔNG được duyệt — dùng đúng isMatchedItem (cùng logic quyết định
+    // tam giác cảnh báo ở cột "Sai lệch" và nút Duyệt từng dòng), để "Duyệt
+    // hàng loạt" không lách được điều kiện đã chặn ở nút đơn lẻ. Bỏ qua các
+    // dòng đó thay vì chặn cả nút, vì 1 lượt chọn có thể lẫn cả dòng đủ điều
+    // kiện lẫn chưa đủ. Chốt 2026-09-10.
+    const selectedNotApproved = rawItems.filter(
       (i) =>
         selectedIds.includes(i.id) && i.reconciliationStatus !== "APPROVED",
     );
+    const unapprovedItems = selectedNotApproved.filter(isMatchedItem);
+    const skippedMismatchCount =
+      selectedNotApproved.length - unapprovedItems.length;
 
     if (unapprovedItems.length === 0) {
-      toast.info("Tất cả các dòng đã chọn đều đã được phê duyệt!");
+      if (skippedMismatchCount > 0) {
+        toast.warning(
+          `Không có dòng nào đủ điều kiện duyệt — ${skippedMismatchCount} dòng đã chọn còn thiếu dữ liệu 1 bên hoặc chưa khớp.`,
+        );
+      } else {
+        toast.info("Tất cả các dòng đã chọn đều đã được phê duyệt!");
+      }
       return;
     }
 
@@ -619,6 +634,11 @@ export const ReconciliationPage: React.FC = () => {
       }
     }
     toast.success(`Đã duyệt thành công ${unapprovedItems.length} dòng!`);
+    if (skippedMismatchCount > 0) {
+      toast.warning(
+        `Bỏ qua ${skippedMismatchCount} dòng còn thiếu dữ liệu 1 bên hoặc chưa khớp — chưa được duyệt.`,
+      );
+    }
   };
 
   const handleBulkRequestChangeSubmit = async (
