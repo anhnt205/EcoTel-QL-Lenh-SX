@@ -3,7 +3,9 @@ package com.ecotel.thong_ke_cao_son.security;
 import com.ecotel.thong_ke_cao_son.model.Position;
 import com.ecotel.thong_ke_cao_son.model.PositionPermission;
 import com.ecotel.thong_ke_cao_son.model.User;
+import com.ecotel.thong_ke_cao_son.model.UserPermission;
 import com.ecotel.thong_ke_cao_son.repository.PositionPermissionRepository;
+import com.ecotel.thong_ke_cao_son.repository.UserPermissionRepository;
 import com.ecotel.thong_ke_cao_son.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -18,6 +20,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -39,6 +42,7 @@ public class LocalAuthService {
 
     private final UserRepository userRepository;
     private final PositionPermissionRepository positionPermissionRepository;
+    private final UserPermissionRepository userPermissionRepository;
     private final PasswordEncoder passwordEncoder;
 
     @Value("${app.auth.jwt-secret}")
@@ -125,40 +129,67 @@ public class LocalAuthService {
     }
 
     /**
-     * Dựng bộ quyền theo resource TỪ CHỨC VỤ của user (data-driven, thay hẳn
-     * {@code Role} tĩnh cũ — chủ dự án chốt 2026-09-10: mọi tài khoản mới tạo
-     * chỉ chọn Chức vụ, không chọn Role; tài khoản {@code admin}/{@code xemthu}
-     * seed sẵn được gán Chức vụ "Quản trị hệ thống" có đủ quyền trên mọi
-     * resource — xem {@code seed-danh-muc-he-thong.sql} — để không bị khoá
-     * ngay khi đổi cơ chế này.
+     * Dựng bộ quyền theo resource — data-driven, thay hẳn {@code Role} tĩnh cũ.
+     * Từ 2026-09-10 (lượt 2, chủ dự án chốt): quyền có 3 tầng ưu tiên, dừng ở
+     * tầng đầu tiên có dữ liệu:
+     * <ol>
+     *   <li><b>Quyền RIÊNG của tài khoản</b> ({@link UserPermission}) — khi màn
+     *       Tài khoản đã lưu ít nhất 1 dòng cho user này (nghĩa là đã từng set
+     *       qua form, dù đang giữ y hệt mẫu Chức vụ hay đã chỉnh tay). Cho phép
+     *       2 tài khoản CÙNG Chức vụ có CRUD khác nhau — đúng yêu cầu gốc.</li>
+     *   <li><b>Dự phòng: quyền của Chức vụ</b> ({@link PositionPermission}) —
+     *       khi tài khoản CHƯA từng được set quyền riêng (tài khoản cũ tạo
+     *       trước tính năng này, hoặc tạo mới nhưng người tạo không đụng gì
+     *       vào bảng phân quyền). Tự "thừa kế" Chức vụ, không cần chạy migrate
+     *       dữ liệu cũ.</li>
+     *   <li><b>Chưa có Chức vụ</b> — chỉ đọc (r) mọi resource, không thao tác
+     *       gì. An toàn hơn hẳn "chặn đăng nhập" mà không lộ lỗi khó hiểu cho
+     *       người mới tạo tài khoản.</li>
+     * </ol>
      *
      * <p>Từ 2026-09-07: {@code PermissionFilter} thật sự gate theo bộ quyền
      * này — mọi controller nghiệp vụ đã gắn {@code @RequirePermission}, và
      * endpoint thiếu annotation bị từ chối mặc định (fail-closed) thay vì
      * cho qua.
-     *
-     * <p>User CHƯA được gán Chức vụ (Phòng Nhân sự chưa kịp cấu hình) chỉ
-     * được xem (r), không thao tác gì — an toàn hơn hẳn "chặn đăng nhập" mà
-     * không lộ ra lỗi khó hiểu cho người mới tạo tài khoản.
      */
     private Map<String, Map<String, Boolean>> permissionsFor(User user) {
+        List<UserPermission> userRows = userPermissionRepository.findByUser_Id(user.getId());
+        if (!userRows.isEmpty()) {
+            return toPermissionMap(userRows.stream()
+                    .collect(Collectors.toMap(UserPermission::getResource, p -> p)),
+                    UserPermission::isCanCreate, UserPermission::isCanRead,
+                    UserPermission::isCanUpdate, UserPermission::isCanDelete, UserPermission::isCanApprove,
+                    false);
+        }
+
         Position position = user.getPosition();
         Map<String, PositionPermission> byResource = position == null
                 ? Map.of()
                 : positionPermissionRepository.findByPosition_Id(position.getId()).stream()
                         .collect(Collectors.toMap(PositionPermission::getResource, p -> p));
+        return toPermissionMap(byResource,
+                PositionPermission::isCanCreate, PositionPermission::isCanRead,
+                PositionPermission::isCanUpdate, PositionPermission::isCanDelete, PositionPermission::isCanApprove,
+                position == null);
+    }
 
+    private <T> Map<String, Map<String, Boolean>> toPermissionMap(
+            Map<String, T> byResource,
+            java.util.function.Predicate<T> canCreate, java.util.function.Predicate<T> canRead,
+            java.util.function.Predicate<T> canUpdate, java.util.function.Predicate<T> canDelete,
+            java.util.function.Predicate<T> canApprove,
+            boolean readOnlyDefault) {
         Map<String, Map<String, Boolean>> perms = new LinkedHashMap<>();
         for (String resource : PermissionResources.ALL) {
-            PositionPermission p = byResource.get(resource);
-            perms.put(resource, p == null
-                    ? Map.of("c", false, "r", position == null, "u", false, "d", false, "a", false)
+            T row = byResource.get(resource);
+            perms.put(resource, row == null
+                    ? Map.of("c", false, "r", readOnlyDefault, "u", false, "d", false, "a", false)
                     : Map.of(
-                            "c", p.isCanCreate(),
-                            "r", p.isCanRead(),
-                            "u", p.isCanUpdate(),
-                            "d", p.isCanDelete(),
-                            "a", p.isCanApprove()));
+                            "c", canCreate.test(row),
+                            "r", canRead.test(row),
+                            "u", canUpdate.test(row),
+                            "d", canDelete.test(row),
+                            "a", canApprove.test(row)));
         }
         return perms;
     }

@@ -1,5 +1,5 @@
 import api from "@/config/api.config";
-import type { User } from "@/types";
+import type { User, PositionPermissionItem } from "@/types";
 import { parsePaginatedResponse, type PaginatedResponse } from "@/types";
 
 const cleanParams = (params?: Record<string, any>) => {
@@ -20,6 +20,8 @@ export interface UserCreatePayload {
   salaryCode: string;
   fullName: string;
   positionId: number;
+  /** Để trống = tài khoản thừa kế quyền theo Chức vụ, không phải "không có quyền". */
+  permissions: PositionPermissionItem[];
 }
 
 export interface UserUpdatePayload {
@@ -29,6 +31,7 @@ export interface UserUpdatePayload {
   active: boolean;
   /** Để trống = giữ nguyên mật khẩu cũ. */
   password?: string;
+  permissions: PositionPermissionItem[];
 }
 
 const UserService = {

@@ -4,6 +4,7 @@ import com.ecotel.thong_ke_cao_son.model.Position;
 import com.ecotel.thong_ke_cao_son.model.PositionPermission;
 import com.ecotel.thong_ke_cao_son.model.User;
 import com.ecotel.thong_ke_cao_son.repository.PositionPermissionRepository;
+import com.ecotel.thong_ke_cao_son.repository.UserPermissionRepository;
 import com.ecotel.thong_ke_cao_son.repository.UserRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -56,10 +57,15 @@ class LocalAuthServiceTest {
 
     @Mock private UserRepository userRepository;
     @Mock private PositionPermissionRepository positionPermissionRepository;
+    @Mock private UserPermissionRepository userPermissionRepository;
     @Mock private PasswordEncoder passwordEncoder;
 
     private LocalAuthService newService() {
-        LocalAuthService service = new LocalAuthService(userRepository, positionPermissionRepository, passwordEncoder);
+        // userPermissionRepository không stub gì -> Mockito tự trả List rỗng
+        // cho findByUser_Id(), đúng nghĩa "tài khoản chưa có quyền riêng" nên
+        // mọi test cũ (chỉ quan tâm quyền theo Chức vụ) không cần đổi gì thêm.
+        LocalAuthService service = new LocalAuthService(
+                userRepository, positionPermissionRepository, userPermissionRepository, passwordEncoder);
         ReflectionTestUtils.setField(service, "jwtSecret", SECRET);
         ReflectionTestUtils.setField(service, "accessTtlSeconds", 28800L);
         ReflectionTestUtils.setField(service, "refreshTtlSeconds", 604800L);
@@ -261,5 +267,94 @@ class LocalAuthServiceTest {
 
             assertThat(reportPeriods.values()).allMatch(Boolean::booleanValue);
         }
+    }
+
+    @Nested
+    @DisplayName("Quyền RIÊNG của tài khoản (2026-09-10, lượt 2) — ưu tiên hơn quyền theo Chức vụ")
+    class PermissionsByUserOverride {
+
+        @Test
+        @DisplayName("Tài khoản CÓ quyền riêng -> dùng đúng quyền riêng, KHÔNG dùng quyền Chức vụ dù khác nhau")
+        void userOwnPermissionOverridesPosition() {
+            Position pos = position(20L);
+            User user = activeUser("nv02", pos);
+            when(userRepository.findByUsername("nv02")).thenReturn(Optional.of(user));
+            when(passwordEncoder.matches("x", "hashed")).thenReturn(true);
+            // Chức vụ cho đủ quyền, nhưng tài khoản chỉ được set riêng "r" —
+            // hai tài khoản CÙNG Chức vụ này phải có thể khác nhau đúng kiểu.
+            when(positionPermissionRepository.findByPosition_Id(20L))
+                    .thenReturn(List.of(permission(pos, "transport-reports", true, true, true, true, true)));
+            when(userPermissionRepository.findByUser_Id(user.getId()))
+                    .thenReturn(List.of(userPermission(user, "transport-reports", false, true, false, false, false)));
+
+            LocalAuthService.TokenPair pair = newService().login("nv02", "x");
+            Map<String, Boolean> transportReports = permissionsOf(decodedClaims(pair.appToken()), "transport-reports");
+
+            assertThat(transportReports.get("r")).isTrue();
+            assertThat(transportReports.get("c")).isFalse();
+            assertThat(transportReports.get("u")).isFalse();
+            assertThat(transportReports.get("d")).isFalse();
+            assertThat(transportReports.get("a")).isFalse();
+        }
+
+        @Test
+        @DisplayName("2 tài khoản cùng Chức vụ, quyền riêng khác nhau -> mỗi tài khoản ra đúng quyền của mình")
+        void twoAccountsSamePositionDifferentOwnPermissions() {
+            Position pos = position(21L);
+            User userA = activeUser("nvA", pos);
+            User userB = activeUser("nvB", pos);
+            userB.setId(2L);
+            when(userRepository.findByUsername("nvA")).thenReturn(Optional.of(userA));
+            when(userRepository.findByUsername("nvB")).thenReturn(Optional.of(userB));
+            when(passwordEncoder.matches("x", "hashed")).thenReturn(true);
+            when(userPermissionRepository.findByUser_Id(1L))
+                    .thenReturn(List.of(userPermission(userA, "excavation-reports", true, true, true, false, false)));
+            when(userPermissionRepository.findByUser_Id(2L))
+                    .thenReturn(List.of(userPermission(userB, "excavation-reports", false, true, false, false, false)));
+
+            LocalAuthService service = newService();
+            Map<String, Boolean> permsA = permissionsOf(
+                    decodedClaims(service.login("nvA", "x").appToken()), "excavation-reports");
+            Map<String, Boolean> permsB = permissionsOf(
+                    decodedClaims(service.login("nvB", "x").appToken()), "excavation-reports");
+
+            assertThat(permsA.get("c")).isTrue();
+            assertThat(permsA.get("u")).isTrue();
+            assertThat(permsB.get("c")).isFalse();
+            assertThat(permsB.get("u")).isFalse();
+            assertThat(permsB.get("r")).isTrue();
+        }
+
+        @Test
+        @DisplayName("Tài khoản CHƯA từng set quyền riêng (findByUser_Id rỗng) -> tự thừa kế theo Chức vụ")
+        void noOwnPermissionFallsBackToPosition() {
+            Position pos = position(22L);
+            User user = activeUser("nv03", pos);
+            when(userRepository.findByUsername("nv03")).thenReturn(Optional.of(user));
+            when(passwordEncoder.matches("x", "hashed")).thenReturn(true);
+            when(positionPermissionRepository.findByPosition_Id(22L))
+                    .thenReturn(List.of(permission(pos, "reconciliation", true, false, true, false, false)));
+            // userPermissionRepository không stub -> Mockito trả List rỗng mặc định.
+
+            LocalAuthService.TokenPair pair = newService().login("nv03", "x");
+            Map<String, Boolean> reconciliation = permissionsOf(decodedClaims(pair.appToken()), "reconciliation");
+
+            assertThat(reconciliation.get("c")).isTrue();
+            assertThat(reconciliation.get("r")).isFalse();
+            assertThat(reconciliation.get("u")).isTrue();
+        }
+    }
+
+    private static com.ecotel.thong_ke_cao_son.model.UserPermission userPermission(
+            User user, String resource, boolean c, boolean r, boolean u, boolean d, boolean a) {
+        com.ecotel.thong_ke_cao_son.model.UserPermission perm = new com.ecotel.thong_ke_cao_son.model.UserPermission();
+        perm.setUser(user);
+        perm.setResource(resource);
+        perm.setCanCreate(c);
+        perm.setCanRead(r);
+        perm.setCanUpdate(u);
+        perm.setCanDelete(d);
+        perm.setCanApprove(a);
+        return perm;
     }
 }

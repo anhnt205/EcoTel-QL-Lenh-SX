@@ -26,6 +26,12 @@ export interface User {
   position?: string;
   role?: string;
   active: boolean;
+  /**
+   * Quyền RIÊNG của tài khoản — rỗng/undefined nghĩa là đang thừa kế theo
+   * Chức vụ (xem `LocalAuthService.permissionsFor`), KHÔNG phải "không có
+   * quyền gì". Xem `PositionPermissionItem` bên dưới.
+   */
+  permissions?: PositionPermissionItem[];
   createdAt?: string;
   updatedAt?: string;
 }

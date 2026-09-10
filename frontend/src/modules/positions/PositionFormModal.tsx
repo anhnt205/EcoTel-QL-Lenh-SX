@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
@@ -12,7 +12,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -23,7 +22,11 @@ import {
 import DepartmentService from "@/modules/departments/services/departmentService";
 import PositionService from "./services/positionService";
 import type { Position, PositionPermissionItem } from "@/types";
-import { PERMISSION_FEATURE_GROUPS, type PermissionFeatureGroup } from "@/constants/permission-features";
+import {
+  PermissionMatrixTable,
+  emptyPermissionItem,
+  type PermissionAction,
+} from "@/components/permissions/PermissionMatrixTable";
 
 interface Props {
   open: boolean;
@@ -32,24 +35,7 @@ interface Props {
   onSaved: () => void;
 }
 
-const ACTION_COLUMNS: { key: keyof Omit<PositionPermissionItem, "resource">; label: string }[] = [
-  { key: "c", label: "Thêm" },
-  { key: "r", label: "Xem" },
-  { key: "u", label: "Sửa" },
-  { key: "d", label: "Xóa" },
-  { key: "a", label: "Duyệt" },
-];
-
 type PermissionMap = Record<string, PositionPermissionItem>;
-
-const emptyPermission = (resource: string): PositionPermissionItem => ({
-  resource,
-  c: false,
-  r: false,
-  u: false,
-  d: false,
-  a: false,
-});
 
 export function PositionFormModal({ open, editing, onClose, onSaved }: Props) {
   const isEdit = editing !== null;
@@ -102,9 +88,9 @@ export function PositionFormModal({ open, editing, onClose, onSaved }: Props) {
     });
   };
 
-  const toggleAction = (resource: string, action: keyof Omit<PositionPermissionItem, "resource">, checked: boolean) => {
+  const toggleAction = (resource: string, action: PermissionAction, checked: boolean) => {
     setPermissionMap((prev) => {
-      const current = prev[resource] ?? emptyPermission(resource);
+      const current = prev[resource] ?? emptyPermissionItem(resource);
       return { ...prev, [resource]: { ...current, [action]: checked } };
     });
   };
@@ -146,54 +132,6 @@ export function PositionFormModal({ open, editing, onClose, onSaved }: Props) {
     } finally {
       setSaving(false);
     }
-  };
-
-  // Chỉ hiện đúng chức năng Phòng ban chủ quản đã cho phép — nhóm/mục nào
-  // không có dòng nào thuộc `allowedResources` thì ẩn hẳn tiêu đề nhóm đó,
-  // tránh 1 rừng tiêu đề rỗng không set được gì.
-  const hasAnyAllowedItem = (group: PermissionFeatureGroup): boolean =>
-    group.items.some((item) => allowedResources.has(item.resource)) ||
-    (group.subGroups?.some(hasAnyAllowedItem) ?? false);
-
-  const renderGroupRows = (group: PermissionFeatureGroup, depth: number): ReactNode => {
-    if (!hasAnyAllowedItem(group)) return null;
-    const visibleItems = group.items.filter((item) => allowedResources.has(item.resource));
-    return (
-      <>
-        <tr key={`h-${depth}-${group.label}`} className="border-t bg-muted/30">
-          <td
-            colSpan={1 + ACTION_COLUMNS.length}
-            className={depth > 0 ? "px-3 py-1 pl-6 text-xs font-semibold text-muted-foreground" : "px-3 py-1.5 text-sm font-semibold"}
-          >
-            {group.label}
-          </td>
-        </tr>
-        {visibleItems.map((item, idx) => {
-          const perm = permissionMap[item.resource] ?? emptyPermission(item.resource);
-          return (
-            <tr key={`${item.resource}-${idx}`} className="border-t">
-              <td className="px-3 py-1.5 pl-6">
-                {item.label}
-                {item.sharedWith && (
-                  <span className="block text-xs text-muted-foreground">
-                    (cùng quyền với {item.sharedWith})
-                  </span>
-                )}
-              </td>
-              {ACTION_COLUMNS.map((a) => (
-                <td key={a.key} className="px-2 py-1.5 text-center">
-                  <Checkbox
-                    checked={perm[a.key]}
-                    onCheckedChange={(v) => toggleAction(item.resource, a.key, v === true)}
-                  />
-                </td>
-              ))}
-            </tr>
-          );
-        })}
-        {group.subGroups?.map((sub) => renderGroupRows(sub, depth + 1))}
-      </>
-    );
   };
 
   return (
@@ -248,26 +186,13 @@ export function PositionFormModal({ open, editing, onClose, onSaved }: Props) {
             <p className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
               Chọn Phòng ban trước để hiện danh sách chức năng có thể phân quyền.
             </p>
-          ) : allowedResources.size === 0 ? (
-            <p className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
-              Phòng ban này chưa được cho phép dùng chức năng nào — vào Danh mục Phòng ban để tick trước.
-            </p>
           ) : (
-            <div className="max-h-80 overflow-y-auto rounded-md border">
-              <table className="w-full text-sm">
-                <thead className="sticky top-0 bg-background">
-                  <tr className="border-b">
-                    <th className="px-3 py-2 text-left font-medium">Chức năng</th>
-                    {ACTION_COLUMNS.map((a) => (
-                      <th key={a.key} className="px-2 py-2 text-center font-medium">
-                        {a.label}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>{PERMISSION_FEATURE_GROUPS.map((group) => renderGroupRows(group, 0))}</tbody>
-              </table>
-            </div>
+            <PermissionMatrixTable
+              allowedResources={allowedResources}
+              permissionMap={permissionMap}
+              onToggle={toggleAction}
+              emptyMessage="Phòng ban này chưa được cho phép dùng chức năng nào — vào Danh mục Phòng ban để tick trước."
+            />
           )}
         </div>
 
