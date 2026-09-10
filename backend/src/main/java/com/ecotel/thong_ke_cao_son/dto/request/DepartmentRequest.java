@@ -24,4 +24,7 @@ public class DepartmentRequest {
 
     /** Danh sách resource (xem {@code PermissionResources.ALL}) phòng ban được phép dùng. */
     Set<String> allowedResources = new LinkedHashSet<>();
+
+    /** Xem javadoc {@code Department.fullDataScope}. Null (chưa gửi) coi như false ở service. */
+    Boolean fullDataScope;
 }

@@ -1,5 +1,6 @@
 package com.ecotel.thong_ke_cao_son.security;
 
+import com.ecotel.thong_ke_cao_son.model.Department;
 import com.ecotel.thong_ke_cao_son.model.Position;
 import com.ecotel.thong_ke_cao_son.model.PositionPermission;
 import com.ecotel.thong_ke_cao_son.model.User;
@@ -115,6 +116,8 @@ public class LocalAuthService {
     // ── Dựng JWT ────────────────────────────────────────────────────────────
 
     private String buildToken(User user, Instant now, long ttlSeconds, String type) {
+        Department department = user.getDepartment();
+
         Map<String, Object> claims = new LinkedHashMap<>();
         claims.put("sub", String.valueOf(user.getId()));
         claims.put("username", user.getUsername());
@@ -123,6 +126,13 @@ public class LocalAuthService {
         claims.put("app", appCode);
         claims.put("typ", type);
         claims.put("permissions", permissionsFor(user));
+        // Phân quyền DỮ LIỆU theo đơn vị (khác "permissions" ở trên — phân
+        // quyền CHỨC NĂNG) — xem javadoc Department.fullDataScope và
+        // AppUserDetails.canAccessDepartment. LUÔN ghi cả hai claim (kể cả
+        // giá trị "trống"/false) để AppTokenFilter phân biệt được token cục
+        // bộ này với token Portal chưa biết tới tính năng này.
+        claims.put("departmentId", department != null ? department.getId() : null);
+        claims.put("fullDataScope", department != null && Boolean.TRUE.equals(department.getFullDataScope()));
         claims.put("iat", now.getEpochSecond());
         claims.put("exp", now.plusSeconds(ttlSeconds).getEpochSecond());
         return LocalJwt.sign(claims, jwtSecret);

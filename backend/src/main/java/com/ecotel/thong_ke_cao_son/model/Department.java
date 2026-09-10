@@ -52,6 +52,20 @@ public class Department {
     @Column(name = "resource", nullable = false)
     Set<String> allowedResources = new LinkedHashSet<>();
 
+    /**
+     * Phân quyền DỮ LIỆU theo đơn vị (khác {@link #allowedResources} — phân
+     * quyền CHỨC NĂNG): mặc định false, tài khoản thuộc phòng ban này chỉ
+     * thấy dữ liệu Vận tải/Khai thác/Đối chiếu của các thiết bị (xe/máy xúc)
+     * CÙNG phòng ban ({@code Device.department}) — true thì thấy TOÀN BỘ,
+     * không lọc (dành cho phòng ban kiểu Thống kê — xem
+     * docs/REQUIREMENT_WORKFLOW.md). Chốt qua Quality Gate của Codex
+     * (lượt 2, 2026-09-10): trước đây backend không hề lọc/xác minh theo
+     * đơn vị — người có quyền CHỨC NĂNG vẫn đọc/sửa được dữ liệu đơn vị khác
+     * qua API trực tiếp.
+     */
+    @Column(name = "full_data_scope", nullable = false)
+    Boolean fullDataScope = false;
+
     @CreatedDate
     @Column(name = "created_at", updatable = false)
     LocalDateTime createdAt;

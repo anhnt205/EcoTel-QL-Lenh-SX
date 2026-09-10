@@ -10,9 +10,12 @@ import com.ecotel.thong_ke_cao_son.enums.LoadLevelType;
 import com.ecotel.thong_ke_cao_son.enums.ReconciliationRowStatus;
 import com.ecotel.thong_ke_cao_son.enums.ReconciliationSide;
 import com.ecotel.thong_ke_cao_son.exception.BadRequestException;
+import com.ecotel.thong_ke_cao_son.exception.ForbiddenException;
 import com.ecotel.thong_ke_cao_son.exception.ResourceNotFoundException;
 import com.ecotel.thong_ke_cao_son.model.*;
 import com.ecotel.thong_ke_cao_son.repository.*;
+import com.ecotel.thong_ke_cao_son.security.AppUserDetails;
+import com.ecotel.thong_ke_cao_son.security.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -87,12 +90,18 @@ public class ReconciliationService {
             Deque<ExcavationReportTrip> candidates = excavationByKey.get(buildTransportKey(tt));
             ExcavationReportTrip matchedExcavation =
                     (candidates != null && !candidates.isEmpty()) ? candidates.poll() : null;
+            if (!canSeeRow(tt, matchedExcavation)) {
+                continue;
+            }
             rows.add(buildRow(tt, matchedExcavation, decisionByTransportTripId, decisionByExcavationTripId,
                     transportIdsWithHistory, excavationIdsWithHistory));
         }
 
         for (Deque<ExcavationReportTrip> remaining : excavationByKey.values()) {
             for (ExcavationReportTrip et : remaining) {
+                if (!canSeeRow(null, et)) {
+                    continue;
+                }
                 rows.add(buildRow(null, et, decisionByTransportTripId, decisionByExcavationTripId,
                         transportIdsWithHistory, excavationIdsWithHistory));
             }
@@ -172,6 +181,45 @@ public class ReconciliationService {
         ExcavationReport header = et.getExcavationReport();
         return header.getReportDate() + "_" + header.getShift().getId() + "_"
                 + et.getVehicle().getId() + "_" + header.getExcavatorDevice().getId();
+    }
+
+    /**
+     * Phân quyền DỮ LIỆU theo đơn vị (Quality Gate lượt 2, 2026-09-10) — xem
+     * javadoc tương ứng ở TransportReportService/ExcavationReportService.
+     * Đối chiếu ghép cặp CẢ HAI bên nên dùng OR: đơn vị Vận tải/Khai thác vẫn
+     * cần thấy bên KIA của dòng mình để so sánh — chỉ ẨN dòng khi KHÔNG bên
+     * nào (trong số các bên THỰC SỰ tồn tại ở dòng đó) thuộc đơn vị mình.
+     */
+    private boolean canSeeRow(TransportReportTrip tt, ExcavationReportTrip et) {
+        AppUserDetails user = SecurityUtils.currentUser();
+        if (user == null || user.hasFullDataScope()) {
+            return true;
+        }
+        boolean transportOk = tt != null && user.canAccessDepartment(
+                tt.getTransportReport().getVehicle().getDepartment() != null
+                        ? tt.getTransportReport().getVehicle().getDepartment().getId() : null);
+        boolean excavationOk = et != null && user.canAccessDepartment(
+                et.getExcavationReport().getExcavatorDevice().getDepartment() != null
+                        ? et.getExcavationReport().getExcavatorDevice().getDepartment().getId() : null);
+        return transportOk || excavationOk;
+    }
+
+    private void assertTransportTripAccess(TransportReportTrip trip) {
+        AppUserDetails user = SecurityUtils.currentUser();
+        Long deptId = trip.getTransportReport().getVehicle().getDepartment() != null
+                ? trip.getTransportReport().getVehicle().getDepartment().getId() : null;
+        if (user == null || !user.canAccessDepartment(deptId)) {
+            throw new ForbiddenException("Không có quyền truy cập dữ liệu Vận tải của đơn vị khác");
+        }
+    }
+
+    private void assertExcavationTripAccess(ExcavationReportTrip trip) {
+        AppUserDetails user = SecurityUtils.currentUser();
+        Long deptId = trip.getExcavationReport().getExcavatorDevice().getDepartment() != null
+                ? trip.getExcavationReport().getExcavatorDevice().getDepartment().getId() : null;
+        if (user == null || !user.canAccessDepartment(deptId)) {
+            throw new ForbiddenException("Không có quyền truy cập dữ liệu Khai thác của đơn vị khác");
+        }
     }
 
     private ReconciliationRowResponse buildRow(
@@ -608,6 +656,7 @@ public class ReconciliationService {
             if (trip == null) {
                 throw new ResourceNotFoundException("Không tìm thấy chuyến Vận tải: " + req.getTransportReportTripId());
             }
+            assertTransportTripAccess(trip);
 
             // Chốt 2026-09-09: chuyến đã duyệt không được sửa qua "Lưu" ở Đối
             // chiếu nữa — phải để Thống kê gửi yêu cầu sửa trước.
@@ -677,6 +726,7 @@ public class ReconciliationService {
             if (trip == null) {
                 throw new ResourceNotFoundException("Không tìm thấy chuyến Khai thác: " + req.getExcavationReportTripId());
             }
+            assertExcavationTripAccess(trip);
 
             // Xem chú thích ở nhánh Vận tải phía trên — cùng lý do.
             if (trip.getStatus() == ApprovalStatus.APPROVED) {
@@ -802,6 +852,7 @@ public class ReconciliationService {
             TransportReportTrip trip = transportReportTripRepository.findById(request.getTransportReportTripId())
                     .orElseThrow(() -> new ResourceNotFoundException(
                             "Không tìm thấy chuyến Vận tải: " + request.getTransportReportTripId()));
+            assertTransportTripAccess(trip);
             if (trip.getStatus() == ApprovalStatus.REVISION_REQUESTED) {
                 trip.setStatus(ApprovalStatus.PENDING);
                 transportReportTripRepository.save(trip);
@@ -812,6 +863,7 @@ public class ReconciliationService {
             ExcavationReportTrip trip = excavationReportTripRepository.findById(request.getExcavationReportTripId())
                     .orElseThrow(() -> new ResourceNotFoundException(
                             "Không tìm thấy chuyến Khai thác: " + request.getExcavationReportTripId()));
+            assertExcavationTripAccess(trip);
             if (trip.getStatus() == ApprovalStatus.REVISION_REQUESTED) {
                 trip.setStatus(ApprovalStatus.PENDING);
                 excavationReportTripRepository.save(trip);

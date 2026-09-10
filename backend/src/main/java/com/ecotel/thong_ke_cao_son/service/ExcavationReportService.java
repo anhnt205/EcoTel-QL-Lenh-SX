@@ -13,14 +13,18 @@ import com.ecotel.thong_ke_cao_son.enums.LoadLevelType;
 import com.ecotel.thong_ke_cao_son.exception.BadRequestException;
 import com.ecotel.thong_ke_cao_son.exception.ResourceNotFoundException;
 import com.ecotel.thong_ke_cao_son.enums.ApprovalStatus;
+import com.ecotel.thong_ke_cao_son.exception.ForbiddenException;
 import com.ecotel.thong_ke_cao_son.mapper.ExcavationReportMapper;
 import com.ecotel.thong_ke_cao_son.model.CargoType;
+import com.ecotel.thong_ke_cao_son.model.Device;
 import com.ecotel.thong_ke_cao_son.model.ExcavationReport;
 import com.ecotel.thong_ke_cao_son.model.ExcavationReportTrip;
 import com.ecotel.thong_ke_cao_son.model.LoadLevel;
 import com.ecotel.thong_ke_cao_son.repository.PickupPointRepository;
 import com.ecotel.thong_ke_cao_son.model.PickupPoint;
 import com.ecotel.thong_ke_cao_son.repository.*;
+import com.ecotel.thong_ke_cao_son.security.AppUserDetails;
+import com.ecotel.thong_ke_cao_son.security.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.Pageable;
@@ -52,6 +56,19 @@ public class ExcavationReportService {
     private final ReconciliationEventPublisher reconciliationEventPublisher;
     @Lazy
     private final ReconciliationService reconciliationService;
+
+    // Xem javadoc tương ứng ở TransportReportService — cùng lý do, cùng thiết kế.
+    private void assertDepartmentAccess(Long targetDepartmentId) {
+        AppUserDetails user = SecurityUtils.currentUser();
+        if (user == null || !user.canAccessDepartment(targetDepartmentId)) {
+            throw new ForbiddenException("Không có quyền truy cập dữ liệu Khai thác của đơn vị khác");
+        }
+    }
+
+    private Long currentScopeDepartmentId() {
+        AppUserDetails user = SecurityUtils.currentUser();
+        return (user == null || user.hasFullDataScope()) ? null : user.getDepartmentId();
+    }
 
     @Transactional
     public ExcavationReportResponse create(ExcavationReportRequest request) {
@@ -91,6 +108,8 @@ public class ExcavationReportService {
     public ExcavationReportResponse getById(Long id) {
         ExcavationReport report = excavationReportRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy báo cáo: " + id));
+        assertDepartmentAccess(report.getExcavatorDevice().getDepartment() != null
+                ? report.getExcavatorDevice().getDepartment().getId() : null);
         return excavationReportMapper.toResponse(report);
     }
 
@@ -101,7 +120,8 @@ public class ExcavationReportService {
                                                              List<String> excavationFloors,
                                                              Pageable pageable) {
         return PageResponse.from(excavationReportRepository
-                .search(fromDate, toDate, shiftIds, excavatorIds, receivingLocationIds, excavationFloors, pageable)
+                .search(fromDate, toDate, shiftIds, excavatorIds, receivingLocationIds, excavationFloors,
+                        currentScopeDepartmentId(), pageable)
                 .map(excavationReportMapper::toResponse));
     }
 
@@ -111,17 +131,39 @@ public class ExcavationReportService {
         return excavationReportRepository.findDistinctExcavationFloors(fromDate, toDate);
     }
 
+    /**
+     * Dùng cho xuất Excel — trước đây {@code ExcavationReportController.export}
+     * gọi THẲNG {@code excavationReportRepository.search(...)}, bỏ qua hoàn
+     * toàn tầng Service (và giờ là cả lọc theo đơn vị). Thêm method này để
+     * controller đi qua đúng 1 điểm chốt, không phải mở khoá phòng thủ ở một
+     * nơi rồi vẫn còn hở cửa sau ở nơi khác.
+     */
+    @Transactional(readOnly = true)
+    public List<ExcavationReport> findAllForExport(LocalDate fromDate, LocalDate toDate,
+                                                    List<Long> shiftIds, List<Long> excavatorIds,
+                                                    List<Long> receivingLocationIds,
+                                                    List<String> excavationFloors) {
+        return excavationReportRepository
+                .search(fromDate, toDate, shiftIds, excavatorIds, receivingLocationIds, excavationFloors,
+                        currentScopeDepartmentId(), Pageable.unpaged())
+                .getContent();
+    }
+
     @Transactional
     public void delete(Long id) {
         ExcavationReport report = excavationReportRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy báo cáo: " + id));
+        assertDepartmentAccess(report.getExcavatorDevice().getDepartment() != null
+                ? report.getExcavatorDevice().getDepartment().getId() : null);
         excavationReportRepository.delete(report);
         reconciliationEventPublisher.publishChanged();
     }
 
     private void applyRelations(ExcavationReport report, ExcavationReportRequest request) {
         report.setShift(getOrThrow(shiftRepository, request.getShiftId(), "Ca"));
-        report.setExcavatorDevice(getOrThrow(deviceRepository, request.getExcavatorDeviceId(), "Máy xúc"));
+        Device excavator = getOrThrow(deviceRepository, request.getExcavatorDeviceId(), "Máy xúc");
+        assertDepartmentAccess(excavator.getDepartment() != null ? excavator.getDepartment().getId() : null);
+        report.setExcavatorDevice(excavator);
         report.setReceivingLocation(getOrThrow(pickupPointRepository, request.getReceivingLocationId(), "Nơi chất tải"));
         report.setEmployee(getOrThrow(userRepository, request.getEmployeeId(), "Nhân viên"));
     }
@@ -176,6 +218,8 @@ public class ExcavationReportService {
             List<Long> missingIds = ids.stream().filter(id -> !foundIds.contains(id)).toList();
             throw new ResourceNotFoundException("Không tìm thấy báo cáo với ID: " + missingIds);
         }
+        reports.forEach(r -> assertDepartmentAccess(
+                r.getExcavatorDevice().getDepartment() != null ? r.getExcavatorDevice().getDepartment().getId() : null));
         excavationReportRepository.deleteAll(reports);
         reconciliationEventPublisher.publishChanged();
         return BulkDeleteResponse.builder()
@@ -190,6 +234,8 @@ public class ExcavationReportService {
     public ExcavationReportTripResponse getTrip(Long tripId) {
         ExcavationReportTrip trip = excavationReportTripRepository.findById(tripId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy chuyến: " + tripId));
+        assertDepartmentAccess(trip.getExcavationReport().getExcavatorDevice().getDepartment() != null
+                ? trip.getExcavationReport().getExcavatorDevice().getDepartment().getId() : null);
         ExcavationReportTripResponse response = excavationReportMapper.toTripResponse(trip);
 
         // Xem chú thích bên TransportReportService.getTrip — cùng lý do.
@@ -204,6 +250,13 @@ public class ExcavationReportService {
     public ExcavationReportTripResponse updateTrip(Long tripId, ExcavationReportTripUpdateRequest request) {
         ExcavationReportTrip trip = excavationReportTripRepository.findById(tripId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy chuyến: " + tripId));
+        assertDepartmentAccess(trip.getExcavationReport().getExcavatorDevice().getDepartment() != null
+                ? trip.getExcavationReport().getExcavatorDevice().getDepartment().getId() : null);
+        if (request.getExcavatorDeviceId() != null) {
+            Device targetExcavator = getOrThrow(deviceRepository, request.getExcavatorDeviceId(), "Máy xúc");
+            assertDepartmentAccess(targetExcavator.getDepartment() != null
+                    ? targetExcavator.getDepartment().getId() : null);
+        }
 
         // Chốt 2026-09-09: chuyến đã duyệt đối chiếu không được sửa trực tiếp ở
         // nhập liệu nữa — phải để Thống kê gửi yêu cầu sửa (chuyển trạng thái
@@ -290,6 +343,8 @@ public class ExcavationReportService {
     public void deleteTrip(Long tripId) {
         ExcavationReportTrip trip = excavationReportTripRepository.findById(tripId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy chuyến: " + tripId));
+        assertDepartmentAccess(trip.getExcavationReport().getExcavatorDevice().getDepartment() != null
+                ? trip.getExcavationReport().getExcavatorDevice().getDepartment().getId() : null);
 
         // Xóa reconciliation decision liên quan trước
         reconciliationDecisionRepository.findByExcavationReportTrip_Id(tripId)
@@ -312,6 +367,8 @@ public class ExcavationReportService {
         for (ExcavationTripBulkUpdateItem item : items) {
             ExcavationReportTrip trip = excavationReportTripRepository.findById(item.getId())
                     .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy chuyến: " + item.getId()));
+            assertDepartmentAccess(trip.getExcavationReport().getExcavatorDevice().getDepartment() != null
+                    ? trip.getExcavationReport().getExcavatorDevice().getDepartment().getId() : null);
 
             if (trip.getStatus() == ApprovalStatus.APPROVED) {
                 throw new BadRequestException(
@@ -341,6 +398,8 @@ public class ExcavationReportService {
             List<Long> missingIds = tripIds.stream().filter(id -> !foundIds.contains(id)).toList();
             throw new ResourceNotFoundException("Không tìm thấy chuyến: " + missingIds);
         }
+        trips.forEach(t -> assertDepartmentAccess(t.getExcavationReport().getExcavatorDevice().getDepartment() != null
+                ? t.getExcavationReport().getExcavatorDevice().getDepartment().getId() : null));
 
         // Xóa reconciliation decisions liên quan trước
         reconciliationDecisionRepository.findByExcavationReportTrip_IdIn(tripIds)

@@ -1,5 +1,6 @@
 package com.ecotel.thong_ke_cao_son.security;
 
+import com.ecotel.thong_ke_cao_son.model.Department;
 import com.ecotel.thong_ke_cao_son.model.Position;
 import com.ecotel.thong_ke_cao_son.model.PositionPermission;
 import com.ecotel.thong_ke_cao_son.model.User;
@@ -22,6 +23,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 /**
@@ -282,7 +284,15 @@ class LocalAuthServiceTest {
             when(passwordEncoder.matches("x", "hashed")).thenReturn(true);
             // Chức vụ cho đủ quyền, nhưng tài khoản chỉ được set riêng "r" —
             // hai tài khoản CÙNG Chức vụ này phải có thể khác nhau đúng kiểu.
-            when(positionPermissionRepository.findByPosition_Id(20L))
+            // lenient(): permissionsFor() dừng ở tầng quyền RIÊNG khi tài
+            // khoản đã có dòng UserPermission (đúng logic bài test đang xác
+            // minh) nên KHÔNG BAO GIỜ đụng tới positionPermissionRepository —
+            // stub này chỉ để tài liệu hoá "Chức vụ CÓ quyền khác", Mockito
+            // strict-stub coi là "unnecessary" nếu không đánh dấu lenient.
+            // Bug tiền tồn tại (không phải do lượt sửa Quality Gate này gây
+            // ra) — mvn test trước giờ luôn chạy với -DskipTests trong
+            // Docker build nên chưa ai bắt được.
+            lenient().when(positionPermissionRepository.findByPosition_Id(20L))
                     .thenReturn(List.of(permission(pos, "transport-reports", true, true, true, true, true)));
             when(userPermissionRepository.findByUser_Id(user.getId()))
                     .thenReturn(List.of(userPermission(user, "transport-reports", false, true, false, false, false)));
@@ -342,6 +352,61 @@ class LocalAuthServiceTest {
             assertThat(reconciliation.get("c")).isTrue();
             assertThat(reconciliation.get("r")).isFalse();
             assertThat(reconciliation.get("u")).isTrue();
+        }
+    }
+
+    @Nested
+    @DisplayName("Claim departmentId/fullDataScope trong token (Quality Gate lượt 2, 2026-09-10)")
+    class DepartmentScopeClaims {
+
+        private static Department department(long id, boolean fullDataScope) {
+            Department d = new Department();
+            d.setId(id);
+            d.setCode("KT");
+            d.setName("Khai thác");
+            d.setFullDataScope(fullDataScope);
+            return d;
+        }
+
+        @Test
+        @DisplayName("Chưa gán phòng ban -> departmentId=null, fullDataScope=false")
+        void noDepartmentMeansNullAndNotFullScope() {
+            User user = activeUser("nv04", null);
+            when(userRepository.findByUsername("nv04")).thenReturn(Optional.of(user));
+            when(passwordEncoder.matches("x", "hashed")).thenReturn(true);
+
+            Map<String, Object> claims = decodedClaims(newService().login("nv04", "x").appToken());
+
+            assertThat(claims.get("departmentId")).isNull();
+            assertThat(claims.get("fullDataScope")).isEqualTo(false);
+        }
+
+        @Test
+        @DisplayName("Phòng ban fullDataScope=false -> claim đúng id phòng ban, fullDataScope=false")
+        void scopedDepartmentCarriesItsId() {
+            User user = activeUser("nv05", null);
+            user.setDepartment(department(7L, false));
+            when(userRepository.findByUsername("nv05")).thenReturn(Optional.of(user));
+            when(passwordEncoder.matches("x", "hashed")).thenReturn(true);
+
+            Map<String, Object> claims = decodedClaims(newService().login("nv05", "x").appToken());
+
+            assertThat(((Number) claims.get("departmentId")).longValue()).isEqualTo(7L);
+            assertThat(claims.get("fullDataScope")).isEqualTo(false);
+        }
+
+        @Test
+        @DisplayName("Phòng ban fullDataScope=true (vd Thống kê) -> claim fullDataScope=true")
+        void fullScopeDepartmentCarriesTrue() {
+            User user = activeUser("nv06", null);
+            user.setDepartment(department(9L, true));
+            when(userRepository.findByUsername("nv06")).thenReturn(Optional.of(user));
+            when(passwordEncoder.matches("x", "hashed")).thenReturn(true);
+
+            Map<String, Object> claims = decodedClaims(newService().login("nv06", "x").appToken());
+
+            assertThat(((Number) claims.get("departmentId")).longValue()).isEqualTo(9L);
+            assertThat(claims.get("fullDataScope")).isEqualTo(true);
         }
     }
 

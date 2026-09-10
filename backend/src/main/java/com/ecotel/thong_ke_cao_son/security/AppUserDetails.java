@@ -27,6 +27,27 @@ public class AppUserDetails implements UserDetails {
     private String app;
     private Map<String, PermissionDto> permissions; // key: "nhan-su/nhan-vien"
 
+    /** Đơn vị (Phòng ban) của tài khoản — null nếu chưa gán. Xem {@code Department.fullDataScope}. */
+    private Long departmentId;
+    /** true = bỏ qua lọc dữ liệu theo đơn vị (đơn vị kiểu Thống kê). */
+    private Boolean fullDataScope;
+
+    public boolean hasFullDataScope() {
+        return Boolean.TRUE.equals(fullDataScope);
+    }
+
+    /**
+     * Có được truy cập dữ liệu gắn với đơn vị {@code targetDepartmentId}
+     * không. {@code targetDepartmentId == null} (thiết bị chưa gán đơn vị)
+     * luôn CHO PHÉP — không thể lọc theo một phạm vi không tồn tại, và dữ
+     * liệu thiết bị cũ trong hệ thống phần lớn chưa từng được gán đơn vị.
+     */
+    public boolean canAccessDepartment(Long targetDepartmentId) {
+        return targetDepartmentId == null
+                || hasFullDataScope()
+                || (departmentId != null && departmentId.equals(targetDepartmentId));
+    }
+
     public boolean hasPermission(String resource, String action) {
         PermissionDto perm = permissions.get(resource);
         if (perm == null) return false;

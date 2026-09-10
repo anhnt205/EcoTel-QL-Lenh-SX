@@ -2,6 +2,7 @@ package com.ecotel.thong_ke_cao_son.service.production;
 
 import com.ecotel.thong_ke_cao_son.event.ReconciliationApprovedEvent;
 import com.ecotel.thong_ke_cao_son.exception.BadRequestException;
+import com.ecotel.thong_ke_cao_son.exception.PeriodNotFullyApprovedException;
 import com.ecotel.thong_ke_cao_son.model.ProductionResult;
 import com.ecotel.thong_ke_cao_son.model.ReportPeriod;
 import com.ecotel.thong_ke_cao_son.repository.ProductionResultRepository;
@@ -30,12 +31,20 @@ import java.util.Set;
  * <p><b>"Chưa đủ điều kiện" KHÔNG phải lỗi:</b> {@code calculatePeriod} đòi
  * TOÀN BỘ chuyến của cả kỳ phải APPROVED (QĐ-16) — duyệt từng dòng lẻ tẻ
  * (không phải duyệt hàng loạt hết 1 kỳ) sẽ liên tục rơi vào trường hợp
- * "còn chuyến chưa duyệt", ném {@link BadRequestException}. Đây là trạng
- * thái BÌNH THƯỜNG (kỳ đang duyệt dở), không phải lỗi hệ thống — chỉ log mức
- * debug, KHÔNG log lỗi, KHÔNG có cách nào báo cho người dùng biết (đang chạy
+ * "còn chuyến chưa duyệt", ném {@link PeriodNotFullyApprovedException}. Đây
+ * là trạng thái BÌNH THƯỜNG (kỳ đang duyệt dở), không phải lỗi hệ thống —
+ * chỉ log mức debug, KHÔNG có cách nào báo cho người dùng biết (đang chạy
  * nền sau khi response đã trả về) nên im lặng bỏ qua là đúng: người dùng
  * duyệt nốt các dòng còn lại, tự động tính lại sẽ thành công ở lần duyệt
  * cuối cùng của kỳ đó.
+ *
+ * <p><b>Mọi {@link BadRequestException} KHÁC (kỳ đã chốt, chưa có chuyến,
+ * hở tháng, tra trượt tham số định mức bắt buộc) là lỗi THẬT</b> — trước
+ * 2026-09-10 (lượt 2) bị bắt CHUNG một chỗ với "chưa đủ điều kiện" nên cũng
+ * bị nuốt y hệt, im lặng: lần duyệt cuối của kỳ có thể không tạo được báo
+ * cáo (ví dụ thiếu định mức) mà không ai biết, không có cách retry. Từ nay
+ * log mức lỗi để còn biết mà xử lý tay — xem {@link #recalculateQuietly}.
+ * Phát hiện qua Quality Gate của Codex.
  */
 @Component
 @RequiredArgsConstructor
@@ -79,8 +88,16 @@ public class ProductionAutoRecalculateListener {
             productionCalculationService.calculatePeriod(periodId, tkeMode);
             log.info("Tự động tính lại sản lượng kỳ {} (id={}) sau khi Đối chiếu duyệt",
                     period.getDisplayName(), periodId);
-        } catch (BadRequestException e) {
+        } catch (PeriodNotFullyApprovedException e) {
+            // Bình thường (kỳ đang duyệt dở) — xem javadoc lớp. KHÔNG log lỗi.
             log.debug("Kỳ {} (id={}) chưa đủ điều kiện để tự động tính lại: {}",
+                    period.getDisplayName(), periodId, e.getMessage());
+        } catch (BadRequestException e) {
+            // Lỗi nghiệp vụ/dữ liệu THẬT (kỳ đã chốt, chưa có chuyến, hở
+            // tháng, tra trượt định mức...) — PHẢI observable, không phải
+            // trạng thái "đang duyệt dở" như trên. Transaction duyệt gốc đã
+            // COMMIT, không rollback được — chỉ log lỗi để xử lý tay.
+            log.error("Kỳ {} (id={}) tự động tính lại thất bại (lỗi nghiệp vụ/dữ liệu): {}",
                     period.getDisplayName(), periodId, e.getMessage());
         } catch (Exception e) {
             // Transaction gốc (duyệt) đã COMMIT xong, không rollback được nữa —

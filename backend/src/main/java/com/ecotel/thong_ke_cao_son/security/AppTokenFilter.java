@@ -32,13 +32,30 @@ public class AppTokenFilter extends OncePerRequestFilter {
             if (rawPerms != null) {
                 // Parse permissions và replace principal bằng AppUserDetails
                 Map<String, PermissionDto> permissions = parsePermissions(rawPerms);
+
+                Object departmentIdClaim = jwt.getClaim("departmentId");
+                Long departmentId = departmentIdClaim instanceof Number n ? n.longValue() : null;
+
+                // Claim "fullDataScope" VẮNG MẶT (khác với có mặt và = false) nghĩa
+                // là token không phải do LocalAuthService phát hành (LocalAuthService
+                // LUÔN ghi claim này, kể cả false) — ví dụ token Portal cũ/tương lai
+                // chưa biết tới tính năng lọc theo đơn vị này. Coi như fullDataScope
+                // để KHÔNG khoá nhầm một luồng đăng nhập khác chưa được cập nhật,
+                // thay vì âm thầm khoá hết dữ liệu của mọi tài khoản Portal.
+                Object fullDataScopeClaim = jwt.getClaim("fullDataScope");
+                Boolean fullDataScope = fullDataScopeClaim != null
+                        ? Boolean.TRUE.equals(fullDataScopeClaim)
+                        : Boolean.TRUE;
+
                 AppUserDetails principal = new AppUserDetails(
                         jwt.getSubject(),
                         jwt.getClaim("username"),
                         jwt.getClaim("fullName"),
                         jwt.getClaim("companyId"),
                         jwt.getClaim("app"),
-                        permissions
+                        permissions,
+                        departmentId,
+                        fullDataScope
                 );
                 UsernamePasswordAuthenticationToken newAuth =
                         new UsernamePasswordAuthenticationToken(

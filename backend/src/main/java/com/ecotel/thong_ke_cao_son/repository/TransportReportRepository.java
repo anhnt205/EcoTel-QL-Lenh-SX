@@ -18,6 +18,7 @@ public interface TransportReportRepository extends JpaRepository<TransportReport
     WHERE r.reportDate BETWEEN :fromDate AND :toDate
       AND (:shiftIds IS NULL OR r.shift.id IN :shiftIds)
       AND (:deviceIds IS NULL OR r.vehicle.id IN :deviceIds)
+      AND (:departmentId IS NULL OR r.vehicle.department.id = :departmentId OR r.vehicle.department.id IS NULL)
     ORDER BY r.reportDate DESC
     """)
     Page<Long> searchIds(
@@ -25,6 +26,7 @@ public interface TransportReportRepository extends JpaRepository<TransportReport
             @Param("toDate") LocalDate toDate,
             @Param("shiftIds") List<Long> shiftIds,
             @Param("deviceIds") List<Long> deviceIds,
+            @Param("departmentId") Long departmentId,
             Pageable pageable);
 
     @Query("""
@@ -46,11 +48,13 @@ public interface TransportReportRepository extends JpaRepository<TransportReport
     WHERE r.reportDate BETWEEN :fromDate AND :toDate
       AND (:shiftIds IS NULL OR r.shift.id IN :shiftIds)
       AND (:deviceIds IS NULL OR r.vehicle.id IN :deviceIds)
+      AND (:departmentId IS NULL OR r.vehicle.department.id = :departmentId OR r.vehicle.department.id IS NULL)
     ORDER BY r.reportDate DESC
     """)
     List<Long> searchAllIds(
             @Param("fromDate") LocalDate fromDate,
             @Param("toDate") LocalDate toDate,
             @Param("shiftIds") List<Long> shiftIds,
-            @Param("deviceIds") List<Long> deviceIds);
+            @Param("deviceIds") List<Long> deviceIds,
+            @Param("departmentId") Long departmentId);
 }

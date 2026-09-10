@@ -10,6 +10,14 @@ import java.util.List;
 
 public interface TransportReportTripRepository extends JpaRepository<TransportReportTrip, Long> {
 
+    // ORDER BY bắt buộc — thiếu nó là lỗi thật đã tìm thấy qua Quality Gate
+    // của Codex (lượt 2, 2026-09-10): ReconciliationService.search() ghép
+    // cặp bằng Deque.poll() theo đúng THỨ TỰ trả về của truy vấn này; không
+    // ORDER BY thì Postgres không đảm bảo thứ tự ổn định giữa các lần gọi,
+    // khiến việc ghép cặp không xác định (không sai NGHIỆP VỤ — vẫn ghép
+    // đúng khoá — nhưng "ai ghép với ai" trong số nhiều chuyến CÙNG khoá có
+    // thể đổi qua lại giữa các lần tìm kiếm). Khớp đúng thứ tự
+    // {@code ExcavationReportTripRepository.findForReconciliation} đã dùng.
     @Query("""
         SELECT t FROM TransportReportTrip t
         JOIN FETCH t.transportReport r
@@ -24,6 +32,7 @@ public interface TransportReportTripRepository extends JpaRepository<TransportRe
         WHERE r.reportDate BETWEEN :fromDate AND :toDate
           AND (:shiftIds IS NULL OR r.shift.id IN :shiftIds)
           AND (:deviceIds IS NULL OR r.vehicle.id IN :deviceIds)
+        ORDER BY r.reportDate, t.id
         """)
     List<TransportReportTrip> findForReconciliation(
             @Param("fromDate") LocalDate fromDate,

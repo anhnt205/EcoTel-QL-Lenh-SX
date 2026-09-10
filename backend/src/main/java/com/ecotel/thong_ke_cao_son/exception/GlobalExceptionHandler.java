@@ -64,6 +64,14 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.error(400, ex.getMessage()));
     }
 
+    /** Đã xác thực + đủ quyền chức năng, nhưng bị chặn theo phạm vi dữ liệu (đơn vị) — xem ForbiddenException. */
+    @ExceptionHandler(ForbiddenException.class)
+    public ResponseEntity<ApiResponse<Void>> handleForbidden(ForbiddenException ex) {
+        log.warn("Từ chối theo phạm vi đơn vị: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(ApiResponse.error(403, ex.getMessage()));
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiResponse<Map<String, String>>> handleValidation(MethodArgumentNotValidException ex) {
         Map<String, String> errors = new LinkedHashMap<>();

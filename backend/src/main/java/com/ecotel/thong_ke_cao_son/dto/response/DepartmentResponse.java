@@ -17,6 +17,7 @@ public class DepartmentResponse {
     String code;
     String description;
     Set<String> allowedResources;
+    Boolean fullDataScope;
     LocalDateTime createdAt;
     LocalDateTime updatedAt;
 }

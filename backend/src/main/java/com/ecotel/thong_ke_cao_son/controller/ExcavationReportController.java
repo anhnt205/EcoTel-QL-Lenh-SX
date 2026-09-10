@@ -10,7 +10,6 @@ import com.ecotel.thong_ke_cao_son.dto.response.*;
 import com.ecotel.thong_ke_cao_son.excel.ExcavationReportExcelExporter;
 import com.ecotel.thong_ke_cao_son.excel.ExcavationReportExcelImporter;
 import com.ecotel.thong_ke_cao_son.model.ExcavationReport;
-import com.ecotel.thong_ke_cao_son.repository.ExcavationReportRepository;
 import com.ecotel.thong_ke_cao_son.service.ExcavationReportService;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -36,7 +35,6 @@ import java.util.List;
 public class ExcavationReportController {
 
     private final ExcavationReportService excavationReportService;
-    private final ExcavationReportRepository excavationReportRepository;
 
     private final ExcavationReportExcelExporter excelExporter;
     private final ExcavationReportExcelImporter excelImporter;
@@ -146,10 +144,8 @@ public class ExcavationReportController {
             @RequestParam(required = false) List<Long> receivingLocationIds,
             @RequestParam(required = false) List<String> excavationFloors) {
 
-        List<ExcavationReport> reports = excavationReportRepository
-                .search(fromDate, toDate, shiftIds, excavatorIds,
-                        receivingLocationIds, excavationFloors, Pageable.unpaged())
-                .getContent();
+        List<ExcavationReport> reports = excavationReportService
+                .findAllForExport(fromDate, toDate, shiftIds, excavatorIds, receivingLocationIds, excavationFloors);
 
         byte[] excelBytes = excelExporter.export(reports);
 

@@ -1,3 +1,11 @@
 spring:
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:dev}
+  sql:
+    init:
+      # Bắt buộc "always" vì Postgres không phải CSDL nhúng — Spring mặc định
+      # chỉ tự chạy schema.sql cho CSDL nhúng (H2...), "embedded" sẽ ÂM THẦM
+      # bỏ qua file này trên Postgres. Chạy TRƯỚC Hibernate ddl-auto=update
+      # (spring.jpa.defer-datasource-initialization mặc định false) — xem
+      # schema.sql để biết lý do bắt buộc thứ tự này.
+      mode: always

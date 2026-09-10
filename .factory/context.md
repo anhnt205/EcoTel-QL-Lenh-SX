@@ -2069,3 +2069,203 @@ gọi `.click()` trên DOM node visual có vẻ đổi (`aria-checked` đổi ng
 KHÔNG chắc đồng bộ vào state React của component cha (đã tự dính bug này khi
 test lượt này: tick "Duyệt" qua JS, DOM đổi đúng, nhưng bấm "Lưu" gửi payload
 KHÔNG có thay đổi đó — mất 1 vòng lặp mới phát hiện ra).
+
+## Lượt 22 (2026-09-10) — Quality Gate lượt 2 của Codex: 4 phát hiện, review commit `2745256`
+
+Trước khi sửa, verify LẠI từng phát hiện đối chiếu code thật (không tin lời
+Codex/agent xác minh trước đó theo mặt chữ) — 1 trong 4 phát hiện SAI (giải
+thích ở mục 3 dưới). Sau khi sửa: build sạch Docker (backend Maven + frontend
+pnpm), `mvn test` 65/66 pass (1 fail còn lại là `ThongKeCaoSonApplicationTests
+.contextLoads` — lỗi PRE-EXISTING đã ghi ở CLAUDE.md dự án mục 3, cần
+Postgres/Redis sống, ngoài phạm vi lượt này), verify sống qua API thật (JWT
+decode, `curl` với 2 tài khoản thật) + UI thật (Browser pane, test_vantai).
+
+### 1. BLOCKING — Phân quyền DỮ LIỆU theo đơn vị (backend chưa lọc/xác minh)
+
+Đúng như Codex nêu: `AppUserDetails` chưa có `department`;
+`TransportReportService`/`ExcavationReportService`/`ReconciliationService`
+không hề lọc hay xác minh đơn vị của chủ tài khoản — có quyền CHỨC NĂNG
+"transport-reports" là đọc/sửa/xoá được báo cáo của xe đơn vị KHÁC qua API
+trực tiếp, bất kể UI có ẩn nút hay không.
+
+**Thiết kế:**
+- `Department` (đã dùng cho `allowedResources` từ lượt 20) thêm cột
+  `full_data_scope` (boolean, mặc định false) — đơn vị nào bật cờ này thì
+  tài khoản thuộc đơn vị đó BỎ QUA lọc theo đơn vị (dành cho Thống kê/Admin).
+  KHÔNG dùng cách so sánh `code` cứng ("THONGKE") trong code — data-driven
+  đúng tinh thần đã chốt từ lượt 20/21, bật/tắt được qua sửa Phòng ban
+  (form UI hiện CHƯA có ô riêng cho cờ này — chỉ set được qua API/DB; ghi
+  nhận đây là khoảng trống cần bổ sung UI sau, KHÔNG chặn phạm vi lượt này).
+- JWT (`LocalAuthService.buildToken`) thêm 2 claim: `departmentId`,
+  `fullDataScope` (tính từ `user.getDepartment()`) — `AppTokenFilter` parse
+  vào `AppUserDetails` mới có 2 field cùng tên + helper
+  `canAccessDepartment(targetDepartmentId)`: `true` nếu target null (thiết
+  bị chưa gán đơn vị — không lọc được cái không tồn tại), hoặc tài khoản
+  full-scope, hoặc `departmentId` trùng target. Claim `fullDataScope` VẮNG
+  MẶT hẳn (khác có mặt+false) → coi như full-scope, để không khoá nhầm
+  token Portal cũ/tương lai chưa biết claim này (auth mode `standalone`
+  đang chạy thật LUÔN ghi đủ 2 claim).
+- `SecurityUtils.currentUser()` (mới) đọc `AppUserDetails` từ
+  `SecurityContextHolder` NGAY TRONG SERVICE — không sửa chữ ký controller
+  nào (controller vốn thin, chỉ delegate).
+- `TransportReportService`/`ExcavationReportService`: `assertDepartmentAccess`
+  (fail-closed, ném `ForbiddenException` → 403) gắn vào MỌI method đụng
+  trực tiếp 1 báo cáo/chuyến theo id (create/update/getById/delete/getTrip/
+  updateTrip/deleteTrip/bulkDelete/bulkUpdateTrips/bulkDeleteTrips — đúng
+  đường Codex nêu "dùng API trực tiếp"); `search`/`findAllForExport` lọc
+  NGAY TRONG SQL (thêm tham số `departmentId` vào JPQL, không lọc sau khi
+  fetch — giữ đúng phân trang). Tiện phát hiện thêm 1 lỗ hổng CÙNG LOẠI khi
+  sửa: `ExcavationReportController.export` gọi THẲNG
+  `excavationReportRepository.search(...)`, bỏ qua hẳn tầng Service (và giờ
+  cả lọc đơn vị) — thêm `ExcavationReportService.findAllForExport` đúng
+  pattern bên Transport, sửa controller gọi qua service.
+- `ReconciliationService.search`: lọc DÒNG (không phải trip riêng lẻ) —
+  đối chiếu vốn 2 chiều (Vận tải x Khai thác) nên dùng OR: giữ dòng nếu BẤT
+  KỲ bên nào (trong các bên THỰC SỰ có ở dòng đó) thuộc đơn vị tài khoản,
+  chỉ ẩn khi KHÔNG bên nào thuộc — đơn vị Vận tải vẫn cần thấy bên Khai thác
+  đối ứng để so sánh. `updateTrips`/`resubmitTrips` (2 đường "gửi lại"/sửa
+  dữ liệu qua Đối chiếu) thêm xác minh CỨNG theo từng bên.
+
+**Phát hiện khi verify sống qua DB thật (KHÔNG phải bug code — lỗ hổng cấu
+hình dữ liệu sẽ khoá nhầm tài khoản thật nếu deploy mà không xử lý):**
+tài khoản `admin` VÀ 3 tài khoản test (`test_vantai`/`test_khaithac`/
+`test_thongke`, dựng ở lượt trước cho tính năng "Chuyển vai trò test" —
+tính năng đó CHỈ đổi label UI phía frontend, KHÔNG liên quan `Department`
+thật) đều đang gán vào 3 "phòng ban vai trò" (`VANTAI`/`KHAITHAC`/
+`THONGKE`, mã 164/165/166) — nhưng THIẾT BỊ (xe/máy xúc) lại gán vào các
+đơn vị CÔNG TRƯỜNG/PHÂN XƯỞNG cụ thể (`VT7`/`VT8`/`VT9`/`VT4`/`KT1`, mã
+11/12/13/63/113) — HAI KHÁI NIỆM KHÁC NHAU dùng chung bảng `Department`.
+Nếu deploy nguyên trạng, `admin` VÀ 2 tài khoản `test_vantai`/`test_khaithac`
+sẽ bị KHOÁ khỏi MỌI dữ liệu thiết bị (không phòng ban nào trùng). Xử lý qua
+DB (dữ liệu môi trường, không phải sửa code): bật `full_data_scope=true`
+cho `ADMIN` VÀ `THONGKE`; đổi `department_id` của `test_vantai`→`VT7` (11),
+`test_khaithac`→`KT1` (113) — đúng ý nghĩa "1 nhân viên VT/KT thuộc 1 phân
+xưởng/công trường CỤ THỂ" theo đúng câu chữ yêu cầu, không đổi gì tới
+Position/quyền CHỨC NĂNG của 2 tài khoản này (Position tách biệt hẳn khỏi
+User.department). **Việc CẦN LÀM TIẾP** (không phải lỗi, là việc vận hành):
+gán `department_id` đúng phân xưởng/công trường thật cho mọi nhân viên
+Vận tải/Khai thác còn lại (hiện `nxbang`→VT7, `tvminh`/`lqhung`→VT8,
+`pvdung`→VT9 đã đúng sẵn — 4 tài khoản NHÂN VIÊN THẬT này giờ sẽ chỉ thấy
+đúng đơn vị mình, đúng ý đồ tính năng); `test_a`/`test_b` (mã 164/165,
+Vai trò) CHƯA xử lý — 2 tài khoản phụ, không critical, ghi nhận để chủ dự
+án tự quyết có cần phân xưởng cụ thể hay không.
+
+**Verify sống (API `curl` + JWT decode + UI thật qua Browser pane):**
+- `test_vantai` (department=VT7/11): `GET /transport-reports/{id}` báo cáo
+  xe VT7 → 200; báo cáo xe VT8/VT4 → 403 "Không có quyền truy cập dữ liệu
+  Vận tải của đơn vị khác". `GET /transport-reports?...` (list) trước sửa
+  trả về cả 4 báo cáo trong CSDL, sau sửa CHỈ còn 1 (đúng đơn vị mình) —
+  UI "Nhập liệu Vận tải" hiện đúng "Tổng số báo giấy: 1", không lỗi console.
+- `test_khaithac` (department=KT1/113): tương tự với `excavation-reports`
+  — báo cáo máy xúc P30 (KT1) → 200; máy xúc P18 (VT9) → 403 "...dữ liệu
+  Khai thác của đơn vị khác".
+- `test_thongke` (fullDataScope=true): `GET /reconciliation` trả đủ CẢ 3
+  dòng (xe 468/VT7, 496/VT8, 950/VT4) — không bị lọc, đúng ý nghĩa "thấy
+  toàn bộ". (Không verify được nhánh lọc-theo-đơn-vị của chính
+  `ReconciliationService.search` bằng tài khoản VT/KT thật vì `test_vantai`/
+  `test_khaithac` chưa được cấp quyền CHỨC NĂNG `reconciliation` — khoảng
+  trống có sẵn từ trước, ngoài phạm vi lượt này; cơ chế lọc dùng CHUNG hàm
+  `canAccessDepartment` đã verify sống ở 2 service kia.)
+
+### 2. BLOCKING — Migration chưa deploy được an toàn (chạy tay)
+
+Đúng như Codex nêu. Thay `migration-2026-09-07-report-period-lock.sql`
+(chạy tay `psql`) bằng `backend/src/main/resources/schema.sql`
+(Spring Boot tự chạy lúc khởi động, TRƯỚC Hibernate `ddl-auto=update`) +
+`spring.sql.init.mode: always` trong `application.yaml` (bắt buộc vì
+Postgres không phải CSDL nhúng — mặc định Spring chỉ tự chạy `schema.sql`
+cho CSDL nhúng). Idempotent (`ADD COLUMN IF NOT EXISTS ... DEFAULT ...`) —
+an toàn chạy lại mỗi lần khởi động, mọi môi trường kể cả CSDL đã có dữ liệu
+thật. File `migration-2026-09-07-report-period-lock.sql` giữ lại (đổi
+header ghi rõ ĐÃ THAY THẾ) — chỉ còn giá trị tham khảo.
+
+Verify sống: redeploy `backend-service` lên preview (CSDL preview đã có sẵn
+13 dòng `departments`, có dữ liệu thật) — khởi động thành công (`Started
+ThongKeCaoSonApplication`, không lỗi), `\d report_periods`/`\d departments`
+qua `psql` xác nhận đủ 3 cột mới (`locked`, `stale`, `full_data_scope`),
+đúng kiểu, đúng NOT NULL, không cần chạy tay bất cứ gì.
+
+### 3. MAJOR — Ghép cặp reconciliation: 1 phần đúng, 1 phần Codex hiểu sai
+
+- **Đúng (đã sửa):** `TransportReportTripRepository.findForReconciliation`
+  thiếu `ORDER BY` trong khi `ExcavationReportTripRepository` cùng tên đã
+  có `ORDER BY r.reportDate, t.id` — bất đối xứng khiến việc ghép cặp bằng
+  `Deque.poll()` không xác định thứ tự khi nhiều chuyến trùng khoá. Sửa:
+  thêm đúng `ORDER BY r.reportDate, t.id` khớp bên kia.
+- **SAI (không sửa theo, đã ghi rõ lý do trong code):** Codex đề nghị đưa
+  `cargoType` (Loại hàng) vào khoá ghép — đây là hiểu nhầm một quyết định
+  nghiệp vụ ĐÃ CHỐT: QĐ-14 (`docs/DECISIONS.md`, 2026-09-08) CỐ Ý bỏ
+  `cargoType` khỏi khoá, thay cho QĐ-01 cũ — vì Loại hàng chính là một
+  trong những thứ đối chiếu PHẢI so sánh xem 2 bên ghi lệch nhau không,
+  không phải điều kiện ghép cặp; đưa vào khoá sẽ khiến 2 chuyến ghi lệch
+  đúng Loại hàng (ca thật đã xảy ra: Vận tải ghi "Bùn nhão", Khai thác ghi
+  "Bùn dượt" cùng 1 xe/máy xúc/ca) tách thành 2 dòng riêng, mất hẳn mục
+  đích đối chiếu. Đã đọc kỹ code + doc trước khi bác bỏ, không làm theo mặt
+  chữ Quality Gate.
+
+Test mới: `ReconciliationServicePairingTest` — mock 3 chuyến Vận tải + 3
+chuyến Khai thác CÙNG khoá, đầu vào ĐÃ sắp xếp (đúng như sau khi có
+`ORDER BY`), xác nhận ghép cặp bám đúng thứ tự (id 1-1, 2-2, 3-3) — khoá lại
+hợp đồng "đầu vào có thứ tự → ghép xác định" mà `poll()` phụ thuộc vào.
+
+### 4. MAJOR — Auto-recalculate nuốt cả lỗi thật lẫn "đang duyệt dở"
+
+Đúng như Codex nêu: `ProductionAutoRecalculateListener` bắt CHUNG 1 chỗ mọi
+`BadRequestException` từ `calculatePeriod` (kỳ đã chốt, chưa có chuyến, hở
+tháng, tra trượt định mức, VÀ "còn chuyến chưa duyệt") rồi `log.debug`
+GIỐNG NHAU — chỉ đúng 1 trong 5 trường hợp đó (chuyến chưa duyệt) là BÌNH
+THƯỜNG, 4 trường hợp còn lại là lỗi thật bị nuốt im lặng.
+
+Sửa: exception mới `PeriodNotFullyApprovedException extends BadRequestException`
+— CHỈ ném ở đúng nhánh "còn chuyến chưa duyệt"
+(`ProductionCalculationService.calculatePeriod`, khối `notApprovedIssues`).
+Listener bắt theo thứ tự: `PeriodNotFullyApprovedException` trước (bình
+thường, `log.debug`) → `BadRequestException` khác (lỗi thật, `log.error`,
+observable để còn xử lý tay) → `Exception` (không mong đợi, `log.error`
+kèm stacktrace). KHÔNG làm retry tự động (Codex không đòi, chỉ đòi
+observable) — quyết định giữ nguyên "lần duyệt cuối của kỳ sẽ tự tính lại
+thành công" làm cơ chế phục hồi, không thêm cơ chế mới.
+
+Test mới `ProductionAutoRecalculateListenerTest` (5 case, dùng
+`ch.qos.logback.core.read.ListAppender` bắt log thật — không chỉ assert
+"không văng exception" mà assert đúng MỨC log cho từng loại lỗi, đúng chỗ
+Codex nêu): "chưa duyệt" → chỉ debug không error; lỗi thật (vd kỳ đã chốt)
+→ phải có error; tính thành công → info, không error; kỳ đã CHỐT → bỏ qua
+ngay không gọi `calculatePeriod`; nhiều ngày CÙNG kỳ → chỉ tính 1 lần.
+
+### Sửa phụ (phát hiện khi chạy `mvn test` thật — trước giờ luôn `-DskipTests`)
+
+`LocalAuthServiceTest.userOwnPermissionOverridesPosition` có 1 stub
+(`positionPermissionRepository.findByPosition_Id`) KHÔNG BAO GIỜ được gọi
+(logic dừng ở tầng quyền riêng tài khoản, không chạm tới Chức vụ) — Mockito
+strict-stub báo lỗi `UnnecessaryStubbing`. Bug PRE-EXISTING (không do lượt
+này gây ra, có từ lượt trước) — chưa ai bắt được vì `docker build` luôn
+dùng `-DskipTests`. Sửa: đánh dấu `lenient()` (stub vẫn còn ý nghĩa tài
+liệu hoá "Chức vụ CÓ quyền khác nhưng bị quyền riêng đè", chỉ không bắt
+buộc phải được gọi).
+
+### Kết quả build/test
+
+- Backend: `mvn -B test` → **65/66 pass**. 1 fail còn lại
+  `ThongKeCaoSonApplicationTests.contextLoads` — PRE-EXISTING, CLAUDE.md dự
+  án mục 3 đã ghi rõ (`@SpringBootTest` cần Postgres/Redis sống, không có
+  Testcontainers, ngoài phạm vi các lượt sửa Quality Gate).
+- Frontend: `pnpm install --frozen-lockfile && pnpm run build` → sạch,
+  không lỗi (chỉ warning pre-existing về chunk size/dynamic import, không
+  liên quan lượt này).
+- Deploy `backend-service` lên preview thành công, verify sống qua API +
+  UI thật như trên.
+
+### BÀN GIAO — việc còn lại (không thuộc phạm vi BLOCKING/MAJOR của lượt này)
+
+1. Form Phòng ban (frontend) chưa có ô bật/tắt `full_data_scope` — hiện chỉ
+   set được qua API/DB trực tiếp. Cần thêm nếu chủ dự án muốn tự đổi qua UI.
+2. `test_a`/`test_b` (2 tài khoản phụ, phòng ban `VANTAI`/`KHAITHAC` dạng
+   "vai trò") chưa được gán phân xưởng/công trường cụ thể — không critical.
+3. Excel import (`TransportReportExcelImporter`/`ExcavationReportExcelImporter`)
+   vẫn ghi thẳng qua repository, KHÔNG đi qua Service — nghĩa là CHƯA có
+   lọc/xác minh theo đơn vị ở đường import. Không thuộc 3 service Codex nêu
+   đích danh; ghi nhận là lỗ hổng cùng loại, còn tồn tại, cần xử lý riêng.
+4. `ReconciliationService.getHistory` (xem lịch sử qua icon "i") chưa có
+   xác minh theo đơn vị — rủi ro thấp hơn (chỉ đọc, cần biết trước tripId
+   hợp lệ, đã qua `search` đã lọc) nhưng chưa được chặn ở chính endpoint đó.

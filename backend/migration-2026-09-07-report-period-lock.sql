@@ -1,3 +1,9 @@
+-- ĐÃ THAY THẾ bởi backend/src/main/resources/schema.sql (2026-09-10, Quality
+-- Gate lượt 2) — ứng dụng giờ TỰ chạy migration này (và các migration tương
+-- tự sau này) mỗi lần khởi động, không cần chạy tay nữa. File này CHỈ còn
+-- giá trị tham khảo lịch sử, hoặc chạy tay cho môi trường đặc biệt không
+-- rebuild/khởi động lại ứng dụng (hiếm khi cần).
+--
 -- Bổ sung khoá/mở khoá kỳ báo cáo (QĐ-03) — bắt buộc chạy TAY.
 --
 -- Vì sao Hibernate `ddl-auto: update` không tự làm được: hai cột mới

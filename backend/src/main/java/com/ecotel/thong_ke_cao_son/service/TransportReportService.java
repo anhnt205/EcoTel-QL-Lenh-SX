@@ -10,7 +10,10 @@ import com.ecotel.thong_ke_cao_son.dto.response.TransportReportResponse;
 import com.ecotel.thong_ke_cao_son.dto.response.TransportReportTripResponse;
 import com.ecotel.thong_ke_cao_son.enums.ApprovalStatus;
 import com.ecotel.thong_ke_cao_son.exception.BadRequestException;
+import com.ecotel.thong_ke_cao_son.exception.ForbiddenException;
 import com.ecotel.thong_ke_cao_son.exception.ResourceNotFoundException;
+import com.ecotel.thong_ke_cao_son.security.AppUserDetails;
+import com.ecotel.thong_ke_cao_son.security.SecurityUtils;
 import com.ecotel.thong_ke_cao_son.model.ExcavationArea;
 import com.ecotel.thong_ke_cao_son.model.ReceivingPoint;
 import com.ecotel.thong_ke_cao_son.repository.UnloadingPointRepository;
@@ -56,6 +59,29 @@ public class TransportReportService {
     @Lazy
     private final ReconciliationService reconciliationService;
 
+    // ============ Phân quyền DỮ LIỆU theo đơn vị (Quality Gate lượt 2, 2026-09-10) ============
+    //
+    // Khác "permissions" (CRUD theo CHỨC NĂNG, đã có từ trước) — đây là lọc/
+    // xác minh theo ĐƠN VỊ (Device.department của Số xe): tài khoản có đủ
+    // quyền chức năng "transport-reports" vẫn KHÔNG được đọc/sửa/xoá báo cáo
+    // của xe thuộc đơn vị khác qua API trực tiếp, trừ khi đơn vị của tài
+    // khoản đó được đánh dấu "thấy toàn bộ" (Department.fullDataScope). Xem
+    // AppUserDetails.canAccessDepartment.
+
+    /** Chặn CỨNG (fail-closed) — dùng cho các thao tác đọc/sửa/xoá TRỰC TIẾP theo id (đúng lỗ hổng Codex nêu). */
+    private void assertDepartmentAccess(Long targetDepartmentId) {
+        AppUserDetails user = SecurityUtils.currentUser();
+        if (user == null || !user.canAccessDepartment(targetDepartmentId)) {
+            throw new ForbiddenException("Không có quyền truy cập dữ liệu Vận tải của đơn vị khác");
+        }
+    }
+
+    /** null = không lọc (tài khoản thấy toàn bộ, hoặc không xác định được — xem javadoc lớp). */
+    private Long currentScopeDepartmentId() {
+        AppUserDetails user = SecurityUtils.currentUser();
+        return (user == null || user.hasFullDataScope()) ? null : user.getDepartmentId();
+    }
+
     @Transactional
     public TransportReportResponse create(TransportReportRequest request) {
         TransportReport report = transportReportMapper.toEntity(request);
@@ -95,6 +121,8 @@ public class TransportReportService {
     public TransportReportResponse getById(Long id) {
         TransportReport report = transportReportRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy báo cáo: " + id));
+        assertDepartmentAccess(report.getVehicle().getDepartment() != null
+                ? report.getVehicle().getDepartment().getId() : null);
         return transportReportMapper.toResponse(report);
     }
 
@@ -103,7 +131,8 @@ public class TransportReportService {
     public PageResponse<TransportReportResponse> search(LocalDate fromDate, LocalDate toDate,
                                                        List<Long> shiftIds, List<Long> deviceIds,
                                                        Pageable pageable) {
-        Page<Long> idPage = transportReportRepository.searchIds(fromDate, toDate, shiftIds, deviceIds, pageable);
+        Page<Long> idPage = transportReportRepository.searchIds(
+                fromDate, toDate, shiftIds, deviceIds, currentScopeDepartmentId(), pageable);
         List<TransportReport> reports = transportReportRepository.findAllByIdWithDetails(idPage.getContent());
 
         // Giữ đúng thứ tự theo idPage (JPA IN không đảm bảo thứ tự trả về)
@@ -122,7 +151,8 @@ public class TransportReportService {
     @Transactional(readOnly = true)
     public List<TransportReport> findAllForExport(LocalDate fromDate, LocalDate toDate,
                                                   List<Long> shiftIds, List<Long> deviceIds) {
-        List<Long> ids = transportReportRepository.searchAllIds(fromDate, toDate, shiftIds, deviceIds);
+        List<Long> ids = transportReportRepository.searchAllIds(
+                fromDate, toDate, shiftIds, deviceIds, currentScopeDepartmentId());
         return transportReportRepository.findAllByIdWithDetails(ids);
     }
 
@@ -130,6 +160,8 @@ public class TransportReportService {
     public void delete(Long id) {
         TransportReport report = transportReportRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy báo cáo: " + id));
+        assertDepartmentAccess(report.getVehicle().getDepartment() != null
+                ? report.getVehicle().getDepartment().getId() : null);
         transportReportRepository.delete(report);
         reconciliationEventPublisher.publishChanged();
     }
@@ -138,7 +170,9 @@ public class TransportReportService {
 
     private void applyRelations(TransportReport report, TransportReportRequest request) {
         report.setShift(getOrThrow(shiftRepository, request.getShiftId(), "Ca"));
-        report.setVehicle(getOrThrow(deviceRepository, request.getVehicleId(), "Số xe"));
+        Device vehicle = getOrThrow(deviceRepository, request.getVehicleId(), "Số xe");
+        assertDepartmentAccess(vehicle.getDepartment() != null ? vehicle.getDepartment().getId() : null);
+        report.setVehicle(vehicle);
         report.setEmployee(getOrThrow(userRepository, request.getEmployeeId(), "Nhân viên"));
     }
 
@@ -202,6 +236,8 @@ public class TransportReportService {
             List<Long> missingIds = ids.stream().filter(id -> !foundIds.contains(id)).toList();
             throw new ResourceNotFoundException("Không tìm thấy báo cáo với ID: " + missingIds);
         }
+        reports.forEach(r -> assertDepartmentAccess(
+                r.getVehicle().getDepartment() != null ? r.getVehicle().getDepartment().getId() : null));
         transportReportRepository.deleteAll(reports);
         reconciliationEventPublisher.publishChanged();
         return BulkDeleteResponse.builder()
@@ -216,6 +252,8 @@ public class TransportReportService {
     public TransportReportTripResponse getTrip(Long tripId) {
         TransportReportTrip trip = transportReportTripRepository.findById(tripId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy chuyến: " + tripId));
+        assertDepartmentAccess(trip.getTransportReport().getVehicle().getDepartment() != null
+                ? trip.getTransportReport().getVehicle().getDepartment().getId() : null);
         TransportReportTripResponse response = transportReportMapper.toTripResponse(trip);
 
         // Chuyến đang bị yêu cầu sửa thì kèm luôn ghi chú Thống kê đã gửi, để
@@ -232,6 +270,16 @@ public class TransportReportService {
     public TransportReportTripResponse updateTrip(Long tripId, TransportReportTripUpdateRequest request) {
         TransportReportTrip trip = transportReportTripRepository.findById(tripId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy chuyến: " + tripId));
+        assertDepartmentAccess(trip.getTransportReport().getVehicle().getDepartment() != null
+                ? trip.getTransportReport().getVehicle().getDepartment().getId() : null);
+        // Đổi sang Số xe khác (nếu có) — xác minh luôn đơn vị của xe ĐÍCH,
+        // không chỉ xe hiện tại, tránh "chuyển chuyến" thành cách lách qua
+        // đơn vị khác.
+        if (request.getVehicleId() != null) {
+            Device targetVehicle = getOrThrow(deviceRepository, request.getVehicleId(), "Số xe");
+            assertDepartmentAccess(targetVehicle.getDepartment() != null
+                    ? targetVehicle.getDepartment().getId() : null);
+        }
 
         // Chốt 2026-09-09: chuyến đã duyệt đối chiếu không được sửa trực tiếp ở
         // nhập liệu nữa — phải để Thống kê gửi yêu cầu sửa (chuyển trạng thái
@@ -323,6 +371,8 @@ public class TransportReportService {
     public void deleteTrip(Long tripId) {
         TransportReportTrip trip = transportReportTripRepository.findById(tripId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy chuyến: " + tripId));
+        assertDepartmentAccess(trip.getTransportReport().getVehicle().getDepartment() != null
+                ? trip.getTransportReport().getVehicle().getDepartment().getId() : null);
 
         // Xóa reconciliation decision liên quan trước
         reconciliationDecisionRepository.findByTransportReportTrip_Id(tripId)
@@ -345,6 +395,8 @@ public class TransportReportService {
         for (TripBulkUpdateItem item : items) {
             TransportReportTrip trip = transportReportTripRepository.findById(item.getId())
                     .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy chuyến: " + item.getId()));
+            assertDepartmentAccess(trip.getTransportReport().getVehicle().getDepartment() != null
+                    ? trip.getTransportReport().getVehicle().getDepartment().getId() : null);
 
             if (trip.getStatus() == ApprovalStatus.APPROVED) {
                 throw new BadRequestException(
@@ -374,6 +426,8 @@ public class TransportReportService {
             List<Long> missingIds = tripIds.stream().filter(id -> !foundIds.contains(id)).toList();
             throw new ResourceNotFoundException("Không tìm thấy chuyến: " + missingIds);
         }
+        trips.forEach(t -> assertDepartmentAccess(t.getTransportReport().getVehicle().getDepartment() != null
+                ? t.getTransportReport().getVehicle().getDepartment().getId() : null));
 
         // Xóa reconciliation decisions liên quan trước
         reconciliationDecisionRepository.findByTransportReportTrip_IdIn(tripIds)

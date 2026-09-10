@@ -2,6 +2,7 @@ package com.ecotel.thong_ke_cao_son.service.production;
 
 import com.ecotel.thong_ke_cao_son.enums.ApprovalStatus;
 import com.ecotel.thong_ke_cao_son.exception.BadRequestException;
+import com.ecotel.thong_ke_cao_son.exception.PeriodNotFullyApprovedException;
 import com.ecotel.thong_ke_cao_son.exception.ResourceNotFoundException;
 import com.ecotel.thong_ke_cao_son.model.*;
 import com.ecotel.thong_ke_cao_son.repository.*;
@@ -136,7 +137,7 @@ public class ProductionCalculationService {
                 .distinct()
                 .toList();
         if (!notApprovedIssues.isEmpty()) {
-            throw new BadRequestException(buildAggregateError(
+            throw new PeriodNotFullyApprovedException(buildAggregateError(
                     "Kỳ " + period.getDisplayName() + " chưa thể tính vì còn "
                             + notApprovedIssues.size() + " chuyến VẬN TẢI CHƯA ĐƯỢC DUYỆT ĐỐI CHIẾU"
                             + " (chỉ dữ liệu đã duyệt mới là \"chuẩn\" để tính sản lượng):",

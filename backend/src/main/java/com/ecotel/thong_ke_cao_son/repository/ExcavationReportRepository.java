@@ -20,6 +20,7 @@ public interface ExcavationReportRepository extends JpaRepository<ExcavationRepo
           AND (:excavatorIds IS NULL OR r.excavatorDevice.id IN :excavatorIds)
           AND (:receivingLocationIds IS NULL OR r.receivingLocation.id IN :receivingLocationIds)
           AND (:excavationFloors IS NULL OR r.excavationFloor IN :excavationFloors)
+          AND (:departmentId IS NULL OR r.excavatorDevice.department.id = :departmentId OR r.excavatorDevice.department.id IS NULL)
         ORDER BY r.reportDate DESC
         """)
     Page<ExcavationReport> search(
@@ -29,6 +30,7 @@ public interface ExcavationReportRepository extends JpaRepository<ExcavationRepo
             @Param("excavatorIds") List<Long> excavatorIds,
             @Param("receivingLocationIds") List<Long> receivingLocationIds,
             @Param("excavationFloors") List<String> excavationFloors,
+            @Param("departmentId") Long departmentId,
             Pageable pageable);
 
     Optional<ExcavationReport> findByReportDateAndShiftIdAndExcavatorDeviceIdAndEmployeeId(
