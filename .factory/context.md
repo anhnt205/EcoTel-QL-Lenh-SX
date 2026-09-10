@@ -2007,3 +2007,65 @@ frontend (`modules/auth/components/RoleGuard.tsx`) vẫn no-op — sidebar chưa
 lọc menu theo quyền thật, chỉ chặn ở tầng API. Muốn UX gọn (ẩn hẳn mục menu
 không có quyền) cần nối `RoleGuard`/sidebar với claim `permissions` trong
 JWT, đây là việc mới, chưa bắt đầu.
+
+## Lượt 21 (2026-09-10) — 2 fix bảo mật/đúng-đắn: Codex + tự phát hiện khi verify
+
+Codex (agent review riêng, cấu hình ở `.codex/config.toml`/`AGENTS.md`) sửa
+TRỰC TIẾP vào working tree (không qua PR/file, không qua task UUID nào tôi
+tra được — `factory_get_task_status`/`factory_get_task_evidence` chỉ nhận
+`task_id` dạng số nguyên, không khớp UUID chủ dự án đưa). Đọc diff chưa
+commit, xác nhận là fix thật, tích hợp lại theo đúng văn phong tiếng Việt
+của dự án (bản Codex viết thông báo lỗi bằng tiếng Anh — đã đổi lại).
+
+**1. `PermissionFilter` — 2 lỗi bảo mật nghiêm trọng do 1 try/catch quá
+rộng:**
+- Nếu `handlerMapping.getHandler()` throw, code cũ ÂM THẦM gọi
+  `chain.doFilter()` — bỏ qua HẲN kiểm tra quyền, request lọt qua tự do.
+- Nếu `chain.doFilter()` (chạy THẬT nghiệp vụ phía sau, nằm trong try) ném
+  lỗi bất kỳ, catch cũ gọi `chain.doFilter()` THÊM LẦN NỮA để "cho qua" —
+  nghiệp vụ chạy 2 LẦN, có thể ghi dữ liệu trùng nếu lỗi xảy ra giữa chừng
+  (sau khi đã ghi một phần).
+- Sửa: tách `getHandler()` ra try/catch RIÊNG (lỗi thì NÉM THẲNG, không
+  bỏ qua); `chain.doFilter()` nằm NGOÀI mọi try/catch của filter — lỗi
+  nghiệp vụ tự trồi lên bình thường, không bị bắt lại gọi lần hai.
+- Kèm `PermissionFilterTest.java` (7 test) — giữ lại nguyên, chỉ sửa 1 lỗi
+  biên dịch trong test (`filter.doFilter(request, response)` thiếu tham số
+  `chain` — `Filter.doFilter` cần 3 tham số, `FilterChain.doFilter` chỉ 2,
+  bản Codex viết nhầm gọi filter như gọi chain).
+
+**2. `ReconciliationController` — endpoint duyệt thiếu action riêng:**
+`/reconciliation/decisions` và `/decisions/bulk` (dùng cho CẢ Duyệt lẫn Yêu
+cầu chỉnh sửa, cùng 1 endpoint theo `status` khác nhau) trước đây KHÔNG có
+method-level `@RequirePermission`, nên tự suy action từ POST → `"c"` (Thêm)
+— nghĩa là AI có quyền "Thêm" trên `reconciliation` cũng duyệt được, cột
+"Duyệt" trong UI Chức vụ (lượt 20) hoàn toàn KHÔNG có tác dụng thật.
+Sửa: gắn `@RequirePermission(resource="reconciliation", action="a")` cho 2
+endpoint đó; `/trips/resubmit` gắn `action="u"` (trước cũng suy nhầm "c").
+**Hệ quả phải xử lý ngay:** NV_THONGKE (Chức vụ Thống kê dựng ở lượt 20)
+chưa từng được tick "Duyệt" cho Đối chiếu (lúc đó cứ tưởng "c" là đủ) — đã
+sửa qua UI thật (tick Duyệt ở dòng Đối chiếu, Lưu), verify JWT
+`test_thongke` sau khi đăng nhập lại: `reconciliation.a: true`.
+
+**3. Bug TỰ PHÁT HIỆN khi verify fix #2 (KHÔNG phải Codex nêu — save đầu
+tiên bị lỗi "Data integrity violation"):** `PositionPermissionRepository
+.deleteByPosition_Id`/`UserPermissionRepository.deleteByUser_Id` khai trần
+`void deleteByX(Long)` không có `@Modifying` — Spring Data JPA hiểu method
+`deleteBy...` không annotation là "nạp hết entity rồi gọi `remove()` từng
+cái" (đưa vào action queue Hibernate, KHÔNG chạy DELETE ngay), mà Hibernate
+lại thực thi INSERT TRƯỚC DELETE trong cùng transaction → `PositionService
+.savePermissions`/`UserService.savePermissions` (xoá-rồi-lưu-lại toàn bộ,
+lượt 20) đụng vi phạm `uk_position_permission_resource`/
+`uk_user_permission_resource` MỖI KHI sửa lại quyền một Chức vụ/Tài khoản
+ĐÃ có quyền từ trước — tức là tính năng vừa làm ở lượt 20 **chưa từng lưu
+sửa-quyền-lần-2 thành công**, chỉ tạo-mới lần đầu là ổn (không có gì để xoá
+trước). Sửa: thêm `@Modifying(clearAutomatically=true, flushAutomatically=true)`
++ `@Query("DELETE FROM ... WHERE ...")` cho cả 2 repository — bulk JPQL
+delete chạy NGAY, không xếp hàng sau insert. Verify sống: sửa lại NV_THONGKE
+(đã có 15 quyền từ trước) thành công, không còn lỗi.
+
+**Bài học quy trình:** khi test qua trình duyệt, PHẢI dùng click chuột thật
+(`computer` tool) để tick checkbox React/Radix — dùng `javascript_tool`
+gọi `.click()` trên DOM node visual có vẻ đổi (`aria-checked` đổi ngay) NHƯNG
+KHÔNG chắc đồng bộ vào state React của component cha (đã tự dính bug này khi
+test lượt này: tick "Duyệt" qua JS, DOM đổi đúng, nhưng bấm "Lưu" gửi payload
+KHÔNG có thay đổi đó — mất 1 vòng lặp mới phát hiện ra).

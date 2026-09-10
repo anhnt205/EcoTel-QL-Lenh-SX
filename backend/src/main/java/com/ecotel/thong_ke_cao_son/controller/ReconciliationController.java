@@ -50,12 +50,14 @@ public class ReconciliationController {
     }
 
     @PostMapping("/decisions")
+    @RequirePermission(resource = "reconciliation", action = "a")
     public ApiResponse<ReconciliationDecisionResponse> saveDecision(
             @Valid @RequestBody ReconciliationDecisionRequest request) {
         return ApiResponse.success(reconciliationService.saveDecision(request));
     }
 
     @PostMapping("/decisions/bulk")
+    @RequirePermission(resource = "reconciliation", action = "a")
     public ApiResponse<List<ReconciliationDecisionResponse>> saveDecisions(
             @Valid @RequestBody ReconciliationDecisionBulkRequest request) {
         return ApiResponse.success(reconciliationService.saveDecisions(request.getDecisions()));
@@ -69,6 +71,7 @@ public class ReconciliationController {
     }
 
     @PostMapping("/trips/resubmit")
+    @RequirePermission(resource = "reconciliation", action = "u")
     public ApiResponse<Void> resubmitTrips(@Valid @RequestBody ReconciliationResubmitRequest request) {
         reconciliationService.resubmitTrips(request);
         return ApiResponse.success(null);
