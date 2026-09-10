@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
@@ -23,6 +23,7 @@ import {
 import DepartmentService from "@/modules/departments/services/departmentService";
 import PositionService from "./services/positionService";
 import type { Position, PositionPermissionItem } from "@/types";
+import { PERMISSION_FEATURE_GROUPS, type PermissionFeatureGroup } from "@/constants/permission-features";
 
 interface Props {
   open: boolean;
@@ -67,7 +68,10 @@ export function PositionFormModal({ open, editing, onClose, onSaved }: Props) {
   });
   const departments = departmentsPage?.content ?? [];
   const selectedDepartment = departments.find((d) => String(d.id) === departmentId);
-  const allowedResources = selectedDepartment?.allowedResources ?? [];
+  const allowedResources = useMemo(
+    () => new Set(selectedDepartment?.allowedResources ?? []),
+    [selectedDepartment],
+  );
 
   useEffect(() => {
     if (!open) return;
@@ -144,6 +148,54 @@ export function PositionFormModal({ open, editing, onClose, onSaved }: Props) {
     }
   };
 
+  // Chỉ hiện đúng chức năng Phòng ban chủ quản đã cho phép — nhóm/mục nào
+  // không có dòng nào thuộc `allowedResources` thì ẩn hẳn tiêu đề nhóm đó,
+  // tránh 1 rừng tiêu đề rỗng không set được gì.
+  const hasAnyAllowedItem = (group: PermissionFeatureGroup): boolean =>
+    group.items.some((item) => allowedResources.has(item.resource)) ||
+    (group.subGroups?.some(hasAnyAllowedItem) ?? false);
+
+  const renderGroupRows = (group: PermissionFeatureGroup, depth: number): ReactNode => {
+    if (!hasAnyAllowedItem(group)) return null;
+    const visibleItems = group.items.filter((item) => allowedResources.has(item.resource));
+    return (
+      <>
+        <tr key={`h-${depth}-${group.label}`} className="border-t bg-muted/30">
+          <td
+            colSpan={1 + ACTION_COLUMNS.length}
+            className={depth > 0 ? "px-3 py-1 pl-6 text-xs font-semibold text-muted-foreground" : "px-3 py-1.5 text-sm font-semibold"}
+          >
+            {group.label}
+          </td>
+        </tr>
+        {visibleItems.map((item, idx) => {
+          const perm = permissionMap[item.resource] ?? emptyPermission(item.resource);
+          return (
+            <tr key={`${item.resource}-${idx}`} className="border-t">
+              <td className="px-3 py-1.5 pl-6">
+                {item.label}
+                {item.sharedWith && (
+                  <span className="block text-xs text-muted-foreground">
+                    (cùng quyền với {item.sharedWith})
+                  </span>
+                )}
+              </td>
+              {ACTION_COLUMNS.map((a) => (
+                <td key={a.key} className="px-2 py-1.5 text-center">
+                  <Checkbox
+                    checked={perm[a.key]}
+                    onCheckedChange={(v) => toggleAction(item.resource, a.key, v === true)}
+                  />
+                </td>
+              ))}
+            </tr>
+          );
+        })}
+        {group.subGroups?.map((sub) => renderGroupRows(sub, depth + 1))}
+      </>
+    );
+  };
+
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent
@@ -196,15 +248,15 @@ export function PositionFormModal({ open, editing, onClose, onSaved }: Props) {
             <p className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
               Chọn Phòng ban trước để hiện danh sách chức năng có thể phân quyền.
             </p>
-          ) : allowedResources.length === 0 ? (
+          ) : allowedResources.size === 0 ? (
             <p className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
               Phòng ban này chưa được cho phép dùng chức năng nào — vào Danh mục Phòng ban để tick trước.
             </p>
           ) : (
-            <div className="max-h-72 overflow-y-auto rounded-md border">
+            <div className="max-h-80 overflow-y-auto rounded-md border">
               <table className="w-full text-sm">
-                <thead className="sticky top-0 bg-muted/50">
-                  <tr>
+                <thead className="sticky top-0 bg-background">
+                  <tr className="border-b">
                     <th className="px-3 py-2 text-left font-medium">Chức năng</th>
                     {ACTION_COLUMNS.map((a) => (
                       <th key={a.key} className="px-2 py-2 text-center font-medium">
@@ -213,24 +265,7 @@ export function PositionFormModal({ open, editing, onClose, onSaved }: Props) {
                     ))}
                   </tr>
                 </thead>
-                <tbody>
-                  {allowedResources.map((resource) => {
-                    const perm = permissionMap[resource] ?? emptyPermission(resource);
-                    return (
-                      <tr key={resource} className="border-t">
-                        <td className="px-3 py-1.5">{resource}</td>
-                        {ACTION_COLUMNS.map((a) => (
-                          <td key={a.key} className="px-2 py-1.5 text-center">
-                            <Checkbox
-                              checked={perm[a.key]}
-                              onCheckedChange={(v) => toggleAction(resource, a.key, v === true)}
-                            />
-                          </td>
-                        ))}
-                      </tr>
-                    );
-                  })}
-                </tbody>
+                <tbody>{PERMISSION_FEATURE_GROUPS.map((group) => renderGroupRows(group, 0))}</tbody>
               </table>
             </div>
           )}

@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -15,6 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import DepartmentService from "./services/departmentService";
 import type { Department } from "@/types";
+import { PERMISSION_FEATURE_GROUPS, type PermissionFeatureGroup } from "@/constants/permission-features";
 
 interface Props {
   open: boolean;
@@ -31,13 +31,6 @@ export function DepartmentFormModal({ open, editing, onClose, onSaved }: Props) 
   const [description, setDescription] = useState("");
   const [selectedResources, setSelectedResources] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
-
-  const { data: availableResources = [] } = useQuery({
-    queryKey: ["departments-available-resources"],
-    queryFn: () => DepartmentService.getAvailableResources(),
-    enabled: open,
-    staleTime: 5 * 60 * 1000,
-  });
 
   useEffect(() => {
     if (!open) return;
@@ -85,6 +78,40 @@ export function DepartmentFormModal({ open, editing, onClose, onSaved }: Props) 
     }
   };
 
+  // Đệ quy vì riêng "Danh mục" có 1 tầng nhóm con (subGroups) — các mục khác
+  // trên thanh nav chỉ có 1 dòng, không cần nhóm.
+  const renderGroup = (group: PermissionFeatureGroup, depth: number) => (
+    <div key={`${depth}-${group.label}`} className={depth > 0 ? "mt-3 first:mt-0" : "mt-4 first:mt-0"}>
+      <div className={depth > 0 ? "mb-1.5 text-xs font-semibold text-muted-foreground" : "mb-1.5 text-sm font-semibold"}>
+        {group.label}
+      </div>
+      {group.items.length > 0 && (
+        <div className="grid grid-cols-1 gap-x-4 gap-y-1.5 pl-1 sm:grid-cols-2">
+          {group.items.map((item, idx) => (
+            <label key={`${item.resource}-${idx}`} className="flex items-start gap-2 text-sm">
+              <Checkbox
+                className="mt-0.5"
+                checked={selectedResources.has(item.resource)}
+                onCheckedChange={(v) => toggleResource(item.resource, v === true)}
+              />
+              <span>
+                {item.label}
+                {item.sharedWith && (
+                  <span className="block text-xs text-muted-foreground">
+                    (cùng quyền với {item.sharedWith})
+                  </span>
+                )}
+              </span>
+            </label>
+          ))}
+        </div>
+      )}
+      {group.subGroups && (
+        <div className="pl-3">{group.subGroups.map((sub) => renderGroup(sub, depth + 1))}</div>
+      )}
+    </div>
+  );
+
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent
@@ -117,16 +144,8 @@ export function DepartmentFormModal({ open, editing, onClose, onSaved }: Props) 
 
         <div className="space-y-1.5">
           <Label>Chức năng được phép dùng</Label>
-          <div className="grid max-h-64 grid-cols-2 gap-x-4 gap-y-2 overflow-y-auto rounded-md border p-3 sm:grid-cols-3">
-            {availableResources.map((resource) => (
-              <label key={resource} className="flex items-center gap-2 text-sm">
-                <Checkbox
-                  checked={selectedResources.has(resource)}
-                  onCheckedChange={(v) => toggleResource(resource, v === true)}
-                />
-                <span className="truncate" title={resource}>{resource}</span>
-              </label>
-            ))}
+          <div className="max-h-80 overflow-y-auto rounded-md border p-3">
+            {PERMISSION_FEATURE_GROUPS.map((group) => renderGroup(group, 0))}
           </div>
         </div>
 
