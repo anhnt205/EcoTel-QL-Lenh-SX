@@ -76,10 +76,28 @@ public class TransportReportService {
         }
     }
 
-    /** null = không lọc (tài khoản thấy toàn bộ, hoặc không xác định được — xem javadoc lớp). */
+    /**
+     * null = full-scope thật, KHÔNG lọc. Quality Gate lượt 3 của Codex
+     * (2026-09-10) — sửa lỗi thật ở lượt trước: trước đây user null hoặc
+     * scoped-nhưng-chưa-gán-đơn-vị cũng trả null giống full-scope, khiến
+     * {@code getById} fail-closed (chặn) trong khi {@code search}/
+     * {@code export} lại fail-open (thấy hết) cho ĐÚNG những tài khoản đó —
+     * tạo đường vòng qua search/export để lách chặn ở getById. Giờ CHỈ
+     * full-scope thật mới trả null; mọi trường hợp khác ném
+     * {@link ForbiddenException} NGAY, khớp đúng {@code assertDepartmentAccess}.
+     */
     private Long currentScopeDepartmentId() {
         AppUserDetails user = SecurityUtils.currentUser();
-        return (user == null || user.hasFullDataScope()) ? null : user.getDepartmentId();
+        if (user == null) {
+            throw new ForbiddenException("Không xác định được tài khoản đăng nhập");
+        }
+        if (user.hasFullDataScope()) {
+            return null;
+        }
+        if (user.getDepartmentId() == null) {
+            throw new ForbiddenException("Tài khoản chưa gán đơn vị — không có quyền xem dữ liệu Vận tải");
+        }
+        return user.getDepartmentId();
     }
 
     @Transactional

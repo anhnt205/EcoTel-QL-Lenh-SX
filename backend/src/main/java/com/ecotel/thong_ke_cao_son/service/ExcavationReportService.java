@@ -65,9 +65,30 @@ public class ExcavationReportService {
         }
     }
 
+    /**
+     * null = full-scope, KHÔNG lọc. Quality Gate lượt 3 của Codex
+     * (2026-09-10) — sửa lỗi thật ở lượt trước: tài khoản null cũng được coi
+     * là "không lọc" GIỐNG HỆT full-scope (bất kể lý do — chưa xác thực,
+     * hay tài khoản scoped nhưng CHƯA GÁN đơn vị) khiến {@code getById} thì
+     * fail-closed (chặn) trong khi {@code search}/{@code export} lại
+     * fail-open (thấy hết) cho ĐÚNG những tài khoản đó — không nhất quán,
+     * tạo đường vòng qua search/export để lách chặn ở getById. Giờ CHỈ
+     * full-scope thật (đã xác thực + {@code hasFullDataScope()}) mới trả
+     * null; mọi trường hợp khác — kể cả tài khoản scoped chưa gán đơn vị —
+     * ném {@link ForbiddenException} NGAY, khớp đúng {@code assertDepartmentAccess}.
+     */
     private Long currentScopeDepartmentId() {
         AppUserDetails user = SecurityUtils.currentUser();
-        return (user == null || user.hasFullDataScope()) ? null : user.getDepartmentId();
+        if (user == null) {
+            throw new ForbiddenException("Không xác định được tài khoản đăng nhập");
+        }
+        if (user.hasFullDataScope()) {
+            return null;
+        }
+        if (user.getDepartmentId() == null) {
+            throw new ForbiddenException("Tài khoản chưa gán đơn vị — không có quyền xem dữ liệu Khai thác");
+        }
+        return user.getDepartmentId();
     }
 
     @Transactional
@@ -128,7 +149,7 @@ public class ExcavationReportService {
     /** Toàn bộ giá trị Tầng xúc trong khoảng ngày — xem javadoc repository. */
     @Transactional(readOnly = true)
     public List<String> getDistinctExcavationFloors(LocalDate fromDate, LocalDate toDate) {
-        return excavationReportRepository.findDistinctExcavationFloors(fromDate, toDate);
+        return excavationReportRepository.findDistinctExcavationFloors(fromDate, toDate, currentScopeDepartmentId());
     }
 
     /**

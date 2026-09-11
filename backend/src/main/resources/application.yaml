@@ -9,3 +9,13 @@ spring:
       # (spring.jpa.defer-datasource-initialization mặc định false) — xem
       # schema.sql để biết lý do bắt buộc thứ tự này.
       mode: always
+      # Bắt buộc (Quality Gate lượt 3 của Codex, 2026-09-11 — lỗi thật tự
+      # phát hiện khi soát lại chính lượt sửa trước): bộ tách câu lệnh mặc
+      # định của Spring (`ScriptUtils`) cắt file theo DẤU ";" ĐƠN GIẢN, không
+      # hiểu cú pháp `DO $$ ... $$;` của PostgreSQL — sẽ cắt NGAY tại dấu ";"
+      # đầu tiên bên TRONG khối DO (vd sau "DEFAULT false"), làm vỡ khối
+      # thành nhiều câu lệnh rời rạc không hợp lệ cú pháp riêng lẻ, khiến
+      # schema.sql lỗi ngay khi khởi động — schema.sql giờ dùng "@@" để đánh
+      # dấu hết MỖI khối lệnh top-level (xem cuối mỗi khối DO trong
+      # schema.sql), dấu ";" bên trong khối được giữ nguyên vẹn.
+      separator: "@@"

@@ -92,6 +92,12 @@ class ReconciliationServicePairingTest {
     /** Cùng khoá (ngày+ca+xe+máy xúc) cho MỌI trip — mục đích của test là buộc chúng cạnh tranh ghép cặp. */
     private static TransportReportTrip transportTrip(long id, LocalDate date, Shift shift, Device vehicle,
                                                        Device excavator, User emp) {
+        return transportTrip(id, id, date, shift, vehicle, excavator, emp);
+    }
+
+    /** Như trên, nhưng cho phép tách rời id của trip khỏi id của CargoType — dùng để mô phỏng "khớp theo NỘI DUNG, không phải theo id". */
+    private static TransportReportTrip transportTrip(long id, long cargoTypeId, LocalDate date, Shift shift,
+                                                       Device vehicle, Device excavator, User emp) {
         TransportReport report = new TransportReport();
         report.setReportDate(date);
         report.setShift(shift);
@@ -105,7 +111,7 @@ class ReconciliationServicePairingTest {
         trip.setExcavator(excavator);
         trip.setLoadingPoint(new ReceivingPoint());
         trip.setUnloadingPoint(new UnloadingPoint());
-        trip.setCargoType(cargoType(id));
+        trip.setCargoType(cargoType(cargoTypeId));
         trip.setTripCount(1);
         trip.setRainyDay(false);
         trip.setSupplementaryVehicle(false);
@@ -114,6 +120,11 @@ class ReconciliationServicePairingTest {
 
     private static ExcavationReportTrip excavationTrip(long id, LocalDate date, Shift shift, Device vehicle,
                                                          Device excavator, User emp) {
+        return excavationTrip(id, id, date, shift, vehicle, excavator, emp);
+    }
+
+    private static ExcavationReportTrip excavationTrip(long id, long cargoTypeId, LocalDate date, Shift shift,
+                                                         Device vehicle, Device excavator, User emp) {
         ExcavationReport report = new ExcavationReport();
         report.setReportDate(date);
         report.setShift(shift);
@@ -124,9 +135,19 @@ class ReconciliationServicePairingTest {
         trip.setId(id);
         trip.setExcavationReport(report);
         trip.setVehicle(vehicle);
-        trip.setCargoType(cargoType(id));
+        trip.setCargoType(cargoType(cargoTypeId));
         trip.setTripCount(1);
         return trip;
+    }
+
+    /** Stub chung: decision/history rỗng cho mọi id trong danh sách — dùng lại ở nhiều test. */
+    private void stubEmptyDecisionsAndHistory(List<Long> transportIds, List<Long> excavationIds) {
+        when(reconciliationDecisionRepository.findByTransportReportTrip_IdIn(transportIds)).thenReturn(List.of());
+        when(reconciliationDecisionRepository.findByExcavationReportTrip_IdIn(excavationIds)).thenReturn(List.of());
+        when(reconciliationDataHistoryRepository.findDistinctTripIdBySideAndTripIdIn(
+                com.ecotel.thong_ke_cao_son.enums.ReconciliationSide.TRANSPORT, transportIds)).thenReturn(List.of());
+        when(reconciliationDataHistoryRepository.findDistinctTripIdBySideAndTripIdIn(
+                com.ecotel.thong_ke_cao_son.enums.ReconciliationSide.EXCAVATION, excavationIds)).thenReturn(List.of());
     }
 
     @Test
@@ -183,5 +204,87 @@ class ReconciliationServicePairingTest {
         // chuyến Khai thác id=N khi cả hai repository trả về theo cùng thứ tự
         // tăng dần (ORDER BY r.reportDate, t.id ở cả hai phía).
         assertThat(excavationIdsInOrder).containsExactly(1L, 2L, 3L);
+    }
+
+    @Test
+    @DisplayName("2 bên nhập CÙNG khoá theo THỨ TỰ KHÁC NHAU (id không tương ứng) -> vẫn ghép ĐÚNG theo nội dung (cargoType), không theo id (Quality Gate lượt 3)")
+    void pairsByContentEvenWhenTwoSidesInsertInDifferentOrder() {
+        LocalDate date = LocalDate.of(2026, 9, 10);
+        Shift shift = shift(1L);
+        Device vehicle = device(10L, "468");
+        Device excavator = device(20L, "P17");
+        User emp = employee(1L);
+
+        // Vận tải nhập "chuyến cargoType=5" (id transport=1) RỒI "chuyến
+        // cargoType=7" (id transport=2). Khai thác nhập NGƯỢC LẠI: "chuyến
+        // cargoType=7" trước (id excavation=1), "chuyến cargoType=5" sau (id
+        // excavation=2) — ĐÚNG kịch bản thật Codex nêu: 2 sequence ID độc
+        // lập, không có quan hệ thứ tự. Ghép theo id/insertion-order (thuật
+        // toán CŨ) sẽ ghép NHẦM (transport id=1 với excavation id=1, dù
+        // cargoType lệch 5 vs 7) — ghép theo NỘI DUNG (thuật toán MỚI) phải
+        // ra đúng transport(cargoType=5)-excavation(cargoType=5).
+        TransportReportTrip transport1 = transportTrip(1L, 5L, date, shift, vehicle, excavator, emp);
+        TransportReportTrip transport2 = transportTrip(2L, 7L, date, shift, vehicle, excavator, emp);
+        ExcavationReportTrip excavation1 = excavationTrip(1L, 7L, date, shift, vehicle, excavator, emp);
+        ExcavationReportTrip excavation2 = excavationTrip(2L, 5L, date, shift, vehicle, excavator, emp);
+
+        List<Long> transportIds = List.of(1L, 2L);
+        List<Long> excavationIds = List.of(1L, 2L);
+        when(transportReportTripRepository.findForReconciliation(date, date, null, null))
+                .thenReturn(List.of(transport1, transport2));
+        when(excavationReportTripRepository.findForReconciliation(date, date, null, null))
+                .thenReturn(List.of(excavation1, excavation2));
+        stubEmptyDecisionsAndHistory(transportIds, excavationIds);
+
+        ReconciliationSearchRequest request = new ReconciliationSearchRequest();
+        request.setFromDate(date);
+        request.setToDate(date);
+        PageResponse<ReconciliationRowResponse> result = newService().search(request, PageRequest.of(0, 20));
+
+        var byTransportId = result.getContent().stream()
+                .collect(java.util.stream.Collectors.toMap(ReconciliationRowResponse::getTransportReportTripId, r -> r));
+
+        assertThat(byTransportId.get(1L).getExcavationReportTripId()).as("transport(cargoType=5) phải ghép excavation(cargoType=5) = id 2, KHÔNG phải id 1").isEqualTo(2L);
+        assertThat(byTransportId.get(2L).getExcavationReportTripId()).as("transport(cargoType=7) phải ghép excavation(cargoType=7) = id 1, KHÔNG phải id 2").isEqualTo(1L);
+        assertThat(byTransportId.get(1L).getPairingAmbiguous()).as("ghép được CHÍNH XÁC theo nội dung -> KHÔNG mơ hồ").isFalse();
+        assertThat(byTransportId.get(2L).getPairingAmbiguous()).isFalse();
+    }
+
+    @Test
+    @DisplayName("Nhiều ứng viên cùng khoá, KHÔNG cái nào khớp nội dung -> ambiguity THẬT, vẫn trả đủ dòng nhưng đánh dấu pairingAmbiguous")
+    void flagsGenuineAmbiguityWhenNoCandidateMatchesByContent() {
+        LocalDate date = LocalDate.of(2026, 9, 10);
+        Shift shift = shift(1L);
+        Device vehicle = device(10L, "468");
+        Device excavator = device(20L, "P17");
+        User emp = employee(1L);
+
+        // 2 chuyến Vận tải CÙNG cargoType=5 (không phân biệt được với nhau
+        // theo nội dung), 2 chuyến Khai thác CÙNG cargoType=9 (khác hẳn cả
+        // hai bên Vận tải) — không có ứng viên nào isMatched với transport
+        // nào cả => ambiguity thật sự theo đúng định nghĩa, không phải lỗi.
+        TransportReportTrip transport1 = transportTrip(1L, 5L, date, shift, vehicle, excavator, emp);
+        TransportReportTrip transport2 = transportTrip(2L, 5L, date, shift, vehicle, excavator, emp);
+        ExcavationReportTrip excavation1 = excavationTrip(1L, 9L, date, shift, vehicle, excavator, emp);
+        ExcavationReportTrip excavation2 = excavationTrip(2L, 9L, date, shift, vehicle, excavator, emp);
+
+        List<Long> transportIds = List.of(1L, 2L);
+        List<Long> excavationIds = List.of(1L, 2L);
+        when(transportReportTripRepository.findForReconciliation(date, date, null, null))
+                .thenReturn(List.of(transport1, transport2));
+        when(excavationReportTripRepository.findForReconciliation(date, date, null, null))
+                .thenReturn(List.of(excavation1, excavation2));
+        stubEmptyDecisionsAndHistory(transportIds, excavationIds);
+
+        ReconciliationSearchRequest request = new ReconciliationSearchRequest();
+        request.setFromDate(date);
+        request.setToDate(date);
+        PageResponse<ReconciliationRowResponse> result = newService().search(request, PageRequest.of(0, 20));
+
+        assertThat(result.getContent()).hasSize(2);
+        assertThat(result.getContent()).as("vẫn phải ghép đủ — không được để trống dòng dù mơ hồ")
+                .allMatch(row -> row.getExcavationReportTripId() != null);
+        assertThat(result.getContent()).as("cả 2 dòng đều phải đánh dấu mơ hồ — không có tín hiệu nội dung nào phân biệt được")
+                .allMatch(row -> Boolean.TRUE.equals(row.getPairingAmbiguous()));
     }
 }

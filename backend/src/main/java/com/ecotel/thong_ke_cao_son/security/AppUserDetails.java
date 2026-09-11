@@ -38,13 +38,24 @@ public class AppUserDetails implements UserDetails {
 
     /**
      * Có được truy cập dữ liệu gắn với đơn vị {@code targetDepartmentId}
-     * không. {@code targetDepartmentId == null} (thiết bị chưa gán đơn vị)
-     * luôn CHO PHÉP — không thể lọc theo một phạm vi không tồn tại, và dữ
-     * liệu thiết bị cũ trong hệ thống phần lớn chưa từng được gán đơn vị.
+     * không.
+     *
+     * <p>Từ Quality Gate lượt 3 của Codex (2026-09-10) — sửa lại quyết định
+     * SAI ở lượt trước: {@code targetDepartmentId == null} (thiết bị CHƯA
+     * gán đơn vị) KHÔNG còn tự động cho phép. Lượt trước lý luận "không thể
+     * lọc theo phạm vi không tồn tại" nhưng đó là lỗ hổng thật — CSDL brownfield
+     * này phần lớn thiết bị/dữ liệu cũ chưa từng gán đơn vị, nên mọi tài
+     * khoản scoped (không full-scope) vẫn đọc/sửa được HẦU HẾT dữ liệu hệ
+     * thống qua đúng "khe hở" targetDepartmentId=null này — vô hiệu hoá gần
+     * hết mục đích của tính năng phân quyền theo đơn vị. Giờ CHỈ tài khoản
+     * full-scope (Thống kê/Admin) mới thấy được dữ liệu chưa gán đơn vị —
+     * coi như "cách ly" (quarantine) cho tới khi đơn vị chủ quản thật của
+     * thiết bị/dữ liệu đó được gán (việc backfill dữ liệu cũ là quyết định
+     * nghiệp vụ của chủ dự án, ngoài phạm vi sửa code — không đoán bừa thiết
+     * bị nào thuộc đơn vị nào).
      */
     public boolean canAccessDepartment(Long targetDepartmentId) {
-        return targetDepartmentId == null
-                || hasFullDataScope()
+        return hasFullDataScope()
                 || (departmentId != null && departmentId.equals(targetDepartmentId));
     }
 

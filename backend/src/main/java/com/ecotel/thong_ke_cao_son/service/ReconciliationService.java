@@ -64,6 +64,16 @@ public class ReconciliationService {
         for (ExcavationReportTrip et : excavationTrips) {
             excavationByKey.computeIfAbsent(buildExcavationKey(et), k -> new ArrayDeque<>()).add(et);
         }
+        // Kích thước GỐC của mỗi nhóm (trước khi bị poll() dần trong vòng lặp
+        // dưới) — bắt buộc chụp lại NGAY ĐÂY, không được đọc candidates.size()
+        // tại thời điểm ghép (xem javadoc pickBestMatch: "còn 1 ứng viên" có
+        // thể là DO nhóm gốc chỉ có 1 (thật sự không mơ hồ), HOẶC do các ứng
+        // viên anh chị em đã bị tiêu thụ trước đó trong cùng nhóm mơ hồ —
+        // đọc size() lúc ghép không phân biệt được hai trường hợp này, gây
+        // đúng bug đã tự bắt được qua test (dòng ghép THỨ HAI trong 1 nhóm mơ
+        // hồ bị đánh dấu SAI thành "không mơ hồ").
+        Map<String, Integer> excavationGroupSize = new HashMap<>();
+        excavationByKey.forEach((key, deque) -> excavationGroupSize.put(key, deque.size()));
 
         // Batch tra decision + cờ "có lịch sử" MỘT LẦN cho cả trang — tránh N+1
         // (trước đây buildRow tự query riêng cho từng dòng).
@@ -87,14 +97,14 @@ public class ReconciliationService {
         List<ReconciliationRowResponse> rows = new ArrayList<>();
 
         for (TransportReportTrip tt : transportTrips) {
-            Deque<ExcavationReportTrip> candidates = excavationByKey.get(buildTransportKey(tt));
-            ExcavationReportTrip matchedExcavation =
-                    (candidates != null && !candidates.isEmpty()) ? candidates.poll() : null;
-            if (!canSeeRow(tt, matchedExcavation)) {
+            String key = buildTransportKey(tt);
+            Deque<ExcavationReportTrip> candidates = excavationByKey.get(key);
+            MatchResult match = pickBestMatch(tt, candidates, excavationGroupSize.getOrDefault(key, 0));
+            if (!canSeeRow(tt, match.excavation())) {
                 continue;
             }
-            rows.add(buildRow(tt, matchedExcavation, decisionByTransportTripId, decisionByExcavationTripId,
-                    transportIdsWithHistory, excavationIdsWithHistory));
+            rows.add(buildRow(tt, match.excavation(), match.ambiguous(), decisionByTransportTripId,
+                    decisionByExcavationTripId, transportIdsWithHistory, excavationIdsWithHistory));
         }
 
         for (Deque<ExcavationReportTrip> remaining : excavationByKey.values()) {
@@ -102,7 +112,7 @@ public class ReconciliationService {
                 if (!canSeeRow(null, et)) {
                     continue;
                 }
-                rows.add(buildRow(null, et, decisionByTransportTripId, decisionByExcavationTripId,
+                rows.add(buildRow(null, et, false, decisionByTransportTripId, decisionByExcavationTripId,
                         transportIdsWithHistory, excavationIdsWithHistory));
             }
         }
@@ -183,6 +193,70 @@ public class ReconciliationService {
                 + et.getVehicle().getId() + "_" + header.getExcavatorDevice().getId();
     }
 
+    /** Kết quả ghép 1 chuyến Vận tải — xem {@link #pickBestMatch}. */
+    private record MatchResult(ExcavationReportTrip excavation, boolean ambiguous) {
+        static final MatchResult NONE = new MatchResult(null, false);
+    }
+
+    /**
+     * Chọn ứng viên Khai thác để ghép với 1 chuyến Vận tải khi CÓ NHIỀU
+     * chuyến Khai thác cùng khoá (Thời gian/Ca/Máy xúc/Số xe) —
+     * {@code candidates} đúng những ứng viên đó.
+     *
+     * <p><b>Vấn đề thật (Quality Gate lượt 3 của Codex, 2026-09-10):</b> ID
+     * của {@code TransportReportTrip} và {@code ExcavationReportTrip} là HAI
+     * sequence ĐỘC LẬP — id transport thứ N KHÔNG có quan hệ gì với id
+     * excavation thứ N. Trước đây (lượt 2) chỉ thêm {@code ORDER BY
+     * reportDate, id} ở repository rồi ghép theo thứ tự đó (Deque.poll())
+     * — việc này CHỈ giải quyết tính XÁC ĐỊNH (chạy lại nhiều lần ra cùng
+     * một kết quả), KHÔNG chứng minh được ghép ĐÚNG cặp thật khi 2 bên nhập
+     * liệu độc lập theo thứ tự khác nhau (vd Vận tải nhập "chuyến Đất" rồi
+     * "chuyến Đá", Khai thác nhập "chuyến Đá" rồi "chuyến Đất" cho CÙNG
+     * khoá 4 trường — ghép theo id/thứ tự chèn sẽ đảo ngược, sai cặp).
+     *
+     * <p><b>Cách khắc phục:</b> khi CÓ NHIỀU ứng viên, ưu tiên ứng viên KHỚP
+     * ĐÚNG {@link #isMatched} (Loại hàng, Số chuyến, Mức tải, Nhân viên —
+     * bốn trường có THẬT trong dữ liệu, không phải thứ tự nhập) — đây là
+     * tín hiệu nghiệp vụ mạnh nhất để phân biệt, và giải quyết ĐÚNG ví dụ
+     * "Đất"/"Đá" ở trên bất kể thứ tự nhập của mỗi bên. Trong trường hợp
+     * hiếm hơn — nhiều ứng viên NHƯNG không cái nào khớp đúng (tức là các
+     * chuyến đó tự nó ĐANG lệch số liệu — chính là ca đối chiếu cần bắt) —
+     * dữ liệu hiện có KHÔNG đủ để xác định cặp nào đúng bằng thuật toán;
+     * đây là ambiguity THẬT SỰ, không phải lỗi code. Không thể để trống
+     * dòng (vẫn phải hiện đủ để đối chiếu), nên vẫn ghép theo thứ tự ổn
+     * định (đầu vào đã {@code ORDER BY} ở repository) nhưng đánh dấu
+     * {@code ambiguous=true} — {@code ReconciliationRowResponse
+     * .pairingAmbiguous} — để phân biệt được với ghép chắc chắn đúng, thay
+     * vì âm thầm coi mọi ghép như nhau.
+     *
+     * <p><b>{@code originalGroupSize} PHẢI là kích thước nhóm GỐC (chụp
+     * TRƯỚC khi vòng lặp ngoài bắt đầu poll dần {@code candidates}), KHÔNG
+     * được dùng {@code candidates.size()} tại thời điểm gọi</b> — tự bắt
+     * được qua test: khi 1 nhóm có 2+ ứng viên KHÔNG ai khớp nội dung, chuyến
+     * Vận tải ĐẦU TIÊN đúng là rơi vào nhánh mơ hồ (còn 2 ứng viên, không cái
+     * nào khớp) — nhưng chuyến THỨ HAI cùng nhóm lúc đó {@code candidates}
+     * chỉ còn 1 phần tử (do chuyến đầu đã poll mất 1), nên nếu đọc
+     * {@code size()} tại chỗ sẽ hiểu NHẦM "chỉ có 1 ứng viên -> chắc chắn
+     * đúng" — trong khi thật ra nó cũng mơ hồ y hệt chuyến đầu, chỉ là bị
+     * "ăn theo" phần còn lại của cùng một nhóm không phân biệt được.
+     */
+    private MatchResult pickBestMatch(TransportReportTrip tt, Deque<ExcavationReportTrip> candidates,
+                                       int originalGroupSize) {
+        if (candidates == null || candidates.isEmpty()) {
+            return MatchResult.NONE;
+        }
+        if (originalGroupSize <= 1) {
+            return new MatchResult(candidates.poll(), false);
+        }
+        for (ExcavationReportTrip candidate : candidates) {
+            if (isMatched(tt, candidate)) {
+                candidates.remove(candidate);
+                return new MatchResult(candidate, false);
+            }
+        }
+        return new MatchResult(candidates.poll(), true);
+    }
+
     /**
      * Phân quyền DỮ LIỆU theo đơn vị (Quality Gate lượt 2, 2026-09-10) — xem
      * javadoc tương ứng ở TransportReportService/ExcavationReportService.
@@ -223,11 +297,11 @@ public class ReconciliationService {
     }
 
     private ReconciliationRowResponse buildRow(
-            TransportReportTrip tt, ExcavationReportTrip et,
+            TransportReportTrip tt, ExcavationReportTrip et, boolean pairingAmbiguous,
             Map<Long, ReconciliationDecision> decisionByTransportTripId,
             Map<Long, ReconciliationDecision> decisionByExcavationTripId,
             Set<Long> transportIdsWithHistory, Set<Long> excavationIdsWithHistory) {
-        var builder = ReconciliationRowResponse.builder();
+        var builder = ReconciliationRowResponse.builder().pairingAmbiguous(pairingAmbiguous);
 
         ApprovalStatus transportStatus = tt != null ? tt.getStatus() : null;
         ApprovalStatus excavationStatus = et != null ? et.getStatus() : null;
@@ -522,11 +596,21 @@ public class ReconciliationService {
             decision = new ReconciliationDecision();
         }
 
+        // Xác minh phạm vi đơn vị TRƯỚC khi gán vào decision (Quality Gate
+        // lượt 3 của Codex, 2026-09-10): trước đây saveDecisions() hoàn toàn
+        // không kiểm tra — tài khoản scoped nhưng có quyền CHỨC NĂNG duyệt
+        // ("reconciliation:a") gửi thẳng trip id của đơn vị khác vẫn duyệt/
+        // yêu cầu sửa được. Ném ở ĐÂY (trong buildDecision, được gọi trong
+        // try/catch của vòng lặp saveDecisions) để lỗi được gom vào cùng cơ
+        // chế "1 phần tử bulk sai -> gom lỗi -> KHÔNG lưu gì hết" đã có sẵn
+        // (toSave chỉ được saveAll SAU KHI toàn bộ vòng lặp không lỗi) —
+        // đúng yêu cầu rollback toàn transaction khi bulk có phần tử sai.
         if (request.getTransportReportTripId() != null) {
             TransportReportTrip trip = transportTripById.get(request.getTransportReportTripId());
             if (trip == null) {
                 throw new ResourceNotFoundException("Không tìm thấy chuyến Vận tải: " + request.getTransportReportTripId());
             }
+            assertTransportTripAccess(trip);
             decision.setTransportReportTrip(trip);
         }
         if (request.getExcavationReportTripId() != null) {
@@ -534,6 +618,7 @@ public class ReconciliationService {
             if (trip == null) {
                 throw new ResourceNotFoundException("Không tìm thấy chuyến Khai thác: " + request.getExcavationReportTripId());
             }
+            assertExcavationTripAccess(trip);
             decision.setExcavationReportTrip(trip);
         }
 
@@ -879,6 +964,23 @@ public class ReconciliationService {
         if (transportReportTripId == null && excavationReportTripId == null) {
             throw new BadRequestException("Cần ít nhất 1 trong 2: chuyến Vận tải hoặc chuyến Khai thác");
         }
+        // Xác minh phạm vi đơn vị TRƯỚC khi trả lịch sử (Quality Gate lượt 3
+        // của Codex, 2026-09-10): trước đây endpoint này truy vấn lịch sử
+        // thẳng theo tripId, không load trip để kiểm tra — người có quyền
+        // CHỨC NĂNG đọc reconciliation có thể dò/đoán tripId của đơn vị khác
+        // để xem snapshot dữ liệu (tên NV, số thẻ lương, loại hàng...) của
+        // đơn vị đó.
+        if (transportReportTripId != null) {
+            TransportReportTrip trip = transportReportTripRepository.findById(transportReportTripId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy chuyến Vận tải: " + transportReportTripId));
+            assertTransportTripAccess(trip);
+        }
+        if (excavationReportTripId != null) {
+            ExcavationReportTrip trip = excavationReportTripRepository.findById(excavationReportTripId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy chuyến Khai thác: " + excavationReportTripId));
+            assertExcavationTripAccess(trip);
+        }
+
         List<ReconciliationDataHistory> entries = new ArrayList<>();
         if (transportReportTripId != null) {
             entries.addAll(reconciliationDataHistoryRepository

@@ -36,16 +36,25 @@ public class AppTokenFilter extends OncePerRequestFilter {
                 Object departmentIdClaim = jwt.getClaim("departmentId");
                 Long departmentId = departmentIdClaim instanceof Number n ? n.longValue() : null;
 
-                // Claim "fullDataScope" VẮNG MẶT (khác với có mặt và = false) nghĩa
-                // là token không phải do LocalAuthService phát hành (LocalAuthService
-                // LUÔN ghi claim này, kể cả false) — ví dụ token Portal cũ/tương lai
-                // chưa biết tới tính năng lọc theo đơn vị này. Coi như fullDataScope
-                // để KHÔNG khoá nhầm một luồng đăng nhập khác chưa được cập nhật,
-                // thay vì âm thầm khoá hết dữ liệu của mọi tài khoản Portal.
+                // FAIL-CLOSED bắt buộc (Quality Gate lượt 3 của Codex,
+                // 2026-09-10 — sửa lại quyết định SAI ở lượt trước): claim
+                // "fullDataScope" VẮNG MẶT — dù vì token Portal cũ/tương lai
+                // chưa biết claim này, token bị chỉnh sửa, hay bất kỳ lý do
+                // nào khác — KHÔNG được coi là "thấy toàn bộ". Lượt trước cố
+                // ý mặc định true để "không khoá nhầm token Portal" nhưng đó
+                // chính là fail-OPEN: bất kỳ token nào thiếu đúng 1 claim
+                // (kể cả token cố tình bị cắt bớt) sẽ bỏ qua HOÀN TOÀN việc
+                // lọc dữ liệu theo đơn vị — vô hiệu hoá cả tính năng. Mặc
+                // định false: token thiếu claim bị coi như "đã scoped
+                // nhưng chưa gán đơn vị" (departmentId cũng sẽ null trong
+                // trường hợp này) — tức KHÔNG xem được dữ liệu đã gắn đơn vị
+                // nào cả (đúng ngữ nghĩa "chưa biết phạm vi thì không được
+                // xem", không phải "chưa biết phạm vi thì xem hết"). Khi
+                // Portal thật sự phát hành token có 2 claim này, hành vi lại
+                // đúng như local token. LocalAuthService (đường auth THẬT
+                // đang chạy — chế độ standalone) LUÔN ghi đủ 2 claim.
                 Object fullDataScopeClaim = jwt.getClaim("fullDataScope");
-                Boolean fullDataScope = fullDataScopeClaim != null
-                        ? Boolean.TRUE.equals(fullDataScopeClaim)
-                        : Boolean.TRUE;
+                Boolean fullDataScope = Boolean.TRUE.equals(fullDataScopeClaim);
 
                 AppUserDetails principal = new AppUserDetails(
                         jwt.getSubject(),

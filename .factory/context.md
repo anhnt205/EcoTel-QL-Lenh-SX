@@ -2256,16 +2256,275 @@ buộc phải được gọi).
 - Deploy `backend-service` lên preview thành công, verify sống qua API +
   UI thật như trên.
 
-### BÀN GIAO — việc còn lại (không thuộc phạm vi BLOCKING/MAJOR của lượt này)
+### BÀN GIAO (lượt 22) — việc còn lại lúc đó
 
 1. Form Phòng ban (frontend) chưa có ô bật/tắt `full_data_scope` — hiện chỉ
    set được qua API/DB trực tiếp. Cần thêm nếu chủ dự án muốn tự đổi qua UI.
+   **Vẫn CHƯA làm ở lượt 23 — ngoài phạm vi 9 phát hiện Codex nêu.**
 2. `test_a`/`test_b` (2 tài khoản phụ, phòng ban `VANTAI`/`KHAITHAC` dạng
-   "vai trò") chưa được gán phân xưởng/công trường cụ thể — không critical.
+   "vai trò") chưa được gán phân xưởng/công trường cụ thể — không critical,
+   **vẫn CHƯA xử lý.**
 3. Excel import (`TransportReportExcelImporter`/`ExcavationReportExcelImporter`)
-   vẫn ghi thẳng qua repository, KHÔNG đi qua Service — nghĩa là CHƯA có
-   lọc/xác minh theo đơn vị ở đường import. Không thuộc 3 service Codex nêu
-   đích danh; ghi nhận là lỗ hổng cùng loại, còn tồn tại, cần xử lý riêng.
-4. `ReconciliationService.getHistory` (xem lịch sử qua icon "i") chưa có
-   xác minh theo đơn vị — rủi ro thấp hơn (chỉ đọc, cần biết trước tripId
-   hợp lệ, đã qua `search` đã lọc) nhưng chưa được chặn ở chính endpoint đó.
+   vẫn ghi thẳng qua repository, KHÔNG đi qua Service — **vẫn CHƯA có lọc
+   theo đơn vị ở lượt 23** (Codex không nêu đích danh 2 lớp này trong cả 2
+   lượt Quality Gate, nhưng đây là lỗ hổng CÙNG LOẠI, còn tồn tại thật).
+4. ~~`ReconciliationService.getHistory` chưa có xác minh theo đơn vị~~ —
+   **ĐÃ SỬA ở lượt 23, xem mục 3 bên dưới.**
+
+## Lượt 23 (2026-09-11) — Quality Gate lượt 3 của Codex: 9 phát hiện (5 BLOCKING, 4 MAJOR), review commit `8e67d723`
+
+Codex review kỹ hơn hẳn — hầu hết phát hiện lần này đều ĐÚNG, kể cả 2 chỗ
+chính tôi (Claude) vừa sửa xong ở lượt 22 vẫn còn sót (fail-open claim thiếu,
+`currentScopeDepartmentId` không nhất quán với `assertDepartmentAccess`).
+**Tự phát hiện thêm 2 bug KHÁC trong lúc sửa/viết test cho lượt này — không
+phải Codex nêu** (mục "Sửa phụ" cuối phần này).
+
+### 1. BLOCKING — Data scope fail-open khi token thiếu claim
+
+`AppTokenFilter` mặc định `fullDataScope=true` khi JWT thiếu claim
+`fullDataScope` — đúng như Codex nêu, đây là fail-OPEN thật: bất kỳ token
+nào (kể cả bị cắt bớt/token Portal cũ) thiếu 1 claim sẽ vô hiệu hoá HOÀN
+TOÀN việc lọc theo đơn vị. Sửa: mặc định `false` khi claim vắng mặt (không
+phân biệt "vắng mặt" khỏi "vắng departmentId" — cả 2 đều fail-closed).
+`LocalAuthService` (đường auth thật đang chạy) LUÔN ghi đủ 2 claim nên không
+ảnh hưởng hành vi hiện tại; chỉ ảnh hưởng token GIẢ ĐỊNH thiếu claim.
+
+Test mới `AppTokenFilterTest` (4 case): đủ 2 claim, `fullDataScope=false`
+tường minh, thiếu CẢ HAI claim, thiếu RIÊNG `fullDataScope` — verify đúng
+giá trị parse + hệ quả (`canAccessDepartment` luôn false khi thiếu claim).
+
+### 2. BLOCKING — `saveDecision(s)` chưa xác minh phạm vi đơn vị
+
+Đúng như Codex nêu: có gate quyền CHỨC NĂNG `reconciliation:a` ở controller
+nhưng `buildDecision` (gọi từ `saveDecisions`) không hề gọi
+`assertTransportTripAccess`/`assertExcavationTripAccess` — tài khoản scoped
+có quyền Duyệt vẫn duyệt/yêu cầu sửa được trip của đơn vị khác qua API trực
+tiếp. Sửa: thêm 2 lệnh gọi xác minh NGAY trong `buildDecision`, TRƯỚC khi
+gán trip vào decision — nằm trong đúng try/catch hiện có của vòng lặp
+`saveDecisions` nên tự động thừa hưởng cơ chế "gom lỗi rồi KHÔNG lưu gì hết
+nếu có ≥1 lỗi" đã có sẵn — thoả đúng yêu cầu "bulk có 1 phần tử sai thì
+rollback toàn bộ, kể cả phần tử hợp lệ" mà không cần viết thêm logic
+transaction nào.
+
+Test mới (`ReconciliationServiceDepartmentScopeTest`, nhóm `SaveDecisions`,
+4 case): cùng đơn vị duyệt được; khác đơn vị bị chặn KHÔNG lưu gì; bulk trộn
+1 đúng + 1 sai đơn vị → không lưu CẢ HAI (kể cả phần tử đúng); full-scope
+duyệt được mọi đơn vị.
+
+### 3. BLOCKING — `getHistory` chưa xác minh phạm vi đơn vị
+
+Đúng như Codex nêu (và đã ghi nhận là việc-còn-lại ở lượt 22): endpoint xem
+lịch sử (icon "i") nhận thẳng tripId rồi query, không load trip để kiểm tra
+đơn vị — biết/đoán được tripId của đơn vị khác là xem được snapshot dữ liệu
+(tên NV, số thẻ lương...). Sửa: load trip qua repository rồi gọi
+`assertTransportTripAccess`/`assertExcavationTripAccess` TRƯỚC khi query
+lịch sử.
+
+Test mới (nhóm `GetHistory`, 3 case): cùng đơn vị xem được; khác đơn vị (cả
+2 phía Vận tải/Khai thác) → 403 Forbidden.
+
+### 4. BLOCKING — Migration tự động LÀM VỠ database hoàn toàn mới
+
+**Lỗi thật nghiêm trọng nhất lượt này — do chính tôi gây ra ở lượt 22 khi
+"tự động hoá" migration.** `schema.sql` (lượt 22) bọc `ALTER TABLE` trong
+điều kiện `IF NOT EXISTS` cho CỘT nhưng không kiểm tra BẢNG đã tồn tại chưa
+— trên CSDL hoàn toàn mới (deploy lần đầu, chưa có bảng nào), `schema.sql`
+chạy TRƯỚC Hibernate nên `report_periods`/`departments` CHƯA hề tồn tại,
+`ALTER TABLE report_periods ...` sẽ lỗi "relation does not exist" và ứng
+dụng KHÔNG khởi động được — **đúng NGƯỢC LẠI mục đích ban đầu của việc tự
+động hoá migration**. Sửa: bọc mỗi khối `ALTER TABLE` trong
+`DO $$ BEGIN IF EXISTS (SELECT FROM information_schema.tables ...) THEN ...
+END IF; END $$;` — bảng chưa tồn tại thì bỏ qua (Hibernate tự tạo bảng mới
+kèm đúng cột NOT NULL khai trong entity), bảng đã tồn tại thì ALTER như cũ.
+
+**Tự phát hiện thêm 1 bug KHÁC khi soát lại chính đoạn sửa này (KHÔNG phải
+Codex nêu):** bộ tách câu lệnh mặc định của Spring (`ScriptUtils`) cắt file
+theo dấu `;` ĐƠN GIẢN, không hiểu cú pháp `DO $$ ... $$;` của Postgres — sẽ
+cắt NGAY tại dấu `;` đầu tiên BÊN TRONG khối DO, vỡ thành nhiều câu lệnh rời
+rạc không hợp lệ cú pháp riêng lẻ, khiến `schema.sql` lỗi khi khởi động dù
+logic SQL bên trong đã đúng. Nếu không tự bắt được qua live-test (đọc kỹ lại
++ verify sống, không chỉ đọc mã), fix #4 sẽ VẪN LỖI trên thực tế dù đọc code
+tưởng đã đúng. Sửa: đổi `spring.sql.init.separator` sang `"@@"`, mỗi khối DO
+kết thúc bằng `@@` riêng dòng — dấu `;` trong khối giữ nguyên.
+
+**Verify sống — cả 3 kịch bản Codex yêu cầu, dùng container Postgres RỖNG
+HOÀN TOÀN (không tái sử dụng volume preview):**
+- CSDL MỚI HOÀN TOÀN (0 bảng): `docker run` Postgres trống + backend-service
+  image → `Started ThongKeCaoSonApplication` thành công, không lỗi. `\d
+  report_periods`/`\d departments` xác nhận Hibernate tự tạo đủ 3 cột
+  (`locked`, `stale`, `full_data_scope`) đúng kiểu NOT NULL.
+- CSDL ĐÃ CÓ (preview thật, có dữ liệu) — redeploy `backend-service` lên
+  preview 2 lần trong lượt này (1 lần sau khi sửa lỗi `.dockerignore` phát
+  sinh giữa chừng, xem "Sửa phụ"), cả 2 lần healthy, không lỗi.
+- Khởi động LẠI (restart) trên CSDL vừa được tạo ở bước 1 (giờ đã có bảng) —
+  `Started ThongKeCaoSonApplication` thành công lần 2, không lỗi.
+
+### 5. BLOCKING — Tài khoản chưa gán đơn vị vẫn xem được TOÀN BỘ qua search/export
+
+Đúng như Codex nêu: `currentScopeDepartmentId()` (dùng cho `search`/
+`findAllForExport`) trả `null` (nghĩa là "không lọc") cho CẢ 2 trường hợp
+khác nhau — tài khoản thật sự full-scope, VÀ tài khoản scoped nhưng
+`departmentId` cũng null (chưa được gán đơn vị) — trong khi `getById`
+(dùng `assertDepartmentAccess`) lại fail-closed đúng cho trường hợp thứ 2.
+Kết quả: 1 tài khoản scoped-nhưng-chưa-gán-đơn-vị bị chặn ở `getById` nhưng
+lại xem được TOÀN BỘ dữ liệu qua `search`/`export` — không nhất quán, và
+chính là đường vòng để lách chặn. Sửa: `currentScopeDepartmentId()` giờ chỉ
+trả `null` khi THẬT SỰ full-scope; mọi trường hợp khác (user null, hoặc
+scoped-nhưng-chưa-gán-đơn-vị) ném `ForbiddenException` NGAY — khớp đúng
+`assertDepartmentAccess`. Áp dụng cho cả `TransportReportService` VÀ
+`ExcavationReportService`.
+
+Test mới (mở rộng `TransportReportServiceDepartmentScopeTest`/
+`ExcavationReportServiceDepartmentScopeTest`, nhóm `SearchAndExport`/
+`SearchExportFloors`): tài khoản scoped truyền đúng departmentId của mình
+vào repository; full-scope truyền null; tài khoản chưa gán đơn vị → 403 ở
+CẢ `search` LẪN `findAllForExport` (trước đây 2 method này khác hành vi với
+`getById` — giờ nhất quán).
+
+### 6. MAJOR — Dữ liệu/thiết bị CHƯA gán đơn vị mở cho MỌI tài khoản scoped
+
+Đúng như Codex nêu: `AppUserDetails.canAccessDepartment(null)` trả `true`
+vô điều kiện (thiết bị chưa gán đơn vị coi như "ai cũng xem được"), và
+repository query có thêm `OR ... department.id IS NULL` — trong 1 CSDL
+brownfield mà PHẦN LỚN thiết bị cũ CHƯA TỪNG được gán đơn vị, điều này khiến
+MỌI tài khoản scoped vẫn đọc/sửa được gần hết dữ liệu hệ thống, vô hiệu hoá
+phần lớn mục đích của toàn bộ tính năng phân quyền theo đơn vị.
+
+**Quyết định (đã cân nhắc 2 hướng Codex đề xuất):** không tự backfill dữ
+liệu cũ (không có căn cứ để đoán thiết bị nào thuộc đơn vị nào — quyết định
+nghiệp vụ của chủ dự án, ngoài phạm vi sửa code). Chọn **fail-closed/cách
+ly**: bỏ nhánh `targetDepartmentId == null` trong `canAccessDepartment`, bỏ
+`OR ... department.id IS NULL` trong CẢ 2 repository — giờ CHỈ tài khoản
+full-scope (Thống kê/Admin) mới thấy dữ liệu/thiết bị chưa gán đơn vị; tài
+khoản scoped (VT7, KT1...) không còn thấy được nữa cho tới khi thiết bị đó
+được gán đúng đơn vị.
+
+**Hệ quả THẬT cần chủ dự án biết:** nếu còn thiết bị/nhân viên VT-KT thật
+đang dùng CHƯA được gán đơn vị, sau lượt sửa này họ sẽ MẤT quyền xem dữ liệu
+thiết bị đó (trước đây thấy được do lỗ hổng, giờ bị chặn đúng thiết kế) —
+cần rà soát gán đủ `Device.department` cho toàn bộ thiết bị đang hoạt động
+trước khi/right sau khi lên production. Không phải regression — là hệ quả
+trực tiếp, có chủ đích của việc sửa đúng lỗ hổng bảo mật.
+
+Test mới: `deviceWithoutDepartmentIsQuarantinedFromScopedAccounts` (403) và
+`deviceWithoutDepartmentIsVisibleToFullScopeOnly` (200) ở CẢ 2 service test
+class. **Không verify sống được** — dữ liệu preview hiện tại không còn báo
+cáo nào trên thiết bị chưa gán đơn vị (4 thiết bị có dữ liệu thật đều đã
+được gán đơn vị từ lượt 22); đã verify qua unit test.
+
+### 7. MAJOR — Endpoint danh sách Tầng xúc bỏ qua data scope
+
+Đúng như Codex nêu: `getDistinctExcavationFloors`/`findDistinctExcavationFloors`
+chỉ lọc theo khoảng ngày, không lọc theo đơn vị — tài khoản 1 đơn vị nhận
+được TOÀN BỘ giá trị Tầng xúc gom từ MỌI đơn vị (rò rỉ tên tầng của đơn vị
+khác qua 1 bộ lọc phụ trợ, dù dữ liệu chính đã lọc đúng). Sửa: thêm tham số
+`departmentId` vào query, dùng `currentScopeDepartmentId()` (đã sửa fail-
+closed ở mục 5) — cùng 1 điểm chốt, không tạo helper riêng.
+
+Đã rà soát thêm các API/query phụ trợ tương tự khác trong phạm vi 3 service
+Codex nêu — không tìm thấy đường bỏ sót nào khác (2 method search chính và
+2 method export đều đã lọc từ lượt 22).
+
+### 8. MAJOR — Ghép cặp: thuật toán CŨ (lượt 22) chưa chứng minh đúng khi 2 bên nhập khác thứ tự
+
+Đúng như Codex nêu — phân tích kỹ: lượt 22 chỉ thêm `ORDER BY` rồi
+`Deque.poll()` theo thứ tự — giải quyết được tính XÁC ĐỊNH (chạy lại ra
+cùng kết quả) nhưng KHÔNG chứng minh ghép ĐÚNG khi 2 bên (Vận tải/Khai thác)
+nhập nhiều chuyến cùng khoá (ngày+ca+xe+máy xúc) theo thứ tự khác nhau — 2
+sequence ID độc lập, không có quan hệ.
+
+**Sửa (thuật toán mới, `pickBestMatch`):** khi 1 khoá có NHIỀU ứng viên, ưu
+tiên ứng viên KHỚP ĐÚNG `isMatched` (Loại hàng, Số chuyến, Mức tải, Nhân
+viên — tín hiệu nội dung THẬT, không phụ thuộc thứ tự nhập) — giải quyết
+đúng ví dụ Codex nêu (2 bên nhập "Đất"/"Đá" theo thứ tự khác nhau vẫn ghép
+đúng theo nội dung). Khi KHÔNG ứng viên nào khớp đúng (dữ liệu tự nó đang
+lệch — đúng ca đối chiếu cần bắt) → **không đủ căn cứ xác định cặp đúng**,
+vẫn phải ghép 1 cặp (không thể để trống dòng) theo thứ tự ổn định nhưng
+đánh dấu **`pairingAmbiguous=true`** (field mới trên `ReconciliationRowResponse`)
+— "phát hiện ambiguity" đúng ý Codex yêu cầu, thay vì âm thầm coi mọi ghép
+như nhau. **Chưa làm UI hiển thị cờ này** — ghi nhận là việc còn lại (mục
+BÀN GIAO cuối phần này).
+
+**Tự phát hiện thêm 1 bug KHÁC trong chính thuật toán mới vừa viết (bắt được
+qua chính test tự viết, KHÔNG phải Codex nêu):** bản đầu tiên của
+`pickBestMatch` dùng `candidates.size() == 1` (kích thước SỐNG, đang co lại
+dần) để quyết định "không mơ hồ" — sai khi 1 nhóm có 2+ ứng viên đều KHÔNG
+khớp nội dung: chuyến Vận tải ĐẦU TIÊN trong nhóm đúng là rơi vào nhánh mơ
+hồ (poll cuối cùng, đánh dấu đúng `ambiguous=true`), nhưng chuyến THỨ HAI
+cùng nhóm lúc đó `candidates` chỉ còn 1 phần tử (do chuyến đầu đã tiêu thụ
+mất 1) — code cũ hiểu NHẦM "còn 1 -> chắc chắn đúng" và đánh dấu SAI thành
+`ambiguous=false`, dù nó mơ hồ y hệt chuyến đầu. Sửa: chụp kích thước GỐC
+của mỗi nhóm (`excavationGroupSize`, tính 1 lần TRƯỚC vòng lặp poll) thay vì
+đọc `candidates.size()` tại thời điểm ghép.
+
+Test mới (`ReconciliationServicePairingTest`, thêm 2 case, giữ nguyên case
+cũ): `pairsByContentEvenWhenTwoSidesInsertInDifferentOrder` (2 bên nhập
+"Đất"/"Đá" đảo thứ tự id — ghép đúng theo cargoType, `pairingAmbiguous=false`
+cả 2 dòng) và `flagsGenuineAmbiguityWhenNoCandidateMatchesByContent` (2+2
+chuyến không ai khớp nội dung — cả 2 dòng đều `pairingAmbiguous=true`,
+chính test này bắt được bug "chỉ dòng đầu đúng, dòng sau sai" ở trên).
+
+### 9. MAJOR — Auto-recalculation chỉ log lỗi, chưa có cơ chế phục hồi quan sát được
+
+Đúng như Codex nêu: lượt 22 đã tách đúng `PeriodNotFullyApprovedException`
+(debug) khỏi `BadRequestException` khác (error), nhưng lỗi thật vẫn CHỈ nằm
+trong log — không có cách nào người vận hành biết mà xử lý, không retry,
+không đánh dấu trạng thái.
+
+**Quyết định:** không xây cơ chế retry/outbox MỚI. Thay vào đó **tái dùng
+đúng cờ `ReportPeriod.stale`** đã có sẵn từ QĐ-03 (ý nghĩa: "báo cáo đang
+hiển thị đã lỗi thời, cần tính lại" — ĐÃ được frontend hiển thị sẵn ở
+`ProductionReportPage.tsx`, không phải cờ mới/ẩn): auto-recalc thất bại
+(lỗi thật, không phải "chưa đủ điều kiện") → `period.stale = true` — người
+vận hành THẤY NGAY trên UI, tự bấm nút "Tính lại kỳ" đã có sẵn sau khi xử
+lý xong nguyên nhân (vd bổ sung định mức thiếu). Bổ sung
+`ProductionCalculationService.calculatePeriod`: tính THÀNH CÔNG thì tự tắt
+`stale` — đóng vòng lặp quan sát-sửa-xác nhận, không kẹt `stale=true` mãi.
+
+Test mới (mở rộng `ProductionAutoRecalculateListenerTest`, +3 case): lỗi
+thật → `stale=true` + `save()` được gọi; lỗi không mong đợi (Exception lạ)
+→ cũng `stale=true`; kỳ ĐÃ stale từ trước → không `save()` lại (tránh update
+thừa); case cũ "chưa đủ điều kiện" bổ sung assert KHÔNG đánh dấu stale.
+
+### Sửa phụ (phát sinh trong lúc làm, không phải 1 trong 9 phát hiện của Codex)
+
+`frontend/.dockerignore` (MỚI, trước đây KHÔNG có): build preview stack lần
+đầu ở lượt này lỗi giữa chừng — `node_modules` do chính tôi tạo ra khi chạy
+`docker run ... pnpm install` để verify build cục bộ (không qua Docker
+multi-stage) VÔ TÌNH còn sót lại trên host, và 1 file bên trong (broken
+symlink kiểu pnpm) khiến Windows filesystem từ chối cho Docker đọc build
+context — `COPY . .` trong Dockerfile fail. Xoá `node_modules` sót lại +
+thêm `.dockerignore` (loại `node_modules`, `dist`, `.git`...) để không lặp
+lại, đồng thời build nhanh hơn (context nhẹ hơn nhiều).
+
+### Kết quả build/test
+
+- Backend: `mvn -B test` → **97/98 pass**. 1 fail còn lại vẫn là
+  `ThongKeCaoSonApplicationTests.contextLoads` — PRE-EXISTING (CLAUDE.md dự
+  án mục 3), không liên quan lượt này.
+- Frontend: `pnpm install --frozen-lockfile && pnpm run build` → sạch.
+- Deploy preview 2 lần (1 lần lỗi vì `.dockerignore`, đã sửa + deploy lại
+  thành công) + 1 container Postgres/backend RỜI throwaway (CSDL trống hoàn
+  toàn, đã xoá sau khi verify) — cả 3 kịch bản CSDL (mới/hiện hữu/restart)
+  đều pass, không lỗi.
+- Verify sống qua API thật (curl + JWT decode, tài khoản `test_vantai` thật)
+  trên preview đã redeploy: same-dept 200, cross-dept 403 vẫn đúng sau khi
+  sửa (không regression so với lượt 22).
+
+### BÀN GIAO (lượt 23) — việc còn lại
+
+1. (Kế thừa lượt 22, vẫn chưa làm) Form Phòng ban chưa có ô UI cho
+   `full_data_scope`; `test_a`/`test_b` chưa gán đơn vị cụ thể; Excel import
+   vẫn chưa lọc theo đơn vị.
+2. `pairingAmbiguous` (mục 8) mới có ở BACKEND (field trong response) — CHƯA
+   có UI hiển thị cảnh báo cho dòng mơ hồ ở màn Đối chiếu. Cần làm nếu chủ
+   dự án muốn người dùng thấy được tín hiệu này thay vì chỉ nằm trong API.
+3. **Hệ quả vận hành CẦN chủ dự án xử lý SỚM** (mục 6): rà soát gán
+   `Device.department` cho MỌI thiết bị VT/KT đang hoạt động thật — thiết bị
+   chưa gán sẽ bị "biến mất" khỏi tầm nhìn của tài khoản scoped kể từ lượt
+   này (đúng thiết kế, không phải bug, nhưng cần chủ động xử lý trước khi
+   nhân viên thật gặp phải).
+4. `saveDecision(s)`/`getHistory` (mục 2, 3) không verify sống được qua API
+   thật vì `test_vantai`/`test_khaithac` (2 tài khoản test có sẵn) chưa được
+   cấp quyền CHỨC NĂNG `reconciliation` (khoảng trống có từ trước, ghi nhận
+   ở lượt 22) — đã verify qua unit test đầy đủ (7 case) thay thế.

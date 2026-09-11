@@ -13,6 +13,9 @@ import java.util.Optional;
 
 public interface ExcavationReportRepository extends JpaRepository<ExcavationReport, Long> {
 
+    // Xem chú thích tương ứng ở TransportReportRepository.searchIds — cùng
+    // lý do, cùng quyết định (Quality Gate lượt 3 của Codex, 2026-09-10):
+    // CỐ Ý không có `OR ... department.id IS NULL`.
     @Query("""
         SELECT r FROM ExcavationReport r
         WHERE r.reportDate BETWEEN :fromDate AND :toDate
@@ -20,7 +23,7 @@ public interface ExcavationReportRepository extends JpaRepository<ExcavationRepo
           AND (:excavatorIds IS NULL OR r.excavatorDevice.id IN :excavatorIds)
           AND (:receivingLocationIds IS NULL OR r.receivingLocation.id IN :receivingLocationIds)
           AND (:excavationFloors IS NULL OR r.excavationFloor IN :excavationFloors)
-          AND (:departmentId IS NULL OR r.excavatorDevice.department.id = :departmentId OR r.excavatorDevice.department.id IS NULL)
+          AND (:departmentId IS NULL OR r.excavatorDevice.department.id = :departmentId)
         ORDER BY r.reportDate DESC
         """)
     Page<ExcavationReport> search(
@@ -47,14 +50,21 @@ public interface ExcavationReportRepository extends JpaRepository<ExcavationRepo
      * Truy vấn này ĐỘC LẬP với {@code Pageable} và mọi bộ lọc khác — chỉ còn
      * phụ thuộc khoảng ngày, khớp đúng cách {@code knownBenches} phía
      * frontend reset khi đổi khoảng ngày.
+     *
+     * <p><b>Thêm {@code departmentId} (Quality Gate lượt 3 của Codex,
+     * 2026-09-10):</b> trước đây bỏ sót — tài khoản 1 đơn vị nhận được toàn
+     * bộ giá trị Tầng xúc gom từ MỌI đơn vị, rò rỉ tên tầng xúc của đơn vị
+     * khác qua bộ lọc phụ trợ dù dữ liệu chính (search/export) đã lọc đúng.
      */
     @Query("""
         SELECT DISTINCT r.excavationFloor FROM ExcavationReport r
         WHERE r.reportDate BETWEEN :fromDate AND :toDate
           AND r.excavationFloor IS NOT NULL AND r.excavationFloor <> ''
+          AND (:departmentId IS NULL OR r.excavatorDevice.department.id = :departmentId)
         ORDER BY r.excavationFloor
         """)
     List<String> findDistinctExcavationFloors(
             @Param("fromDate") LocalDate fromDate,
-            @Param("toDate") LocalDate toDate);
+            @Param("toDate") LocalDate toDate,
+            @Param("departmentId") Long departmentId);
 }

@@ -13,12 +13,19 @@ import java.util.Optional;
 
 public interface TransportReportRepository extends JpaRepository<TransportReport, Long> {
 
+    // `:departmentId` NULL = tài khoản full-scope, không lọc. Tài khoản
+    // scoped luôn có departmentId thật (currentScopeDepartmentId() ở
+    // TransportReportService fail-closed trước khi gọi query này nếu tài
+    // khoản chưa gán đơn vị) — CỐ Ý KHÔNG có `OR r.vehicle.department.id IS
+    // NULL` (đã bỏ qua Quality Gate lượt 3 của Codex, 2026-09-10): xe chưa
+    // gán đơn vị bị "cách ly" khỏi mọi tài khoản scoped, chỉ full-scope mới
+    // thấy — xem javadoc AppUserDetails.canAccessDepartment.
     @Query("""
     SELECT r.id FROM TransportReport r
     WHERE r.reportDate BETWEEN :fromDate AND :toDate
       AND (:shiftIds IS NULL OR r.shift.id IN :shiftIds)
       AND (:deviceIds IS NULL OR r.vehicle.id IN :deviceIds)
-      AND (:departmentId IS NULL OR r.vehicle.department.id = :departmentId OR r.vehicle.department.id IS NULL)
+      AND (:departmentId IS NULL OR r.vehicle.department.id = :departmentId)
     ORDER BY r.reportDate DESC
     """)
     Page<Long> searchIds(
@@ -48,7 +55,7 @@ public interface TransportReportRepository extends JpaRepository<TransportReport
     WHERE r.reportDate BETWEEN :fromDate AND :toDate
       AND (:shiftIds IS NULL OR r.shift.id IN :shiftIds)
       AND (:deviceIds IS NULL OR r.vehicle.id IN :deviceIds)
-      AND (:departmentId IS NULL OR r.vehicle.department.id = :departmentId OR r.vehicle.department.id IS NULL)
+      AND (:departmentId IS NULL OR r.vehicle.department.id = :departmentId)
     ORDER BY r.reportDate DESC
     """)
     List<Long> searchAllIds(

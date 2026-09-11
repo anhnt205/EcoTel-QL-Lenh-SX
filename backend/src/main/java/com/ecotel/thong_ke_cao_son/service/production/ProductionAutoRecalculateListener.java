@@ -45,6 +45,20 @@ import java.util.Set;
  * cáo (ví dụ thiếu định mức) mà không ai biết, không có cách retry. Từ nay
  * log mức lỗi để còn biết mà xử lý tay — xem {@link #recalculateQuietly}.
  * Phát hiện qua Quality Gate của Codex.
+ *
+ * <p><b>Phục hồi (lượt 3, 2026-09-10 — Codex yêu cầu "eventual calculation"
+ * chứ không chỉ log rồi bỏ):</b> khi tự động tính lại thất bại vì lỗi THẬT
+ * (không phải "chưa đủ điều kiện"), đánh dấu {@code period.stale = true} —
+ * TÁI DÙNG đúng cờ QĐ-03 đã có sẵn ý nghĩa "báo cáo đang hiển thị đã lỗi
+ * thời, cần tính lại" và ĐÃ được frontend hiển thị (xem
+ * {@code ProductionReportPage.tsx}), không phải cờ mới/ẩn. Người vận hành
+ * thấy kỳ "stale" trên UI, tự bấm nút "Tính lại kỳ" (đã có sẵn) sau khi xử
+ * lý xong nguyên nhân lỗi (vd khai bổ sung định mức thiếu) — không cần cơ
+ * chế retry/outbox mới: chính hành động tính lại thủ công đó XOÁ cờ stale
+ * khi thành công (xem {@code ProductionCalculationService}/luồng mở khoá
+ * QĐ-03 đã tắt cờ này theo đúng cách tương tự). KHÔNG retry tự động có giới
+ * hạn — đa số lỗi ở đây (thiếu định mức, kỳ đã chốt) cần con người xử lý
+ * trước, retry tự động vô nghĩa cho tới khi đó.
  */
 @Component
 @RequiredArgsConstructor
@@ -99,12 +113,26 @@ public class ProductionAutoRecalculateListener {
             // COMMIT, không rollback được — chỉ log lỗi để xử lý tay.
             log.error("Kỳ {} (id={}) tự động tính lại thất bại (lỗi nghiệp vụ/dữ liệu): {}",
                     period.getDisplayName(), periodId, e.getMessage());
+            markStale(period);
         } catch (Exception e) {
             // Transaction gốc (duyệt) đã COMMIT xong, không rollback được nữa —
             // chỉ log lỗi thật để biết mà xử lý tay, không được throw tiếp (sẽ
             // không ai bắt được, chỉ tạo stacktrace vô ích trong log listener).
             log.error("Lỗi không mong đợi khi tự động tính lại kỳ {} (id={})",
                     period.getDisplayName(), periodId, e);
+            markStale(period);
+        }
+    }
+
+    /**
+     * Đánh dấu kỳ "lỗi thời" sau khi tự động tính lại thất bại thật — xem
+     * javadoc lớp. Tự tắt lại khi {@code ProductionCalculationService
+     * .calculatePeriod} tính thành công LẦN SAU (thủ công hoặc tự động).
+     */
+    private void markStale(ReportPeriod period) {
+        if (!period.isStale()) {
+            period.setStale(true);
+            reportPeriodRepository.save(period);
         }
     }
 }

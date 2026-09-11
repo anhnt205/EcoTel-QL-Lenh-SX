@@ -52,4 +52,14 @@ public class ReconciliationRowResponse {
     private Boolean transportHistoryAvailable;
     private Boolean excavationHistoryAvailable;
 
+    /**
+     * true = dòng này có NHIỀU HƠN 1 ứng viên ghép cặp cùng khoá (Thời gian/
+     * Ca/Máy xúc/Số xe) ở CẢ hai phía, và KHÔNG ứng viên nào khớp đúng đủ 4
+     * trường so sánh ({@code isMatched}) để phân biệt — hệ thống vẫn phải
+     * ghép 1 cặp (không thể để trống dòng) nhưng không có tín hiệu nghiệp vụ
+     * nào đảm bảo đúng ứng viên. Thêm theo Quality Gate lượt 3 của Codex
+     * (2026-09-10) — xem javadoc {@code ReconciliationService.pickBestMatch}.
+     */
+    private Boolean pairingAmbiguous;
+
 }

@@ -230,6 +230,17 @@ public class ProductionCalculationService {
         coefficientRepository.saveAll(apTkm.values());
         resultRepository.saveAll(results);
 
+        // Tính THÀNH CÔNG -> báo cáo đang hiển thị không còn lỗi thời nữa,
+        // dù trước đó có bị đánh dấu stale vì lần TỰ ĐỘNG tính lại nào đó
+        // thất bại (xem ProductionAutoRecalculateListener, Quality Gate lượt
+        // 3 của Codex, 2026-09-10) hay vì vừa mở khoá (QĐ-03). Không tắt cờ
+        // này thì "stale" sẽ kẹt true mãi sau khi sửa lỗi + tính lại thành
+        // công — chỉ báo lỗi được nửa vòng đời, không đóng được vòng lặp.
+        if (period.isStale()) {
+            period.setStale(false);
+            periodRepository.save(period);
+        }
+
         log.info("Tính sản lượng kỳ {}: {} chuyến, {} dòng hệ số, TKE={}",
                 period.getDisplayName(), results.size(), apTdia.size() + apTkm.size(), tkeMode);
 

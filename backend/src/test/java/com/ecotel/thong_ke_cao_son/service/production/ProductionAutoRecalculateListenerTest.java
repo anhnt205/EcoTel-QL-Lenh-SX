@@ -85,7 +85,7 @@ class ProductionAutoRecalculateListenerTest {
     }
 
     @Test
-    @DisplayName("PeriodNotFullyApprovedException (kỳ đang duyệt dở) -> chỉ log DEBUG, không log ERROR")
+    @DisplayName("PeriodNotFullyApprovedException (kỳ đang duyệt dở) -> chỉ log DEBUG, không log ERROR, KHÔNG đánh dấu stale")
     void incompleteApprovalIsLoggedAtDebugOnly() {
         LocalDate reportDate = LocalDate.of(2026, 9, 1);
         ReportPeriod period = openPeriod(1L);
@@ -99,11 +99,13 @@ class ProductionAutoRecalculateListenerTest {
 
         assertThat(logAppender.list).noneMatch(e -> e.getLevel() == Level.ERROR);
         assertThat(logAppender.list).anyMatch(e -> e.getLevel() == Level.DEBUG);
+        assertThat(period.isStale()).as("kỳ đang duyệt dở là BÌNH THƯỜNG, không phải lỗi cần đánh dấu").isFalse();
+        verify(reportPeriodRepository, never()).save(any());
     }
 
     @Test
-    @DisplayName("BadRequestException KHÁC (lỗi nghiệp vụ/dữ liệu thật, vd kỳ đã chốt) -> phải log ERROR")
-    void genuineBusinessErrorIsLoggedAtError() {
+    @DisplayName("BadRequestException KHÁC (lỗi nghiệp vụ/dữ liệu thật, vd kỳ đã chốt) -> phải log ERROR VÀ đánh dấu kỳ stale (Quality Gate lượt 3 — eventual calculation)")
+    void genuineBusinessErrorIsLoggedAtErrorAndMarksStale() {
         LocalDate reportDate = LocalDate.of(2026, 9, 1);
         ReportPeriod period = openPeriod(1L);
         when(reportPeriodRepository.findByDate(reportDate)).thenReturn(Optional.of(period));
@@ -116,6 +118,44 @@ class ProductionAutoRecalculateListenerTest {
 
         assertThat(logAppender.list).anyMatch(e -> e.getLevel() == Level.ERROR
                 && e.getFormattedMessage().contains("lỗi nghiệp vụ"));
+        assertThat(period.isStale())
+                .as("phải quan sát được qua ReportPeriod.stale (đã hiển thị sẵn ở frontend) -> người vận hành biết mà xử lý, không chỉ nằm trong log")
+                .isTrue();
+        verify(reportPeriodRepository).save(period);
+    }
+
+    @Test
+    @DisplayName("Lỗi KHÔNG mong đợi (Exception bất kỳ) -> cũng đánh dấu stale, không chỉ log")
+    void unexpectedErrorAlsoMarksStale() {
+        LocalDate reportDate = LocalDate.of(2026, 9, 1);
+        ReportPeriod period = openPeriod(1L);
+        when(reportPeriodRepository.findByDate(reportDate)).thenReturn(Optional.of(period));
+        when(reportPeriodRepository.findById(1L)).thenReturn(Optional.of(period));
+        when(productionResultRepository.findFirstByReportPeriod_Id(1L)).thenReturn(Optional.empty());
+        doThrow(new RuntimeException("lỗi lạ không xác định trước"))
+                .when(productionCalculationService).calculatePeriod(1L, false);
+
+        newListener().onApproved(new ReconciliationApprovedEvent(this, Set.of(reportDate)));
+
+        assertThat(period.isStale()).isTrue();
+        verify(reportPeriodRepository).save(period);
+    }
+
+    @Test
+    @DisplayName("Kỳ ĐÃ stale từ trước -> không save lại lần nữa (tránh update thừa)")
+    void alreadyStalePeriodIsNotSavedAgain() {
+        LocalDate reportDate = LocalDate.of(2026, 9, 1);
+        ReportPeriod period = openPeriod(1L);
+        period.setStale(true);
+        when(reportPeriodRepository.findByDate(reportDate)).thenReturn(Optional.of(period));
+        when(reportPeriodRepository.findById(1L)).thenReturn(Optional.of(period));
+        when(productionResultRepository.findFirstByReportPeriod_Id(1L)).thenReturn(Optional.empty());
+        doThrow(new BadRequestException("lỗi thật"))
+                .when(productionCalculationService).calculatePeriod(1L, false);
+
+        newListener().onApproved(new ReconciliationApprovedEvent(this, Set.of(reportDate)));
+
+        verify(reportPeriodRepository, never()).save(any());
     }
 
     @Test
