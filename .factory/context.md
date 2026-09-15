@@ -2742,3 +2742,114 @@ Test mới:
   chuyến trùng nội dung) sẽ chỉ lặp lại đúng điều unit test đã chứng minh,
   không thêm được bằng chứng mới. Ghi nhận rõ ràng, không giấu giếm việc
   không làm.
+
+## Lượt 26 (2026-09-16) — Quality Gate lượt 6 của Codex: 1 phát hiện MAJOR, review commit `ff5e026`
+
+Codex xác nhận lượt 25 (thuật toán ghép cặp đối xứng 2 chiều) đã sửa đúng.
+Phát hiện MỚI 1 lỗ hổng khác trong CHÍNH `assertPairingUnambiguous` (đổi tên
+thành `assertValidPair` lượt này).
+
+### 1. MAJOR — nhánh "không cạnh tranh" (early-return) chưa từng kiểm tra `et` gửi lên có CÙNG khoá với `tt` hay không
+
+Đúng như Codex nêu — phân tích kỹ: điều kiện `sameKeyTransport.size()<=1 &&
+sameKeyExcavation.size()<=1` (lượt 5) CHỈ đếm số ứng viên CÙNG KHOÁ CỦA
+RIÊNG `tt`, và số ứng viên CÙNG KHOÁ CỦA RIÊNG `et` — nhưng KHÔNG BAO GIỜ so
+2 khoá đó với NHAU. Hệ quả: client gửi lên 2 id của 2 chuyến hoàn toàn KHÔNG
+liên quan (khác ngày/ca/xe/máy xúc) — nếu mỗi bên riêng lẻ không bị cạnh
+tranh trong nhóm khoá CỦA CHÍNH NÓ — vẫn lọt qua early-return và được coi là
+"chắc chắn", cho phép duyệt/yêu cầu sửa một cặp bịa đặt. Toàn bộ bước "đếm
+ứng viên cùng khoá" phía sau hoàn toàn vô nghĩa nếu không chặn từ đầu, vì
+chúng chỉ tính TỪ khoá của `tt`, không hề đụng `et` nếu `et` lạc khoá.
+
+Codex cũng chỉ ra 1 lỗ hổng ĐỘC LẬP thứ hai trong cùng phát hiện: backend
+CHƯA TỪNG ép lại quy tắc "chỉ duyệt (APPROVED) khi nội dung 2 bên đã khớp"
+— frontend đã khoá nút Duyệt qua `canApprove`/`isMatched`
+(`reconciliationColumns.tsx`) nhưng gọi API trực tiếp vẫn duyệt được 1 cặp
+cùng khoá (không mơ hồ) nhưng SỐ LIỆU LỆCH NHAU — hợp đồng FE/BE không nhất
+quán, và về bản chất là duyệt một dữ liệu bên thống kê viên biết là sai.
+
+**Sửa** — viết lại `assertValidPair(tt, et, status)` (đổi tên từ
+`assertPairingUnambiguous`, thêm tham số `status` vì cần biết đang
+duyệt/yêu cầu sửa) gộp 3 điều kiện độc lập, thứ tự có ý nghĩa:
+
+1. **Kiểm tra CÙNG khoá ghép ngay đầu tiên**, TRƯỚC mọi truy vấn khác —
+   `buildTransportKey(tt).equals(buildExcavationKey(et))`, nếu sai thì ném
+   `BadRequestException` ngay (không tốn 2 query `findForReconciliation` vô
+   ích). Đây chính là lỗ hổng #1 Codex nêu — vá triệt để bằng cách chặn từ
+   gốc thay vì vá thêm nhánh vào logic đếm cạnh tranh cũ.
+2. Logic mutual-unique-match cũ (lượt 5) giữ nguyên, chỉ đảo điều kiện
+   (`if (!(...size<=1 && ...size<=1))` thay vì `if (...) return;`) để có thể
+   tiếp tục xuống bước 3 kể cả khi không cạnh tranh.
+3. **MỚI: nếu `status == APPROVED` mà `!isMatched(tt, et)` → từ chối.**
+   Không áp dụng cho `REVISION_REQUESTED` — đó CHÍNH LÀ mục đích nghiệp vụ
+   của Đối chiếu (phát hiện lệch → yêu cầu sửa), chặn cả `REVISION_REQUESTED`
+   sẽ tự mâu thuẫn với luồng nghiệp vụ đã có (chặn cả cặp KHÁC khoá thì vẫn
+   chặn `REVISION_REQUESTED` như cũ — vì đó là bước 1, không điều kiện theo
+   status).
+
+**Đã rà lại toàn bộ test cũ trong `PairingAmbiguity` trước khi build** (đúng
+kỷ luật đã lập ở lượt 5): `uniquePairIsAccepted` có tiền đề SAI với logic
+mới — gửi `status=APPROVED` nhưng cố ý cho `cargoType` 2 bên KHÁC nhau (5 vs
+9) để chứng minh "không cạnh tranh thì không bị chặn dù nội dung lệch" —
+đúng với logic lượt 5 nhưng SAI với luật mới #3 (APPROVED bắt buộc khớp nội
+dung). Sửa: đổi `excavation1` sang cùng `cargoTypeId=5` (khớp `transport1`)
+để giữ đúng mục đích gốc của test (chứng minh cặp không cạnh tranh, nội dung
+khớp, APPROVED vẫn hoạt động bình thường — không regression), tên/mô tả test
+cập nhật theo. 3 test còn lại (`ambiguousPairIsRejected*2`,
+`bulkWithAmbiguousPairRollsBackEntirely`) đều dùng nội dung KHỚP giữa các
+ứng viên cạnh tranh — không bị ảnh hưởng bởi luật #3 (bị chặn ở bước 2 mơ hồ
+trước khi tới bước 3).
+
+Test mới (đúng 6 kịch bản Codex yêu cầu, thêm vào
+`ReconciliationServiceDepartmentScopeTest.PairingAmbiguity`):
+- `differentDateIsRejected` — khác ngày → từ chối ngay, không cần stub
+  `findForReconciliation` (đúng vì bước 1 chặn TRƯỚC khi query).
+- `differentShiftIsRejected` — khác ca → từ chối ngay.
+- `differentVehicleOrExcavatorIsRejected` — khác xe/máy xúc → từ chối ngay.
+- `sameKeyMismatchedContentApprovedIsRejected` — cùng khoá, không cạnh
+  tranh, nội dung lệch (`cargoType` 5 vs 9), `status=APPROVED` → từ chối.
+- `sameKeyMismatchedContentRevisionRequestedIsAccepted` — y hệt kịch bản
+  trên nhưng `status=REVISION_REQUESTED` → KHÔNG bị chặn (đúng luồng nghiệp
+  vụ, luật #3 không áp dụng).
+- `bulkWithCrossKeyPairRollsBackEntirely` — bulk có 1 phần tử là cặp khác
+  khoá (khác ngày, không cạnh tranh riêng lẻ ở bên nào) → TOÀN BỘ rollback,
+  không lưu cả phần tử hợp lệ khác trong cùng request.
+
+### Kết quả build/test
+
+- Backend: `mvn -B test` (lệnh CHUẨN, container builder mới build lại) →
+  **113/113 pass, BUILD SUCCESS, exit code 0** (nhóm `PairingAmbiguity` từ
+  4 lên 10 test).
+- **`mvn test -Plive-integration-test` với Postgres/Redis THẬT** (container
+  gắn network `thongke-caoson-preview_backnet`, trỏ đúng service
+  `postgres`/`redis`, đúng `SPRING_DATASOURCE_URL`/`_USERNAME`/`_PASSWORD`
+  và `AUTH_JWT_SECRET` lấy từ `preview-docker-compose.yaml`):
+  `ThongKeCaoSonApplicationTests.contextLoads` → **1/1 pass, BUILD SUCCESS,
+  exit code 0**.
+- Frontend: `pnpm install --frozen-lockfile && pnpm run build` (không đụng
+  file frontend nào lượt này — chạy để sanity-check theo đúng yêu cầu #6 của
+  Codex) → sạch, exit code 0, không có file nào thay đổi trong `dist/`.
+- Deploy lại `backend-service` lên preview (build lại image, recreate
+  container) → **healthy** sau ~30s, log khởi động sạch, không có lỗi/
+  exception, Tomcat start bình thường trên cổng 8088.
+- **Không verify sống qua UI/API thật cho riêng phát hiện này** — cùng lý do
+  đã ghi lượt 25: đây là sửa logic nghiệp vụ thuần tuý ở tầng `saveDecision`
+  (không phải ranh giới bảo mật/phân quyền — tầng đó không đổi), bộ test
+  dựng lại CHÍNH XÁC từng kịch bản Codex mô tả (khác ngày/ca/xe/máy xúc,
+  cùng khoá+lệch nội dung+từng loại status, bulk rollback) một cách xác
+  định. Thêm: tài khoản `admin` không rõ mật khẩu gốc (mục 8 CLAUDE.md dự
+  án) nên không tự đăng nhập API thật để dựng lại kịch bản này qua HTTP —
+  ghi nhận rõ ràng, không giấu giếm giới hạn này.
+
+### BÀN GIAO (lượt 26) — việc còn lại
+
+1. (Kế thừa lượt 24) Form Phòng ban chưa có ô UI `full_data_scope`;
+   `test_a`/`test_b` chưa gán đơn vị; Excel import chưa lọc theo đơn vị;
+   `Device.department` cần rà soát gán đủ cho thiết bị thật.
+2. (Kế thừa lượt 24) `getHistory` chưa được chặn bởi `assertValidPair` — chỉ
+   xem, rủi ro thấp hơn hẳn duyệt/sửa, nhưng nếu chủ dự án muốn chặt chẽ
+   tuyệt đối thì đây là việc còn lại.
+3. Không có cách tự động verify sống qua UI/API thật cho các fix logic
+   nghiệp vụ thuần tuý (lượt 25, 26) vì không rõ mật khẩu tài khoản seed sẵn
+   — nếu chủ dự án muốn verify sống trong tương lai, cần cấp 1 tài khoản
+   test có mật khẩu biết trước.

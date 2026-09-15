@@ -659,7 +659,7 @@ public class ReconciliationService {
         // HAI id (đang thao tác trên 1 CẶP) — request chỉ 1 phía không giả
         // định gì về pairing nên không cần kiểm tra này.
         if (transportTrip != null && excavationTrip != null) {
-            assertPairingUnambiguous(transportTrip, excavationTrip);
+            assertValidPair(transportTrip, excavationTrip, request.getStatus());
         }
 
         decision.setStatus(request.getStatus());
@@ -669,30 +669,48 @@ public class ReconciliationService {
     }
 
     /**
-     * Xem javadoc {@link #pickBestMatch} — dùng LẠI ĐÚNG logic đó (ứng viên
-     * cùng khoá + {@link #isMatched}) để xác minh cặp {@code (tt, et)} gửi
-     * lên có phải ứng viên duy nhất khớp nội dung hay không. Không có ứng
-     * viên cạnh tranh (chỉ 1 chuyến cùng khoá) thì KHÔNG mơ hồ dù nội dung
-     * có khớp hay không — đó là hiện tượng "lệch số liệu" bình thường của
-     * đối chiếu, không phải vấn đề PAIRING.
-     */
-    /**
-     * Xem javadoc {@link #pairGroup} — dùng LẠI đúng định nghĩa "chắc chắn"
-     * (mutual-unique-match) để xác minh cặp {@code (tt, et)} gửi lên có
-     * phải khớp DUY NHẤT CẢ HAI CHIỀU hay không.
+     * Xác minh cặp {@code (tt, et)} gửi lên trong 1 {@code ReconciliationDecisionRequest}
+     * là 1 cặp HỢP LỆ để thao tác — gộp 3 điều kiện độc lập, đều là lỗ hổng
+     * thật được Codex tìm ra qua các lượt Quality Gate liên tiếp:
      *
-     * <p><b>Quality Gate lượt 5 của Codex</b> — bản trước (lượt 4) CHỈ kiểm
-     * tra 1 chiều (bao nhiêu chuyến Khai thác cùng khoá khớp nội dung với
-     * {@code tt}) — không kiểm tra chiều ngược lại ({@code et} có đang bị
-     * NHIỀU chuyến Vận tải khác cạnh tranh hay không). Khi 2 chuyến Vận tải
-     * cùng khoá/cùng nội dung chỉ có 1 chuyến Khai thác phù hợp, hàm cũ trả
-     * về ngay ở nhánh "chỉ 1 ứng viên phía Khai thác" mà không hề biết
-     * chuyến Khai thác đó đang bị chuyến Vận tải KHÁC cạnh tranh — vẫn cho
-     * duyệt/yêu cầu sửa một cặp thực ra không xác định. Sửa: truy vấn CẢ
-     * HAI phía cùng khoá, đòi khớp duy nhất từ CẢ 2 hướng.
+     * <ol>
+     *   <li><b>CÙNG khoá ghép</b> (Thời gian/Ca/Máy xúc/Số xe) — kiểm tra
+     *       NGAY ĐẦU, trước mọi truy vấn khác. <b>Lỗ hổng thật lượt 6 của
+     *       Codex:</b> bản trước (lượt 5) khi nhóm của {@code tt} chỉ có 1
+     *       ứng viên mỗi phía ({@code sameKeyTransport.size()<=1 &&
+     *       sameKeyExcavation.size()<=1}) thì return ngay coi là "không mơ
+     *       hồ" — nhưng KHÔNG hề kiểm tra bản thân {@code et} GỬI LÊN có
+     *       cùng khoá với {@code tt} hay không! Client hoàn toàn có thể gửi
+     *       2 id của 2 chuyến chả liên quan gì nhau (khác ngày/ca/xe/máy
+     *       xúc) — nếu nhóm của mỗi bên riêng lẻ không có cạnh tranh, hàm cũ
+     *       vẫn coi là "chắc chắn" và cho ghép/duyệt. Không kiểm tra khoá
+     *       trước tiên thì các bước "đếm ứng viên cùng khoá" phía dưới hoàn
+     *       toàn vô nghĩa — chúng được TÍNH TỪ khoá của {@code tt}, không hề
+     *       đụng đến {@code et} nếu {@code et} lạc khoá.</li>
+     *   <li><b>Khớp DUY NHẤT CẢ HAI CHIỀU</b> (mutual-unique-match, xem
+     *       {@link #pairGroup}) — chỉ áp dụng khi CÙNG khoá và có cạnh
+     *       tranh (nhiều hơn 1 ứng viên 1 trong 2 phía).</li>
+     *   <li><b>Nội dung phải khớp {@link #isMatched} mới được DUYỆT</b>
+     *       (chỉ áp dụng khi {@code status == APPROVED}) — <b>lỗ hổng thật
+     *       khác lượt 6:</b> FE khoá nút "Duyệt" khi {@code isMatched=false}
+     *       ({@code canApprove}, xem {@code reconciliationColumns.tsx}) —
+     *       nhưng backend CHƯA TỪNG ép lại quy tắc này, chỉ kiểm tra pairing
+     *       có xác định hay không, không kiểm tra NỘI DUNG có khớp không.
+     *       Gọi API trực tiếp vẫn duyệt được 1 cặp cùng khoá nhưng lệch số
+     *       liệu — hợp đồng FE/BE không nhất quán. {@code REVISION_REQUESTED}
+     *       (yêu cầu sửa) KHÔNG bị chặn dù lệch nội dung — đó CHÍNH LÀ mục
+     *       đích của đối chiếu: phát hiện lệch rồi yêu cầu sửa, không thể tự
+     *       mâu thuẫn với quy trình nghiệp vụ.</li>
+     * </ol>
      */
-    private void assertPairingUnambiguous(TransportReportTrip tt, ExcavationReportTrip et) {
+    private void assertValidPair(TransportReportTrip tt, ExcavationReportTrip et, ApprovalStatus status) {
         String key = buildTransportKey(tt);
+        if (!key.equals(buildExcavationKey(et))) {
+            throw new BadRequestException(
+                    "Chuyến Vận tải #" + tt.getId() + " và chuyến Khai thác #" + et.getId()
+                            + " không cùng khoá ghép (Thời gian/Ca/Máy xúc/Số xe khác nhau) — không phải một cặp hợp lệ.");
+        }
+
         LocalDate date = tt.getTransportReport().getReportDate();
         List<TransportReportTrip> sameKeyTransport = transportReportTripRepository
                 .findForReconciliation(date, date, null, null).stream()
@@ -702,17 +720,23 @@ public class ReconciliationService {
                 .findForReconciliation(date, date, null, null).stream()
                 .filter(c -> buildExcavationKey(c).equals(key))
                 .toList();
-        if (sameKeyTransport.size() <= 1 && sameKeyExcavation.size() <= 1) {
-            return;
+        if (!(sameKeyTransport.size() <= 1 && sameKeyExcavation.size() <= 1)) {
+            long excavationMatchesForTt = sameKeyExcavation.stream().filter(c -> isMatched(tt, c)).count();
+            long transportMatchesForEt = sameKeyTransport.stream().filter(c -> isMatched(c, et)).count();
+            boolean confident = isMatched(tt, et) && excavationMatchesForTt == 1 && transportMatchesForEt == 1;
+            if (!confident) {
+                throw new BadRequestException(
+                        "Cặp chuyến Vận tải #" + tt.getId() + " - Khai thác #" + et.getId()
+                                + " không xác định rõ ràng (nhiều chuyến cùng khoá ngày/ca/xe/máy xúc ở ít nhất 1 phía, "
+                                + "không khớp DUY NHẤT cả hai chiều) — cần làm rõ dữ liệu trước khi duyệt/yêu cầu sửa cặp này.");
+            }
         }
-        long excavationMatchesForTt = sameKeyExcavation.stream().filter(c -> isMatched(tt, c)).count();
-        long transportMatchesForEt = sameKeyTransport.stream().filter(c -> isMatched(c, et)).count();
-        boolean confident = isMatched(tt, et) && excavationMatchesForTt == 1 && transportMatchesForEt == 1;
-        if (!confident) {
+
+        if (status == ApprovalStatus.APPROVED && !isMatched(tt, et)) {
             throw new BadRequestException(
-                    "Cặp chuyến Vận tải #" + tt.getId() + " - Khai thác #" + et.getId()
-                            + " không xác định rõ ràng (nhiều chuyến cùng khoá ngày/ca/xe/máy xúc ở ít nhất 1 phía, "
-                            + "không khớp DUY NHẤT cả hai chiều) — cần làm rõ dữ liệu trước khi duyệt/yêu cầu sửa cặp này.");
+                    "Không thể duyệt cặp chuyến Vận tải #" + tt.getId() + " - Khai thác #" + et.getId()
+                            + " vì dữ liệu 2 bên CHƯA khớp (Loại hàng/Số chuyến/Mức tải/Nhân viên) — "
+                            + "cần yêu cầu sửa và thống nhất trước khi duyệt.");
         }
     }
 
