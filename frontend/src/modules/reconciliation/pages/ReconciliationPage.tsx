@@ -65,6 +65,13 @@ const isMatchedItem = (item: ReconciliationItem) => {
   );
 };
 
+// Cặp ghép KHÔNG xác định rõ ràng (backend đã từ chối duyệt/yêu cầu sửa cho
+// cặp này ở API) — dùng ở CẢ nút đơn lẻ (reconciliationColumns.tsx) LẪN
+// hàng loạt ở đây, để "Duyệt/Yêu cầu sửa hàng loạt" không lách được điều
+// kiện đã chặn ở nút đơn lẻ. Quality Gate lượt 4 của Codex, 2026-09-15.
+const isPairingAmbiguousItem = (item: ReconciliationItem) =>
+  !!(item as any).backendRow?.pairingAmbiguous;
+
 export const ReconciliationPage: React.FC = () => {
   // Tự cập nhật khi Vận tải/Khai thác sửa dữ liệu, hoặc khi Thống kê
   // duyệt/yêu cầu sửa/gửi lại — không cần bấm tải lại trang (chốt 2026-09-10).
@@ -575,7 +582,12 @@ export const ReconciliationPage: React.FC = () => {
       (i) =>
         selectedIds.includes(i.id) && i.reconciliationStatus !== "APPROVED",
     );
-    const unapprovedItems = selectedNotApproved.filter(isMatchedItem);
+    // Bỏ qua CẢ dòng chưa khớp LẪN dòng ghép cặp không chắc chắn — cùng lý
+    // do isMatchedItem ở trên: "Duyệt hàng loạt" không được lách qua điều
+    // kiện đã chặn ở nút đơn lẻ.
+    const unapprovedItems = selectedNotApproved
+      .filter(isMatchedItem)
+      .filter((i) => !isPairingAmbiguousItem(i));
     const skippedMismatchCount =
       selectedNotApproved.length - unapprovedItems.length;
 
@@ -669,7 +681,21 @@ export const ReconciliationPage: React.FC = () => {
       }),
     );
 
-    const decisions = requests
+    // target="BOTH" gửi CẢ HAI id cùng lúc -> backend coi đây là thao tác
+    // trên 1 CẶP và từ chối nếu pairing không chắc chắn (Quality Gate lượt 4
+    // của Codex, 2026-09-15) — chặn ở FE trước để không gửi request vô ích
+    // và người dùng hiểu ngay lý do, thay vì chỉ thấy lỗi 400 chung chung.
+    // target="TRANSPORT"/"MINING" chỉ gửi 1 id (xem bên dưới) nên KHÔNG bị
+    // chặn — không giả định gì về pairing.
+    const ambiguousBothTargets = requests.filter(
+      (req) =>
+        req.target === "BOTH" && isPairingAmbiguousItem(req.item),
+    );
+    const eligibleRequests = requests.filter(
+      (req) => !ambiguousBothTargets.includes(req),
+    );
+
+    const decisions = eligibleRequests
       .filter((req) => (req.item as any).backendRow)
       .map((req) => {
         const bRow = (req.item as any).backendRow;
@@ -689,6 +715,12 @@ export const ReconciliationPage: React.FC = () => {
           note: req.note,
         };
       });
+
+    if (ambiguousBothTargets.length > 0) {
+      toast.warning(
+        `Bỏ qua ${ambiguousBothTargets.length} dòng ghép cặp không chắc chắn — cần làm rõ dữ liệu trước khi yêu cầu sửa cả 2 bên.`,
+      );
+    }
 
     if (decisions.length > 0) {
       try {

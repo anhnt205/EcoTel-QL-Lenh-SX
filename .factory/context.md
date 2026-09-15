@@ -2516,9 +2516,7 @@ lại, đồng thời build nhanh hơn (context nhẹ hơn nhiều).
 1. (Kế thừa lượt 22, vẫn chưa làm) Form Phòng ban chưa có ô UI cho
    `full_data_scope`; `test_a`/`test_b` chưa gán đơn vị cụ thể; Excel import
    vẫn chưa lọc theo đơn vị.
-2. `pairingAmbiguous` (mục 8) mới có ở BACKEND (field trong response) — CHƯA
-   có UI hiển thị cảnh báo cho dòng mơ hồ ở màn Đối chiếu. Cần làm nếu chủ
-   dự án muốn người dùng thấy được tín hiệu này thay vì chỉ nằm trong API.
+2. ~~`pairingAmbiguous` chưa có UI hiển thị~~ — **ĐÃ LÀM ở lượt 24**, xem bên dưới.
 3. **Hệ quả vận hành CẦN chủ dự án xử lý SỚM** (mục 6): rà soát gán
    `Device.department` cho MỌI thiết bị VT/KT đang hoạt động thật — thiết bị
    chưa gán sẽ bị "biến mất" khỏi tầm nhìn của tài khoản scoped kể từ lượt
@@ -2528,3 +2526,149 @@ lại, đồng thời build nhanh hơn (context nhẹ hơn nhiều).
    thật vì `test_vantai`/`test_khaithac` (2 tài khoản test có sẵn) chưa được
    cấp quyền CHỨC NĂNG `reconciliation` (khoảng trống có từ trước, ghi nhận
    ở lượt 22) — đã verify qua unit test đầy đủ (7 case) thay thế.
+
+## Lượt 24 (2026-09-15) — Quality Gate lượt 4 của Codex: 5 phát hiện (3 BLOCKING, 2 MAJOR), review commit `4e67037`
+
+Codex bắt được **2 lỗ hổng BLOCKING nghiêm trọng mà chính tôi bỏ sót suốt 3
+lượt trước** — `update()` của cả 2 service chỉ kiểm tra đơn vị của thiết bị
+ĐÍCH (trong `applyRelations`), KHÔNG BAO GIỜ kiểm tra đơn vị của thiết bị
+NGUỒN (báo cáo đang sửa) — trong khi `getById`/`delete`/`getTrip`/
+`updateTrip`/`deleteTrip` đều đã làm đúng cả 2 chiều từ lượt 22. Đây là lỗ
+hổng có thể khai thác thật: tài khoản đơn vị A biết id báo cáo đơn vị B,
+gửi update với thiết bị đích thuộc đơn vị A → chiếm đoạt báo cáo B.
+
+### 1. BLOCKING — TransportReportService.update() bỏ sót kiểm tra xe NGUỒN
+
+Sửa: thêm `assertDepartmentAccess(report.getVehicle()...)` NGAY SAU khi
+load report, TRƯỚC `updateEntity`/`applyRelations`/mọi mutation. Xe ĐÍCH vẫn
+kiểm tra ở `applyRelations` như cũ (không đổi).
+
+### 2. BLOCKING — ExcavationReportService.update() cùng lỗ hổng
+
+Sửa tương tự, dùng `report.getExcavatorDevice()`.
+
+**Verify sống (không chỉ unit test) — đúng kịch bản khai thác Codex mô tả**:
+đăng nhập `test_vantai` (đơn vị VT7/id=11), gọi `PUT /api/transport-reports/6303`
+(báo cáo THẬT thuộc đơn vị VT8/id=12) với `vehicleId=209` (xe thuộc VT7,
+đơn vị của chính mình) — TRƯỚC lượt này sẽ THÀNH CÔNG (chiếm đoạt báo cáo).
+Sau khi sửa: `403 Forbidden` ngay lập tức, và `SELECT vehicle_id FROM
+transport_reports WHERE id=6303` xác nhận **KHÔNG đổi** (vẫn là 208, không
+bị chiếm đoạt). Verify thêm: update báo cáo CÙNG đơn vị (6052, VT7) không
+bị chặn ở department-scope (request test tối giản `trips:[]` gây lỗi 409
+data-integrity KHÔNG LIÊN QUAN — đúng ra là bằng chứng request đã ĐI QUA
+được lớp kiểm tra đơn vị, không phải regression; đã xác nhận báo cáo 6052
+không bị mutation sau lỗi 409, transaction rollback đúng).
+
+Test mới (`TransportReportServiceDepartmentScopeTest`/
+`ExcavationReportServiceDepartmentScopeTest`, nhóm `Update`, 2 case/service):
+báo cáo NGUỒN khác đơn vị + thiết bị ĐÍCH cùng đơn vị người gọi -> 403,
+verify KHÔNG gọi `mapper.updateEntity`/`repository.save`/`deviceRepository
+.findById` (không mutation, lỗi xảy ra TRƯỚC khi đụng gì tới entity); báo
+cáo NGUỒN cùng đơn vị -> không bị chặn ở department-scope.
+
+### 3. BLOCKING — Backend test suite vẫn FAIL (contextLoads), lệnh test chuẩn phải exit 0
+
+Đúng như Codex nêu — trước đây báo "97/98 pass, 1 fail" và tự cho là chấp
+nhận được vì "pre-existing", nhưng Quality Gate không chấp nhận BẤT KỲ test
+fail nào trong lệnh chuẩn, bất kể lý do. `ThongKeCaoSonApplicationTests
+.contextLoads()` là `@SpringBootTest` THẬT (không Testcontainers), cần
+Postgres/Redis sống — không thể pass trong môi trường build/test không có
+hạ tầng đó.
+
+**Sửa (làm rõ theo đúng yêu cầu Codex — "chuyển thành integration test/
+profile riêng có dependency rõ ràng"):** thêm property `excluded.tests` +
+cấu hình `maven-surefire-plugin` loại `ThongKeCaoSonApplicationTests` khỏi
+`mvn test` mặc định; thêm profile `live-integration-test` (kích hoạt qua
+`mvn test -Plive-integration-test`) để bao gồm lại test này KHI THẬT SỰ có
+Postgres/Redis sống (vd chạy trong network preview) — không xoá test, không
+giả vờ nó "pass", chỉ tách đúng ra khỏi bộ test mặc định với lý do ghi rõ.
+
+Kết quả: `mvn test` (lệnh chuẩn) giờ **104/104 pass, BUILD SUCCESS, exit
+code 0** — không còn fail nào, đúng yêu cầu Quality Gate.
+
+### 4. MAJOR — pickBestMatch chỉ dừng ở ứng viên khớp ĐẦU TIÊN, không đếm hết
+
+Đúng như Codex nêu: bản lượt 3 duyệt `candidates`, gặp ứng viên đầu tiên
+`isMatched=true` thì chọn ngay và trả `ambiguous=false` — KHÔNG kiểm tra
+còn ứng viên nào KHÁC cũng khớp. 2 chuyến Khai thác có thể cùng khớp đủ 4
+trường (cargoType/tripCount/loadLevel/employee) với 1 chuyến Vận tải nhưng
+khác id/trạng thái/decision/lịch sử — không có căn cứ chọn ứng viên nào.
+
+Sửa: thu thập TOÀN BỘ ứng viên khớp (`exactMatches`) trước, chỉ coi là chắc
+chắn khi ĐÚNG 1 ứng viên khớp; 0 hoặc ĐA khớp đều là `ambiguous=true`.
+
+Test mới (`ReconciliationServicePairingTest`): 2 chuyến Khai thác CÙNG khớp
+nội dung với 1 chuyến Vận tải → `pairingAmbiguous=true` (trước đây bản lỗi
+sẽ trả `false`, chọn bừa ứng viên đầu).
+
+### 5. MAJOR — pairingAmbiguous chỉ có ở backend, chưa được frontend xử lý; backend vẫn chấp nhận duyệt cặp mơ hồ
+
+Đúng như Codex nêu — 2 phần:
+
+**Backend (yêu cầu "tốt hơn" của Codex — đã làm, không chỉ khoá UI):** thêm
+`ReconciliationService.assertPairingUnambiguous(tt, et)` — dùng LẠI đúng
+logic `pickBestMatch` (ứng viên cùng khoá + `isMatched`) để xác minh cặp
+`(transportReportTripId, excavationReportTripId)` gửi lên trong 1
+`ReconciliationDecisionRequest` (khi CẢ HAI id cùng có mặt — request chỉ 1
+phía không giả định gì về pairing) có phải ứng viên DUY NHẤT khớp nội dung
+hay không. Không phải -> `BadRequestException`, gọi trong `buildDecision`
+nên tự động thừa hưởng cơ chế rollback bulk đã có (1 phần tử sai -> không
+lưu gì hết). Test mới (`ReconciliationServiceDepartmentScopeTest`, nhóm
+`PairingAmbiguity`, 2 case): cặp mơ hồ (2 ứng viên cùng khớp) bị từ chối,
+KHÔNG lưu gì; cặp không cạnh tranh (chỉ 1 ứng viên cùng khoá) không bị chặn
+dù nội dung khớp hay không (phân biệt rõ "mơ hồ PAIRING" khỏi "lệch số liệu
+bình thường" — 2 khái niệm khác nhau, chỉ cái đầu mới bị chặn).
+
+**Frontend (mới, chưa có gì trước lượt này):**
+- `ReconciliationRowResponse.pairingAmbiguous` thêm vào type ở
+  `reconciliation.service.ts` (đã có sẵn `backendRow` trong item nhờ
+  `mapRowResponseToReconciliationItem`, không cần sửa `ReconciliationItem`).
+- Cột "Sai lệch" (`reconciliationColumns.tsx`): thêm badge tím riêng "?"
+  (khác hẳn tam giác vàng "sai lệch" thường) khi `pairingAmbiguous` — tooltip
+  giải thích rõ đây là KHÔNG CHẮC CHẮN VỀ CẶP GHÉP, không phải lệch số liệu.
+- Nút "Duyệt" VÀ "Yêu cầu chỉnh sửa" (vai trò Thống kê) đều khoá khi
+  `pairingAmbiguous` — Codex yêu cầu rõ cả 2, không chỉ Duyệt (sửa dữ liệu
+  dựa trên liên kết tuỳ ý cũng vô nghĩa y hệt duyệt nhầm).
+- "Duyệt hàng loạt"/"Yêu cầu sửa hàng loạt" (`ReconciliationPage.tsx`): lọc
+  bỏ dòng `pairingAmbiguous` khỏi danh sách xử lý (cùng pattern đã có sẵn
+  cho dòng "chưa khớp" `isMatchedItem`), toast báo số dòng bị bỏ qua — hàng
+  loạt không được lách qua điều kiện đã chặn ở nút đơn lẻ.
+- History popover: KHÔNG chặn thêm — mỗi entry đã tự gắn nhãn `side` riêng
+  (Vận tải/Khai thác độc lập), không fabricate một "câu chuyện chung" nào
+  về cặp ghép nên rủi ro thấp hơn hẳn duyệt/sửa; ghi nhận là phạm vi có thể
+  mở rộng sau nếu cần (mục BÀN GIAO).
+
+### Kết quả build/test
+
+- Backend: `mvn -B test` (lệnh CHUẨN, không profile) → **104/104 pass,
+  BUILD SUCCESS, exit code 0** — không còn `contextLoads` trong danh sách
+  chạy (loại đúng cách qua profile, không xoá/giả vờ pass).
+- Frontend: `pnpm install --frozen-lockfile && pnpm run build` → sạch,
+  exit code 0 (đã tự phát hiện + sửa 1 lần chạy trước đó có exit code gây
+  hiểu lầm do pipe `| tee | tail` che mất — chạy lại KHÔNG qua pipe để lấy
+  đúng exit code thật, một bài học quy trình verify).
+- Deploy preview: gặp lỗi mạng Docker tồn dư sau khi Docker Desktop tự
+  crash/restart giữa lượt này (không liên quan code) — `docker compose down`
+  rồi `up -d` lại (KHÔNG mất dữ liệu, volume Postgres là named volume, tách
+  biệt khỏi container/network) giải quyết sạch, backend khởi động thành
+  công, không lỗi.
+- **Verify sống ĐÚNG kịch bản khai thác Codex mô tả** (không chỉ unit test):
+  `test_vantai` (VT7) gọi API thật cố chiếm đoạt báo cáo VT8 bằng xe thuộc
+  VT7 → 403, DB xác nhận KHÔNG đổi. Đây là bằng chứng mạnh nhất của lượt
+  này — đúng lỗ hổng nghiêm trọng nhất Codex tìm thấy.
+
+### BÀN GIAO (lượt 24) — việc còn lại
+
+1. (Kế thừa) Form Phòng ban chưa có ô UI `full_data_scope`; `test_a`/
+   `test_b` chưa gán đơn vị; Excel import chưa lọc theo đơn vị;
+   `Device.department` cần rà soát gán đủ cho thiết bị thật (mục 6 lượt 23).
+2. `getHistory` chưa được chặn bởi `assertPairingUnambiguous` — chỉ xem, rủi
+   ro thấp hơn hẳn duyệt/sửa (mỗi entry tự gắn nhãn side riêng, không
+   fabricate liên kết) nhưng nếu chủ dự án muốn chặt chẽ tuyệt đối thì đây
+   là việc còn lại.
+3. **Bài học quy trình tự rút ra lượt này:** khi verify build/test bằng
+   cách pipe qua `| tee | tail`, exit code báo cáo có thể là exit code của
+   LỆNH CUỐI trong pipe (vd `tail`, luôn 0) chứ KHÔNG PHẢI exit code thật
+   của lệnh chính — phải chạy KHÔNG qua pipe (redirect `> file 2>&1` +
+   `echo $?` riêng) khi cần xác nhận exit code, không được tin `tail` báo
+   "exited with code 0" là bằng chứng đủ.

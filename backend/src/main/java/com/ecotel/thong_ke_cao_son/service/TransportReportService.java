@@ -120,6 +120,17 @@ public class TransportReportService {
         TransportReport report = transportReportRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy báo cáo: " + id));
 
+        // Xác minh đơn vị của xe HIỆN TẠI (nguồn) NGAY SAU KHI load, TRƯỚC bất
+        // kỳ mutation nào (Quality Gate lượt 4 của Codex, 2026-09-15) — lỗ
+        // hổng thật: trước đây chỉ `applyRelations` kiểm tra xe ĐÍCH (xe mới
+        // trong request), không hề kiểm tra xe NGUỒN (report đang có sẵn) —
+        // tài khoản đơn vị A biết id báo cáo của đơn vị B vẫn update được
+        // (miễn gửi vehicleId thuộc đơn vị A, xe ĐÍCH hợp lệ) — chiếm đoạt
+        // báo cáo B sang A, đổi toàn bộ dữ liệu/chuyến. Kiểm tra CẢ HAI: xe
+        // nguồn ở đây, xe đích vẫn ở applyRelations như cũ (không đổi).
+        assertDepartmentAccess(report.getVehicle().getDepartment() != null
+                ? report.getVehicle().getDepartment().getId() : null);
+
         transportReportMapper.updateEntity(request, report);
         applyRelations(report, request);
         report.recalculateFuelUsed();

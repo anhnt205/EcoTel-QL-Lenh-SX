@@ -827,9 +827,22 @@ export function createReconciliationColumns(
             // Chốt 2026-09-09.
             const isApproved =
               row.original.reconciliationStatus === "APPROVED";
+            // Cặp ghép KHÔNG xác định rõ ràng (nhiều chuyến cùng khoá, không
+            // đúng 1 chuyến khớp nội dung) — backend đã chặn duyệt/yêu cầu
+            // sửa cho cặp này, FE phải cảnh báo RIÊNG (khác hẳn tam giác "sai
+            // lệch" thường — đây không phải lỗi số liệu mà là không chắc
+            // chắn đúng cặp). Quality Gate lượt 4 của Codex, 2026-09-15.
+            const isAmbiguous = !!bRow?.pairingAmbiguous && !isApproved;
             return (
               <div className="flex items-center justify-center gap-1">
-                {isApproved ? (
+                {isAmbiguous ? (
+                  <div
+                    className="w-5 h-5 rounded-full bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300 flex items-center justify-center"
+                    title="Ghép cặp không chắc chắn — nhiều chuyến cùng ngày/ca/xe/máy xúc, không đúng 1 chuyến khớp nội dung. Không thể duyệt/yêu cầu sửa cho tới khi làm rõ dữ liệu."
+                  >
+                    <span className="text-[11px] font-bold leading-none">?</span>
+                  </div>
+                ) : isApproved ? (
                   <div
                     className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 flex items-center justify-center"
                     title="Đã duyệt"
@@ -895,25 +908,32 @@ export function createReconciliationColumns(
             // ── Vai trò THỐNG KÊ: Người Điều Hành (Gộp Duyệt, Sửa, Xóa thành icon) ──
             if (currentRole === "ROLE_STATISTICIAN") {
               const isRevisionRequested = status === "REVISION_REQUESTED";
+              // Cặp ghép không chắc chắn -> khoá luôn "Yêu cầu chỉnh sửa"
+              // (không riêng "Duyệt") — sửa dữ liệu dựa trên 1 liên kết tuỳ ý
+              // (có thể sai cặp) cũng vô nghĩa/gây nhầm y hệt duyệt nhầm.
+              // Quality Gate lượt 4 của Codex, 2026-09-15.
+              const isAmbiguous = !!bRow?.pairingAmbiguous;
+              const editDisabled = isRevisionRequested || isAmbiguous;
 
-              // ponytail: disable request button if already requested revision and waiting for units to update
               const editButton = (
                 <Button
                   size="sm"
                   variant="outline"
-                  disabled={isRevisionRequested}
+                  disabled={editDisabled}
                   onClick={() =>
-                    !isRevisionRequested && setRequestModalItem(item)
+                    !editDisabled && setRequestModalItem(item)
                   }
                   className={`h-7 w-7 p-0 rounded-lg shadow-2xs transition-all ${
-                    isRevisionRequested
+                    editDisabled
                       ? "opacity-50 cursor-not-allowed border-amber-200 text-amber-600 bg-amber-50/50 dark:border-amber-900/50 dark:text-amber-400 dark:bg-amber-950/20"
                       : "border-blue-200 text-blue-700 hover:bg-blue-50/70 hover:border-blue-300 dark:border-blue-800 dark:text-blue-300 dark:hover:bg-blue-950/40"
                   }`}
                   title={
-                    isRevisionRequested
-                      ? "Đang chờ đơn vị sửa lại"
-                      : "Yêu cầu chỉnh sửa"
+                    isAmbiguous
+                      ? "Cặp ghép không chắc chắn — cần làm rõ dữ liệu trước"
+                      : isRevisionRequested
+                        ? "Đang chờ đơn vị sửa lại"
+                        : "Yêu cầu chỉnh sửa"
                   }
                 >
                   <FileEdit className="w-3.5 h-3.5" />
@@ -970,8 +990,11 @@ export function createReconciliationColumns(
               // chưa khớp (Loại hàng/Số chuyến lệch nhau) thì KHÔNG cho
               // duyệt — dùng đúng meta().isMatched, cùng logic đang quyết
               // định tam giác cảnh báo ở cột "Sai lệch", để 2 chỗ không bao
-              // giờ lệch nhau. Chốt 2026-09-10.
-              const canApprove = meta().isMatched(item);
+              // giờ lệch nhau. Chốt 2026-09-10. Cặp ghép KHÔNG chắc chắn
+              // (pairingAmbiguous) cũng chặn — backend đã từ chối duyệt cho
+              // cặp này ở API, khoá nút ở đây để người dùng không bấm vô ích
+              // (và không hiểu nhầm là bấm được). Quality Gate lượt 4.
+              const canApprove = meta().isMatched(item) && !isAmbiguous;
 
               return (
                 <div className="flex items-center justify-center gap-1.5">
@@ -984,9 +1007,11 @@ export function createReconciliationColumns(
                     }}
                     className="h-7 w-7 p-0 bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-2xs transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-blue-600"
                     title={
-                      canApprove
-                        ? "Duyệt bản ghi"
-                        : "Chưa đủ dữ liệu 2 bên hoặc dữ liệu chưa khớp — không thể duyệt"
+                      isAmbiguous
+                        ? "Cặp ghép không chắc chắn — cần làm rõ dữ liệu trước khi duyệt"
+                        : canApprove
+                          ? "Duyệt bản ghi"
+                          : "Chưa đủ dữ liệu 2 bên hoặc dữ liệu chưa khớp — không thể duyệt"
                     }
                   >
                     <Check className="w-3.5 h-3.5 stroke-[2.5]" />

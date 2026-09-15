@@ -18,6 +18,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -226,6 +227,146 @@ class ReconciliationServiceDepartmentScopeTest {
 
             assertThatThrownBy(() -> newService().getHistory(null, 2L))
                     .isInstanceOf(ForbiddenException.class);
+        }
+    }
+
+    // ── Fixture ĐẦY ĐỦ (khoá ghép + nội dung) cho nhóm PairingAmbiguity — khác
+    // transportTripOf/excavationTripOf ở trên (chỉ đủ department, thiếu
+    // reportDate/shift/vehicle/excavator/cargoType nên KHÔNG dùng được cho
+    // assertPairingUnambiguous, vốn cần buildTransportKey/buildExcavationKey
+    // + isMatched hoạt động đầy đủ, không NPE).
+
+    private static Shift shift(long id) {
+        Shift s = new Shift();
+        s.setId(id);
+        s.setName(1);
+        return s;
+    }
+
+    private static Device device(long id) {
+        Device d = new Device();
+        d.setId(id);
+        d.setCode("D" + id);
+        return d;
+    }
+
+    private static User employee(long id) {
+        User u = new User();
+        u.setId(id);
+        u.setSalaryCode("NV" + id);
+        u.setFullName("Nhân viên " + id);
+        return u;
+    }
+
+    private static CargoType cargoType(long id) {
+        CargoType c = new CargoType();
+        c.setId(id);
+        c.setName("Đất");
+        return c;
+    }
+
+    private static TransportReportTrip fullTransportTrip(long id, long cargoTypeId, LocalDate date, Shift shift,
+                                                           Device vehicle, Device excavator, User emp) {
+        TransportReport report = new TransportReport();
+        report.setReportDate(date);
+        report.setShift(shift);
+        report.setVehicle(vehicle);
+        report.setEmployee(emp);
+
+        TransportReportTrip trip = new TransportReportTrip();
+        trip.setId(id);
+        trip.setTransportReport(report);
+        trip.setExcavator(excavator);
+        trip.setCargoType(cargoType(cargoTypeId));
+        trip.setTripCount(1);
+        trip.setLoadLevel(new LoadLevel());
+        trip.setStatus(ApprovalStatus.PENDING);
+        return trip;
+    }
+
+    private static ExcavationReportTrip fullExcavationTrip(long id, long cargoTypeId, LocalDate date, Shift shift,
+                                                             Device vehicle, Device excavator, User emp) {
+        ExcavationReport report = new ExcavationReport();
+        report.setReportDate(date);
+        report.setShift(shift);
+        report.setExcavatorDevice(excavator);
+        report.setEmployee(emp);
+
+        ExcavationReportTrip trip = new ExcavationReportTrip();
+        trip.setId(id);
+        trip.setExcavationReport(report);
+        trip.setVehicle(vehicle);
+        trip.setCargoType(cargoType(cargoTypeId));
+        trip.setTripCount(1);
+        trip.setLoadLevel(new LoadLevel());
+        trip.setStatus(ApprovalStatus.PENDING);
+        return trip;
+    }
+
+    @Nested
+    @DisplayName("saveDecision(s) — từ chối cặp ghép không chắc chắn (Quality Gate lượt 4)")
+    class PairingAmbiguity {
+
+        private static final LocalDate DATE = LocalDate.of(2026, 9, 10);
+
+        @Test
+        @DisplayName("2 chuyến Khai thác cùng khoá VÀ cùng khớp nội dung với chuyến Vận tải -> saveDecision bị từ chối, KHÔNG lưu gì")
+        void ambiguousPairIsRejected() {
+            loginAs(9L, true); // full-scope — cô lập kiểm tra pairing khỏi kiểm tra đơn vị
+            Shift shift = shift(1L);
+            Device vehicle = device(10L);
+            Device excavator = device(20L);
+            User emp = employee(1L);
+
+            TransportReportTrip transport1 = fullTransportTrip(1L, 5L, DATE, shift, vehicle, excavator, emp);
+            ExcavationReportTrip excavation1 = fullExcavationTrip(1L, 5L, DATE, shift, vehicle, excavator, emp);
+            ExcavationReportTrip excavation2 = fullExcavationTrip(2L, 5L, DATE, shift, vehicle, excavator, emp);
+
+            when(transportReportTripRepository.findAllById(List.of(1L))).thenReturn(List.of(transport1));
+            when(excavationReportTripRepository.findAllById(List.of(1L))).thenReturn(List.of(excavation1));
+            when(reconciliationDecisionRepository.findByTransportReportTrip_IdIn(List.of(1L))).thenReturn(List.of());
+            when(reconciliationDecisionRepository.findByExcavationReportTrip_IdIn(List.of(1L))).thenReturn(List.of());
+            // assertPairingUnambiguous tự truy vấn lại toàn bộ ứng viên cùng ngày.
+            when(excavationReportTripRepository.findForReconciliation(DATE, DATE, null, null))
+                    .thenReturn(List.of(excavation1, excavation2));
+
+            ReconciliationDecisionRequest req = new ReconciliationDecisionRequest();
+            req.setTransportReportTripId(1L);
+            req.setExcavationReportTripId(1L);
+            req.setStatus(ApprovalStatus.APPROVED);
+
+            assertThatThrownBy(() -> newService().saveDecision(req))
+                    .isInstanceOf(BadRequestException.class);
+            verify(reconciliationDecisionRepository, never()).saveAll(anyList());
+        }
+
+        @Test
+        @DisplayName("Chỉ 1 chuyến Khai thác cùng khoá (không cạnh tranh) -> saveDecision KHÔNG bị chặn dù nội dung có khớp hay không (không regression)")
+        void uniquePairIsAccepted() {
+            loginAs(9L, true);
+            Shift shift = shift(1L);
+            Device vehicle = device(10L);
+            Device excavator = device(20L);
+            User emp = employee(1L);
+
+            TransportReportTrip transport1 = fullTransportTrip(1L, 5L, DATE, shift, vehicle, excavator, emp);
+            ExcavationReportTrip excavation1 = fullExcavationTrip(1L, 9L, DATE, shift, vehicle, excavator, emp); // cargoType khác -> "chưa khớp" bình thường, KHÔNG phải ambiguous
+
+            when(transportReportTripRepository.findAllById(List.of(1L))).thenReturn(List.of(transport1));
+            when(excavationReportTripRepository.findAllById(List.of(1L))).thenReturn(List.of(excavation1));
+            when(reconciliationDecisionRepository.findByTransportReportTrip_IdIn(List.of(1L))).thenReturn(List.of());
+            when(reconciliationDecisionRepository.findByExcavationReportTrip_IdIn(List.of(1L))).thenReturn(List.of());
+            when(excavationReportTripRepository.findForReconciliation(DATE, DATE, null, null))
+                    .thenReturn(List.of(excavation1));
+            when(reconciliationDecisionRepository.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
+
+            ReconciliationDecisionRequest req = new ReconciliationDecisionRequest();
+            req.setTransportReportTripId(1L);
+            req.setExcavationReportTripId(1L);
+            req.setStatus(ApprovalStatus.APPROVED);
+
+            newService().saveDecision(req); // không ném lỗi
+            verify(reconciliationDecisionRepository).saveAll(anyList());
         }
     }
 }

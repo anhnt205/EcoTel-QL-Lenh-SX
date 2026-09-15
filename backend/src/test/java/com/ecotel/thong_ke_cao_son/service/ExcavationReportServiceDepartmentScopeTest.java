@@ -1,5 +1,6 @@
 package com.ecotel.thong_ke_cao_son.service;
 
+import com.ecotel.thong_ke_cao_son.dto.request.ExcavationReportRequest;
 import com.ecotel.thong_ke_cao_son.exception.ForbiddenException;
 import com.ecotel.thong_ke_cao_son.mapper.ExcavationReportMapper;
 import com.ecotel.thong_ke_cao_son.model.Department;
@@ -130,6 +131,50 @@ class ExcavationReportServiceDepartmentScopeTest {
             when(excavationReportRepository.findById(200L)).thenReturn(Optional.of(reportOfDepartment(null)));
 
             newService().getById(200L); // không ném lỗi
+        }
+    }
+
+    @Nested
+    @DisplayName("update() — kiểm tra CẢ máy xúc nguồn lẫn đích (Quality Gate lượt 4)")
+    class Update {
+
+        /** Xem javadoc tương ứng ở TransportReportServiceDepartmentScopeTest.Update — cùng lỗ hổng, cùng cách sửa. */
+        @Test
+        @DisplayName("Báo cáo NGUỒN thuộc đơn vị khác, máy xúc ĐÍCH thuộc đơn vị mình -> 403, KHÔNG mutation")
+        void crossDepartmentSourceReportCannotBeUpdatedEvenWithOwnTargetExcavator() {
+            loginAs(113L, false);
+            ExcavationReport sourceReport = reportOfDepartment(12L); // đơn vị KHÁC
+            when(excavationReportRepository.findById(200L)).thenReturn(Optional.of(sourceReport));
+
+            ExcavationReportRequest request = new ExcavationReportRequest();
+            request.setExcavatorDeviceId(999L);
+            request.setTrips(List.of());
+
+            assertThatThrownBy(() -> newService().update(200L, request))
+                    .isInstanceOf(ForbiddenException.class);
+
+            verify(excavationReportMapper, org.mockito.Mockito.never()).updateEntity(any(), any());
+            verify(excavationReportRepository, org.mockito.Mockito.never()).save(any());
+            verify(deviceRepository, org.mockito.Mockito.never()).findById(999L);
+        }
+
+        @Test
+        @DisplayName("Báo cáo NGUỒN cùng đơn vị -> update không bị chặn ở department-scope (không regression)")
+        void sameDepartmentSourceReportCanStillBeUpdated() {
+            loginAs(113L, false);
+            ExcavationReport sourceReport = reportOfDepartment(113L);
+            when(excavationReportRepository.findById(200L)).thenReturn(Optional.of(sourceReport));
+            when(shiftRepository.findById(any())).thenReturn(Optional.empty());
+
+            ExcavationReportRequest request = new ExcavationReportRequest();
+            request.setExcavatorDeviceId(999L);
+            request.setShiftId(50L);
+            request.setReceivingLocationId(60L);
+            request.setEmployeeId(70L);
+            request.setTrips(List.of());
+
+            assertThatThrownBy(() -> newService().update(200L, request))
+                    .isNotInstanceOf(ForbiddenException.class);
         }
     }
 

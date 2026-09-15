@@ -1,5 +1,6 @@
 package com.ecotel.thong_ke_cao_son.service;
 
+import com.ecotel.thong_ke_cao_son.dto.request.TransportReportRequest;
 import com.ecotel.thong_ke_cao_son.exception.ForbiddenException;
 import com.ecotel.thong_ke_cao_son.mapper.TransportReportMapper;
 import com.ecotel.thong_ke_cao_son.model.Department;
@@ -164,6 +165,67 @@ class TransportReportServiceDepartmentScopeTest {
 
             assertThatThrownBy(() -> newService().getById(100L))
                     .isInstanceOf(ForbiddenException.class);
+        }
+    }
+
+    @Nested
+    @DisplayName("update() — kiểm tra CẢ xe nguồn lẫn xe đích (Quality Gate lượt 4)")
+    class Update {
+
+        /**
+         * Lỗ hổng thật Codex nêu (lượt 4, 2026-09-15): trước đây
+         * {@code update()} chỉ kiểm tra đơn vị của xe ĐÍCH (trong
+         * {@code applyRelations}) — KHÔNG kiểm tra đơn vị của xe NGUỒN (báo
+         * cáo hiện có). Tài khoản đơn vị A biết id báo cáo của đơn vị B vẫn
+         * update được (miễn gửi vehicleId thuộc đơn vị A) — chiếm đoạt báo
+         * cáo B sang A.
+         */
+        @Test
+        @DisplayName("Báo cáo NGUỒN thuộc đơn vị khác, xe ĐÍCH thuộc đơn vị mình -> 403, KHÔNG mutation")
+        void crossDepartmentSourceReportCannotBeUpdatedEvenWithOwnTargetVehicle() {
+            loginAs(1L, false);
+            TransportReport sourceReport = reportOfDepartment(2L); // đơn vị KHÁC (id=2)
+            when(transportReportRepository.findById(100L)).thenReturn(Optional.of(sourceReport));
+
+            TransportReportRequest request = new TransportReportRequest();
+            request.setVehicleId(999L); // xe ĐÍCH — giả định thuộc đơn vị 1 (của người gọi), không cần stub vì phải throw TRƯỚC khi đọc tới
+            request.setTrips(List.of());
+
+            assertThatThrownBy(() -> newService().update(100L, request))
+                    .isInstanceOf(ForbiddenException.class);
+
+            // Không mutation: mapper/save KHÔNG được gọi — lỗi phải xảy ra
+            // TRƯỚC mọi thay đổi lên entity, không chỉ trước khi commit.
+            verify(transportReportMapper, org.mockito.Mockito.never()).updateEntity(any(), any());
+            verify(transportReportRepository, org.mockito.Mockito.never()).save(any());
+            verify(deviceRepository, org.mockito.Mockito.never()).findById(999L);
+        }
+
+        @Test
+        @DisplayName("Báo cáo NGUỒN cùng đơn vị -> update bình thường (không regression)")
+        void sameDepartmentSourceReportCanStillBeUpdated() {
+            loginAs(1L, false);
+            TransportReport sourceReport = reportOfDepartment(1L);
+            when(transportReportRepository.findById(100L)).thenReturn(Optional.of(sourceReport));
+            // applyRelations() gọi shiftRepository TRƯỚC deviceRepository —
+            // chỉ cần stub tới đây là đủ để chứng minh KHÔNG bị chặn ở
+            // department-scope (ném ResourceNotFoundException ở bước sau,
+            // không phải ForbiddenException). Không stub deviceRepository vì
+            // sẽ không bao giờ được gọi tới (unnecessary stubbing).
+            when(shiftRepository.findById(any())).thenReturn(Optional.empty());
+
+            TransportReportRequest request = new TransportReportRequest();
+            request.setVehicleId(999L);
+            request.setShiftId(50L);
+            request.setEmployeeId(60L);
+            request.setTrips(List.of());
+
+            // Không xác minh hết luồng update thành công (cần mock rất nhiều
+            // repository khác không thuộc phạm vi test này) — chỉ xác nhận
+            // KHÔNG bị chặn ở department-scope (ném lỗi khác, không phải
+            // ForbiddenException do đơn vị).
+            assertThatThrownBy(() -> newService().update(100L, request))
+                    .isNotInstanceOf(ForbiddenException.class);
         }
     }
 

@@ -76,6 +76,12 @@ export interface ReconciliationRowResponse {
   // Có lịch sử để xem qua icon "i" hay không.
   transportHistoryAvailable?: boolean;
   excavationHistoryAvailable?: boolean;
+  // true = cặp ghép Vận tải-Khai thác này KHÔNG xác định rõ ràng (nhiều
+  // chuyến cùng khoá ngày/ca/xe/máy xúc, không đúng 1 chuyến khớp nội dung
+  // để phân biệt) — backend đã từ chối duyệt/yêu cầu sửa cho cặp này ở API,
+  // FE PHẢI cảnh báo rõ và khoá hành động thay vì cho thao tác như bình
+  // thường (Quality Gate lượt 4 của Codex, 2026-09-15).
+  pairingAmbiguous?: boolean;
 }
 
 export interface ReconciliationHistoryEntry {

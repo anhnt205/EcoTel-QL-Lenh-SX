@@ -239,6 +239,19 @@ public class ReconciliationService {
      * {@code size()} tại chỗ sẽ hiểu NHẦM "chỉ có 1 ứng viên -> chắc chắn
      * đúng" — trong khi thật ra nó cũng mơ hồ y hệt chuyến đầu, chỉ là bị
      * "ăn theo" phần còn lại của cùng một nhóm không phân biệt được.
+     *
+     * <p><b>PHẢI đếm ĐỦ số ứng viên khớp {@link #isMatched}, không dừng ở
+     * ứng viên khớp ĐẦU TIÊN</b> (Quality Gate lượt 4 của Codex, 2026-09-15
+     * — lỗi thật ở bản trước): 2 chuyến Khai thác có thể cùng khớp cả 4
+     * trường (Loại hàng/Số chuyến/Mức tải/Nhân viên) với 1 chuyến Vận tải
+     * NHƯNG khác nhau ở những trường KHÔNG nằm trong {@code isMatched}
+     * (id, trạng thái duyệt, decision, lịch sử...) — bản trước chọn ứng
+     * viên khớp đầu tiên tìm thấy rồi coi là chắc chắn đúng (ambiguous
+     * =false), không hề kiểm tra còn ứng viên nào KHÁC cũng khớp — không có
+     * căn cứ để khẳng định "đúng ứng viên ĐẦU" hơn ứng viên khớp thứ hai.
+     * Sửa: thu thập TOÀN BỘ ứng viên khớp trước, chỉ coi là chắc chắn khi
+     * ĐÚNG 1 ứng viên khớp; 0 hoặc ĐA khớp đều là ambiguous — dữ liệu không
+     * đủ để phân biệt, không phải lỗi thuật toán.
      */
     private MatchResult pickBestMatch(TransportReportTrip tt, Deque<ExcavationReportTrip> candidates,
                                        int originalGroupSize) {
@@ -248,12 +261,16 @@ public class ReconciliationService {
         if (originalGroupSize <= 1) {
             return new MatchResult(candidates.poll(), false);
         }
-        for (ExcavationReportTrip candidate : candidates) {
-            if (isMatched(tt, candidate)) {
-                candidates.remove(candidate);
-                return new MatchResult(candidate, false);
-            }
+        List<ExcavationReportTrip> exactMatches = candidates.stream()
+                .filter(candidate -> isMatched(tt, candidate))
+                .toList();
+        if (exactMatches.size() == 1) {
+            ExcavationReportTrip match = exactMatches.get(0);
+            candidates.remove(match);
+            return new MatchResult(match, false);
         }
+        // 0 ứng viên khớp (tự lệch số liệu), hoặc ĐA ứng viên cùng khớp (dữ
+        // liệu không đủ phân biệt) — cả hai đều là ambiguity thật sự.
         return new MatchResult(candidates.poll(), true);
     }
 
@@ -605,27 +622,72 @@ public class ReconciliationService {
         // chế "1 phần tử bulk sai -> gom lỗi -> KHÔNG lưu gì hết" đã có sẵn
         // (toSave chỉ được saveAll SAU KHI toàn bộ vòng lặp không lỗi) —
         // đúng yêu cầu rollback toàn transaction khi bulk có phần tử sai.
+        TransportReportTrip transportTrip = null;
+        ExcavationReportTrip excavationTrip = null;
+
         if (request.getTransportReportTripId() != null) {
-            TransportReportTrip trip = transportTripById.get(request.getTransportReportTripId());
-            if (trip == null) {
+            transportTrip = transportTripById.get(request.getTransportReportTripId());
+            if (transportTrip == null) {
                 throw new ResourceNotFoundException("Không tìm thấy chuyến Vận tải: " + request.getTransportReportTripId());
             }
-            assertTransportTripAccess(trip);
-            decision.setTransportReportTrip(trip);
+            assertTransportTripAccess(transportTrip);
+            decision.setTransportReportTrip(transportTrip);
         }
         if (request.getExcavationReportTripId() != null) {
-            ExcavationReportTrip trip = excavationTripById.get(request.getExcavationReportTripId());
-            if (trip == null) {
+            excavationTrip = excavationTripById.get(request.getExcavationReportTripId());
+            if (excavationTrip == null) {
                 throw new ResourceNotFoundException("Không tìm thấy chuyến Khai thác: " + request.getExcavationReportTripId());
             }
-            assertExcavationTripAccess(trip);
-            decision.setExcavationReportTrip(trip);
+            assertExcavationTripAccess(excavationTrip);
+            decision.setExcavationReportTrip(excavationTrip);
+        }
+
+        // Từ chối duyệt/yêu cầu sửa một CẶP không xác định rõ ràng (Quality
+        // Gate lượt 4 của Codex, 2026-09-15) — trước đây `pairingAmbiguous`
+        // chỉ có ở response cho FE hiển thị, backend vẫn chấp nhận duyệt bất
+        // kỳ cặp id nào gửi lên dù pairing đó không có căn cứ (ví dụ FE bị
+        // qua mặt, hoặc gọi API trực tiếp). CHỈ áp dụng khi request gửi CẢ
+        // HAI id (đang thao tác trên 1 CẶP) — request chỉ 1 phía không giả
+        // định gì về pairing nên không cần kiểm tra này.
+        if (transportTrip != null && excavationTrip != null) {
+            assertPairingUnambiguous(transportTrip, excavationTrip);
         }
 
         decision.setStatus(request.getStatus());
         decision.setNote(request.getNote());
 
         return decision;
+    }
+
+    /**
+     * Xem javadoc {@link #pickBestMatch} — dùng LẠI ĐÚNG logic đó (ứng viên
+     * cùng khoá + {@link #isMatched}) để xác minh cặp {@code (tt, et)} gửi
+     * lên có phải ứng viên duy nhất khớp nội dung hay không. Không có ứng
+     * viên cạnh tranh (chỉ 1 chuyến cùng khoá) thì KHÔNG mơ hồ dù nội dung
+     * có khớp hay không — đó là hiện tượng "lệch số liệu" bình thường của
+     * đối chiếu, không phải vấn đề PAIRING.
+     */
+    private void assertPairingUnambiguous(TransportReportTrip tt, ExcavationReportTrip et) {
+        String key = buildTransportKey(tt);
+        LocalDate date = tt.getTransportReport().getReportDate();
+        List<ExcavationReportTrip> sameKeyCandidates = excavationReportTripRepository
+                .findForReconciliation(date, date, null, null).stream()
+                .filter(c -> buildExcavationKey(c).equals(key))
+                .toList();
+        if (sameKeyCandidates.size() <= 1) {
+            return;
+        }
+        List<ExcavationReportTrip> exactMatches = sameKeyCandidates.stream()
+                .filter(c -> isMatched(tt, c))
+                .toList();
+        boolean submittedIsUniqueMatch = exactMatches.size() == 1
+                && exactMatches.get(0).getId().equals(et.getId());
+        if (!submittedIsUniqueMatch) {
+            throw new BadRequestException(
+                    "Cặp chuyến Vận tải #" + tt.getId() + " - Khai thác #" + et.getId()
+                            + " không xác định rõ ràng (nhiều chuyến Khai thác cùng khoá ngày/ca/xe/máy xúc, "
+                            + "không đúng 1 chuyến khớp nội dung) — cần làm rõ dữ liệu trước khi duyệt/yêu cầu sửa cặp này.");
+        }
     }
 
     // ================= LƯU (sửa dữ liệu chuyến Vận tải/Khai thác, KHÔNG đổi trạng thái duyệt) =================

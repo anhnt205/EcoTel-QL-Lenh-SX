@@ -111,6 +111,12 @@ public class ExcavationReportService {
         ExcavationReport report = excavationReportRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy báo cáo: " + id));
 
+        // Xem chú thích ở TransportReportService.update — cùng lỗ hổng, cùng
+        // cách sửa: xác minh đơn vị của máy xúc HIỆN TẠI (nguồn) trước khi
+        // đụng gì tới report; xe/máy xúc ĐÍCH vẫn kiểm tra ở applyRelations.
+        assertDepartmentAccess(report.getExcavatorDevice().getDepartment() != null
+                ? report.getExcavatorDevice().getDepartment().getId() : null);
+
         excavationReportMapper.updateEntity(request, report);
         applyRelations(report, request);
         report.recalculateFuelUsed();
