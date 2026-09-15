@@ -2672,3 +2672,73 @@ bình thường" — 2 khái niệm khác nhau, chỉ cái đầu mới bị ch�
    của lệnh chính — phải chạy KHÔNG qua pipe (redirect `> file 2>&1` +
    `echo $?` riêng) khi cần xác nhận exit code, không được tin `tail` báo
    "exited with code 0" là bằng chứng đủ.
+
+## Lượt 25 (2026-09-15) — Quality Gate lượt 5 của Codex: 1 phát hiện MAJOR, review commit `85aa0ef`
+
+### 1. MAJOR — Ghép cặp reconciliation chưa xử lý ĐỐI XỨNG (chỉ 1 chiều Vận tải → Khai thác)
+
+Đúng như Codex nêu — phân tích kỹ: `pickBestMatch`/`assertPairingUnambiguous`
+(lượt 4) chỉ hỏi "chuyến Vận tải này có bao nhiêu ứng viên Khai thác khớp
+nội dung" — KHÔNG BAO GIỜ hỏi chiều ngược lại "chuyến Khai thác đó có đang
+bị NHIỀU chuyến Vận tải khác cạnh tranh hay không". Khi 2 chuyến Vận tải
+CÙNG khoá VÀ CÙNG nội dung (không phân biệt được với nhau) chỉ có 1 chuyến
+Khai thác phù hợp, chuyến Vận tải xử lý trước (thứ tự lặp — không có ý
+nghĩa nghiệp vụ) vẫn được ghép và đánh dấu `pairingAmbiguous=false` — sai,
+vì chuyến còn lại cũng khớp y hệt, không có căn cứ chọn chuyến nào.
+
+**Sửa (viết lại toàn bộ thuật toán ghép cặp, không phải vá thêm 1 nhánh):**
+đổi từ "duyệt Vận tải, tìm ứng viên Khai thác" (1 chiều) sang xử lý CẢ NHÓM
+cùng khoá (cả 2 phía) 1 lần — `ReconciliationService.pairGroup(tGroup,
+eGroup)`, thay hẳn `pickBestMatch`/`MatchResult` cũ. Định nghĩa "chắc chắn"
+(mutual-unique-match): cặp `(t, e)` chỉ chắc chắn khi `e` là ứng viên DUY
+NHẤT khớp `isMatched` của `t` TRONG SỐ ứng viên CÒN LẠI, VÀ `t` cũng là ứng
+viên DUY NHẤT khớp của `e` — khớp duy nhất CẢ HAI CHIỀU, không chỉ 1 chiều.
+Thuật toán 2 vòng: vòng 1 lặp lại tìm hết mọi cặp mutual-unique (loại 1 cặp
+chắc chắn có thể làm lộ ra cặp chắc chắn khác, ví dụ 3 chuyến cạnh tranh
+dây chuyền); vòng 2 ghép TẠM phần còn lại theo thứ tự ổn định, đánh dấu
+`ambiguous=true`. `assertPairingUnambiguous` (backend guard cho
+`saveDecision(s)`) viết lại tương tự — truy vấn CẢ HAI phía cùng khoá
+(trước chỉ truy vấn phía Khai thác), đòi khớp duy nhất từ CẢ 2 hướng.
+
+**Đã kiểm chứng lại toàn bộ 4 test ghép cặp có sẵn (lượt 3+4) vẫn đúng với
+thuật toán mới** trước khi sửa code (không đổi kỳ vọng của các test cũ, chỉ
+thêm test mới) — cả 4 kịch bản (ghép xác định theo id, ghép theo nội dung
+khi 2 bên nhập khác thứ tự, ambiguous khi không ai khớp, ambiguous khi 2
+ứng viên Khai thác cùng khớp 1 Vận tải) đều cho kết quả GIỐNG HỆT dưới
+thuật toán mới — thuật toán cũ chỉ THIẾU 1 trường hợp (chiều ngược lại),
+không SAI ở những trường hợp đã test trước đó.
+
+Test mới:
+- `ReconciliationServicePairingTest.flagsAmbiguityWhenMultipleTransportsCompeteForOneExcavation`
+  — đúng kịch bản Codex nêu ở tầng `search()`: 2 Vận tải cùng khoá/nội dung,
+  1 Khai thác → dòng ghép được phải `pairingAmbiguous=true`.
+- `ReconciliationServiceDepartmentScopeTest.PairingAmbiguity` (+2 case):
+  `ambiguousPairIsRejectedWhenMultipleTransportsCompeteForOneExcavation`
+  (chiều ngược lại ở tầng `saveDecision` — bị từ chối, không lưu) và
+  `bulkWithAmbiguousPairRollsBackEntirely` (bulk có 1 phần tử là cặp mơ hồ
+  dạng "2 Vận tải cạnh tranh" → TOÀN BỘ rollback, kể cả phần tử hợp lệ khác
+  trong cùng request, đúng khoá khác hẳn không liên quan).
+- 2 test cũ (`ambiguousPairIsRejected`/`uniquePairIsAccepted`) bổ sung stub
+  `transportReportTripRepository.findForReconciliation` còn thiếu (bản mới
+  truy vấn CẢ HAI phía) — không đổi kỳ vọng, chỉ đủ mock cho logic mới.
+
+### Kết quả build/test
+
+- Backend: `mvn -B test` (lệnh CHUẨN) → **107/107 pass, BUILD SUCCESS, exit
+  code 0**.
+- **`mvn test -Plive-integration-test` với Postgres/Redis THẬT** (container
+  gắn vào network preview, trỏ đúng `postgres`/`redis` service — đúng yêu
+  cầu "Lưu ý thêm" của Codex, chứng minh profile này THẬT SỰ chạy được, không
+  chỉ khai báo cho có): `ThongKeCaoSonApplicationTests.contextLoads` →
+  **1/1 pass, BUILD SUCCESS, exit code 0**.
+- Frontend: `pnpm install --frozen-lockfile && pnpm run build` → sạch, exit
+  code 0 (chạy KHÔNG qua pipe, đúng bài học lượt 24).
+- Deploy `backend-service` lên preview thành công, healthy, không lỗi.
+- **Không verify sống qua UI/API thật cho riêng phát hiện này** — đây là
+  sửa thuật toán nghiệp vụ thuần tuý (không phải ranh giới bảo mật/phân
+  quyền như các lượt trước, vốn luôn được ưu tiên verify sống), và bộ test
+  đã tự xây dựng CHÍNH XÁC kịch bản Codex mô tả ở cả 2 tầng (`search()` và
+  `saveDecision`) một cách xác định — dựng lại y hệt qua UI thật (nhập 2
+  chuyến trùng nội dung) sẽ chỉ lặp lại đúng điều unit test đã chứng minh,
+  không thêm được bằng chứng mới. Ghi nhận rõ ràng, không giấu giếm việc
+  không làm.

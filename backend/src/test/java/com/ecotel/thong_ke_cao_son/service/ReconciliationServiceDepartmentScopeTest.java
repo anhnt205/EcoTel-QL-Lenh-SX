@@ -326,7 +326,10 @@ class ReconciliationServiceDepartmentScopeTest {
             when(excavationReportTripRepository.findAllById(List.of(1L))).thenReturn(List.of(excavation1));
             when(reconciliationDecisionRepository.findByTransportReportTrip_IdIn(List.of(1L))).thenReturn(List.of());
             when(reconciliationDecisionRepository.findByExcavationReportTrip_IdIn(List.of(1L))).thenReturn(List.of());
-            // assertPairingUnambiguous tự truy vấn lại toàn bộ ứng viên cùng ngày.
+            // assertPairingUnambiguous tự truy vấn lại toàn bộ ứng viên cùng
+            // ngày ở CẢ HAI phía (Quality Gate lượt 5 — kiểm tra 2 chiều).
+            when(transportReportTripRepository.findForReconciliation(DATE, DATE, null, null))
+                    .thenReturn(List.of(transport1));
             when(excavationReportTripRepository.findForReconciliation(DATE, DATE, null, null))
                     .thenReturn(List.of(excavation1, excavation2));
 
@@ -336,6 +339,90 @@ class ReconciliationServiceDepartmentScopeTest {
             req.setStatus(ApprovalStatus.APPROVED);
 
             assertThatThrownBy(() -> newService().saveDecision(req))
+                    .isInstanceOf(BadRequestException.class);
+            verify(reconciliationDecisionRepository, never()).saveAll(anyList());
+        }
+
+        @Test
+        @DisplayName("2 chuyến Vận tải cùng khoá VÀ cùng khớp nội dung, chỉ 1 chuyến Khai thác phù hợp -> saveDecision bị từ chối (Quality Gate lượt 5 — chiều NGƯỢC LẠI, lỗi thật ở bản trước)")
+        void ambiguousPairIsRejectedWhenMultipleTransportsCompeteForOneExcavation() {
+            loginAs(9L, true);
+            Shift shift = shift(1L);
+            Device vehicle = device(10L);
+            Device excavator = device(20L);
+            User emp = employee(1L);
+
+            TransportReportTrip transport1 = fullTransportTrip(1L, 5L, DATE, shift, vehicle, excavator, emp);
+            TransportReportTrip transport2 = fullTransportTrip(2L, 5L, DATE, shift, vehicle, excavator, emp);
+            ExcavationReportTrip excavation1 = fullExcavationTrip(1L, 5L, DATE, shift, vehicle, excavator, emp);
+
+            when(transportReportTripRepository.findAllById(List.of(1L))).thenReturn(List.of(transport1));
+            when(excavationReportTripRepository.findAllById(List.of(1L))).thenReturn(List.of(excavation1));
+            when(reconciliationDecisionRepository.findByTransportReportTrip_IdIn(List.of(1L))).thenReturn(List.of());
+            when(reconciliationDecisionRepository.findByExcavationReportTrip_IdIn(List.of(1L))).thenReturn(List.of());
+            when(transportReportTripRepository.findForReconciliation(DATE, DATE, null, null))
+                    .thenReturn(List.of(transport1, transport2));
+            when(excavationReportTripRepository.findForReconciliation(DATE, DATE, null, null))
+                    .thenReturn(List.of(excavation1));
+
+            ReconciliationDecisionRequest req = new ReconciliationDecisionRequest();
+            req.setTransportReportTripId(1L);
+            req.setExcavationReportTripId(1L);
+            req.setStatus(ApprovalStatus.APPROVED);
+
+            assertThatThrownBy(() -> newService().saveDecision(req))
+                    .isInstanceOf(BadRequestException.class);
+            verify(reconciliationDecisionRepository, never()).saveAll(anyList());
+        }
+
+        @Test
+        @DisplayName("Bulk: 1 phần tử là cặp mơ hồ (2 Vận tải cạnh tranh 1 Khai thác) -> TOÀN BỘ rollback, không lưu phần tử hợp lệ khác")
+        void bulkWithAmbiguousPairRollsBackEntirely() {
+            loginAs(9L, true);
+            Shift shift = shift(1L);
+            Device vehicle = device(10L);
+            Device excavator = device(20L);
+            User emp = employee(1L);
+
+            // Nhóm mơ hồ: transport1/transport2 cùng khoá+nội dung, cạnh
+            // tranh excavation1 duy nhất.
+            TransportReportTrip transport1 = fullTransportTrip(1L, 5L, DATE, shift, vehicle, excavator, emp);
+            TransportReportTrip transport2 = fullTransportTrip(2L, 5L, DATE, shift, vehicle, excavator, emp);
+            ExcavationReportTrip excavation1 = fullExcavationTrip(1L, 5L, DATE, shift, vehicle, excavator, emp);
+            // Phần tử hợp lệ khác trong CÙNG request — khoá khác hẳn (ngày khác), không cạnh tranh.
+            LocalDate otherDate = DATE.plusDays(1);
+            TransportReportTrip transport3 = fullTransportTrip(3L, 7L, otherDate, shift, vehicle, excavator, emp);
+            ExcavationReportTrip excavation3 = fullExcavationTrip(3L, 7L, otherDate, shift, vehicle, excavator, emp);
+
+            when(transportReportTripRepository.findAllById(List.of(1L, 3L)))
+                    .thenReturn(List.of(transport1, transport3));
+            when(excavationReportTripRepository.findAllById(List.of(1L, 3L)))
+                    .thenReturn(List.of(excavation1, excavation3));
+            when(reconciliationDecisionRepository.findByTransportReportTrip_IdIn(List.of(1L, 3L))).thenReturn(List.of());
+            when(reconciliationDecisionRepository.findByExcavationReportTrip_IdIn(List.of(1L, 3L))).thenReturn(List.of());
+            when(transportReportTripRepository.findForReconciliation(DATE, DATE, null, null))
+                    .thenReturn(List.of(transport1, transport2));
+            when(excavationReportTripRepository.findForReconciliation(DATE, DATE, null, null))
+                    .thenReturn(List.of(excavation1));
+            // Phần tử hợp lệ (khoá otherDate) — lenient vì request lỗi ở
+            // phần tử đầu có thể khiến vòng lặp không cần đọc tới đây.
+            org.mockito.Mockito.lenient()
+                    .when(transportReportTripRepository.findForReconciliation(otherDate, otherDate, null, null))
+                    .thenReturn(List.of(transport3));
+            org.mockito.Mockito.lenient()
+                    .when(excavationReportTripRepository.findForReconciliation(otherDate, otherDate, null, null))
+                    .thenReturn(List.of(excavation3));
+
+            ReconciliationDecisionRequest ambiguousReq = new ReconciliationDecisionRequest();
+            ambiguousReq.setTransportReportTripId(1L);
+            ambiguousReq.setExcavationReportTripId(1L);
+            ambiguousReq.setStatus(ApprovalStatus.APPROVED);
+            ReconciliationDecisionRequest validReq = new ReconciliationDecisionRequest();
+            validReq.setTransportReportTripId(3L);
+            validReq.setExcavationReportTripId(3L);
+            validReq.setStatus(ApprovalStatus.APPROVED);
+
+            assertThatThrownBy(() -> newService().saveDecisions(List.of(ambiguousReq, validReq)))
                     .isInstanceOf(BadRequestException.class);
             verify(reconciliationDecisionRepository, never()).saveAll(anyList());
         }
@@ -356,6 +443,8 @@ class ReconciliationServiceDepartmentScopeTest {
             when(excavationReportTripRepository.findAllById(List.of(1L))).thenReturn(List.of(excavation1));
             when(reconciliationDecisionRepository.findByTransportReportTrip_IdIn(List.of(1L))).thenReturn(List.of());
             when(reconciliationDecisionRepository.findByExcavationReportTrip_IdIn(List.of(1L))).thenReturn(List.of());
+            when(transportReportTripRepository.findForReconciliation(DATE, DATE, null, null))
+                    .thenReturn(List.of(transport1));
             when(excavationReportTripRepository.findForReconciliation(DATE, DATE, null, null))
                     .thenReturn(List.of(excavation1));
             when(reconciliationDecisionRepository.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));

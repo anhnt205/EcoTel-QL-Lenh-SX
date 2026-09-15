@@ -60,20 +60,23 @@ public class ReconciliationService {
                     .collect(Collectors.toList());
         }
 
-        Map<String, Deque<ExcavationReportTrip>> excavationByKey = new HashMap<>();
-        for (ExcavationReportTrip et : excavationTrips) {
-            excavationByKey.computeIfAbsent(buildExcavationKey(et), k -> new ArrayDeque<>()).add(et);
+        // Nhóm CẢ HAI bên theo khoá ghép (Quality Gate lượt 5 của Codex —
+        // lỗi thật: bản trước chỉ xử lý 1 CHIỀU (duyệt Vận tải, tìm ứng viên
+        // Khai thác) — không kiểm tra chiều ngược lại. Khi 2 chuyến Vận tải
+        // CÙNG khoá VÀ CÙNG nội dung cạnh tranh 1 chuyến Khai thác DUY NHẤT,
+        // chuyến Vận tải xử lý trước (thứ tự lặp bất kỳ) vẫn ghép với chuyến
+        // Khai thác đó và bị đánh dấu KHÔNG mơ hồ — sai, vì chuyến Vận tải
+        // còn lại cũng khớp y hệt, không có căn cứ chọn chuyến nào. Xem
+        // {@link #pairGroup} — xử lý CẢ nhóm cùng khoá 1 lần, đòi khớp DUY
+        // NHẤT CẢ HAI CHIỀU (mutual-unique-match) mới coi là chắc chắn.
+        Map<String, List<TransportReportTrip>> transportByKey = new LinkedHashMap<>();
+        for (TransportReportTrip tt : transportTrips) {
+            transportByKey.computeIfAbsent(buildTransportKey(tt), k -> new ArrayList<>()).add(tt);
         }
-        // Kích thước GỐC của mỗi nhóm (trước khi bị poll() dần trong vòng lặp
-        // dưới) — bắt buộc chụp lại NGAY ĐÂY, không được đọc candidates.size()
-        // tại thời điểm ghép (xem javadoc pickBestMatch: "còn 1 ứng viên" có
-        // thể là DO nhóm gốc chỉ có 1 (thật sự không mơ hồ), HOẶC do các ứng
-        // viên anh chị em đã bị tiêu thụ trước đó trong cùng nhóm mơ hồ —
-        // đọc size() lúc ghép không phân biệt được hai trường hợp này, gây
-        // đúng bug đã tự bắt được qua test (dòng ghép THỨ HAI trong 1 nhóm mơ
-        // hồ bị đánh dấu SAI thành "không mơ hồ").
-        Map<String, Integer> excavationGroupSize = new HashMap<>();
-        excavationByKey.forEach((key, deque) -> excavationGroupSize.put(key, deque.size()));
+        Map<String, List<ExcavationReportTrip>> excavationByKey = new LinkedHashMap<>();
+        for (ExcavationReportTrip et : excavationTrips) {
+            excavationByKey.computeIfAbsent(buildExcavationKey(et), k -> new ArrayList<>()).add(et);
+        }
 
         // Batch tra decision + cờ "có lịch sử" MỘT LẦN cho cả trang — tránh N+1
         // (trước đây buildRow tự query riêng cho từng dòng).
@@ -96,23 +99,19 @@ public class ReconciliationService {
 
         List<ReconciliationRowResponse> rows = new ArrayList<>();
 
-        for (TransportReportTrip tt : transportTrips) {
-            String key = buildTransportKey(tt);
-            Deque<ExcavationReportTrip> candidates = excavationByKey.get(key);
-            MatchResult match = pickBestMatch(tt, candidates, excavationGroupSize.getOrDefault(key, 0));
-            if (!canSeeRow(tt, match.excavation())) {
-                continue;
-            }
-            rows.add(buildRow(tt, match.excavation(), match.ambiguous(), decisionByTransportTripId,
-                    decisionByExcavationTripId, transportIdsWithHistory, excavationIdsWithHistory));
-        }
+        Set<String> allKeys = new LinkedHashSet<>();
+        allKeys.addAll(transportByKey.keySet());
+        allKeys.addAll(excavationByKey.keySet());
 
-        for (Deque<ExcavationReportTrip> remaining : excavationByKey.values()) {
-            for (ExcavationReportTrip et : remaining) {
-                if (!canSeeRow(null, et)) {
+        for (String key : allKeys) {
+            List<TransportReportTrip> tGroup = transportByKey.getOrDefault(key, List.of());
+            List<ExcavationReportTrip> eGroup = excavationByKey.getOrDefault(key, List.of());
+            for (PairResult pair : pairGroup(tGroup, eGroup)) {
+                if (!canSeeRow(pair.transport(), pair.excavation())) {
                     continue;
                 }
-                rows.add(buildRow(null, et, false, decisionByTransportTripId, decisionByExcavationTripId,
+                rows.add(buildRow(pair.transport(), pair.excavation(), pair.ambiguous(),
+                        decisionByTransportTripId, decisionByExcavationTripId,
                         transportIdsWithHistory, excavationIdsWithHistory));
             }
         }
@@ -193,85 +192,95 @@ public class ReconciliationService {
                 + et.getVehicle().getId() + "_" + header.getExcavatorDevice().getId();
     }
 
-    /** Kết quả ghép 1 chuyến Vận tải — xem {@link #pickBestMatch}. */
-    private record MatchResult(ExcavationReportTrip excavation, boolean ambiguous) {
-        static final MatchResult NONE = new MatchResult(null, false);
-    }
+    /** Kết quả ghép 1 CẶP (hoặc 1 chuyến không ghép được, phía còn lại null) trong cùng 1 khoá — xem {@link #pairGroup}. */
+    private record PairResult(TransportReportTrip transport, ExcavationReportTrip excavation, boolean ambiguous) {}
 
     /**
-     * Chọn ứng viên Khai thác để ghép với 1 chuyến Vận tải khi CÓ NHIỀU
-     * chuyến Khai thác cùng khoá (Thời gian/Ca/Máy xúc/Số xe) —
-     * {@code candidates} đúng những ứng viên đó.
+     * Ghép TOÀN BỘ 1 nhóm cùng khoá (Thời gian/Ca/Máy xúc/Số xe) —
+     * {@code tGroup}/{@code eGroup} đúng các chuyến Vận tải/Khai thác chia
+     * sẻ khoá đó.
      *
-     * <p><b>Vấn đề thật (Quality Gate lượt 3 của Codex, 2026-09-10):</b> ID
-     * của {@code TransportReportTrip} và {@code ExcavationReportTrip} là HAI
-     * sequence ĐỘC LẬP — id transport thứ N KHÔNG có quan hệ gì với id
-     * excavation thứ N. Trước đây (lượt 2) chỉ thêm {@code ORDER BY
-     * reportDate, id} ở repository rồi ghép theo thứ tự đó (Deque.poll())
-     * — việc này CHỈ giải quyết tính XÁC ĐỊNH (chạy lại nhiều lần ra cùng
-     * một kết quả), KHÔNG chứng minh được ghép ĐÚNG cặp thật khi 2 bên nhập
-     * liệu độc lập theo thứ tự khác nhau (vd Vận tải nhập "chuyến Đất" rồi
-     * "chuyến Đá", Khai thác nhập "chuyến Đá" rồi "chuyến Đất" cho CÙNG
-     * khoá 4 trường — ghép theo id/thứ tự chèn sẽ đảo ngược, sai cặp).
+     * <p><b>Lịch sử:</b> lượt 3 thêm {@code ORDER BY} để ghép XÁC ĐỊNH.
+     * Lượt 4 sửa lỗi dừng ở ứng viên khớp {@link #isMatched} ĐẦU TIÊN thay
+     * vì đếm hết — nhưng vẫn chỉ xử lý 1 CHIỀU (duyệt từng chuyến Vận tải,
+     * tìm ứng viên Khai thác). <b>Lỗi thật còn lại (Quality Gate lượt 5 của
+     * Codex):</b> khi 2+ chuyến Vận tải CÙNG khoá VÀ CÙNG nội dung cạnh
+     * tranh 1 chuyến Khai thác DUY NHẤT, chuyến Vận tải xử lý trước (thứ tự
+     * lặp — không có ý nghĩa nghiệp vụ) vẫn được ghép với chuyến Khai thác
+     * đó và đánh dấu {@code ambiguous=false} — SAI, vì chuyến Vận tải còn
+     * lại cũng khớp y hệt, không có căn cứ chọn chuyến nào là "đúng".
      *
-     * <p><b>Cách khắc phục:</b> khi CÓ NHIỀU ứng viên, ưu tiên ứng viên KHỚP
-     * ĐÚNG {@link #isMatched} (Loại hàng, Số chuyến, Mức tải, Nhân viên —
-     * bốn trường có THẬT trong dữ liệu, không phải thứ tự nhập) — đây là
-     * tín hiệu nghiệp vụ mạnh nhất để phân biệt, và giải quyết ĐÚNG ví dụ
-     * "Đất"/"Đá" ở trên bất kể thứ tự nhập của mỗi bên. Trong trường hợp
-     * hiếm hơn — nhiều ứng viên NHƯNG không cái nào khớp đúng (tức là các
-     * chuyến đó tự nó ĐANG lệch số liệu — chính là ca đối chiếu cần bắt) —
-     * dữ liệu hiện có KHÔNG đủ để xác định cặp nào đúng bằng thuật toán;
-     * đây là ambiguity THẬT SỰ, không phải lỗi code. Không thể để trống
-     * dòng (vẫn phải hiện đủ để đối chiếu), nên vẫn ghép theo thứ tự ổn
-     * định (đầu vào đã {@code ORDER BY} ở repository) nhưng đánh dấu
-     * {@code ambiguous=true} — {@code ReconciliationRowResponse
-     * .pairingAmbiguous} — để phân biệt được với ghép chắc chắn đúng, thay
-     * vì âm thầm coi mọi ghép như nhau.
-     *
-     * <p><b>{@code originalGroupSize} PHẢI là kích thước nhóm GỐC (chụp
-     * TRƯỚC khi vòng lặp ngoài bắt đầu poll dần {@code candidates}), KHÔNG
-     * được dùng {@code candidates.size()} tại thời điểm gọi</b> — tự bắt
-     * được qua test: khi 1 nhóm có 2+ ứng viên KHÔNG ai khớp nội dung, chuyến
-     * Vận tải ĐẦU TIÊN đúng là rơi vào nhánh mơ hồ (còn 2 ứng viên, không cái
-     * nào khớp) — nhưng chuyến THỨ HAI cùng nhóm lúc đó {@code candidates}
-     * chỉ còn 1 phần tử (do chuyến đầu đã poll mất 1), nên nếu đọc
-     * {@code size()} tại chỗ sẽ hiểu NHẦM "chỉ có 1 ứng viên -> chắc chắn
-     * đúng" — trong khi thật ra nó cũng mơ hồ y hệt chuyến đầu, chỉ là bị
-     * "ăn theo" phần còn lại của cùng một nhóm không phân biệt được.
-     *
-     * <p><b>PHẢI đếm ĐỦ số ứng viên khớp {@link #isMatched}, không dừng ở
-     * ứng viên khớp ĐẦU TIÊN</b> (Quality Gate lượt 4 của Codex, 2026-09-15
-     * — lỗi thật ở bản trước): 2 chuyến Khai thác có thể cùng khớp cả 4
-     * trường (Loại hàng/Số chuyến/Mức tải/Nhân viên) với 1 chuyến Vận tải
-     * NHƯNG khác nhau ở những trường KHÔNG nằm trong {@code isMatched}
-     * (id, trạng thái duyệt, decision, lịch sử...) — bản trước chọn ứng
-     * viên khớp đầu tiên tìm thấy rồi coi là chắc chắn đúng (ambiguous
-     * =false), không hề kiểm tra còn ứng viên nào KHÁC cũng khớp — không có
-     * căn cứ để khẳng định "đúng ứng viên ĐẦU" hơn ứng viên khớp thứ hai.
-     * Sửa: thu thập TOÀN BỘ ứng viên khớp trước, chỉ coi là chắc chắn khi
-     * ĐÚNG 1 ứng viên khớp; 0 hoặc ĐA khớp đều là ambiguous — dữ liệu không
-     * đủ để phân biệt, không phải lỗi thuật toán.
+     * <p><b>Sửa — khớp DUY NHẤT CẢ HAI CHIỀU (mutual-unique-match):</b> 1
+     * cặp {@code (t, e)} chỉ CHẮC CHẮN khi {@code e} là ứng viên DUY NHẤT
+     * khớp {@link #isMatched} của {@code t} TRONG SỐ những ứng viên CÒN LẠI
+     * (chưa ghép), VÀ {@code t} cũng là ứng viên DUY NHẤT khớp của
+     * {@code e} — không chỉ kiểm tra 1 chiều như trước. Xử lý theo 2 vòng:
+     * <ol>
+     *   <li>Vòng 1 — ghép hết mọi cặp thoả mutual-unique-match tìm được (áp
+     *       dụng lặp lại trên phần CÒN LẠI sau mỗi lần ghép, vì loại bỏ 1
+     *       cặp chắc chắn có thể làm lộ ra cặp chắc chắn khác).</li>
+     *   <li>Vòng 2 — phần còn lại (không xác định được bằng nội dung, tự nó
+     *       đang lệch số liệu hoặc vẫn cạnh tranh nhau) ghép TẠM theo thứ
+     *       tự ổn định (đầu vào đã {@code ORDER BY} ở repository), đánh dấu
+     *       {@code ambiguous=true} — không thể để trống dòng (vẫn phải hiện
+     *       đủ để đối chiếu) nhưng phải phân biệt rõ với ghép chắc chắn.</li>
+     * </ol>
+     * Nhóm chỉ có tối đa 1 chuyến mỗi bên (không cạnh tranh phía nào) luôn
+     * {@code ambiguous=false} dù nội dung khớp hay không — đó là "lệch số
+     * liệu" bình thường của đối chiếu, không phải vấn đề PAIRING.
      */
-    private MatchResult pickBestMatch(TransportReportTrip tt, Deque<ExcavationReportTrip> candidates,
-                                       int originalGroupSize) {
-        if (candidates == null || candidates.isEmpty()) {
-            return MatchResult.NONE;
+    private List<PairResult> pairGroup(List<TransportReportTrip> tGroup, List<ExcavationReportTrip> eGroup) {
+        List<PairResult> results = new ArrayList<>();
+        if (tGroup.size() <= 1 && eGroup.size() <= 1) {
+            if (!tGroup.isEmpty() && !eGroup.isEmpty()) {
+                results.add(new PairResult(tGroup.get(0), eGroup.get(0), false));
+            } else if (!tGroup.isEmpty()) {
+                results.add(new PairResult(tGroup.get(0), null, false));
+            } else if (!eGroup.isEmpty()) {
+                results.add(new PairResult(null, eGroup.get(0), false));
+            }
+            return results;
         }
-        if (originalGroupSize <= 1) {
-            return new MatchResult(candidates.poll(), false);
+
+        List<TransportReportTrip> remainingT = new ArrayList<>(tGroup);
+        List<ExcavationReportTrip> remainingE = new ArrayList<>(eGroup);
+
+        // Vòng 1: lặp lại tới khi không còn ghép được cặp mutual-unique nào
+        // nữa — loại 1 cặp chắc chắn có thể làm 1 cặp khác (trước đó bị
+        // "vướng" vì ứng viên của nó còn bị cạnh tranh) trở nên duy nhất.
+        boolean foundInPass;
+        do {
+            foundInPass = false;
+            for (int i = 0; i < remainingT.size(); i++) {
+                TransportReportTrip tt = remainingT.get(i);
+                List<ExcavationReportTrip> tMatches = remainingE.stream().filter(e -> isMatched(tt, e)).toList();
+                if (tMatches.size() != 1) {
+                    continue;
+                }
+                ExcavationReportTrip candidate = tMatches.get(0);
+                long candidateMatchCount = remainingT.stream().filter(t -> isMatched(t, candidate)).count();
+                if (candidateMatchCount == 1) {
+                    results.add(new PairResult(tt, candidate, false));
+                    remainingT.remove(i);
+                    remainingE.remove(candidate);
+                    foundInPass = true;
+                    break; // remainingT vừa đổi chỉ số -> bắt đầu lại vòng for
+                }
+            }
+        } while (foundInPass);
+
+        // Vòng 2: phần còn lại — không đủ căn cứ nội dung để phân biệt.
+        int n = Math.min(remainingT.size(), remainingE.size());
+        for (int i = 0; i < n; i++) {
+            results.add(new PairResult(remainingT.get(i), remainingE.get(i), true));
         }
-        List<ExcavationReportTrip> exactMatches = candidates.stream()
-                .filter(candidate -> isMatched(tt, candidate))
-                .toList();
-        if (exactMatches.size() == 1) {
-            ExcavationReportTrip match = exactMatches.get(0);
-            candidates.remove(match);
-            return new MatchResult(match, false);
+        for (int i = n; i < remainingT.size(); i++) {
+            results.add(new PairResult(remainingT.get(i), null, false));
         }
-        // 0 ứng viên khớp (tự lệch số liệu), hoặc ĐA ứng viên cùng khớp (dữ
-        // liệu không đủ phân biệt) — cả hai đều là ambiguity thật sự.
-        return new MatchResult(candidates.poll(), true);
+        for (int i = n; i < remainingE.size(); i++) {
+            results.add(new PairResult(null, remainingE.get(i), false));
+        }
+        return results;
     }
 
     /**
@@ -667,26 +676,43 @@ public class ReconciliationService {
      * có khớp hay không — đó là hiện tượng "lệch số liệu" bình thường của
      * đối chiếu, không phải vấn đề PAIRING.
      */
+    /**
+     * Xem javadoc {@link #pairGroup} — dùng LẠI đúng định nghĩa "chắc chắn"
+     * (mutual-unique-match) để xác minh cặp {@code (tt, et)} gửi lên có
+     * phải khớp DUY NHẤT CẢ HAI CHIỀU hay không.
+     *
+     * <p><b>Quality Gate lượt 5 của Codex</b> — bản trước (lượt 4) CHỈ kiểm
+     * tra 1 chiều (bao nhiêu chuyến Khai thác cùng khoá khớp nội dung với
+     * {@code tt}) — không kiểm tra chiều ngược lại ({@code et} có đang bị
+     * NHIỀU chuyến Vận tải khác cạnh tranh hay không). Khi 2 chuyến Vận tải
+     * cùng khoá/cùng nội dung chỉ có 1 chuyến Khai thác phù hợp, hàm cũ trả
+     * về ngay ở nhánh "chỉ 1 ứng viên phía Khai thác" mà không hề biết
+     * chuyến Khai thác đó đang bị chuyến Vận tải KHÁC cạnh tranh — vẫn cho
+     * duyệt/yêu cầu sửa một cặp thực ra không xác định. Sửa: truy vấn CẢ
+     * HAI phía cùng khoá, đòi khớp duy nhất từ CẢ 2 hướng.
+     */
     private void assertPairingUnambiguous(TransportReportTrip tt, ExcavationReportTrip et) {
         String key = buildTransportKey(tt);
         LocalDate date = tt.getTransportReport().getReportDate();
-        List<ExcavationReportTrip> sameKeyCandidates = excavationReportTripRepository
+        List<TransportReportTrip> sameKeyTransport = transportReportTripRepository
+                .findForReconciliation(date, date, null, null).stream()
+                .filter(c -> buildTransportKey(c).equals(key))
+                .toList();
+        List<ExcavationReportTrip> sameKeyExcavation = excavationReportTripRepository
                 .findForReconciliation(date, date, null, null).stream()
                 .filter(c -> buildExcavationKey(c).equals(key))
                 .toList();
-        if (sameKeyCandidates.size() <= 1) {
+        if (sameKeyTransport.size() <= 1 && sameKeyExcavation.size() <= 1) {
             return;
         }
-        List<ExcavationReportTrip> exactMatches = sameKeyCandidates.stream()
-                .filter(c -> isMatched(tt, c))
-                .toList();
-        boolean submittedIsUniqueMatch = exactMatches.size() == 1
-                && exactMatches.get(0).getId().equals(et.getId());
-        if (!submittedIsUniqueMatch) {
+        long excavationMatchesForTt = sameKeyExcavation.stream().filter(c -> isMatched(tt, c)).count();
+        long transportMatchesForEt = sameKeyTransport.stream().filter(c -> isMatched(c, et)).count();
+        boolean confident = isMatched(tt, et) && excavationMatchesForTt == 1 && transportMatchesForEt == 1;
+        if (!confident) {
             throw new BadRequestException(
                     "Cặp chuyến Vận tải #" + tt.getId() + " - Khai thác #" + et.getId()
-                            + " không xác định rõ ràng (nhiều chuyến Khai thác cùng khoá ngày/ca/xe/máy xúc, "
-                            + "không đúng 1 chuyến khớp nội dung) — cần làm rõ dữ liệu trước khi duyệt/yêu cầu sửa cặp này.");
+                            + " không xác định rõ ràng (nhiều chuyến cùng khoá ngày/ca/xe/máy xúc ở ít nhất 1 phía, "
+                            + "không khớp DUY NHẤT cả hai chiều) — cần làm rõ dữ liệu trước khi duyệt/yêu cầu sửa cặp này.");
         }
     }
 

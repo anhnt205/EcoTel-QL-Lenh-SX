@@ -334,4 +334,50 @@ class ReconciliationServicePairingTest {
                 .as("2 ứng viên cùng khớp -> không có căn cứ chọn 1 trong 2 -> PHẢI ambiguous=true")
                 .isTrue();
     }
+
+    @Test
+    @DisplayName("2 chuyến Vận tải CÙNG khoá VÀ cùng khớp nội dung, chỉ 1 chuyến Khai thác phù hợp -> ambiguous (Quality Gate lượt 5 — chiều NGƯỢC LẠI, lỗi thật ở bản trước: chỉ xử lý 1 chiều Vận tải -> Khai thác)")
+    void flagsAmbiguityWhenMultipleTransportsCompeteForOneExcavation() {
+        LocalDate date = LocalDate.of(2026, 9, 10);
+        Shift shift = shift(1L);
+        Device vehicle = device(10L, "468");
+        Device excavator = device(20L, "P17");
+        User emp = employee(1L);
+
+        // Đúng kịch bản Codex nêu: 2 chuyến Vận tải CÙNG khoá + CÙNG nội
+        // dung (không phân biệt được với nhau), chỉ 1 chuyến Khai thác phù
+        // hợp. Bản trước (chỉ xử lý chiều Vận tải -> Khai thác) ghép chuyến
+        // Vận tải XỬ LÝ TRƯỚC (thứ tự lặp bất kỳ) với chuyến Khai thác đó
+        // rồi đánh dấu ambiguous=false — SAI, vì chuyến Vận tải còn lại
+        // cũng khớp y hệt, không có căn cứ chọn chuyến nào.
+        TransportReportTrip transport1 = transportTrip(1L, 5L, date, shift, vehicle, excavator, emp);
+        TransportReportTrip transport2 = transportTrip(2L, 5L, date, shift, vehicle, excavator, emp);
+        ExcavationReportTrip excavation1 = excavationTrip(1L, 5L, date, shift, vehicle, excavator, emp);
+
+        List<Long> transportIds = List.of(1L, 2L);
+        List<Long> excavationIds = List.of(1L);
+        when(transportReportTripRepository.findForReconciliation(date, date, null, null))
+                .thenReturn(List.of(transport1, transport2));
+        when(excavationReportTripRepository.findForReconciliation(date, date, null, null))
+                .thenReturn(List.of(excavation1));
+        stubEmptyDecisionsAndHistory(transportIds, excavationIds);
+
+        ReconciliationSearchRequest request = new ReconciliationSearchRequest();
+        request.setFromDate(date);
+        request.setToDate(date);
+        PageResponse<ReconciliationRowResponse> result = newService().search(request, PageRequest.of(0, 20));
+
+        // 1 trong 2 chuyến Vận tải ghép được với excavation1 (ambiguous),
+        // chuyến còn lại rơi vào dòng riêng (không còn ứng viên Khai thác).
+        ReconciliationRowResponse pairedRow = result.getContent().stream()
+                .filter(r -> r.getExcavationReportTripId() != null)
+                .findFirst().orElseThrow();
+
+        assertThat(pairedRow.getTransportReportTripId()).as("vẫn phải ghép 1 trong 2, không để trống")
+                .isIn(1L, 2L);
+        assertThat(pairedRow.getPairingAmbiguous())
+                .as("2 chuyến Vận tải cùng cạnh tranh 1 chuyến Khai thác -> không có căn cứ chọn chuyến nào -> PHẢI ambiguous=true")
+                .isTrue();
+        assertThat(result.getContent()).hasSize(2);
+    }
 }
