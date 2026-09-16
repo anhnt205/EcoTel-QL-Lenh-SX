@@ -41,6 +41,7 @@ class ProductionCalculationServiceLockTest {
     @Mock private SurveyStandardRepository surveyStandardRepository;
     @Mock private SurveyCoefficientRepository coefficientRepository;
     @Mock private ProductionResultRepository resultRepository;
+    @Mock private ReconciliationDecisionRepository reconciliationDecisionRepository;
     @Mock private TripBaseCalculator baseCalculator;
     @Mock private FuelCalculator fuelCalculator;
     @Mock private MatrixCatalogService matrixService;
@@ -48,7 +49,7 @@ class ProductionCalculationServiceLockTest {
     private ProductionCalculationService newService() {
         return new ProductionCalculationService(periodRepository, tripRepository,
                 surveyStandardRepository, coefficientRepository, resultRepository,
-                baseCalculator, fuelCalculator, matrixService);
+                reconciliationDecisionRepository, baseCalculator, fuelCalculator, matrixService);
     }
 
     private static ReportPeriod period(int year, int month, int index,

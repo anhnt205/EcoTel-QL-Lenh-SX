@@ -77,6 +77,17 @@ class PermissionFilterTest {
         verify(chain, times(1)).doFilter(request, response);
     }
 
+    @Test void noAuthenticatedAppUserDetailsIsRejected() throws Exception {
+        // Không gọi authenticate(...) -> SecurityContextHolder rỗng, đúng
+        // trạng thái khi AppTokenFilter từ chối dựng AppUserDetails (vd
+        // refresh token gửi thẳng làm Bearer, Quality Gate lượt 7 của
+        // Codex — xem AppTokenFilterTest.AccessVsRefreshToken).
+        handler("approve");
+        filter.doFilter(request, response, chain);
+        assertEquals(401, response.getStatus());
+        verifyNoInteractions(chain);
+    }
+
     @Test void unconfiguredHandlerIsDenied() throws Exception {
         handler("unconfigured");
         filter.doFilter(request, response, chain);

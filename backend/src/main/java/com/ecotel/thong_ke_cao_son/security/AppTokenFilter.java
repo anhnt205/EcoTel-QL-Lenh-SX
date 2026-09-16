@@ -5,6 +5,7 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -19,6 +20,9 @@ import java.util.Map;
 @Component
 public class AppTokenFilter extends OncePerRequestFilter {
 
+    @Value("${app.auth.mode:standalone}")
+    private String authMode = "standalone";
+
     @Override
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
@@ -28,6 +32,30 @@ public class AppTokenFilter extends OncePerRequestFilter {
 
         // Spring đã verify và set Jwt object vào context
         if (auth != null && auth.getPrincipal() instanceof Jwt jwt) {
+            // Refresh token dùng được như access token (Quality Gate lượt 7
+            // của Codex, 2026-09-16) — LocalAuthService phát hành 2 loại
+            // token với claim "permissions"/"departmentId"/"fullDataScope"
+            // GIỐNG HỆT NHAU, chỉ khác "typ" (access/refresh) và TTL. Trước
+            // đây filter này dựng AppUserDetails từ BẤT KỲ JWT hợp lệ nào có
+            // claim "permissions" — gửi thẳng refresh token (sống tới 7
+            // ngày) làm "Authorization: Bearer" vẫn gọi được API nghiệp vụ
+            // suốt TTL đó, bỏ qua hẳn ý nghĩa "access token hết hạn sau vài
+            // giờ". Sửa: ở chế độ standalone (nơi LocalAuthService LUÔN ghi
+            // claim "typ"), CHỈ chấp nhận typ="access" — token thiếu claim
+            // hoặc typ khác đều KHÔNG được dựng thành AppUserDetails, để
+            // nguyên principal ở dạng Jwt "thô" (không có quyền) khiến
+            // PermissionFilter tự từ chối 401 (không phải AppUserDetails,
+            // xem PermissionFilter dòng kiểm tra "auth.getPrincipal()
+            // instanceof AppUserDetails"). CỐ Ý bỏ qua kiểm tra này ở chế độ
+            // portal — CHƯA XÁC MINH Portal có phát hành claim "typ" với
+            // đúng ngữ nghĩa này hay không (token Portal có thể hoàn toàn
+            // không có claim "typ"), ép sai có nguy cơ khoá nhầm toàn bộ chế
+            // độ portal.
+            if ("standalone".equalsIgnoreCase(authMode) && !"access".equals(jwt.getClaim("typ"))) {
+                chain.doFilter(request, response);
+                return;
+            }
+
             Map<String, Object> rawPerms = jwt.getClaim("permissions");
             if (rawPerms != null) {
                 // Parse permissions và replace principal bằng AppUserDetails

@@ -2853,3 +2853,210 @@ Test mới (đúng 6 kịch bản Codex yêu cầu, thêm vào
    nghiệp vụ thuần tuý (lượt 25, 26) vì không rõ mật khẩu tài khoản seed sẵn
    — nếu chủ dự án muốn verify sống trong tương lai, cần cấp 1 tài khoản
    test có mật khẩu biết trước.
+
+## Lượt 27 (2026-09-16) — Quality Gate lượt 7 của Codex: 3 phát hiện MAJOR, review commit `db77494`
+
+Codex xác nhận toàn bộ finding về pairing (lượt 5+6) đã sửa đúng — mutual-
+unique-match 2 chiều, chặn cặp khác khoá, APPROVED bắt buộc khớp nội dung,
+đủ test cho search/saveDecision/bulk rollback. Phát hiện MỚI 3 lỗ hổng MAJOR
+độc lập, không liên quan reconciliation pairing.
+
+### 1. MAJOR — Refresh token dùng được như access token
+
+Đúng như Codex nêu: `LocalAuthService` phát hành access/refresh token với
+claim `permissions`/`departmentId`/`fullDataScope` GIỐNG HỆT NHAU, chỉ khác
+`typ` và TTL (access 8h, refresh 7 ngày). `AppTokenFilter` (lớp dựng
+`AppUserDetails` từ JWT cho MỌI request nghiệp vụ) trước đây KHÔNG hề đọc
+claim `typ` — gửi thẳng refresh token làm `Authorization: Bearer` vẫn gọi
+được API nghiệp vụ suốt TTL 7 ngày, bỏ qua hoàn toàn ý nghĩa "access token
+hết hạn sau vài giờ".
+
+**Sửa** `AppTokenFilter`: thêm `@Value("${app.auth.mode:standalone}")
+authMode`. Ở chế độ `standalone` (nơi `LocalAuthService` LUÔN ghi claim
+`typ`), CHỈ chấp nhận `typ="access"` — token thiếu claim hoặc `typ` khác
+đều KHÔNG được dựng thành `AppUserDetails`, principal giữ nguyên dạng `Jwt`
+"thô" khiến `PermissionFilter` tự từ chối 401 (đã có sẵn cơ chế "principal
+không phải AppUserDetails -> 401", chỉ cần không dựng AppUserDetails là đủ,
+không cần viết logic 401 riêng). **CỐ Ý bỏ qua kiểm tra này ở chế độ
+portal** — đúng yêu cầu #3 của Codex ("không làm hỏng portal mode nếu
+Portal không dùng cùng claim typ"): chưa xác minh được token Portal thật có
+mang claim `typ` với đúng ngữ nghĩa này hay không.
+
+`/api/auth/refresh-local` (đổi refresh token cục bộ) đã tự bảo vệ đúng từ
+trước (`LocalAuthService.refresh()` đã kiểm `typ=="refresh"`, có test
+`rejectsAccessTokenPassedAsRefreshToken`/`allowsRefreshWhileStillActive`
+trong `LocalAuthServiceTest` — không cần sửa gì thêm cho endpoint này, chỉ
+lỗ hổng ở `AppTokenFilter` cho API nghiệp vụ).
+
+Test mới `AppTokenFilterTest.AccessVsRefreshToken` (5 test, đủ theo yêu cầu
+Codex): access token ở standalone -> chấp nhận; refresh token ở standalone
+-> KHÔNG dựng AppUserDetails; thiếu claim typ ở standalone -> fail-closed;
+refresh token ở portal -> KHÔNG bị ảnh hưởng (tránh regression); thiếu claim
+typ ở portal -> KHÔNG bị ảnh hưởng. Thêm 1 test
+`PermissionFilterTest.noAuthenticatedAppUserDetailsIsRejected` chứng minh
+end-to-end: principal không phải AppUserDetails -> 401 thật.
+
+### 2. MAJOR — Có thể duyệt riêng Transport rồi đưa vào tính sản lượng
+
+Đúng như Codex nêu: `ReconciliationDecisionRequest` cho phép chỉ gửi
+`transportReportTripId`; `buildDecision()` chỉ gọi `assertValidPair()` khi
+có ĐỦ CẢ HAI id — request chỉ 1 phía với `status=APPROVED` vẫn được chấp
+nhận, đặt `TransportReportTrip.status=APPROVED` mà KHÔNG hề xác minh chuyến
+Khai thác ghép cặp. `ProductionCalculationService` (trước lượt này) chỉ đọc
+`TransportReportTrip.status==APPROVED`, không xác minh có chuyến Khai thác
+tương ứng hay đã duyệt hay chưa — đưa lọt được 1 chuyến chưa đối chiếu đầy
+đủ vào báo cáo sản lượng, trái yêu cầu "cả hai bên cùng duyệt".
+
+**Sửa 2 lớp (chặn ở nguồn + tự vệ độc lập ở nơi dùng dữ liệu):**
+
+- `ReconciliationService.buildDecision()`: thêm kiểm tra MỚI, ĐỘC LẬP với
+  `assertValidPair` — nếu `status==APPROVED` mà thiếu 1 trong 2 id (transport
+  hoặc excavation) thì từ chối ngay (`BadRequestException`, "không thể duyệt
+  một phía"). `REVISION_REQUESTED` KHÔNG bị chặn (đúng luồng nghiệp vụ
+  "đỏ/vàng/trắng" đã có — yêu cầu sửa 1 bên là chuyện bình thường).
+- `ProductionCalculationService.calculatePeriod()`: KHÔNG tin riêng
+  `TransportReportTrip.status` nữa — tra thêm `ReconciliationDecision` gắn
+  với từng chuyến Vận tải (`findByTransportReportTrip_IdIn`, batch 1 query),
+  yêu cầu decision đó PHẢI có chuyến Khai thác ghép cặp VÀ chuyến đó CŨNG
+  phải `APPROVED`. Đây là tự vệ ĐỘC LẬP (defense in depth) — không tin
+  ngược dữ liệu cũ hoặc đường ghi khác, đúng tinh thần "không phụ thuộc 1
+  điểm kiểm tra duy nhất" đã áp dụng nhất quán các lượt trước.
+
+**Sửa 2 test cũ hết hợp lệ:** `sameDepartmentCanApprove`/
+`fullScopeCanApproveAnyDepartment` (nhóm `SaveDecisions`) gửi APPROVED một
+phía — đổi sang `REVISION_REQUESTED` để giữ đúng mục đích gốc (kiểm tra
+PHẠM VI ĐƠN VỊ, không phải quy tắc APPROVED một phía); phải bổ sung
+cargoType/tripCount/loadLevel/nhân viên cho fixture vì REVISION_REQUESTED
+chạm nhánh lưu lịch sử (`snapshotTransport`, tính năng đỏ/vàng/trắng có sẵn
+từ trước) vốn cần đủ các trường đó, khác hẳn fixture nhẹ ban đầu.
+
+Test mới đúng 6 kịch bản Codex yêu cầu:
+- `ReconciliationServiceDepartmentScopeTest.PairingAmbiguity`:
+  `approvedTransportOnlyIsRejected`, `approvedExcavationOnlyIsRejected`,
+  `bulkWithSingleSidedApprovalRollsBackEntirely`.
+- `ProductionCalculationServiceApprovalGateTest` (file mới):
+  `transportApprovedWithoutPairedExcavationBlocksCalculation`,
+  `transportApprovedButExcavationNotApprovedBlocksCalculation`,
+  `validPairBothApprovedPassesApprovalGate` (verify
+  `resultRepository.deleteByPeriod` được gọi — dòng NGAY SAU gate, chứng
+  minh đã qua được gate mà không cần hoàn tất toàn bộ phép tính phức tạp
+  phía sau, không phải trọng tâm test này).
+
+### 3. MAJOR — Migration database hiện hữu chưa có đường chạy bảo đảm
+
+Đúng như Codex nêu: 6 file `migration-*.sql` (tách danh mục địa điểm, S1/S2
+khoá ngoại, matrix phiên bản…) chỉ có hướng dẫn CHẠY TAY sau deploy —
+`schema.sql` tự động chỉ xử lý 2 cột (`report_periods.locked/stale`,
+`departments.full_data_scope`); `docker-entrypoint-initdb.d` chỉ chạy lần
+đầu tạo volume; Hibernate `ddl-auto=update` không đảm nhận được migrate dữ
+liệu/đổi FK. Không có version history nào cho schema.
+
+**Sửa — đưa Flyway vào, dùng baseline (không replay lịch sử):**
+
+1. `pg_dump --schema-only --no-owner --no-privileges` từ CHÍNH CSDL preview
+   đang chạy thật (đã áp dụng đủ cả 6 migration tay + mọi cột do
+   schema.sql/Hibernate sinh tới ngày 2026-09-16) → dọn sạch các dòng
+   `\restrict`/`\unrestrict` (cú pháp riêng của psql, không phải SQL — nếu
+   để lại Flyway sẽ lỗi cú pháp) và MỌI dòng `SET ...`/
+   `SELECT pg_catalog.set_config('search_path', ...)` (phát hiện quan
+   trọng: dòng này đặt `search_path=''` cho CẢ PHIÊN, không chỉ transaction
+   — nếu Flyway mượn connection từ CHUNG connection pool với ứng dụng rồi
+   trả lại pool mang theo session state này, các query JPA sau đó dùng tên
+   bảng KHÔNG qua tiền tố schema sẽ lỗi "relation does not exist"; SET
+   không xoá thì an toàn khi Flyway KHÔNG dùng chung pool, nhưng xoá đi vẫn
+   đúng và an toàn tuyệt đối bất kể cơ chế connection nào) → lưu thành
+   `backend/src/main/resources/db/migration/V1__baseline.sql`.
+2. **Phát hiện quan trọng khi verify sống:** dự án dùng Spring Boot 4.0.7 —
+   bản này đã tách `spring-boot-autoconfigure` thành nhiều module nhỏ theo
+   từng starter; package `org.springframework.boot.autoconfigure.flyway`
+   KHÔNG tồn tại trong bộ dependency hiện có (rà toàn bộ jar `spring-boot-*`
+   và cả `flyway-core`/`flyway-database-postgresql`: không jar nào chứa lớp
+   hay `AutoConfiguration.imports` nào nhắc tới Flyway). Thêm
+   `spring.flyway.*` vào `application.yaml` như bình thường KHÔNG có tác
+   dụng gì — không lỗi, không log, ÂM THẦM vô hiệu (tự phát hiện bằng cách
+   khởi động thật rồi kiểm tra bảng `flyway_schema_history` không hề được
+   tạo — nếu không kiểm tra sống bằng psql thật, dễ tưởng đã xong). **Sửa:**
+   viết `FlywayContextInitializer` (implements
+   `ApplicationContextInitializer`), gọi Flyway Java API trực tiếp
+   (`Flyway.configure()...migrate()`), đăng ký thủ công qua
+   `SpringApplication.addInitializers(...)` trong
+   `ThongKeCaoSonApplication#main` — chạy ở giai đoạn SỚM NHẤT (trước khi
+   BẤT KỲ bean nào được tạo, kể cả `DataSource`/`EntityManagerFactory`),
+   đúng thứ tự bắt buộc (Flyway trước schema.sql trước Hibernate ddl-auto).
+   **Lưu ý quan trọng khác tự phát hiện:** `@SpringBootTest` (dùng bởi
+   `ThongKeCaoSonApplicationTests`/`mvn test -Plive-integration-test`)
+   KHÔNG gọi `main()` — initializer này chỉ chạy thật khi khởi động qua
+   `java -jar`. Test sống cho tính năng này BẮT BUỘC chạy trực tiếp file
+   jar (không qua `mvn test`), xem mục kết quả build/test.
+3. Cấu hình `spring.flyway.baseline-on-migrate=true` +
+   `baseline-version=1` (đọc thủ công bởi `FlywayContextInitializer`, xem
+   trên) — CSDL HIỆN HỮU (đã có sẵn đúng schema này) tự đánh dấu "đã ở V1"
+   mà KHÔNG replay lại V1; CSDL HOÀN TOÀN MỚI (schema rỗng) thì cờ này
+   không có tác dụng, Flyway chạy V1 THẬT để dựng toàn bộ 48 bảng.
+4. 6 file `migration-*.sql` cũ chuyển vào `backend/migration-archive/`
+   (kèm `README.md` giải thích rõ: đã áp dụng xong, không chạy lại, chỉ lưu
+   tham khảo lịch sử — đúng quy tắc dự án "không xoá tài liệu hiện có nếu
+   chưa được yêu cầu rõ ràng"). `schema.sql` GIỮ LẠI làm lớp an toàn PHỤ
+   (idempotent, vô hại khi chạy lại) trong giai đoạn chuyển tiếp, có ghi chú
+   Flyway giờ là nguồn chính — không thêm khối DO mới vào đó nữa, mọi thay
+   đổi schema tương lai phải là 1 file `V2__...sql` mới.
+
+**Đã verify SỐNG cả 3 kịch bản Codex yêu cầu** (bắt buộc vì đây là lỗ hổng
+vận hành, không phải thuần logic — cùng kỷ luật đã áp dụng cho các lỗ hổng
+ranh giới bảo mật/vận hành các lượt trước, khác các lượt 25/26 thuần logic
+nghiệp vụ):
+- **CSDL hiện hữu có dữ liệu thật** (preview, 13 phòng ban/13 kỳ báo
+  cáo/11 tài khoản): redeploy `backend-service` → log
+  `Schema history table does not exist yet` → `Successfully baselined
+  schema with version: 1` → `Schema is up to date. No migration
+  necessary.` → app khởi động healthy. Xác nhận KHÔNG mất dữ liệu (đếm lại
+  đúng 13/13/11 sau khi baseline).
+- **CSDL hoàn toàn trống** (container Postgres mới tinh, `\dt` xác nhận
+  không có bảng nào TRƯỚC khi chạy): chạy trực tiếp file jar (không qua
+  `mvn test`, đúng lưu ý mục 2) → log `All configured schemas are empty;
+  baseline operation skipped` → `Migrating schema "public" to version "1 -
+  baseline"` → `Successfully applied 1 migration` → 49 bảng được tạo (48 +
+  `flyway_schema_history`) → app khởi động healthy, Hibernate không báo
+  thiếu cột/bảng nào (chứng minh V1 khớp ĐÚNG với entity hiện tại).
+- **Khởi động lại lần hai (idempotent)** — cả 2 kịch bản trên: restart lần
+  2 → log `Schema "public" is up to date. No migration necessary.`, không
+  lỗi, không áp dụng lại, app khởi động healthy.
+- Container Postgres test dùng xong đã dọn (`docker rm -f`), không để lại
+  rác theo quy tắc dự án.
+
+### Kết quả build/test
+
+- Backend: `mvn -B test` → **125/125 pass, BUILD SUCCESS, exit code 0**
+  (thêm 12 test mới: 5 AppTokenFilterTest + 1 PermissionFilterTest + 3
+  ReconciliationServiceDepartmentScopeTest + 3
+  ProductionCalculationServiceApprovalGateTest).
+- `mvn test -Plive-integration-test` với Postgres/Redis preview THẬT:
+  `ThongKeCaoSonApplicationTests.contextLoads` → **1/1 pass, BUILD SUCCESS**
+  (lưu ý: đường này KHÔNG chạy qua `FlywayContextInitializer`, xem mục 2 ở
+  trên — bằng chứng Flyway thật nằm ở phần "verify SỐNG" phía trên, chạy
+  trực tiếp jar).
+- Frontend: `pnpm install --frozen-lockfile && pnpm run build` → sạch,
+  exit code 0 (không đụng file frontend nào lượt này).
+- Redeploy `backend-service` lên preview 2 lần (verify + verify lại
+  idempotent) → healthy cả 2 lần, không lỗi.
+
+### BÀN GIAO (lượt 27) — việc còn lại
+
+1. (Kế thừa lượt 24) Form Phòng ban chưa có ô UI `full_data_scope`;
+   `test_a`/`test_b` chưa gán đơn vị; Excel import chưa lọc theo đơn vị;
+   `Device.department` cần rà soát gán đủ cho thiết bị thật.
+2. (Kế thừa lượt 24) `getHistory` chưa được chặn bởi `assertValidPair`.
+3. `FlywayContextInitializer` là giải pháp THAY THẾ auto-configuration
+   chuẩn của Spring Boot (không tồn tại ở bản 4.0.7 hiện dùng) — nếu dự án
+   sau này nâng cấp Spring Boot lên bản có lại
+   `org.springframework.boot.autoconfigure.flyway`, nên cân nhắc chuyển về
+   cơ chế chuẩn (đơn giản hơn, được cộng đồng bảo trì) thay vì tiếp tục
+   dùng initializer thủ công này — không cấp bách, chỉ ghi nhận.
+4. `ddl-auto` vẫn là `update` (không đổi sang `validate`) — Flyway mới chỉ
+   đóng vai trò "nguồn xác định schema ban đầu + lịch sử version", chưa
+   thay thế HOÀN TOÀN vai trò của ddl-auto cho các thay đổi additive nhỏ.
+   Đây là lựa chọn THẬN TRỌNG có chủ đích (tránh rủi ro boot-fail nếu có
+   drift chưa phát hiện giữa entity và schema thật trên 1 môi trường nào
+   đó) — nếu chủ dự án muốn siết chặt hơn nữa (ddl-auto=validate, buộc MỌI
+   thay đổi schema phải qua Flyway), cần rà soát kỹ trước, không nên đổi
+   vội.

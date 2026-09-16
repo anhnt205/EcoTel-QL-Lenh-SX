@@ -110,10 +110,18 @@ class ReconciliationServiceDepartmentScopeTest {
     class SaveDecisions {
 
         @Test
-        @DisplayName("Tài khoản CÙNG đơn vị với chuyến Vận tải -> duyệt được bình thường")
+        @DisplayName("Tài khoản CÙNG đơn vị với chuyến Vận tải -> yêu cầu sửa 1 phía được bình thường (APPROVED một phía đã bị chặn riêng, xem PairingAmbiguity)")
         void sameDepartmentCanApprove() {
             loginAs(11L, false);
             TransportReportTrip trip = transportTripOf(1L, 11L);
+            // REVISION_REQUESTED chạm nhánh lưu lịch sử (snapshotTransport,
+            // tính năng "đỏ/vàng/trắng" — xem commit 3c7c139) — cần đủ
+            // cargoType/tripCount/loadLevel/nhân viên để không NPE, khác hẳn
+            // trọng tâm test này (kiểm soát phạm vi đơn vị).
+            trip.setCargoType(cargoType(5L));
+            trip.setTripCount(1);
+            trip.setLoadLevel(new LoadLevel());
+            trip.getTransportReport().setEmployee(employee(1L));
             when(transportReportTripRepository.findAllById(List.of(1L))).thenReturn(List.of(trip));
             when(excavationReportTripRepository.findAllById(List.of())).thenReturn(List.of());
             when(reconciliationDecisionRepository.findByTransportReportTrip_IdIn(List.of(1L))).thenReturn(List.of());
@@ -121,9 +129,13 @@ class ReconciliationServiceDepartmentScopeTest {
             when(reconciliationDecisionRepository.saveAll(anyList()))
                     .thenAnswer(inv -> inv.getArgument(0));
 
+            // REVISION_REQUESTED (không phải APPROVED) — bài test này kiểm
+            // tra kiểm soát PHẠM VI ĐƠN VỊ, không phải quy tắc APPROVED một
+            // phía (Quality Gate lượt 7 của Codex, 2026-09-16 — xem
+            // PairingAmbiguity.approvedSingleSidedIsRejected).
             ReconciliationDecisionRequest req = new ReconciliationDecisionRequest();
             req.setTransportReportTripId(1L);
-            req.setStatus(ApprovalStatus.APPROVED);
+            req.setStatus(ApprovalStatus.REVISION_REQUESTED);
 
             newService().saveDecision(req); // không ném lỗi
             verify(reconciliationDecisionRepository).saveAll(anyList());
@@ -173,19 +185,25 @@ class ReconciliationServiceDepartmentScopeTest {
         }
 
         @Test
-        @DisplayName("Tài khoản fullDataScope=true -> duyệt được chuyến của MỌI đơn vị")
+        @DisplayName("Tài khoản fullDataScope=true -> thao tác được chuyến của MỌI đơn vị (APPROVED một phía đã bị chặn riêng, xem PairingAmbiguity)")
         void fullScopeCanApproveAnyDepartment() {
             loginAs(9L, true);
             TransportReportTrip trip = transportTripOf(1L, 12L);
+            // Xem chú thích tương tự ở sameDepartmentCanApprove.
+            trip.setCargoType(cargoType(5L));
+            trip.setTripCount(1);
+            trip.setLoadLevel(new LoadLevel());
+            trip.getTransportReport().setEmployee(employee(1L));
             when(transportReportTripRepository.findAllById(List.of(1L))).thenReturn(List.of(trip));
             when(excavationReportTripRepository.findAllById(List.of())).thenReturn(List.of());
             when(reconciliationDecisionRepository.findByTransportReportTrip_IdIn(List.of(1L))).thenReturn(List.of());
             when(reconciliationDecisionRepository.findByExcavationReportTrip_IdIn(List.of())).thenReturn(List.of());
             when(reconciliationDecisionRepository.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
 
+            // REVISION_REQUESTED — cùng lý do đã ghi ở sameDepartmentCanApprove.
             ReconciliationDecisionRequest req = new ReconciliationDecisionRequest();
             req.setTransportReportTripId(1L);
-            req.setStatus(ApprovalStatus.APPROVED);
+            req.setStatus(ApprovalStatus.REVISION_REQUESTED);
 
             newService().saveDecision(req); // không ném lỗi
         }
@@ -639,6 +657,86 @@ class ReconciliationServiceDepartmentScopeTest {
             validReq.setStatus(ApprovalStatus.APPROVED);
 
             assertThatThrownBy(() -> newService().saveDecisions(List.of(crossKeyReq, validReq)))
+                    .isInstanceOf(BadRequestException.class);
+            verify(reconciliationDecisionRepository, never()).saveAll(anyList());
+        }
+
+        // ── Quality Gate lượt 7 của Codex (2026-09-16) — APPROVED một phía ──
+
+        @Test
+        @DisplayName("APPROVED chỉ gửi transportReportTripId (không kèm excavationReportTripId) -> từ chối, KHÔNG lưu")
+        void approvedTransportOnlyIsRejected() {
+            loginAs(9L, true);
+            TransportReportTrip transport1 = fullTransportTrip(1L, 5L, DATE, shift(1L), device(10L), device(20L), employee(1L));
+
+            when(transportReportTripRepository.findAllById(List.of(1L))).thenReturn(List.of(transport1));
+            when(excavationReportTripRepository.findAllById(List.of())).thenReturn(List.of());
+            when(reconciliationDecisionRepository.findByTransportReportTrip_IdIn(List.of(1L))).thenReturn(List.of());
+            when(reconciliationDecisionRepository.findByExcavationReportTrip_IdIn(List.of())).thenReturn(List.of());
+
+            ReconciliationDecisionRequest req = new ReconciliationDecisionRequest();
+            req.setTransportReportTripId(1L);
+            req.setStatus(ApprovalStatus.APPROVED);
+
+            assertThatThrownBy(() -> newService().saveDecision(req))
+                    .isInstanceOf(BadRequestException.class)
+                    .hasMessageContaining("một phía");
+            verify(reconciliationDecisionRepository, never()).saveAll(anyList());
+        }
+
+        @Test
+        @DisplayName("APPROVED chỉ gửi excavationReportTripId (không kèm transportReportTripId) -> từ chối, KHÔNG lưu")
+        void approvedExcavationOnlyIsRejected() {
+            loginAs(9L, true);
+            ExcavationReportTrip excavation1 = fullExcavationTrip(1L, 5L, DATE, shift(1L), device(10L), device(20L), employee(1L));
+
+            when(transportReportTripRepository.findAllById(List.of())).thenReturn(List.of());
+            when(excavationReportTripRepository.findAllById(List.of(1L))).thenReturn(List.of(excavation1));
+            when(reconciliationDecisionRepository.findByTransportReportTrip_IdIn(List.of())).thenReturn(List.of());
+            when(reconciliationDecisionRepository.findByExcavationReportTrip_IdIn(List.of(1L))).thenReturn(List.of());
+
+            ReconciliationDecisionRequest req = new ReconciliationDecisionRequest();
+            req.setExcavationReportTripId(1L);
+            req.setStatus(ApprovalStatus.APPROVED);
+
+            assertThatThrownBy(() -> newService().saveDecision(req))
+                    .isInstanceOf(BadRequestException.class)
+                    .hasMessageContaining("một phía");
+            verify(reconciliationDecisionRepository, never()).saveAll(anyList());
+        }
+
+        @Test
+        @DisplayName("Bulk: 1 phần tử APPROVED một phía (dù phần tử kia là cặp hợp lệ) -> TOÀN BỘ rollback")
+        void bulkWithSingleSidedApprovalRollsBackEntirely() {
+            loginAs(9L, true);
+            Shift shift = shift(1L);
+            Device vehicle = device(10L);
+            Device excavator = device(20L);
+            User emp = employee(1L);
+
+            // Phần tử SAI: APPROVED chỉ gửi transportReportTripId.
+            TransportReportTrip transport1 = fullTransportTrip(1L, 5L, DATE, shift, vehicle, excavator, emp);
+            // Phần tử hợp lệ khác trong CÙNG request — cặp đủ 2 id, khoá khác hẳn.
+            LocalDate otherDate = DATE.plusDays(1);
+            TransportReportTrip transport3 = fullTransportTrip(3L, 7L, otherDate, shift, vehicle, excavator, emp);
+            ExcavationReportTrip excavation3 = fullExcavationTrip(3L, 7L, otherDate, shift, vehicle, excavator, emp);
+
+            when(transportReportTripRepository.findAllById(List.of(1L, 3L)))
+                    .thenReturn(List.of(transport1, transport3));
+            when(excavationReportTripRepository.findAllById(List.of(3L)))
+                    .thenReturn(List.of(excavation3));
+            when(reconciliationDecisionRepository.findByTransportReportTrip_IdIn(List.of(1L, 3L))).thenReturn(List.of());
+            when(reconciliationDecisionRepository.findByExcavationReportTrip_IdIn(List.of(3L))).thenReturn(List.of());
+
+            ReconciliationDecisionRequest singleSidedReq = new ReconciliationDecisionRequest();
+            singleSidedReq.setTransportReportTripId(1L);
+            singleSidedReq.setStatus(ApprovalStatus.APPROVED);
+            ReconciliationDecisionRequest validReq = new ReconciliationDecisionRequest();
+            validReq.setTransportReportTripId(3L);
+            validReq.setExcavationReportTripId(3L);
+            validReq.setStatus(ApprovalStatus.APPROVED);
+
+            assertThatThrownBy(() -> newService().saveDecisions(List.of(singleSidedReq, validReq)))
                     .isInstanceOf(BadRequestException.class);
             verify(reconciliationDecisionRepository, never()).saveAll(anyList());
         }

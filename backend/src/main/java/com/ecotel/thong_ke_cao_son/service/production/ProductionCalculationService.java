@@ -64,6 +64,7 @@ public class ProductionCalculationService {
     private final SurveyStandardRepository surveyStandardRepository;
     private final SurveyCoefficientRepository coefficientRepository;
     private final ProductionResultRepository resultRepository;
+    private final ReconciliationDecisionRepository reconciliationDecisionRepository;
     private final TripBaseCalculator baseCalculator;
     private final FuelCalculator fuelCalculator;
     private final com.ecotel.thong_ke_cao_son.service.MatrixCatalogService matrixService;
@@ -129,11 +130,29 @@ public class ProductionCalculationService {
         // ràng, không âm thầm tính thiếu chuyến chưa duyệt. Áp dụng ngay cho MỌI
         // kỳ kể cả kỳ cũ — chủ dự án đã xác nhận chấp nhận rủi ro kỳ cũ tạm
         // không tính lại được cho tới khi duyệt bù qua Đối chiếu.
+        //
+        // Quality Gate lượt 7 của Codex (2026-09-16) — lỗ hổng thật: kiểm tra
+        // BAN ĐẦU chỉ đọc {@code TransportReportTrip.status}, hoàn toàn không
+        // xác minh chuyến Khai thác GHÉP CẶP có tồn tại hay đã duyệt hay chưa.
+        // ReconciliationService.buildDecision() trước đây chỉ gọi
+        // assertValidPair() khi request gửi ĐỦ CẢ HAI id — request chỉ gửi
+        // transportReportTripId vẫn duyệt được TransportReportTrip riêng lẻ
+        // (giờ đã chặn ở ReconciliationService, xem assertValidPair/
+        // buildDecision), nhưng engine này vẫn phải tự vệ ĐỘC LẬP (defense in
+        // depth) — không được tin dữ liệu cũ/dữ liệu tạo qua đường khác chỉ vì
+        // cờ APPROVED đã bật trên 1 phía. Tra CÙNG quyết định đối chiếu
+        // (ReconciliationDecision) đã gắn cho từng chuyến Vận tải: phải có
+        // chuyến Khai thác ghép cặp VÀ chuyến đó cũng đã APPROVED.
+        Map<Long, ReconciliationDecision> decisionByTransportTripId =
+                reconciliationDecisionRepository
+                        .findByTransportReportTrip_IdIn(trips.stream().map(TransportReportTrip::getId).toList())
+                        .stream()
+                        .collect(java.util.stream.Collectors.toMap(
+                                d -> d.getTransportReportTrip().getId(), d -> d));
+
         List<String> notApprovedIssues = trips.stream()
-                .filter(t -> t.getStatus() != ApprovalStatus.APPROVED)
-                .map(t -> "Chuyến #" + t.getId() + " ngày " + t.getTransportReport().getReportDate()
-                        + ", xe " + t.getTransportReport().getVehicle().getCode()
-                        + " — trạng thái đối chiếu: " + t.getStatus())
+                .map(t -> describeProductionApprovalIssue(t, decisionByTransportTripId.get(t.getId())))
+                .filter(Objects::nonNull)
                 .distinct()
                 .toList();
         if (!notApprovedIssues.isEmpty()) {
@@ -245,6 +264,44 @@ public class ProductionCalculationService {
                 period.getDisplayName(), results.size(), apTdia.size() + apTkm.size(), tkeMode);
 
         return new CalculationSummary(results.size(), apTdia.size() + apTkm.size(), tkeMode, warnings);
+    }
+
+    /**
+     * Trả về mô tả lỗi nếu chuyến Vận tải {@code t} CHƯA đủ điều kiện tính sản
+     * lượng, hoặc {@code null} nếu đã đủ (Quality Gate lượt 7 của Codex,
+     * 2026-09-16 — xem chú thích ở {@link #calculatePeriod}). Ba trường hợp bị
+     * chặn:
+     * <ol>
+     *   <li>{@code t.status != APPROVED} — như cũ.</li>
+     *   <li>{@code t.status == APPROVED} nhưng KHÔNG có {@link ReconciliationDecision}
+     *       nào gắn chuyến Khai thác ghép cặp — tức từng được duyệt RIÊNG LẺ
+     *       một phía (lỗ hổng thật đã chặn ở nguồn tại
+     *       {@code ReconciliationService}, nhưng ở đây tự vệ độc lập, không
+     *       tin ngược lại dữ liệu cũ/đường ghi khác).</li>
+     *   <li>Có chuyến Khai thác ghép cặp nhưng CHÍNH chuyến đó chưa
+     *       {@code APPROVED} — 2 bên phải CÙNG duyệt mới coi là "chuẩn".</li>
+     * </ol>
+     */
+    private String describeProductionApprovalIssue(TransportReportTrip t, ReconciliationDecision decision) {
+        if (t.getStatus() != ApprovalStatus.APPROVED) {
+            return "Chuyến #" + t.getId() + " ngày " + t.getTransportReport().getReportDate()
+                    + ", xe " + t.getTransportReport().getVehicle().getCode()
+                    + " — trạng thái đối chiếu: " + t.getStatus();
+        }
+        ExcavationReportTrip excavationTrip = decision != null ? decision.getExcavationReportTrip() : null;
+        if (excavationTrip == null) {
+            return "Chuyến #" + t.getId() + " ngày " + t.getTransportReport().getReportDate()
+                    + ", xe " + t.getTransportReport().getVehicle().getCode()
+                    + " — ĐÃ DUYỆT Vận tải nhưng CHƯA có chuyến Khai thác ghép cặp tương ứng"
+                    + " (duyệt một phía không hợp lệ, cần đối chiếu đủ cả hai bên).";
+        }
+        if (excavationTrip.getStatus() != ApprovalStatus.APPROVED) {
+            return "Chuyến #" + t.getId() + " ngày " + t.getTransportReport().getReportDate()
+                    + ", xe " + t.getTransportReport().getVehicle().getCode()
+                    + " — chuyến Khai thác ghép cặp #" + excavationTrip.getId()
+                    + " CHƯA được duyệt (trạng thái: " + excavationTrip.getStatus() + ").";
+        }
+        return null;
     }
 
     private static final int MAX_ERRORS_IN_MESSAGE = 15;

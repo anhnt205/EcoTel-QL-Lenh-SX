@@ -59,6 +59,22 @@
 			<artifactId>postgresql</artifactId>
 			<scope>runtime</scope>
 		</dependency>
+		<!-- Quality Gate lượt 7 của Codex (2026-09-16): schema trước đây KHÔNG
+		     có version history — dựng dần qua Hibernate ddl-auto=update (chỉ
+		     ADD, không sửa/xoá đúng) + 6 file migration-*.sql rời rạc phải
+		     CHẠY TAY sau deploy (dễ quên, không ai ép buộc). Flyway thay thế:
+		     mọi thay đổi schema từ nay là 1 file version hoá trong
+		     src/main/resources/db/migration/, tự chạy khi ứng dụng khởi động,
+		     có bảng flyway_schema_history theo dõi đã áp dụng gì — xem
+		     V1__baseline.sql và application.yaml (baseline-on-migrate). -->
+		<dependency>
+			<groupId>org.flywaydb</groupId>
+			<artifactId>flyway-core</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.flywaydb</groupId>
+			<artifactId>flyway-database-postgresql</artifactId>
+		</dependency>
 		<dependency>
 			<groupId>org.projectlombok</groupId>
 			<artifactId>lombok</artifactId>

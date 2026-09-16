@@ -651,6 +651,25 @@ public class ReconciliationService {
             decision.setExcavationReportTrip(excavationTrip);
         }
 
+        // APPROVED một phía là không hợp lệ (Quality Gate lượt 7 của Codex,
+        // 2026-09-16) — lỗ hổng thật: request chỉ gửi transportReportTripId
+        // (không kèm excavationReportTripId) vẫn duyệt được TransportReportTrip
+        // RIÊNG LẺ, không hề xác minh chuyến Khai thác ghép cặp có tồn tại hay
+        // đã khớp hay chưa. ProductionCalculationService trước đây CHỈ đọc
+        // TransportReportTrip.status == APPROVED để đưa vào tính sản lượng —
+        // đưa lọt được 1 chuyến chưa đối chiếu đầy đủ vào báo cáo, trái yêu
+        // cầu nghiệp vụ "cả hai bên cùng duyệt". APPROVED bắt buộc phải là
+        // quyết định cho CẢ MỘT CẶP xác định (đủ 2 id, rồi đi qua assertValidPair
+        // ngay dưới đây — cùng khoá, khớp nội dung, mutual-unique). Yêu cầu
+        // sửa (REVISION_REQUESTED) thì NGƯỢC LẠI vẫn PHẢI cho phép gửi 1 phía
+        // — đúng luồng nghiệp vụ "đỏ/vàng/trắng" đã có (yêu cầu bên nào sửa
+        // thì chỉ nhắm đúng bên đó, xem updateTrips/resubmitTrips).
+        if (request.getStatus() == ApprovalStatus.APPROVED && (transportTrip == null || excavationTrip == null)) {
+            throw new BadRequestException(
+                    "Không thể duyệt (APPROVED) một phía — cần gửi ĐỦ CẢ HAI id (Vận tải và Khai thác) của "
+                            + "một cặp xác định. Muốn yêu cầu sửa riêng 1 bên, dùng trạng thái REVISION_REQUESTED.");
+        }
+
         // Từ chối duyệt/yêu cầu sửa một CẶP không xác định rõ ràng (Quality
         // Gate lượt 4 của Codex, 2026-09-15) — trước đây `pairingAmbiguous`
         // chỉ có ở response cho FE hiển thị, backend vẫn chấp nhận duyệt bất

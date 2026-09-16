@@ -1,6 +1,15 @@
 -- Migration TỰ ĐỘNG chạy mỗi lần ứng dụng khởi động (spring.sql.init.mode:
 -- always, xem application.yaml) — KHÔNG còn cần chạy tay qua psql.
 --
+-- LƯU Ý (Quality Gate lượt 7 của Codex, 2026-09-16): từ ngày này, Flyway là
+-- nguồn xác định CHÍNH cho schema — xem
+-- backend/src/main/resources/db/migration/V1__baseline.sql (đã chụp cả 2
+-- cột report_periods.locked/stale và departments.full_data_scope dưới đây).
+-- File này (schema.sql) GIỮ LẠI làm lớp an toàn PHỤ (idempotent, không hại
+-- gì khi chạy lại) trong giai đoạn chuyển tiếp — mọi thay đổi schema MỚI từ
+-- nay phải là 1 file Flyway version hoá (`V2__...sql`…), KHÔNG thêm khối DO
+-- mới vào đây nữa.
+--
 -- Vì sao KHÔNG thể chỉ dựa vào Hibernate `ddl-auto: update`: cột mới khai
 -- NOT NULL nhưng không có giá trị mặc định ở tầng JPA thì Hibernate sinh
 -- `ALTER TABLE ... ADD COLUMN ... NOT NULL` KHÔNG kèm DEFAULT — Postgres từ
