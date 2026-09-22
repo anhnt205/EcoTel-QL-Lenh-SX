@@ -3060,3 +3060,158 @@ nghiệp vụ):
    đó) — nếu chủ dự án muốn siết chặt hơn nữa (ddl-auto=validate, buộc MỌI
    thay đổi schema phải qua Flyway), cần rà soát kỹ trước, không nên đổi
    vội.
+
+## Lượt 28 (2026-09-22/23) — Deploy + xử lý dữ liệu THẬT trên server dùng chung của công ty (KHÔNG phải preview/staging local)
+
+**Khác hẳn mọi lượt trước**: đây KHÔNG phải commit/PR trong repo — là thao
+tác TRỰC TIẾP (SSH + `docker exec psql`) lên 1 server Linux vật lý dùng
+chung của công ty (`118.70.151.69`, port SSH `2223`, user
+`ecotel-admin`) — nơi ĐANG chạy ~40 dự án khác của công ty (portal, KHG,
+KTV, coal-tracking-prod...). Mật khẩu SSH và mật khẩu tài khoản `admin` đã
+được CHỦ DỰ ÁN cung cấp trực tiếp qua chat trong phiên này — **KHÔNG ghi
+lại giá trị thật ở đây** (file này commit vào git) — cần hỏi lại chủ dự án
+nếu phiên sau cần SSH tiếp.
+
+### Việc đã làm, theo thứ tự
+
+1. **Deploy code nhánh `claude-dev` (commit `e463450`, round 7) lên server
+   này** — build TRỰC TIẾP từ source (rsync qua tarball, không qua
+   registry `ecoteldev` như quy trình gốc `start-app.sh`/`.env` vốn dùng).
+   Compose file mới: `staging-docker-compose-build.yml` (cùng thư mục với
+   `staging-docker-compose.yml` gốc trên server,
+   `/home/ecotel-admin/thong-ke-cs/deployment/staging/`) — dùng `build:`
+   thay `image:`, GIỮ NGUYÊN port (1400/1401/1402/1403), volume Postgres/
+   pgAdmin thật (`/mnt/hdd/thong_ke_cs_postgres_data`), network ngoài
+   `staging_frontnet`/`staging_backnet` — TÁI SỬ DỤNG đúng dữ liệu Postgres
+   thật đã có trên server (không tạo CSDL mới). Source code đã rsync nằm ở
+   `deployment/staging/source/` trên server (backend/frontend/reverse_proxy).
+2. **`.env_backend` trên server THIẾU `AUTH_MODE`/`AUTH_JWT_SECRET`** (CSDL
+   này được deploy từ TRƯỚC khi có tính năng standalone-auth, 3 tuần
+   trước, commit `d479de1`) — đã bổ sung 2 biến này (standalone mode, JWT
+   secret sinh ngẫu nhiên, LƯU TRÊN SERVER, không ghi lại giá trị ở đây).
+3. **Xác nhận SỐNG cả 3 kịch bản Flyway** (CSDL hiện hữu có dữ liệu thật →
+   baseline không mất dữ liệu; restart lần 2 → idempotent) — thêm bằng
+   chứng thứ 3 (ngoài preview local) cho phần việc Flyway ở lượt 27.
+4. **Phát hiện + sửa lỗi thật**: `excavation_areas`/`receiving_points`/
+   `pickup_points`/`unloading_points` HOÀN TOÀN TRỐNG trên server này dù
+   đã có 7 chuyến Vận tải/3 báo cáo Khai thác thật — vì migration tách
+   danh mục địa điểm (`backend/migration-archive/migration-2026-08-30*.sql`,
+   xem lượt 27) CHƯA TỪNG chạy trên server này (khác preview local). Hậu
+   quả: Hibernate cố thêm ràng buộc khoá ngoại mỗi lần khởi động nhưng LỖI
+   liên tục (không crash app, nhưng ràng buộc chưa từng thiết lập thật).
+   Đã chạy đúng 2 script migration đó (sau khi sửa 1 chỗ: `receiving_points`
+   trên server này đã không còn cột `seam_group` dạng text, chỉ còn
+   `seam_group_id` — do 1 migration SAU đó, S1/S2, cũng từng chạy) → hết
+   lỗi FK, xác nhận qua log khởi động sạch.
+5. **Reset mật khẩu tài khoản `admin` có sẵn** (id=52, role ADMIN) theo
+   yêu cầu trực tiếp của chủ dự án (mật khẩu mới do chủ dự án cung cấp,
+   không ghi lại ở đây) — BCrypt hash đúng chuẩn `BCryptPasswordEncoder`,
+   đã test đăng nhập thật qua `/api/auth/login`, nhận `appToken` hợp lệ.
+6. **Trích 10 dòng dữ liệu THẬT** từ file Excel gốc của khách hàng
+   (`D:\EcoTel\3. Dự án\TKV Công ty than Cao sơn\Phần mềm thống kê\Dữ
+   liệu\Tháng 5 đổi tên xe.xlsx`, 190MB, sheet `tinh toan` = **sheet80.xml**
+   — LƯU Ý: khác `sheet78.xml` mà `docs/_source/*.txt` ghi từ lượt onboarding
+   cũ, vì file đã được lưu lại — PHẢI dò lại `xl/workbook.xml` +
+   `xl/_rels/workbook.xml.rels` trước khi tin bất kỳ số sheet cũ nào ghi
+   trong `docs/_source/`). Dữ liệu thô nằm ở sheet
+   `'Cap nhat Slg ThanV+Dat B1'` (=sheet37.xml, tinh_toan hàng N = CnSl
+   hàng N-2), không phải chính sheet `tinh toan`. Đã đối chiếu khớp
+   CHÍNH XÁC 100% với giá trị Excel cache sẵn (`AL5=207` trong file gốc =
+   34,5 Mô hình × 6 chuyến tính lại từ app) — **Tổng M³ = 1.464,0, Tổng tấn
+   = 3.831,3** cho Kỳ 1 - Tháng 5/2026 (10 chuyến, ngày 2/5/2026).
+   - Dùng `tkeMode=true` (bỏ qua hệ số trắc địa) + `provisional_density`/
+     `provisional_model` = giá trị THẬT trích từ sheet
+     `Mohinh_TheTrong( ko dk xoa)` (=sheet43.xml) — KHÔNG phải placeholder.
+   - Tổng Tkm/nhiên liệu CHƯA trích (để `total_route_distance_km=NULL`,
+     bỏ qua nhánh nhiên liệu) — xem mục "còn lại" bên dưới.
+   - Danh mục mới tạo theo đúng mã/tên Excel (không khớp danh mục cũ có
+     sẵn — do chủ dự án chọn "Cách 1"): `excavation_areas` "CS",
+     `receiving_points` "10.NCS"/"11.ĐCS", `unloading_points` "Băng tải."/
+     "Cạp công nghệ."/"Khe Chàm.", `cargo_types` "Nomin."/"Nomin.CN" (nhóm
+     Đá, KHÔNG phải Than — xác nhận qua `Ký hiệu CLH` cột B sheet
+     Mohinh_TheTrong), `acceptance_products` "Dat_SX"/"Dat_CN".
+   - 8 xe + 2 máy xúc dùng trong 10 chuyến này đều khớp thiết bị THẬT có
+     sẵn (`devices.vehicle_number`/`devices.code`, KHÔNG phải mã Excel
+     "Số xe" nội bộ — phải tra qua `vehicle_number`, không phải `code`).
+7. **Phát hiện lỗ hổng nghiệp vụ nghiêm trọng, đã sửa**:
+   `position_permissions` HOÀN TOÀN TRỐNG (195 Chức vụ, 0 dòng quyền) —
+   nghĩa là TRƯỚC lượt này, toàn bộ ~3.276 tài khoản thật gắn Chức vụ chỉ
+   có quyền ĐỌC (fallback mặc định), KHÔNG tạo/sửa/duyệt được gì. Đã gán
+   quyền mặc định theo TÊN chức vụ (best-effort, **chủ dự án cần rà lại**):
+   baseline đọc-only cho 195 chức vụ × 34 resource (6.630 dòng); nâng quyền
+   tạo+sửa cho "Thống kê ghi chuyến"/"Công nhân tổng hợp thống kê"; nâng
+   tạo+sửa+DUYỆT cho "Thống kê tổng hợp"; nâng DUYỆT (không tạo/sửa) cho 13
+   chức vụ lãnh đạo vận hành (Giám đốc/Phó GĐ/Trưởng-Phó phòng/Quản đốc/Phó
+   quản đốc/Chánh-Phó Chánh văn phòng — loại trừ chức vụ Đảng/Công đoàn/
+   Đoàn TN). Tổng 16 chức vụ được nâng quyền, 179 chức vụ còn lại giữ
+   nguyên hành vi cũ (chỉ đọc).
+8. **Điền danh mục Chủng loại xe/Hạng xe/Nhiên liệu bằng dữ liệu THẬT**
+   trích từ named range Excel `DSXE` (sheet `KBTC Xe&May Xuc(ko dk xoa)` =
+   sheet41.xml, vùng `$F$4:$L$500`) — 164 xe vận tải thật (Số xe/Chủng
+   loại/Hạng xe/PXVT). Đã tạo 6 Chủng loại xe (CAT773E/CAT777/CAT777D/
+   CAT777E/HD465-7R/HD785-7), 5 Hạng xe (A/B/C1/C2/C3), 7 lớp Nhiên liệu
+   (1/loại xe) — gán được cho **156/325 xe vận tải thật** (169 xe còn lại
+   không có trong 500 dòng DSXE mà file Excel này chứa — KHÔNG PHẢI bỏ
+   sót, do giới hạn dữ liệu nguồn). Trước đó gần như toàn bộ 453 thiết bị
+   thật (chỉ 12/455 sau lượt trước) hoàn toàn thiếu `fuel_class_id` — nay
+   160/455.
+9. **Đã redeploy backend-service 2 lần** trong lượt này (verify Flyway +
+   verify lại sau restart) — cả 2 lần healthy, log sạch.
+10. **Đã tự vào bằng trình duyệt thật** (không chỉ tin API/SQL) xác nhận:
+    kỳ Tháng 5 hiện đúng số liệu trên UI thật (10 chuyến, 1.464,0 m³,
+    3.831,3 tấn) khớp 100% — nguyên nhân chủ dự án ban đầu tưởng "trắng
+    nguyên" là do bộ lọc Tháng mặc định khi mở "Báo cáo thống kê" đang ở
+    Tháng 9 (kỳ demo cũ), không tự nhảy sang Tháng 5 — PHẢI tự đổi ô
+    "Tháng" để dropdown "Kỳ" hiện đúng kỳ cần xem (dropdown Kỳ chỉ liệt kê
+    kỳ THUỘC ĐÚNG Năm/Tháng đang chọn, không phải toàn bộ kỳ có sẵn).
+
+### Còn lại — CHƯA làm, cần tiếp tục hoặc chủ dự án quyết định hướng
+
+1. **`survey_standards`, `density_parameters`, `DMNL T2-2025` (định mức
+   nhiên liệu 2 chiều dốc×cung độ), `model_periods`, `classifications`,
+   `coefficient_items`, `seam_groups`, `ttl_clh_items`** — TRỐNG HOÀN
+   TOÀN. Phạm vi rất lớn (nhiều sheet Excel khác: `STD(Dat+thanSX)`,
+   `STD(DatCN)`, `AP Tdia(m3-tan-tkm)`, `DMNL T2-2025`, hàng trăm tổ hợp
+   loại hàng × khu vực × mùa) — CHƯA trích, vì rủi ro cao nếu tự bịa số
+   (đây là tiêu chuẩn kỹ thuật thật gắn Quyết định công ty QĐ 1298/QĐ
+   1828). Hiện KHÔNG bị chặn vì 10 chuyến demo dùng `tkeMode=true` +
+   override thủ công — nhưng chuyến MỚI nhập qua UI (không dùng TKE, có
+   quãng đường thật) SẼ báo lỗi "tra trượt" ngay.
+2. **169/325 xe vận tải + toàn bộ máy xúc/thiết bị khác** (chỉ máy xúc
+   8U7/8U8 dùng trong 10 chuyến demo có `fuel_class_id`, còn lại chưa) vẫn
+   thiếu Chủng loại/Hạng xe/Nhiên liệu.
+3. **Phân quyền 16 chức vụ vừa gán là SUY ĐOÁN từ TÊN**, chưa phải quy tắc
+   chính thức — chủ dự án cần rà lại qua màn Chức vụ.
+4. (Kế thừa) Mọi mục BÀN GIAO lượt 24-27 vẫn còn nguyên — riêng mục 1 của
+   lượt 27 (Form Phòng ban UI, `Device.department`...) giờ liên quan trực
+   tiếp tới việc 169 xe còn thiếu chủng loại ở mục 2 trên.
+
+### Ghi chú kỹ thuật quan trọng cho phiên sau (tránh lặp lại sai lầm)
+
+- **Không tin số sheet Excel (`sheetNN.xml`) ghi trong `docs/_source/*.txt`
+  từ lượt onboarding cũ** — LUÔN dò lại `xl/workbook.xml` +
+  `xl/_rels/workbook.xml.rels` trước (file gốc có thể đã được lưu lại,
+  số sheet dịch chuyển — đã xảy ra thật: `tinh toan` từ `sheet78.xml`
+  (docs cũ) → `sheet80.xml` (thực tế)).
+- **`transport_reports`/`excavation_reports` có UNIQUE constraint** trên
+  (report_date, shift_id, vehicle_id/excavator_device_id, employee_id) —
+  nhiều CHUYẾN cùng xe/ca/ngày phải gộp chung 1 report (nhiều trip), không
+  tạo report riêng từng chuyến.
+- **Cặp ghép Vận tải-Khai thác dùng khoá (ngày, ca, xe, máy xúc)** — khi 2
+  chuyến Excel trùng khoá này (khác đích đến), `assertValidPair` chỉ chấp
+  nhận nếu nội dung (loại hàng/số chuyến) khớp DUY NHẤT giữa 2 phía — phải
+  tạo 2 excavation_report_trip riêng biệt khớp đúng nội dung tương ứng.
+- **Ghi mật khẩu/secret vào SQL chạy qua nhiều lớp shell (bash→docker→ssh→
+  psql) rất dễ vỡ escape** (đã tự gặp: hash BCrypt `$2b$10$...` bị mangle
+  thành 2 ký tự qua nested quote) — LUÔN ghi ra file cục bộ rồi truyền qua
+  STDIN (`cat file | docker run -i ... | ssh ... 'cat > remote'`), không
+  bao giờ nội suy trực tiếp trong lệnh nhiều lớp quote.
+- **Windows Git Bash + `docker run -v` với đường dẫn ổ đĩa (`C:\...`) rất
+  dễ vỡ** (dấu `:` bị hiểu nhầm là separator, tạo thư mục rác kiểu
+  `file.txt;C`) — dùng cách truyền qua STDIN (`cat local | docker run -i`)
+  thay vì `-v` bind-mount cho file đơn lẻ.
+- Server thật: SSH port `2223`, user `ecotel-admin`, host `118.70.151.69`;
+  container Postgres `thong-ke-cs-postgres-1`, backend
+  `thong-ke-cs-backend-service-1`; port công khai 1400 (reverse-proxy)/
+  1402 (backend trực tiếp)/1403 (pgAdmin). Mật khẩu SSH + mật khẩu
+  `admin` do chủ dự án cấp qua chat, KHÔNG lưu trong file này.
