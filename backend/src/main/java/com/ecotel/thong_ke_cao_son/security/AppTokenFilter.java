@@ -23,6 +23,12 @@ public class AppTokenFilter extends OncePerRequestFilter {
     @Value("${app.auth.mode:standalone}")
     private String authMode = "standalone";
 
+    private final PortalUserScopeResolver portalUserScopeResolver;
+
+    public AppTokenFilter(PortalUserScopeResolver portalUserScopeResolver) {
+        this.portalUserScopeResolver = portalUserScopeResolver;
+    }
+
     @Override
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
@@ -83,6 +89,22 @@ public class AppTokenFilter extends OncePerRequestFilter {
                 // đang chạy — chế độ standalone) LUÔN ghi đủ 2 claim.
                 Object fullDataScopeClaim = jwt.getClaim("fullDataScope");
                 Boolean fullDataScope = Boolean.TRUE.equals(fullDataScopeClaim);
+
+                // Chế độ portal: token Portal KHÔNG mang 2 claim phạm vi này
+                // (Portal chỉ phát username/fullName/companyId/app/
+                // permissions). User Portal chính là user của app -> tra
+                // phạm vi từ bảng users cục bộ theo username thay vì để
+                // fail-closed thành "không thấy dữ liệu đơn vị nào" cho MỌI
+                // người. CHỈ bổ sung khi token thiếu CẢ HAI claim: nếu Portal
+                // sau này phát claim (hoặc token chỉ có 1 trong 2), token là
+                // nguồn đúng — không ghi đè. Standalone không bao giờ tra.
+                if ("portal".equalsIgnoreCase(authMode)
+                        && !jwt.hasClaim("departmentId") && !jwt.hasClaim("fullDataScope")) {
+                    PortalUserScopeResolver.Scope scope =
+                            portalUserScopeResolver.resolve(jwt.getClaim("username"));
+                    departmentId = scope.departmentId();
+                    fullDataScope = scope.fullDataScope();
+                }
 
                 AppUserDetails principal = new AppUserDetails(
                         jwt.getSubject(),

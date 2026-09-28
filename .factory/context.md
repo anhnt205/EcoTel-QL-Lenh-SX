@@ -3215,3 +3215,81 @@ nếu phiên sau cần SSH tiếp.
   `thong-ke-cs-backend-service-1`; port công khai 1400 (reverse-proxy)/
   1402 (backend trực tiếp)/1403 (pgAdmin). Mật khẩu SSH + mật khẩu
   `admin` do chủ dự án cấp qua chat, KHÔNG lưu trong file này.
+
+## Lượt 29 (2026-09-28) — Manifest đăng ký phân quyền vào PORTAL-PM
+
+Theo yêu cầu chủ dự án: đọc PORTAL-PM và tạo file manifest để sẵn sàng kết
+nối. Đặc tả gốc: `projects/PORTAL-PM/docs/APP_MANIFEST_CONTRACT.md`.
+
+**File mới:** `frontend/public/.well-known/portal-manifest.json` — Portal
+KÉO (pull) `GET {origin}/.well-known/portal-manifest.json` khi admin bấm
+"Đồng bộ từ manifest" ở trang Module (không polling). Nginx frontend
+(`try_files $uri`) phục vụ thẳng file tĩnh, reverse-proxy `location /` đã
+chuyển tiếp — không cần sửa cấu hình nào.
+
+**Thiết kế then chốt:** Portal phát app-token với claim
+`permissions = Map<moduleCode, {c,r,u,d,a}>` (`JwtService.generateAppToken`,
+`PermissionDto` c/r/u/d/a **trùng hệt** `PermissionDto` của app này). Nên
+**`code` của mỗi module = ĐÚNG khoá resource backend** (`PermissionResources.ALL`,
+34 khoá) → claim của Portal khớp thẳng `AppUserDetails.hasPermission()`,
+KHÔNG cần lớp dịch. 42 module = 34 resource + 8 nhóm cha thuần cấu trúc
+(`nhom-danh-muc` + 7 nhóm con, mã có tiền tố `nhom-danh-muc/...` để không
+bao giờ trùng khoá resource). Cấu trúc nhóm bám `PERMISSION_FEATURE_GROUPS`
+(`frontend/src/constants/permission-features.ts`) = menu thật. Resource phục
+vụ nhiều màn (`devices`, `survey-standards`, `matrix-catalogs`,
+`production`, `reconciliation`...) chỉ là 1 module vì quyền backend chỉ có 1
+ô — tên module ghi rõ các màn nó điều khiển.
+
+**Đã kiểm chứng:** JSON hợp lệ, không trùng `code`, đủ 34/34 resource, mọi
+`parentCode` nằm trong cùng mảng (Portal từ chối cả lần đồng bộ nếu vi phạm).
+
+### Khi thật sự nối Portal — CẦN LÀM/NHỚ (chưa làm, ngoài phạm vi lượt này)
+1. Đăng ký app trên Portal với `code` = `tkcs` (đúng `app.code`), URL gốc
+   `http://<host>:1400/` → origin dùng để dựng URL manifest. Portal gọi với
+   timeout 5s, endpoint phải public (đã đúng).
+2. Đổi `AUTH_MODE=portal` (+ `PORTAL_JWKS_URI`/`PORTAL_INTERNALURL` đúng).
+3. **Token Portal KHÔNG có claim `departmentId`/`fullDataScope`** (chỉ có
+   `type`,`username`,`fullName`,`companyId`,`app`,`permissions`) →
+   `AppTokenFilter` fail-closed: mọi user Portal bị coi "scoped chưa gán đơn
+   vị" → KHÔNG thấy dữ liệu đã gắn đơn vị nào. Phải chọn: (a) Portal phát
+   thêm 2 claim này, hoặc (b) app tự tra `Department` theo `username` từ DB
+   local khi token Portal thiếu claim. Đây là quyết định thiết kế, chưa chốt.
+4. Portal dùng claim **`type`** ("app"/"portal"), KHÁC `typ` của token cục bộ
+   — kiểm tra `typ=access` ở lượt 27 chỉ bật ở chế độ standalone là ĐÚNG; ở
+   chế độ portal nên cân nhắc thay bằng kiểm `type=="app"` (chặn dùng nhầm
+   portal-token làm app-token).
+5. Sau khi đồng bộ manifest, admin Portal vẫn phải gán quyền c/r/u/d/a theo
+   từng module cho từng user/chức vụ — manifest chỉ đăng ký DANH SÁCH module.
+6. Manifest là file TĨNH: thêm resource mới ở `PermissionResources` phải sửa
+   tay cả manifest (chưa có test chặn lệch — backend Docker build chỉ thấy
+   thư mục `backend/`, không đọc được file frontend). Cân nhắc endpoint
+   động về sau.
+
+### Lượt 29b (2026-09-28) — ĐÃ LÀM phương án B: phạm vi đơn vị của user Portal tra từ DB cục bộ
+
+Chủ dự án chốt "User Portal chính là user của app" + "Làm B". Mục 3 ở trên
+ĐÃ ĐƯỢC XỬ LÝ:
+- `PortalUserScopeResolver` (mới): `username` -> (departmentId, fullDataScope)
+  qua `UserRepository.findScopeByUsername` (projection `UserScopeView`, 1 truy
+  vấn nhẹ, chỉ user `active=true`). Cache trong bộ nhớ TTL 60s (filter chạy
+  mọi request) -> đổi phòng ban/khoá tài khoản có hiệu lực tối đa sau 60s.
+  Không tìm thấy/khoá/username rỗng -> `Scope.NONE` (FAIL-CLOSED, cả kết quả
+  NONE cũng được cache).
+- `AppTokenFilter`: CHỈ ở `app.auth.mode=portal` VÀ token thiếu CẢ HAI claim
+  `departmentId`+`fullDataScope` mới tra. Token có 1 hoặc 2 claim -> token là
+  nguồn đúng, không ghi đè. Standalone không bao giờ tra DB.
+- Test: `AppTokenFilterTest.PortalScopeEnrichment` (5 ca) +
+  `PortalUserScopeResolverTest` (7 ca).
+- **Hệ quả cần nhớ:** ở chế độ portal, quyền c/r/u/d/a lấy từ claim
+  `permissions` của Portal (admin Portal gán theo từng module); bảng
+  `position_permissions`/`user_permissions` cục bộ KHÔNG còn tác dụng. Còn
+  PHẠM VI ĐƠN VỊ thì vẫn do `users.department_id` + `departments.full_data_scope`
+  cục bộ quyết định -> user phải TỒN TẠI trong bảng `users` (cùng `username`
+  với Portal) và được gán phòng ban, nếu không sẽ không thấy dữ liệu đơn vị nào.
+- CHƯA deploy lên server thật (server vẫn `AUTH_MODE=standalone`). Mục 1, 2,
+  4, 5, 6 ở trên vẫn còn nguyên.
+
+### Lượt 29c (2026-09-28) — Dữ liệu demo trên server thật + kết quả test
+- Test backend: `mvn -B test` = **137 pass, 0 fail** (125 cũ + 5 `PortalScopeEnrichment` + 7 `PortalUserScopeResolverTest`). Frontend build ra `dist/.well-known/portal-manifest.json` đúng.
+- Server thật `118.70.151.69:1400`: thêm 10 chuyến Vận tải + 10 chuyến Khai thác khớp cặp (ngày 2026-05-03/04, đã APPROVED + `reconciliation_decisions` APPROVED, theo mẫu Excel Tháng 5, `provisional_density=2.617`/`provisional_model` như 10 dòng thật). Kỳ id=101 (Tháng 5/2026) tính lại `tkeMode=true` -> **20 dòng báo cáo, 3.655 m³, 9.565,1 tấn** (Tkm/nhiên liệu vẫn 0 — chưa nạp ĐMNL 2 chiều, như đã ghi ở lượt trước). Lưu ý: `tkeMode=false` báo thiếu STD (`survey_standards` còn trống, việc đã hoãn).
+- 10 dòng bổ sung là dữ liệu DEMO tổng hợp theo mẫu (không phải trích Excel từng dòng).

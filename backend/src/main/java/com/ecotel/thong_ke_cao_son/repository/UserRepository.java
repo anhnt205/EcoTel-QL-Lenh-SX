@@ -18,6 +18,19 @@ public interface UserRepository extends JpaRepository<User, Long> {
     /** Dùng cho đăng nhập cục bộ (chế độ chạy độc lập, không qua Portal). */
     Optional<User> findByUsername(String username);
 
+    /**
+     * Phạm vi dữ liệu (phòng ban + cờ xem toàn bộ) của tài khoản ĐANG HOẠT
+     * ĐỘNG theo username — dùng ở chế độ portal khi token Portal không mang
+     * claim này ({@code PortalUserScopeResolver}). Tài khoản bị khoá hoặc
+     * không tồn tại -> {@code Optional.empty()}.
+     */
+    @Query("""
+        SELECT d.id AS departmentId, d.fullDataScope AS fullDataScope
+        FROM User u LEFT JOIN u.department d
+        WHERE u.username = :username AND u.active = true
+        """)
+    Optional<UserScopeView> findScopeByUsername(@Param("username") String username);
+
     @Query("""
         SELECT u FROM User u
         LEFT JOIN u.department dep

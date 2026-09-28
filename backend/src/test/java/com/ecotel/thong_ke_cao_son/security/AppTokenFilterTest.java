@@ -30,7 +30,16 @@ import static org.mockito.Mockito.mock;
  */
 class AppTokenFilterTest {
 
-    private final AppTokenFilter filter = new AppTokenFilter();
+    private final PortalUserScopeResolver scopeResolver = mockResolver();
+
+    /** Mặc định như resolver thật: không bao giờ trả null, user lạ -> Scope.NONE. */
+    private static PortalUserScopeResolver mockResolver() {
+        PortalUserScopeResolver r = mock(PortalUserScopeResolver.class);
+        org.mockito.Mockito.when(r.resolve(org.mockito.ArgumentMatchers.any()))
+                .thenReturn(PortalUserScopeResolver.Scope.NONE);
+        return r;
+    }
+    private final AppTokenFilter filter = new AppTokenFilter(scopeResolver);
     private final MockHttpServletRequest request = new MockHttpServletRequest();
     private final MockHttpServletResponse response = new MockHttpServletResponse();
     private final FilterChain chain = mock(FilterChain.class);
@@ -136,7 +145,7 @@ class AppTokenFilterTest {
     class AccessVsRefreshToken {
 
         private AppTokenFilter filterWithMode(String mode) {
-            AppTokenFilter f = new AppTokenFilter();
+            AppTokenFilter f = new AppTokenFilter(scopeResolver);
             ReflectionTestUtils.setField(f, "authMode", mode);
             return f;
         }
@@ -213,6 +222,102 @@ class AppTokenFilterTest {
 
             assertThat(SecurityContextHolder.getContext().getAuthentication().getPrincipal())
                     .isInstanceOf(AppUserDetails.class);
+        }
+    }
+
+    /**
+     * Token Portal KHÔNG mang departmentId/fullDataScope (Portal chỉ phát
+     * username/fullName/companyId/app/permissions) — ở chế độ portal, phạm vi
+     * được tra từ bảng users cục bộ theo username thay vì fail-closed cho
+     * mọi người. Standalone và token đã có claim thì KHÔNG bao giờ tra.
+     */
+    @Nested
+    @DisplayName("Chế độ portal — bổ sung phạm vi đơn vị từ bảng users cục bộ")
+    class PortalScopeEnrichment {
+
+        private AppTokenFilter portalFilter() {
+            AppTokenFilter f = new AppTokenFilter(scopeResolver);
+            ReflectionTestUtils.setField(f, "authMode", "portal");
+            return f;
+        }
+
+        private Jwt portalTokenWithoutScopeClaims() {
+            return Jwt.withTokenValue("token-value")
+                    .header("alg", "none")
+                    .subject("1")
+                    .claim("username", "nv01")
+                    .claim("permissions", Map.of("transport-reports", Map.of("r", true)))
+                    .issuedAt(Instant.now())
+                    .expiresAt(Instant.now().plusSeconds(3600))
+                    .build();
+        }
+
+        private AppUserDetails principalAfter(AppTokenFilter f, Jwt jwt) throws Exception {
+            authenticateWithJwt(jwt);
+            f.doFilterInternal(request, response, chain);
+            Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+            assertThat(principal).isInstanceOf(AppUserDetails.class);
+            return (AppUserDetails) principal;
+        }
+
+        @Test
+        @DisplayName("token Portal thiếu cả 2 claim -> lấy phòng ban + fullDataScope từ DB theo username")
+        void missingClaimsAreResolvedFromLocalUser() throws Exception {
+            org.mockito.Mockito.when(scopeResolver.resolve("nv01"))
+                    .thenReturn(new PortalUserScopeResolver.Scope(7L, true));
+
+            AppUserDetails p = principalAfter(portalFilter(), portalTokenWithoutScopeClaims());
+
+            assertThat(p.getDepartmentId()).isEqualTo(7L);
+            assertThat(p.hasFullDataScope()).isTrue();
+        }
+
+        @Test
+        @DisplayName("user không có trong DB / bị khoá -> Scope.NONE: không phòng ban, KHÔNG xem toàn bộ (fail-closed)")
+        void unknownUserStaysFailClosed() throws Exception {
+            org.mockito.Mockito.when(scopeResolver.resolve("nv01"))
+                    .thenReturn(PortalUserScopeResolver.Scope.NONE);
+
+            AppUserDetails p = principalAfter(portalFilter(), portalTokenWithoutScopeClaims());
+
+            assertThat(p.getDepartmentId()).isNull();
+            assertThat(p.hasFullDataScope()).isFalse();
+            assertThat(p.canAccessDepartment(99L)).isFalse();
+        }
+
+        @Test
+        @DisplayName("token Portal ĐÃ có cả 2 claim (Portal nâng cấp sau này) -> dùng token, KHÔNG tra DB")
+        void tokenClaimsWinAndDbIsNotQueried() throws Exception {
+            AppUserDetails p = principalAfter(portalFilter(),
+                    jwtWithClaims(Map.of("departmentId", 3, "fullDataScope", false)));
+
+            assertThat(p.getDepartmentId()).isEqualTo(3L);
+            assertThat(p.hasFullDataScope()).isFalse();
+            org.mockito.Mockito.verifyNoInteractions(scopeResolver);
+        }
+
+        @Test
+        @DisplayName("token chỉ có 1 trong 2 claim -> token là nguồn đúng, KHÔNG tra DB (không ghi đè nửa vời)")
+        void partialClaimsAreNotOverwritten() throws Exception {
+            AppUserDetails p = principalAfter(portalFilter(),
+                    jwtWithClaims(Map.of("departmentId", 5)));
+
+            assertThat(p.getDepartmentId()).isEqualTo(5L);
+            assertThat(p.hasFullDataScope()).isFalse();
+            org.mockito.Mockito.verifyNoInteractions(scopeResolver);
+        }
+
+        @Test
+        @DisplayName("standalone + token thiếu claim -> vẫn fail-closed, KHÔNG bao giờ tra DB")
+        void standaloneNeverQueriesScope() throws Exception {
+            AppTokenFilter standalone = new AppTokenFilter(scopeResolver);
+            ReflectionTestUtils.setField(standalone, "authMode", "standalone");
+
+            AppUserDetails p = principalAfter(standalone, jwtWithClaims(Map.of()));
+
+            assertThat(p.getDepartmentId()).isNull();
+            assertThat(p.hasFullDataScope()).isFalse();
+            org.mockito.Mockito.verifyNoInteractions(scopeResolver);
         }
     }
 }
