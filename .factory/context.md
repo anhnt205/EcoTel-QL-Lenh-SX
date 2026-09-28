@@ -3293,3 +3293,14 @@ Chủ dự án chốt "User Portal chính là user của app" + "Làm B". Mục 
 - Test backend: `mvn -B test` = **137 pass, 0 fail** (125 cũ + 5 `PortalScopeEnrichment` + 7 `PortalUserScopeResolverTest`). Frontend build ra `dist/.well-known/portal-manifest.json` đúng.
 - Server thật `118.70.151.69:1400`: thêm 10 chuyến Vận tải + 10 chuyến Khai thác khớp cặp (ngày 2026-05-03/04, đã APPROVED + `reconciliation_decisions` APPROVED, theo mẫu Excel Tháng 5, `provisional_density=2.617`/`provisional_model` như 10 dòng thật). Kỳ id=101 (Tháng 5/2026) tính lại `tkeMode=true` -> **20 dòng báo cáo, 3.655 m³, 9.565,1 tấn** (Tkm/nhiên liệu vẫn 0 — chưa nạp ĐMNL 2 chiều, như đã ghi ở lượt trước). Lưu ý: `tkeMode=false` báo thiếu STD (`survey_standards` còn trống, việc đã hoãn).
 - 10 dòng bổ sung là dữ liệu DEMO tổng hợp theo mẫu (không phải trích Excel từng dòng).
+
+### Lượt 29d (2026-09-28) — Làm sạch + nạp ĐMNL/Năng suất xe thật lên server 118.70.151.69:1400
+- **Backup** trước khi xoá: `~/backups/thong_ke_before_cleanup_20260928_2338.dump` (pg_dump -Fc, trên server). **Đã xoá**: 8 chuyến Vận tải + 5 chuyến Khai thác có ngày ngoài tháng 5/2026 (dữ liệu thử cũ, created_at NULL), kỳ 51 (DEMO) và 102 (năm=5 tự sinh), loại hàng/xe/máy xúc DEMO. Còn lại: 1 kỳ (id=101), 20 chuyến Vận tải + 20 Khai thác + 20 quyết định đối chiếu APPROVED.
+- **Nạp thật từ Excel (Tháng 5 đổi tên xe.xlsx):**
+  - `DMNL` = sheet `DMNL T2-2025` (28 độ dốc × 960 cột `<xe>.<BK|DAT|Than|Bun>_<cung độ>`, 26.880 ô; khoá cột dùng dấu chấm thập phân, hàng `numeric_row_axis=true`).
+  - `NANG_SUAT_XE` = sheet `NS XE (3305( ko dk xoa))` (80 cung độ × 27 cột, 2.160 ô).
+  - Cung độ/nâng tải của 10 dòng thật lấy theo GIÁ TRỊ CACHE cột L,M của sheet `tinh toan` hàng 5-14 (KHÔNG phải công thức `='Cap nhat…'!J3` — hàng 5,6 có M=210 nhập cứng, đọc công thức sẽ ra 0: bẫy mới, cùng họ với bẫy trong `docs/_source/tools/README.md`). 10 dòng demo bổ sung dùng lại thông số tuyến theo nơi dỡ tải.
+- **Kiểm chứng khớp Excel:** Tkm (AN) 2356.4777 / 2527.2369 / 279.8882; ĐMNL cuối (BF5) 148.93; nhiên liệu theo định mức (BG5..BG7) 350.950224 / 331.965708 / 43.790188 — app ra ĐÚNG y hệt. Kỳ 101 `tkeMode=true`: 20 dòng, 3.655 m³, 9.565,1 tấn, **40.732,6 Tkm**, không cảnh báo.
+- Lưu ý: khi có `total_route_distance_km` thì thiếu ô lưới DMNL/NĂNG SUẤT là CHẶN tính (cảnh báo gộp thành lỗi), khác với khi distance NULL (bỏ qua nhánh nhiên liệu).
+- Xe: điền thêm 8 xe (tên dạng "108 CAT 773E", "912 "...) nên còn **160/324 xe vận tải chưa có chủng loại/hạng/nhiên liệu** — đó là xe thuê ngoài biển số (14A-…) và số 26xx-28xx, KHÔNG có trong danh sách DSXE của Excel nên không suy ra được; cần chủ dự án cung cấp.
+- **Vẫn trống** (đã hoãn, chỉ ảnh hưởng `tkeMode=false`): survey_standards (STD), density_parameters, model_periods, classifications, coefficient_items, seam_groups, ttl_clh_items.
