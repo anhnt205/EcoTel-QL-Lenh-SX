@@ -3310,3 +3310,9 @@ Nguồn THẬT từ sheet `Mohinh_TheTrong( ko dk xoa)`: **cargo_types 146** (th
 **survey_standards (STD) — SỐ DEMO, KHÔNG PHẢI SỐ THẬT:** 4 dòng cho khoá của app (`8U7_CS`,`8U8_CS` × DAT_SX_THAN_SX/DAT_CN, tháng 5/2026) = 98,5% số thống kê của kỳ mẫu, note bắt đầu bằng "DEMO". Lý do: khoá STD trong Excel dạng `<nhóm vỉa>._<tầng>_<máy xúc>._<khu>` (vd `10._-120_u7._CS`), khác khoá app dựng (`8U7_CS`, vì receiving_points chưa gán nhóm vỉa) — và "Nhóm tầng nhận tải" đang TẠM GÁC (TG-01); số STD Excel là số cả tháng nên không dùng được cho mẫu 20 dòng. Khi chốt TG-01 + gán nhóm vỉa cho điểm nhận tải thì nạp STD thật.
 Kỳ 101 tính được ở CẢ HAI chế độ, không cảnh báo: `tkeMode=true` 9.565,1 tấn/40.732,6 Tkm; `tkeMode=false` 9.421,7 tấn/40.121,6 Tkm (đang lưu chế độ này). Thêm `docs/_source/tools/dump-sheet.ps1`.
 Còn lại: 160 xe vận tải thuê ngoài chưa có chủng loại/hạng/nhiên liệu (không có trong Excel).
+
+### Lượt 30b (2026-09-29) — Điền dữ liệu TẠM theo yêu cầu chủ dự án ("Bạn điền dữ liệu tạm")
+- **160 xe vận tải thuê ngoài** (biển 14A-…, số 26xx-28xx) gán TẠM chủng loại `HD465-7R` / hạng `C2` / lớp nhiên liệu `HD465-7R`; `devices.note` ghi "TẠM: …" để lọc ra thay bằng số thật (`WHERE note LIKE '%TẠM:%'`). Nay 324/324 xe vận tải đã đủ 3 trường.
+- **HS điều chỉnh NLĐM:** thêm đủ 21 khoá hàng (nhiên liệu × hạng × DAT/Than) × 24 cột (T1..T12 × CS/KC) = 339 ô, TẠM = 1,0 (ghi vào note định nghĩa). Số thật nằm ở vùng `FW..GY` sheet `tinh toan` (chưa trích).
+- Hệ quả: nhập chuyến cho bất kỳ xe nào cũng không còn bị chặn tính vì thiếu khai báo ĐMNL/HS. Kỳ 101 tính lại `tkeMode=false` vẫn OK.
+- Các số TẠM còn lại (đều có "DEMO"/"TẠM" trong note): STD 4 dòng (lượt 30), HS điều chỉnh, xe thuê ngoài.
