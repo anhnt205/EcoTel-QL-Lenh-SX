@@ -86,3 +86,19 @@ dòng 5 là dòng chuẩn, chứ không phải vì "tình cờ nhiều công th�
   phút — nên chạy nền (`run_in_background`).
 - `xl/calcChain.xml` của workbook `Tháng 5 đổi tên xe.xlsx` nặng **190 MB**
   (chiếm gần hết dung lượng file). Không cần đọc.
+
+## dump-sheet.ps1 (thêm 2026-09-29)
+
+Đổ TOÀN BỘ ô có giá trị của 1 sheet ra TSV (`hàng<TAB>cột<TAB>giá trị`, đã giải mã
+shared string, lấy GIÁ TRỊ CACHE chứ không phải công thức) — dùng để nạp danh
+mục (DMNL, NS XE, Mohinh_TheTrong…) qua `COPY ... FROM STDIN` vào bảng tạm rồi
+`INSERT ... SELECT`. Nạp bằng `XmlDocument` nên chỉ dùng cho sheet nhỏ (< ~10MB
+XML); sheet `tinh toan` (784MB) vẫn phải dùng `xlfind.ps1`.
+
+```powershell
+.\dump-sheet.ps1 -Sheet sheet46 -Out .\dmnl.tsv -Max 80
+```
+
+**Bẫy mới:** công thức `L5 = 'Cap nhat…'!I3` nói ô lấy từ sheet khác, nhưng GIÁ TRỊ
+CACHE có thể là số nhập cứng khác (M5 = 210 trong khi ô nguồn trống). Khi cần số
+liệu thật của dòng nào, đọc `<v>` cache của chính ô đó bằng `xlfind.ps1`.
