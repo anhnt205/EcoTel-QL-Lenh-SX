@@ -3333,3 +3333,61 @@ Còn lại: 160 xe vận tải thuê ngoài chưa có chủng loại/hạng/nhi�
 - **HS điều chỉnh NLĐM:** thêm đủ 21 khoá hàng (nhiên liệu × hạng × DAT/Than) × 24 cột (T1..T12 × CS/KC) = 339 ô, TẠM = 1,0 (ghi vào note định nghĩa). Số thật nằm ở vùng `FW..GY` sheet `tinh toan` (chưa trích).
 - Hệ quả: nhập chuyến cho bất kỳ xe nào cũng không còn bị chặn tính vì thiếu khai báo ĐMNL/HS. Kỳ 101 tính lại `tkeMode=false` vẫn OK.
 - Các số TẠM còn lại (đều có "DEMO"/"TẠM" trong note): STD 4 dòng (lượt 30), HS điều chỉnh, xe thuê ngoài.
+
+## Lượt 31 (2026-09-29) — Đồng bộ danh mục thiết bị từ QL-TAISAN (nhánh `dev`)
+
+Bắt nguồn từ phiên PORTAL-PM: chủ dự án xác nhận **QL-TAISAN là nguồn gốc
+duy nhất** cho danh mục thiết bị (xe/máy), ánh xạ sang Điều phối MM (giao ca)
+và Thống kê Cao Sơn (báo chuyến/sản lượng theo xe). Quyết định BAN ĐẦU cho
+Thống kê là "thay thế hoàn toàn" bảng `devices` hiện có — **sau đó chủ dự án
+đổi ý, yêu cầu làm GIỐNG Điều phối để giảm rủi ro**: chỉ đồng bộ phần "gốc",
+giữ nguyên phần Thống kê tự quản.
+
+**Vì sao "thay thế hoàn toàn" thật sự rủi ro cao hơn nhiều so với Điều
+phối**: `Device.java` ở đây không chỉ có vài field vận hành (status,
+coordinates) như Điều phối — nó còn mang **toàn bộ field phục vụ ENGINE TÍNH
+SẢN LƯỢNG/ĐỊNH MỨC NHIÊN LIỆU của chính hệ thống này** (`fuelClass`,
+`vehicleType`, `vehicleRank`, `categoryClass`, `bucketCapacity`,
+`carRenovation`, `qualityLevel` — tham chiếu QĐ-11/QĐ-13, xem comment gốc
+trong `model/Device.java`). QL-TAISAN hoàn toàn không biết gì về các khái
+niệm này — thay thế hoàn toàn sẽ xoá mất dữ liệu tính toán sản lượng đang
+dùng thật (vừa nạp dữ liệu thật/tạm lên server ở Lượt 28/30/30b).
+
+**Đã thêm — chỉ đồng bộ phần gốc, không đụng phần tính toán**:
+- `model/Device.java`: thêm `externalTaiSanId` (unique) — khớp bản ghi
+  TaiSan để không nhân đôi khi chạy lại.
+- `model/DeviceType.java`: thêm `externalNhomTaiSanId` (unique) tương tự cho
+  nhóm thiết bị.
+- `repository/DeviceRepository.java`, `DeviceTypeRepository.java`: thêm
+  `findByExternalTaiSanId`/`findByExternalNhomTaiSanId`.
+- `service/TaiSanSyncService.java` (MỚI) — gọi
+  `GET {taisan.api-base-url}/api/taisan?idcongty=...` kèm header
+  `X-Service-Key` (service-to-service, không qua user nào), dùng
+  `RestTemplate` có sẵn (`config/AppConfig.java`). **CHỈ set**: `name`,
+  `code`, `vehicleNumber`, `category` (qua upsert `DeviceType`), `power` —
+  **TUYỆT ĐỐI KHÔNG đụng** `status`/`coordinates`/`note`/`files`/`fuelClass`/
+  `vehicleType`/`vehicleRank`/`categoryClass`/`bucketCapacity`/
+  `carRenovation`/`qualityLevel`.
+- `controller/DeviceController.java`: thêm `POST /api/devices/sync-from-taisan`
+  (gate bởi `@RequirePermission(resource="devices")` sẵn có ở class, action
+  suy từ POST) — gọi thủ công, không chạy nền tự động.
+- Cấu hình qua env var (không cần khai YAML, giống `app.auth.*` sẵn có):
+  `TAISAN_API_BASE_URL`, `TAISAN_SERVICE_KEY`, `TAISAN_ID_CONG_TY`. Thiếu bất
+  kỳ biến nào → ném lỗi rõ ràng lúc gọi, không crash lúc khởi động.
+- **Schema**: `ddl-auto: update` (dev/prod) nên cột mới tự thêm lúc khởi
+  động, không cần viết migration Flyway mới (chỉ có `V1__baseline.sql`, xem
+  cơ chế baseline ở `application.yaml`).
+- **Verify**: `mvn compile` qua Docker — lần đầu lỗi biên dịch
+  (`UriComponentsBuilder.fromHttpUrl` đã bị gỡ khỏi Spring Framework mới, đổi
+  thành `fromUriString`) — đã sửa, build lại đang chạy nền lúc ghi chú này.
+  **CHƯA verify runtime thật** (chưa có `SERVICE_KEY_TKCS` thật từ QL-TAISAN
+  để gọi thử đầu-cuối, chưa deploy lại container).
+
+**Chưa làm (phạm vi tiếp theo)**:
+- Xin `SERVICE_KEY_TKCS` thật từ đội QL-TAISAN, gọi thử
+  `POST /api/devices/sync-from-taisan`, đối chiếu 324 xe vận tải hiện có
+  (Lượt 30b) xem có bị trùng/tạo nhầm bản ghi mới không (nếu `code` hiện tại
+  không khớp `soKyHieu`/`kyHieu` bên QL-TAISAN, sync sẽ tạo THÊM thiết bị mới
+  thay vì cập nhật đúng thiết bị cũ — cần đối chiếu mã trước khi chạy thật
+  trên dữ liệu sản xuất).
+- Chưa thêm nút "Đồng bộ từ Tài sản" ở Frontend.
