@@ -84,3 +84,46 @@ Review chuẩn:
 - **Tuyệt đối không đụng `main`/`develop`** — 2 nhánh này có CI/CD thật tự
   deploy VPS (đã ghi rõ ở trên và trong `CLAUDE.md`), không liên quan gì tới
   việc tạo `dev`/`claude-dev`/`codex-dev` ở đây.
+
+## Cập nhật 2026-09-29 — Fix iframe bị chặn (Portal) + đồng bộ danh mục thiết bị từ QL-TAISAN (nhánh `dev-dieuphoi-mm`)
+
+Bắt nguồn từ phiên làm việc PORTAL-PM: mở app này trong khung iframe của
+Portal bị trắng, console báo `X-Frame-Options 'sameorigin'`.
+
+- **Fix iframe**: `WebApp/reverse_proxy/nginx_release.conf` (domain thật
+  `dieuhanhquanlythietbitcs.vn`) — thay `X-Frame-Options: SAMEORIGIN` bằng
+  `Content-Security-Policy: frame-ancestors 'self' http://118.70.151.69:1200
+  http://118.70.151.69:1201 http://118.70.151.69:50008` (đúng 3 origin Portal
+  đang tồn tại lúc sửa — cập nhật lại nếu Portal đổi domain/cổng thật). File
+  `nginx_staging.conf` KHÔNG có `X-Frame-Options` sẵn nên không cần sửa.
+  **CHƯA deploy lên domain thật** — mình không có quyền build/redeploy hạ
+  tầng riêng của DIEU-PHOI-MM, cần đội này tự rebuild + đưa lên.
+  Bị chính Claude Code chặn 1 lần lúc sửa (phân loại "Security Weaken" — nới
+  lỏng chống clickjacking, đúng đắn dù đã thu hẹp đúng origin) — chủ dự án tự
+  cấp quyền Bash mới sửa được.
+
+- **Đồng bộ danh mục thiết bị từ QL-TAISAN** (QL-TAISAN là nguồn gốc, xem
+  context.md bên đó mục 9): thêm `services/taiSanSync.js` gọi
+  `GET {TAISAN_API_BASE_URL}/api/taisan?idcongty=...` kèm header
+  `X-Service-Key` (service-to-service, không qua user Portal nào), upsert vào
+  `models/Device.js` khớp theo field mới `externalTaiSanId` (tránh nhân đôi
+  bản ghi khi chạy lại). **Chỉ đồng bộ phần "gốc"** (tên, mã/biển số, loại
+  qua `models/DeviceType.js` field mới `externalNhomTaiSanId`, công suất) —
+  **KHÔNG đụng phần vận hành** Điều phối tự quản (`status`, `coordinates`
+  GPS, `files` đính kèm) — đúng quyết định chủ dự án đã chốt (khác với
+  THONGKE-CAOSON chọn thay thế hoàn toàn). Kích hoạt thủ công qua
+  `POST /api/devices/sync-from-taisan` (admin-only, giống nút "Đồng bộ từ
+  manifest" bên Portal — không chạy nền tự động).
+  Cần cấu hình `.env` (đã thêm placeholder rỗng, giá trị thật xin từ đội
+  QL-TAISAN): `TAISAN_API_BASE_URL`, `TAISAN_SERVICE_KEY`, `TAISAN_ID_CONG_TY`.
+  **Verify**: `node --check` qua container cho cả 4 file — cú pháp hợp lệ.
+  **CHƯA verify runtime thật** (chưa có `TAISAN_SERVICE_KEY` thật để gọi thử
+  cuối-đến-cuối) — cần làm khi QL-TAISAN cấp key thật.
+
+**Việc còn lại, chưa làm**:
+- Đội DIEU-PHOI-MM tự rebuild + deploy lại `nginx_release.conf` lên domain
+  thật để fix iframe có hiệu lực.
+- Xin `SERVICE_KEY_DPMM` thật từ đội QL-TAISAN, điền vào `.env`, gọi thử
+  `POST /api/devices/sync-from-taisan` để verify end-to-end thật.
+- Chưa thêm nút "Đồng bộ từ Tài sản" ở giao diện Frontend (mới chỉ có API) —
+  hiện phải gọi API tay hoặc Postman.
