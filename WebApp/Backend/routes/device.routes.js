@@ -1170,4 +1170,29 @@ router.delete(
   },
 );
 
+// Đồng bộ danh mục thiết bị từ QL-TAISAN (nguồn gốc) — xem services/taiSanSync.js.
+// Admin-only: gọi thủ công (giống nút "Đồng bộ từ manifest" bên PORTAL-PM),
+// không chạy nền tự động để tránh gọi khi chưa cấu hình đủ TAISAN_* trong .env.
+router.post(
+  "/sync-from-taisan",
+  verifyToken,
+  restrictTo(ROLE.ADMIN),
+  async (req, res) => {
+    try {
+      const { syncDevicesFromTaiSan } = require("../services/taiSanSync");
+      const result = await syncDevicesFromTaiSan();
+      req.logger.info(
+        `🔥 ${req.user?.username} đồng bộ thiết bị từ Tài sản: ${JSON.stringify(result)}`,
+      );
+      res.status(200).json({ status: "success", data: result });
+    } catch (err) {
+      req.logger.error("❌ Lỗi đồng bộ thiết bị từ Tài sản", err);
+      res.status(500).json({
+        status: "error",
+        message: err.message || "Đồng bộ thất bại",
+      });
+    }
+  },
+);
+
 module.exports = router;

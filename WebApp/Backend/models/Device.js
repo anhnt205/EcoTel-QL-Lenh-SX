@@ -10,6 +10,15 @@ const deviceSchema = new mongoose.Schema({
     name: {
         type: String,
     },
+    // Gắn với đúng bản ghi TaiSan bên QL-TAISAN (nguồn gốc danh mục thiết bị)
+    // để đồng bộ lại (đổi tên, loại, công suất...) không bị nhân đôi bản ghi.
+    // Thiết bị tạo thủ công trong Điều phối (không qua đồng bộ) để trống field
+    // này. Xem services/taiSanSync.js.
+    externalTaiSanId: {
+        type: String,
+        index: true,
+        sparse: true,
+    },
     department: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Department',
