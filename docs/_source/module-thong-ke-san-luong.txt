@@ -1,0 +1,499 @@
+ MODULE THỐNG KÊ – PHẦN MỀM ĐIỀU PHỐI MÁY MÓC THIẾT BỊ CAO SƠN
+03.08.2026
+I. Luồng nghiệp vụ
+[HINH ANH]
+II. Mô tả chi tiết
+Sau khi công nhân lái máy, lái xe kết thúc công việc sẽ báo công. Nhân viên kinh tế ở mỗi công trường, phân xưởng sẽ in ra giấy và nhập liệu vào phần mềm sau khi chuẩn hóa số liệu lần 1.
+2.1. Dữ liệu nhập liệu của Công trường Khai thác
+Từ tờ lệnh in ra (Ảnh 1), nhân viên kinh tế sẽ nhập vào phần mềm (phần lớn sẽ xuất Excel và nhập liệu)
+[HINH ANH]
+Ảnh 1: Báo công lái Máy
+Các trường thông tin khi nhập vào phần mềm gồm:
+Năm (Calendar) 
+Tháng (Calendar)
+Ngày (Calendar)
+Ca (Danh mục)
+Nơi chất tải (Danh mục)
+Máy xúc (Danh mục) 
+Tầng xúc
+Số xe (combo box) 
+Số chuyến (text)  
+ Vị trí đổ (Danh mục) 
+Loại hàng (Danh mục)– Chọn 1 trong 3 options : Đủ tải/ Roda (2/3)/ Khác (Chọn khác thì nhập số dạng phần: 1/2, 1/3) 
+Đơn vị (Lấy thông tin từ Số xe) 
+Chủng loại xe (Lấy thông tin từ Số xe) 
+Nhiên liệu tiêu thụ ( = Nhiên liệu tồn đầu + Nhiên liệu lĩnh – Nhiên liệu tồn cuối)
+Nhiên liệu tồn đầu (text)
+Nhiên liệu tồn cuối (text)
+Nhiên liệu lĩnh (text)
+Số thẻ lương (Danh mục ) 
+Họ và tên (Lấy thông tin từ Số thẻ lương)
+Đơn vị (Lấy thông tin từ Số thẻ lương)
+[HINH ANH]
+[HINH ANH]
+2.2. Dữ liệu nhập liệu của Phân xưởng Vận tải:
+Từ tờ lệnh in ra (Ảnh 2), nhân viên kinh tế sẽ nhập vào phần mềm (phần lớn sẽ xuất Excel và nhập liệu)
+[HINH ANH]
+Ảnh 2: Báo công lái Xe
+Năm (Calendar) 
+Tháng (Calendar)
+Ngày (Calendar)
+Ca (Danh mục)
+Khu vực xúc (Danh mục)
+Máy xúc (Danh mục)
+Nơi nhận tải (Danh mục)
+Tầng nhận tải (text)
+Tầng dỡ tải (text)
+Cung độ toàn tuyến (km) (text)
+Nâng tải toàn tuyến (m) (text)
+Cung độ dốc cục bộ (km) (text)
+Dốc cục bộ (m) (text)
+Nơi dỡ tải (danh mục)
+Loại hàng (danh mục ) > Nhóm hàng (Lấy thông tin từ danh mục Loại hàng, cái này chưa có)
+Số xe  (text)
+Số chuyến (text) 
+Chọn 1 trong 3 options : Đủ tải/ Roda (2/3)/ Khác (Chọn khác thì nhập số dạng phần: 1/2, 1/3) 
+Ngày mưa (Tick)
+Xe bổ túc (Tick)
+Nhiên liệu tiêu thụ (=Nhiên liệu tồn đầu + Nhiên liệu lĩnh – Nhiên liệu tồn cuối)
+Nhiên liệu tồn đầu (text)
+Nhiên liệu tồn cuối (text)
+Nhiên liệu lĩnh (text)
+Số thẻ lương (danh mục)
+Họ và tên (Lấy thông tin từ Số thẻ lương)
+Đơn vị (Lấy thông tin từ Số thẻ lương)
+Đơn vị quản lý thiết bị (Lấy thông tin từ Số xe)
+Chủng loại xe (Lấy thông tin từ Số xe)
+Nhóm tầng nhận tải:
+Nếu “Khu vực xúc” là Khe Chàm
+“Tầng nhận tải” <-195 > “Nhóm tầng nhận tải” = -200
+“Tầng nhận tải” < 0  > “Nhóm tầng nhận tải” = (-1+TRUNC((G3+1)/15) *15
+Tầng nhận tải >= 0 > “Nhóm tầng nhận tải” = TRUNC(G3/15) *15
+Nếu “Khu vực xúc” ≠ Khe Chàm
+“Tầng nhận tải” < 0  > “Nhóm tầng nhận tải” = (-1+TRUNC((G3+1)/15) *15
+“Tầng nhận tải” >= 0 > “Nhóm tầng nhận tải” = TRUNC(G3/15) *15
+TRUNC là hàm giữ lại phần nguyên, bỏ phần thập phân.
+Một xe có thể chở 2 chuyến hàng khác nhau, thông tin chuyến khác, nhưng sẽ chung thông tin xe, nhân viên, nhiên liệu: Ví dụ, xe 911 do nhân viên số thẻ lương 1234 lái,  đi từ máy xúc P9 đến Bãi sàng: 5 chuyến  đi từ máy xúc P10 đến Kho: 6 chuyến, hoặc đi từ máy xúc P9 đến Bãi sàng: 5 chuyến  đi từ máy xúc P9 đến Kho: 6 chuyến (khi đổ ra table thì như Excel bên dưới)
+> Các thông tin chuyến xe khác, còn nhiên liệu thì giống nhau > Thiết kế giao diện để nhập phần này.
+> Thiết kế thao tác nhanh để nhập cho nhiều xe 1 lúc
+[HINH ANH]
+[HINH ANH]
+2.3. Đối soát 
+Sau khi nhập liệu, Nhân viên kinh tế Khai thác và Nhân viên kinh tế Vận tải sẽ nhìn được thông tin chung (chỉ đối với phần nhập liệu của mình), sau đó sẽ tự đối soát và điều chỉnh dữ liệu. Sau khi chốt dữ liệu, Nhân viên kinh tế sẽ gửi dữ liệu cho phòng Thống kê.
+Nhân viên Thống kê của phòng Thống kê sẽ đối soát giữa các Phân xưởng Vận tải và Công trường Khai thác, yêu cầu chỉnh sửa dữ liệu khi cần và gửi yêu cầu tới Nhân viên kinh tế để điều chỉnh lại, ngoài ra sẽ nhập liệu bổ sung một số trường thông tin.
+Nhân viên Thống kê sẽ là người cuối cùng chốt dữ liệu để PM tính toán sản lượng.
+Chọn theo ca/ngày/tháng/ năm > Hiển thị các thông tin xe/máy xúc hoạt động và chuyến thực hiện để đối chiếu > Xác nhận thông tin chính xác cuối cùng để tính sản lượng.
+[HINH ANH]
+Nhân viên kinh tế sẽ nhìn được dữ liệu của Đơn vị, còn Nhân viên thống kê sẽ nhìn được dữ liệu toàn bộ
+[HINH ANH]
+ / 
+III. Thống kê sản lượng theo dữ liệu chuẩn
+Sau khi Thống kê xác nhận dữ liệu chuẩn, sẽ kết hợp với các danh mục thông số khác để đưa ra sản lượng.
+Đầu vào:
+Tháng/Ngày/Ca
+Khu vực xúc (danh mục)
+Mã khu vực xúc (text)
+Khu vực xúc (text)
+Ghi chú (text)
+[HINH ANH][HINH ANH][HINH ANH][HINH ANH][HINH ANH]
+[HINH ANH][HINH ANH][HINH ANH]
+Máy xúc (danh mục)
+Tầng nhận tải 
+Nơi nhận tải (danh mục)
+Mã nơi nhận tải (text)
+Nơi nhận tải (text)
+Nhóm vỉa (combobox)
+Ghi chú (text)[HINH ANH][HINH ANH]
+[HINH ANH][HINH ANH][HINH ANH]
+[HINH ANH]
+Nhóm vỉa (theo danh mục Nơi nhận tải)
+Tầng dỡ tải
+Nơi dỡ tải (danh mục)
+Mã nơi dỡ tải (text)
+Nơi dở tải (text)
+Ghi chú (text)
+[HINH ANH][HINH ANH][HINH ANH]
+[HINH ANH][HINH ANH][HINH ANH]
+Nơi chất tải (danh mục)
+Mã nơi chất tải (text)
+Nơi chất tải (text)
+Ghi chú (text)
+[HINH ANH]
+[HINH ANH][HINH ANH][HINH ANH]
+Chủng loại hàng (danh mục)
+Mã chủng loại hàng (text)
+Chủng loại hàng (text)
+Nhóm chủng loại hàng (combobox)
+Sản phẩm nghiệm thu (combobox)
+TTL CLH (combobox)
+Ghi chú (text)
+[HINH ANH]
+[HINH ANH]
+Tỷ trọng (danh mục)
+Thời gian (dd/mm/yy – dd/mm/yy)
+Khu vực xúc
+Mã chủng loại hàng (text)
+Chủng loại hàng (text)
+Nhóm chủng loại hàng (combobox)
+Sản phẩm nghiệm thu (combobox)
+TTL CLH (combobox)
+Tỷ trọng (quy ẩm)
+Tỷ trọng (không quy ẩm)
+[HINH ANH][HINH ANH][HINH ANH][HINH ANH][HINH ANH]
+[HINH ANH][HINH ANH][HINH ANH]
+Nhóm chủng loại hàng (danh mục)
+Mã nhóm chủng loại hàng (text)
+Nhóm chủng loại hàng (text)
+Ghi chú
+[HINH ANH]
+Sản phẩm nghiệm thu (danh mục)
+Mã sản phẩm nghiệm thu (text)
+Sản phẩm nghiệm thu (text)
+Ghi chú (text)
+[HINH ANH]
+TTL CLH (danh mục)
+Mã TTL CLH (text)
+TTL CLH (text)
+Ghi chú (text)
+[HINH ANH]
+Nhóm chủng loại hàng (theo danh mục Chủng loại hàng)
+Cung độ toàn tuyến (km)
+Nâng tải toàn tuyến (m) 
+Nâng tải toàn tuyến (m) = Tầng nhận tải – Tầng dỡ tải (2 biến đều đưa về số dương)
+Cung độ dốc cục bộ (km)
+Dốc cục bộ (m)
+Chênh cao thanh toán nhiên liệu 
+Nếu Cung độ toàn tuyến = 0 > Chênh cao thanh toán nhiên liệu = 0
+Nếu Cung độ toàn tuyến ≠ 0, Dốc cục bộ < Nâng tải toàn tuyến thì Chênh cao thanh toán nhiên liệu = Nâng tải toàn tuyến
+Nếu Cung độ toàn tuyến ≠ 0, Dốc cục bộ ≥ Nâng tải toàn tuyến, Cung độ dốc cục bộ = 0 thì
+Nâng tải toàn tuyến <0  thì Chênh cao thanh toán nhiên liệu = 0
+Nâng tải toàn tuyến >=0  thì Chênh cao thanh toán nhiên liệu = Nâng tải toàn tuyến > Làm tròn đến số nguyên
+Nếu Cung độ toàn tuyến ≠ 0, Dốc cục bộ ≥ Nâng tải toàn tuyến, Cung độ dốc cục bộ ≠ 0 thì 
+Chênh cao thanh toán nhiên liệu = Nâng tải toàn tuyến quy đổi + (Dốc cục bộ - Nâng tải toàn tuyến quy đổi) * Cung độ dốc cục bộ/Cung độ toàn tuyến > Làm tròn đến số nguyên
+*Trong đó: 
+Nâng tải toàn tuyến quy đổi = 0 Nếu Nâng tải toàn tuyến <0
+Nâng tải toàn tuyến quy đổi = Nâng tải toàn tuyến nếu Nâng tải toàn tuyến >=0
+Số xe (theo danh mục Thông tin xe)
+Số chuyến
+Danh mục AP Tdia (m3-tan-tkm) (only view) 
+Thời gian
+Máy xúc
+Nhóm vỉa + Máy xúc
+Đất CN
+Tổng m3 
+Tổng KLVC (tấn)
+Tổng Tkm
+Đất SX 
+Tổng m3
+Tổng KLVC (tấn)
+Tổng Tkm
+Than
+Tổng m3
+Tổng KLVC (tấn)
+Tống Tkm
+Số Trắc địa
+Đất CN (m3)
+Đất CN (tấn)
+Đất CN (tkm)
+Đất SX (m3)
+Đất SX (tấn)
+Đất SX (tkm)
+Than SX (m3)
+Than SX (tấn)
+Than SX (tkm)
+Hệ số
+o	HS Đất CN (m3) 
+o	HS Đất CN (tấn)
+o	HS Đất CN (tkm)
+o	HS Đất SX (m3)
+o	HS Đất SX (tấn)
+o	HS Đất SX (tkm)
+o	HS Than SX (m3)
+o	HS Than SX (tấn)
+o	HS Than SX (tkm)
+[HINH ANH]
+[HINH ANH]
+[HINH ANH]
+Danh mục STD (Đất SX/Than SX)
+Thời gian
+Nhóm vỉa + Máy xúc (tự set)
+Đất SX (Sản phẩm nghiệm thu)
+Đất SX (m3)
+V Tke
+Clech
+Đất SX (tấn)
+CD đất
+Thể trọng đất (TĐ)
+Đất SX (tkm)
+Than SX (Sản phẩm nghiệm thu)
+Than SX (m3)
+Thể trọng than (TĐ)
+Than SX (tấn)
+Q Tke
+Clech
+CD than
+Than SX (Tkm)
+[HINH ANH]
+[HINH ANH]
+[HINH ANH]
+Danh mục STD (Đất CN)
+Thời gian
+Nhóm vỉa + Máy xúc (tự set)
+Đất CN (Sản phẩm nghiệm thu)
+Đất CN (m3)
+ V Tke
+Clech
+Đất CN (tấn)
+CD đất
+Thể trọng đất (TĐ)
+Đất CN (tkm)
+[HINH ANH]
+[HINH ANH]
+[HINH ANH]
+Nếu 
+Tổng m3 = 0 > Đất CN (m3) =0 và HS Đất CN (m3) = 0
+Tổng KLVC (tấn) = 0 > Đất CN (tấn) =0 và HS Đất CN (tấn) = 0
+Tổng Tkm = 0 > Đất CN (tkm) =0 và HS Đất CN (tkm) = 0
+*Tương tự với Đất SX/Than SX
+Nếu Tổng m3 ≠ 0 thì đối chiếu theo Nhóm vỉa + Máy xúc trong danh mục STD (Đất CN) hoặc danh mục (Đất SX/Than SX) để lấy được Đất CN (m3/tấn/tkm)/ Than SX (m3,tấn,tkm)/ Đất SX (m3, tấn, tkm)
+HSTĐ(m3) = m3/Tổng m3 (tương ứng)
+HSTĐ(tấn) = tấn/Tổng tấn (tương ứng)
+HSTĐ(tkm) = tkm/Tổng tkm (tương ứng)
+Hệ số chất tải bùn (Trắc địa)
+Ngày mưa (Báo chuyến)
+Khối lượng qua cân (tấn) (Báo chuyến)
+Tải trọng (Roda/Khác) (Báo chuyến)
+Mô hình (tạm tính) (Báo chuyến)
+Tỷ trọng (tạm tính) (Báo chuyến)
+Thể trọng (TĐ)
+Nếu Sản phẩm nghiệm thu là Dat_TCN hoặc Than_CN> Thể trọng TĐ = Tỷ trọng (tấn/m3)
+Nếu Sản phẩm nghiệm thu ≠ Dat_SX/Than_SX/Dat_CN >Thể trọng TĐ = 0
+Nếu Sản phẩm nghiệm thu là Dat_SX > đối chiếu theo Nhóm vỉa + Máy xúc trong danh mục STD (Dat+ThanSX) > Thể trọng (TĐ) = cột Thể trọng Đất – TĐ
+Nếu Sản phẩm nghiệm thu là Than_SX > đối chiếu theo Nhóm vỉa + Máy xúc trong danh mục STD (Dat+ThanSX) > Thể trọng (TĐ) = cột Thể trọng Than – TĐ
+Nếu Sản phẩm nghiệm thu là Dat_CN > đối chiếu theo Nhóm vỉa + Máy xúc trong danh mục STD (Dat_CN) > Thể trọng (TĐ) = cột Đất CN – Thể trọng
+Phân loại (Đất/Than) (theo Loại hàng)
+Lái xe bổ túc (Báo chuyến)
+HS áp cho than CTNB
+Nếu Hệ số chênh lệch _CTNB (Báo chuyến) = 0 > HS áp cho than CTNB = 1
+Nếu Hệ số chênh lệch _CTNB (Báo chuyến)  ≠ 0 > HS áp cho than CTNB = Hệ số chênh lệch _CTNB
+Sản phẩm nghiệm thu
+Nếu Khu vực xúc = CS và Chủng loại hàng là Daxit.NK > Sản phẩm nghiệm thu = Dat_SX
+Nếu Loại hàng ≠ 0 > Sản phẩm nghiệm thu theo Chủng loại hàng (gán trong danh mục)
+Trừ vơi (đất-m3, than-tấn) (Báo chuyến)
+Tỷ trọng (tấn/m3)
+Nếu Tỷ trọng (cập nhật) ≠ 0 > Tỷ trọng (tấn/m3) = Tỷ trọng (cập nhật)
+Nếu Tỷ trọng (cập nhật) = 0 > Đối chiếu danh mục Tỷ trọng (quy ẩm)
+Mô hình (m3/ch) (danh mục)
+[HINH ANH]
+[HINH ANH]
+Nếu Số chuyến = 0 thì Mô hình (m3/ch) = 0
+Nếu Mô hình (tạm tính) ≠ 0 thì Mô hình (m3/ch) = Mô hình (tạm tính)
+Nếu Số chuyến ≠ 0 và Mô hình (tạm tính) = 0 > Đối chiếu theo Chủng loại hàng và Chủng loại xe trong danh mục Mô hình
+Sau khi được giá trị  Mô hình cần tìm > Mô hình = Mô hình * Roda ( Roda =2/3 thì nhân 2/3, Roda = 0 thì nhân 1) ( làm tròn đến 3 chữ số thập phân)
+Nhóm tầng nhận tải
+Nếu “Khu vực xúc” là KC
+“Tầng nhận tải” < -195 > “Nhóm tầng nhận tải” = -200
+“Tầng nhận tải” < 0  > “Nhóm tầng nhận tải” = (-1+TRUNC((G3+1)/15) *15
+Tầng nhận tải >= 0 > “Nhóm tầng nhận tải” = TRUNC(G3/15) *15
+Nếu “Khu vực xúc” ≠ KC
+“Tầng nhận tải” < 0  > “Nhóm tầng nhận tải” = (-1+TRUNC((G3+1)/15) *15
+“Tầng nhận tải” >= 0 > “Nhóm tầng nhận tải” = TRUNC(G3/15) *15
+TRUNC là hàm lấy số nguyên, bỏ số thập phân
+	Tổng m3	
+	Nếu Khối lượng qua cân (tấn) > 0 thì Tổng m3= Khối lượng qua cân/Tỷ trọng (tấn/m3)
+	Nếu Khối lượng qua cân (tấn) <=0
+	Nhóm chủng loại hàng bắt đầu bằng D> làm tròn đến 1 chữ số thập phân với mô hình
+	Nhóm chủng loại hàng bắt đầu không bằng D > làm tròn 3 chữ số thập phân với mô hình
+	> 
+	Phân loại = DAT > Tổng m3 = Mô hình (sau khi làm tròn) * số chuyến - Trừ vơi (đất  - m3, than - tấn)
+	Nếu Phân loại ≠ DAT Tổng m3 = Mô hình (sau khi làm tròn) * số chuyến
+	> làm tròn đến 3 chữ số thập phân
+Tổng KLVC (tấn)
+Nếu Phân loại là THAN  thì Tổng KLVC (tấn) = Tổng m3 * Tỷ trọng (tấn/m3) – Đá thải (tấn) - Trừ vơi (đất  - m3, than - tấn)
+Nếu phân loại ≠ THAN thì Tổng KLVC (tấn) = Tổng m3 * Tỷ trọng (tấn/m3) – Đá thải (tấn)
+Tiếp tục:
+Nếu Sản phẩm nghiệm thu là THAN > * hệ số (Than tke trừ đá/Than kcs) (set hệ số ở phần danh mục Hệ số)
+Nếu Sản phẩm nghiệm thu ≠ THAN > giữ nguyên
+Tổng Tkm
+Nếu Khối lượng qua cân (tấn) ≠ 0 > Tổng Tkm = Khối lượng qua cân (tấn) * Cung độ toàn tuyến
+Nếu Khối lượng qua cân (tấn) = 0 > Tổng Tkm = Tổng KLVC (tấn)* Cung độ toàn tuyến (làm tròn 4 chữ số thập phân)
+Đá thải (tấn)
+Nếu Nhóm chủng loại hàng ≠ THANV > Đá thải (tấn) = 0
+Nếu Nhóm chủng loại hàng = THANV
+Khu vực xúc = CS > Đá thải (tấn) = Giá trị tự nhập (Báo chuyến)
+Khu vực xúc = KC > và 2 ký tự cuối Nơi dỡ tải là CS >  Đá thải (tấn) = Giá trị tự nhập (Báo chuyến)
+Các trường hợp khác = Giá trị tự nhập (Báo chuyến)
+Sau đó Giá trị* Tổng KLVC TKE ban đầu chưa trừ đá (tấn)
+Đá thải (m3)
+Nếu Khu vực xúc = KC > Đá thải (m3) = Đá thải (tấn)/2,625
+Nếu Khu vực xúc = CS > Đá thải (m3) = Đá thải (tấn)/2,617
+Tổng km vận chuyển
+Tổng km vận chuyển= Cung độ toàn tuyến * Số chuyến
+Chủng loại xe + DMNL (danh mục)
+Chủng loại xe + DMNL (text)
+Ghi chú (text)
+Định mức nhiên liệu (danh mục)
+Cung độ (text)
+Độ dốc (text)
+Chủng loại xe + DMNL (combobox) + Cung độ (auto)
+[HINH ANH]
+Nội suy định mức nhiên liệu
+Hb- Cung độ cận trên
+Điểm nhỏ hơn gần nhất với cung độ toàn tuyến trong cột cung độ bảng ĐM
+Ha- Cung độ cận dưới
+Điểm lớn hơn gần nhất với cung độ toàn tuyến trong cột cung độ bảng ĐM
+VD: CĐTT = 4,2 > hb=4, ha=4,5
+h1- Dốc cận trước
+Điểm nhỏ hơn gần nhất với chiều cao nâng tải trong cột độ dốc
+h2- Dốc cận sau
+Điểm lớn hơn gần nhất với chiều cao nâng tải trong cột độ dốc
+VD: ccnt = 210, h1=200, h2=250
+Nb-h1 (đối chiếu trong danh mục Định mức nhiên liệu) > lấy h1 và cụm Chủng loại xe + DMNL + Cung độ (hb)
+Nb-h2 (đối chiếu trong danh mục Định mức nhiên liệu) > lấy h2 và cụm Chủng loại xe + DMNL + Cung độ (hb)
+Nb- Nhiên liệu tương ứng Hb = 
+H1=h2 > nb-nl = nb-h1
+H1 ≠ h2 > nb-nl = (nb-h1) + ((nb-h2) – (nb-h1))*(chênh lệch thanh toán – h1) / (h2-h1)
+Na-h1 (đối chiếu trong danh mục Định mức nhiên liệu) > lấy h1 và cụm Chủng loại xe + DMNL + Cung độ (ha)
+Na-h2 (đối chiếu trong danh mục Định mức nhiên liệu) > lấy h2 và cụm Chủng loại xe + DMNL + Cung độ (ha)
+Na- Nhiên liệu tương ứng Ha
+H1=h2 > na-nl = na-h1
+H1≠h2 >  (na-h1) + (chênh lệch thanh toán – h1) * (na-h2)-(na-h1)/(h2-h1)
+Nt- NLĐM tiêu hao cần tìm
+Cung độ toàn tuyến = 0> =0
+Ha=hb > = nb-NL
+Nếu không thì = (na-nl)-(na-nl – nb-nl)/(nb-ha)*(cung độ toàn tuyến -ha)
+ĐMNL theo mùa
+Nếu Tháng 6,7,8,9 > hệ số =1,03
+Các tháng còn lại > hệ số =1
+> ĐMNL theo mùa = hệ số *Nt-NLĐM tiêu hao cần tìm
+ĐMNL  - công ty
+ĐMNL công ty = ĐMNL theo mùa
+ĐMNL – hạng xe
+Nếu hạng xe là A > hệ số 0.97, B > 1, C1> 1,04, Khác những cái trên thì là 1,06
+Lấy dmnl công ty * hệ số
+ĐMNL – cải tạo ben
+Nếu Số xe nào Cải tạo toa (đánh dấu trong danh mục) 
+> ĐMNL – cải tạo ben = ĐMNL hạng xe *1,03, không thì ĐMNL -cải tạo ben = ĐMNL - hạng xe
+HS Than (CN-NK)
+*Công thức xét theo thứ tự từ trên xuống, thỏa mãn điều kiện nào thì không xét tiếp
+Nếu SPNT/CN ≠ Than_CN > HS than (CN-NK) =1
+Nếu SPNT/CN = Than_CN
+Nếu Chủng loại xe = VolvoA40F/ VolvoA40G > HS than (CN-NK) = 1,02
+Nếu không, kiểm tra tiếp: 
+Khu vực xúc=CS
+Chủng loại hàng = SPNT.Baichua
+5 ký tự đầu của Chủng loại xe = HD465
+> HS than (CN-NK) = 0.9
+Nếu không, kiểm tra tiếp: 
+Cung độ toàn tuyến <1.5, Chủng loại xe là HD465-7R
+> HS than (CN-NK) =1.15
+Nếu không thuộc cái nào thì > HS than (CN-NK) =1
+ĐMNL xe (Đ/C tháng) = NLĐM cải tạo ben *HS than (CN-NK)
+Nhiên liệu tiêu hao theo ĐM (lít) = Tổng Tkm*ĐMNL xe/1000
+BSNL- Roda (xe) 
+Nếu Roda = Roda > BSNL- Roda (xe) = 0.5*Nhiên liệu tiêu hao theo ĐM (lít)
+Nếu Roda ≠ Roda > BSNL- Roda (xe) = 0
+BSNL - ngày mưa (5%) 
+Nếu Ngày mưa > BSNL - ngày mưa = 5%*Nhiên liệu tiêu hao theo ĐM (lít)
+Nếu không > BSNL ngày mưa = 0
+BSNL – bổ túc (4%)
+Nếu xe bổ túc > BSNL – bổ túc = 4%*Nhiên liệu tiêu hao theo ĐM (lít)
+Nếu không > BSNL – bổ túc = 0
+BSNL – SC, BD (xe)
+Nếu chủng loại xe là 1 trong: HS465-7, HD465-7R, CAT773E > BSNL – SC,BD (xe) = 1% *Nhiên liệu tiêu hao theo ĐM (lít)
+Nếu chủng loại xe là 1 trong: CAT777, CAT777D, CAT777E, HD785-7 > BSNL – SC,BD (xe) = 0,5% *Nhiên liệu tiêu hao theo ĐM (lít)
+Nếu không thuộc Chủng loại xe bên trên > BSNL – SC,BD (xe) = 1,5% *Nhiên liệu tiêu hao theo ĐM (lít)
+BSNL – khác
+Nếu Số xe = 965 > BSNL – khác =  0.05* Nhiên liệu tiêu hao theo ĐM (lít)
+Nếu Số xe ≠ 965 thì BSNL – khác = 0
+BSNL - SPNT (xe)
+Nếu Chủng loại hàng ≠ spnt_uot.via/spnt.via > BSNL - SPNT (xe) = 0
+Nếu Chủng loại hàng = spnt_uot.via/spnt.via 
+Chủng loại xe là 1 trong: HM400-2R, VolvoA40F, VolvoA40G > BSNL - SPNT (xe) = 0.1* Nhiên liệu tiêu hao theo ĐM (lít)
+Nếu Chủng loại xe ≠ 3 Chủng loại xe trên > BSNL - SPNT (xe) = 0.15* Nhiên liệu tiêu hao theo ĐM (lít)
+BSNL – bùn (xe)
+Nếu Chủng loại xe = HM400-2R > BSNL – bùn (xe) = 0
+Nếu Chủng loại xe ≠ HM400-2R, Chủng loại hàng là 1 trong: B.Duot, B.Loang, DBChan, B.Chan
+> BSNL – bùn (xe) = Hệ số bùn (user set) * Nhiên liệu tiêu hao theo ĐM (lít)
+Nếu Chủng loại xe ≠ HM400-2R, Chủng loại hàng là 1 trong: B.Tron, DBTron
+> BSNL – bùn (xe) = Hệ số bùn (user set) * Nhiên liệu tiêu hao theo ĐM (lít)
+> Làm tròn (1,88 > 1,9/ 0,96 > 1)
+Các trường hợp khác > BSNL – bùn (xe) = 0
+BSNL – SPNT,CN (xe)
+ĐMNL xe (QD 1828_25/02/2025) (Số Tke)
+ĐMNL xe (QD 1828_25/02/2025) (Số Tke)= BSNL – SPNT,CN + BSNL – bùn + BSNL SPNT + BSNL khác + BSNL - SC,BD + BSNL - bổ túc + BSNL - ngày mưa +BSNL - Roda + Nhiên liệu tiêu hao theo ĐM (lít)
+NLĐM hiện hành (Số Tke)
+NLĐM hiện hành (Số Tke) = ĐMNL xe (QD 1828_25/02/2025) (Số Tke)* HS điều chỉnh NLĐM (đối chiếu theo Chủng loại xe + Chất lượng + Phân loại để lấy HSNL điều chỉnh tương ứng trong bảng)
+Danh mục HS điều chỉnh NLĐM 
+[HINH ANH]
+[HINH ANH]
+Định mức năng suất xe tải (ch/ca)
+Nếu Số chuyến hoặc Cung độ toàn tuyến = 0 >  Định mức năng suất xe tải (ch/ca) = 0
+Nếu Số chuyến hoặc Cung độ toàn tuyến ≠ 0 > 
+Cung độ toàn tuyến > 8 > Cung độ = 8
+Cung độ toàn tuyến <=8 > Làm tròn Cung độ tới 1 chữ số thập phân (4,33 > 4,3)
+> Đối chiếu trong danh mục Năng suất xe (996) đối chiếu theo cột Cung độ và Chủng loại xe + Phân loại
+Danh mục Chủng loại xe + Phân loại
+Danh mục Năng suất xe (996)
+[HINH ANH]
+[HINH ANH]
+Chênh cao NLxM3
+Chênh cao NLxM3= Chênh cao thanh toán nhiên liệu * Tổng m3
+Mã hóa hàng
+Nếu Chủng loại hàng = 0> Mã hóa hàng =0
+Nếu ≠ 0 > Đối chiếu trong danh mục Chủng loại hàng
+Mã hàng TTL
+Nếu Mã hóa hàng = xitNK
+Nơi nhận tải là 1 trong: Sàng 3.CS, Sàng 1.CS, Sàng 2B.CS > Mã hàng TTL = daloai.NK
+Nơi nhận tải ≠ 3 giá trị trên > Mã hàng TTL = xitCTNB
+Nếu Mã hóa hàng = DAT_thai
+Nhóm vỉa = PA.PCMB.S+90 > Mã hàng TTL  = thai.PCMB
+Nhóm vỉa ≠ PA.PCMB.S+90 > Mã hàng TTL  = DAT_thai
+Nếu Mã hóa hàng ≠ xitNK và ≠ DAT_thai > Mã hàng TTL = Mã hóa hàng
+Vỉa KPMB
+Nếu Nhóm vỉa có 4 kí tự cuối là KPMB >  Vỉa KPMB = KPMB, còn không thì để trống
+Ký hiệu bùn
+Chủng loại hàng = B.Loan, B.Duot. B.Tron, Btr.Tron, B.chan > Ký hiệu bùn = _Bun
+Chủng loại hàng = BunDac > Ký hiệu bùn = _BĐ
+Chủng loại hàng = D.uot > Ký hiệu bùn = _D.uot
+Chủng loại hàng = Dbchan > Ký hiệu bùn = _Dbun
+Chủng loại hàng = Dbtron > Ký hiệu bùn = _Dbun
+Nếu 2 ký tự cuối của Chủng loại hàng = cũ > Ký hiệu bùn = _cũ
+Không thuộc thì không thêm gì
+Thể trọng bùn
+Tỏng m3 (trừ bùn)
+Tổng tấn (trừ bùn)
+Tổng Tkm (trừ bùn)
+Tổng Tkm (trừ bùn)
+Tổng bùn (tấn)
+Tỷ trọng (không quy ẩm)
+Đối chiếu theo danh mục Mô hình theo Chủng loại hàng – Tỷ trọng (không quy ẩm)
+Tổng KLVC Tke (tấn, không quy ẩm)
+Tổng KLVC Tke (tấn, không quy ẩm) = Tỷ trọng (không quy ẩm) *Tổng KLVC ban đầu (m3) > làm tròn 5 chữ số thập phân
+Tổng Thống kê (tkm, không quy ẩm)
+Tổng Thống kê (tkm, không quy ẩm) = Tổng KLVC Tke*Cung độ toàn tuyến > làm tròn 3 chữ số thập phân
+Tỷ trọng (ban đầu)
+Đối chiếu theo danh mục Mô hình theo Chủng loại hàng – Tỷ trọng
+Tổng KLVC Thống kê (m3) ban đầu
+Nếu Phân loại = DAT > Tổng KLVC Thống kê (m3) ban đầu = Mô hình (làm tròn tới 3 chữ số thập phân) * Số chuyến  - Trừ vơi (dat_m3, than_tấn)
+Nếu Phân loại ≠ DAT > Tổng KLVC Thống kê (m3) ban đầu = Mô hình (làm tròn tới 3 chữ số thập phân) * Số chuyến  - Trừ vơi (dat_m3, than_tấn) /Tỷ trọng ban đầu
+> Làm tròn 3 chữ số thập phân
+Tổng KLVC Tke (tấn) quy ẩm
+Tổng KLVC Tke (tấn) quy ẩm = Tổng KLVC Tke (m3) ban đầu *Tỷ trọng (ban đầu) > làm tròn 5 chữ số thập phân
+	Tổng Tke (tkm) quy ẩm	
+Tổng Tke (tkm) quy ẩm = Tổng KLVC Tke (tấn) quy ẩm* Cung độ toàn tuyến > làm tròn 3 chữ số thập phân
+NLĐM Thống kê (ban đầu)
+Tổng KLVC Thống kê (tấn) ban đầu chưa trừ đá
+Nếu Phân loại = THAN > Tổng KLVC Thống kê (tấn) ban đầu chưa trừ đá = Tỷ trọng (ban đầu) *Mô hình * Số chuyến  - Trừ vơi (dat_m3, than_tấn)
+Nếu Phân loại ≠ THAN > Tổng KLVC Thống kê (tấn) ban đầu chưa trừ đá = Tỷ trọng (ban đầu) *Mô hình * Số chuyến  - Trừ vơi (dat_m3, than_tấn)*Tỷ trọng (ban đầu)
+> làm tròn tới 5 chữ số thập phân
+Nhóm vỉa + Máy xúc = “Nhóm vỉa”_”Nhóm tầng”_”Máy xúc”_”Ký hiệu bùn ”_”Khu vực xúc” _hậu tố
+(PA.PCMB.S+90_75_ht7._CS_BK_dthai)
+Đầu tiên:
+Nếu Nơi dỡ tải =Băng tải > Thêm đuôi_BK
+Nếu Nhóm chủng loại hàng = SPNT.via > Thêm đuôi_SPNT
+* Ưu tiên kiểm tra Băng tải trước. Nếu Nơi dở tải ≠ Băng tải mới kiểm tra SPNT.via.
+Tiếp tục:
+Nếu Nhóm chủng loại hàng = SPNT.via > Giữ nguyên
+Nếu Nhóm hàng ≠ SPNT.via, Tỷ trọng (tấn/m3) = 2,25 > Thêm đuôi _2,25
+Nếu Chủng loại hàng = Dthai > Thêm đuôi _dthai

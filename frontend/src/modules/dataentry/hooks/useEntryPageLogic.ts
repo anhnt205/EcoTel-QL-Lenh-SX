@@ -108,6 +108,75 @@ export function useEntryPageLogic<
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initDrafts]);
 
+  // Tải chi tiết 1 chuyến (Bảng 1) và mở modal sửa — dùng chung cho cả
+  // "Chỉnh sửa" ở header (yêu cầu chọn đúng 1 dòng qua checkbox) VÀ nút bút
+  // chì sửa nhanh theo từng dòng (không cần chọn checkbox trước).
+  // Trả về `false` nếu API chưa hỗ trợ sửa theo chuyến (thiếu fetchTripById/
+  // mapTripResponseToDraft) để nơi gọi tự quyết định fallback.
+  const editTripByRow = async (
+    selectedTripRow: TRow | undefined,
+  ): Promise<boolean> => {
+    if (!fetchTripById || !mapTripResponseToDraft) {
+      return false;
+    }
+    if (!selectedTripRow) {
+      toast.warning("Không tìm thấy chuyến để chỉnh sửa!");
+      return true;
+    }
+
+    if (
+      selectedTripRow.status === "APPROVED" ||
+      selectedTripRow.status === "DA_DUYET"
+    ) {
+      toast.warning("Không thể chỉnh sửa chuyến đã được duyệt!");
+      return true;
+    }
+
+    const tripId =
+      (selectedTripRow as any)?.tripId ??
+      (typeof selectedTripRow.id === "number"
+        ? selectedTripRow.id
+        : Number(String(selectedTripRow.id).replace(/\D/g, "")));
+
+    if (!tripId || isNaN(tripId)) {
+      toast.warning("Không tìm thấy mã chuyến để chỉnh sửa!");
+      return true;
+    }
+
+    const toastId = toast.loading("Đang tải dữ liệu chi tiết chuyến...");
+    try {
+      const res = await fetchTripById(tripId);
+      if (!res?.data) {
+        toast.error("Không tải được thông tin chi tiết của chuyến!", {
+          id: toastId,
+        });
+        return true;
+      }
+
+      const draft = mapTripResponseToDraft(res.data, selectedTripRow);
+      toast.dismiss(toastId);
+      loadSessionsForEdit([draft]);
+      setEntryModalMode("edit");
+      setIsEntryModalOpen(true);
+    } catch (err: any) {
+      console.error("[Fetch Trip Detail Error]", err);
+      toast.error(
+        `Không thể tải chi tiết chuyến: ${err.message || "Lỗi máy chủ"}`,
+        { id: toastId },
+      );
+    }
+    return true;
+  };
+
+  // Sửa nhanh 1 dòng từ nút bút chì đầu dòng — không cần chọn checkbox
+  // trước, gọi thẳng đúng chuyến của dòng đó.
+  const handleEditRow = async (row: TRow) => {
+    const handled = await editTripByRow(row);
+    if (!handled) {
+      toast.warning("Chức năng sửa nhanh theo dòng chưa được hỗ trợ!");
+    }
+  };
+
   // Edit selected records
   const handleEditSelected = async () => {
     // 1. Nếu chỉ chọn đúng 1 chuyến ở Bảng 1 (Chuyến) và có cung cấp API fetch chi tiết chuyến
@@ -121,48 +190,7 @@ export function useEntryPageLogic<
       const selectedTripRow = tripRows.find(
         (r) => r.id && tripSelection.selectedIds.has(String(r.id)),
       );
-
-      if (
-        selectedTripRow?.status === "APPROVED" ||
-        selectedTripRow?.status === "DA_DUYET"
-      ) {
-        toast.warning("Không thể chỉnh sửa chuyến đã được duyệt!");
-        return;
-      }
-
-      const tripId =
-        (selectedTripRow as any)?.tripId ??
-        (typeof selectedTripRow?.id === "number"
-          ? selectedTripRow.id
-          : Number(String(selectedTripRow?.id).replace(/\D/g, "")));
-
-      if (!tripId || isNaN(tripId)) {
-        toast.warning("Không tìm thấy mã chuyến để chỉnh sửa!");
-        return;
-      }
-
-      const toastId = toast.loading("Đang tải dữ liệu chi tiết chuyến...");
-      try {
-        const res = await fetchTripById!(tripId);
-        if (!res?.data) {
-          toast.error("Không tải được thông tin chi tiết của chuyến!", {
-            id: toastId,
-          });
-          return;
-        }
-
-        const draft = mapTripResponseToDraft!(res.data, selectedTripRow);
-        toast.dismiss(toastId);
-        loadSessionsForEdit([draft]);
-        setEntryModalMode("edit");
-        setIsEntryModalOpen(true);
-      } catch (err: any) {
-        console.error("[Fetch Trip Detail Error]", err);
-        toast.error(
-          `Không thể tải chi tiết chuyến: ${err.message || "Lỗi máy chủ"}`,
-          { id: toastId },
-        );
-      }
+      await editTripByRow(selectedTripRow);
       return;
     }
     const selectedRows = [...tripRows, ...fuelRows].filter(
@@ -392,6 +420,7 @@ export function useEntryPageLogic<
     setEntryModalMode,
     handleAddNew,
     handleEditSelected,
+    handleEditRow,
     handleDeleteSelected,
     tripSelection,
     fuelSelection,

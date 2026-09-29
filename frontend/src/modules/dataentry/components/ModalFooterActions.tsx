@@ -52,11 +52,15 @@ export const ModalFooterActions: React.FC<ModalFooterActionsProps> = ({
         className="h-9 text-sm px-6 gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-md transition-all"
       >
         <Save className="w-4 h-4" />
+        {/* Lưu ở màn nhập liệu LUÔN đồng thời là "gửi đi đối chiếu" (chuyến về
+            trạng thái Chờ duyệt), nên nhãn thống nhất "Lưu và gửi" cho cả thêm
+            mới lẫn chỉnh sửa — trước đây chế độ sửa ghi "Lưu bản ghi" gây hiểu
+            nhầm là chỉ lưu nháp. Chốt 2026-09-09. */}
         {isSaving
           ? "Đang lưu..."
           : sessionsCount > 1
-            ? `Lưu (${sessionsCount} bản ghi) (F5)`
-            : "Lưu bản ghi (F5)"}
+            ? `Lưu và gửi (${sessionsCount} bản ghi) (F5)`
+            : "Lưu và gửi (F5)"}
       </Button>
     </>
   );

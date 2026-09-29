@@ -1,6 +1,7 @@
 package com.ecotel.thong_ke_cao_son.controller;
 
 import com.ecotel.thong_ke_cao_son.annotation.PublicApi;
+import com.ecotel.thong_ke_cao_son.security.LocalAuthService;
 import com.ecotel.thong_ke_cao_son.security.OtcStore;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -19,12 +20,36 @@ public class AuthController {
 
     private final OtcStore otcStore;
     private final RestTemplate restTemplate;
+    private final LocalAuthService localAuthService;
 
     @Value("${portal.internal-url}")     // ví dụ: http://portal-service:8080
     private String portalInternalUrl;
 
     @Value("${app.code}")                // "tkcs"
     private String appCode;
+
+    /**
+     * Đăng nhập CỤC BỘ — chế độ chạy độc lập, không cần Portal.
+     * Chỉ có tác dụng khi {@code app.auth.mode=standalone} (mặc định), vì khi
+     * đó bộ giải mã JWT mới là HS256 khớp với token do đây cấp.
+     */
+    @PublicApi
+    @PostMapping("/login")
+    public ResponseEntity<ExchangeCodeResponse> login(@RequestBody LoginRequest request) {
+        LocalAuthService.TokenPair pair =
+                localAuthService.login(request.username(), request.password());
+        return ResponseEntity.ok(new ExchangeCodeResponse(pair.appToken(), pair.refreshToken()));
+    }
+
+    /** Đổi refresh token CỤC BỘ lấy cặp token mới (chế độ standalone). */
+    @PublicApi
+    @PostMapping("/refresh-local")
+    public ResponseEntity<ExchangeCodeResponse> refreshLocal(@RequestBody RefreshRequest request) {
+        LocalAuthService.TokenPair pair = localAuthService.refresh(request.refreshToken());
+        return ResponseEntity.ok(new ExchangeCodeResponse(pair.appToken(), pair.refreshToken()));
+    }
+
+    public record LoginRequest(String username, String password) {}
 
     @PublicApi
     @PostMapping("/exchange-code")

@@ -15,11 +15,19 @@ public interface PositionRepository extends JpaRepository<Position, Long> {
 
     Optional<Position> findByMongoId(String mongoId);
 
+    Optional<Position> findByCode(String code);
+
+    boolean existsByCodeAndIdNot(String code, Long id);
+
+    boolean existsByDepartment_Id(Long departmentId);
+
     @Query("""
         SELECT p FROM Position p
-        WHERE :keyword IS NULL OR :keyword = ''
+        LEFT JOIN p.department dep
+        WHERE (:departmentId IS NULL OR dep.id = :departmentId)
+           AND (:keyword IS NULL OR :keyword = ''
            OR LOWER(p.name) LIKE LOWER(CONCAT('%', :keyword, '%'))
-           OR LOWER(p.code) LIKE LOWER(CONCAT('%', :keyword, '%'))
+           OR LOWER(p.code) LIKE LOWER(CONCAT('%', :keyword, '%')))
         """)
-    Page<Position> search(@Param("keyword") String keyword, Pageable pageable);
+    Page<Position> search(@Param("keyword") String keyword, @Param("departmentId") Long departmentId, Pageable pageable);
 }

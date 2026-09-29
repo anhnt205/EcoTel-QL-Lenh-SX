@@ -13,11 +13,17 @@ import java.util.Optional;
 
 public interface ExcavationReportRepository extends JpaRepository<ExcavationReport, Long> {
 
+    // Xem chú thích tương ứng ở TransportReportRepository.searchIds — cùng
+    // lý do, cùng quyết định (Quality Gate lượt 3 của Codex, 2026-09-10):
+    // CỐ Ý không có `OR ... department.id IS NULL`.
     @Query("""
         SELECT r FROM ExcavationReport r
         WHERE r.reportDate BETWEEN :fromDate AND :toDate
           AND (:shiftIds IS NULL OR r.shift.id IN :shiftIds)
           AND (:excavatorIds IS NULL OR r.excavatorDevice.id IN :excavatorIds)
+          AND (:receivingLocationIds IS NULL OR r.receivingLocation.id IN :receivingLocationIds)
+          AND (:excavationFloors IS NULL OR r.excavationFloor IN :excavationFloors)
+          AND (:departmentId IS NULL OR r.excavatorDevice.department.id = :departmentId)
         ORDER BY r.reportDate DESC
         """)
     Page<ExcavationReport> search(
@@ -25,8 +31,40 @@ public interface ExcavationReportRepository extends JpaRepository<ExcavationRepo
             @Param("toDate") LocalDate toDate,
             @Param("shiftIds") List<Long> shiftIds,
             @Param("excavatorIds") List<Long> excavatorIds,
+            @Param("receivingLocationIds") List<Long> receivingLocationIds,
+            @Param("excavationFloors") List<String> excavationFloors,
+            @Param("departmentId") Long departmentId,
             Pageable pageable);
 
     Optional<ExcavationReport> findByReportDateAndShiftIdAndExcavatorDeviceIdAndEmployeeId(
             LocalDate reportDate, Long shiftId, Long excavatorDeviceId, Long employeeId);
+
+    /**
+     * Toàn bộ giá trị Tầng xúc khác rỗng trong khoảng ngày — KHÔNG phân
+     * trang, KHÔNG lọc theo ca/máy xúc/nơi nhận tải/chính tầng xúc.
+     *
+     * <p>"Tầng xúc" là chuỗi tự do, không có danh mục riêng — màn nhập liệu
+     * phải tự gom giá trị từ dữ liệu để làm tuỳ chọn lọc. Trước đây gom từ
+     * kết quả TRANG ĐANG XEM của {@link #search}, nên tầng chỉ xuất hiện ở
+     * trang sau (hoặc bị chính bộ lọc khác giấu đi) không bao giờ chọn được.
+     * Truy vấn này ĐỘC LẬP với {@code Pageable} và mọi bộ lọc khác — chỉ còn
+     * phụ thuộc khoảng ngày, khớp đúng cách {@code knownBenches} phía
+     * frontend reset khi đổi khoảng ngày.
+     *
+     * <p><b>Thêm {@code departmentId} (Quality Gate lượt 3 của Codex,
+     * 2026-09-10):</b> trước đây bỏ sót — tài khoản 1 đơn vị nhận được toàn
+     * bộ giá trị Tầng xúc gom từ MỌI đơn vị, rò rỉ tên tầng xúc của đơn vị
+     * khác qua bộ lọc phụ trợ dù dữ liệu chính (search/export) đã lọc đúng.
+     */
+    @Query("""
+        SELECT DISTINCT r.excavationFloor FROM ExcavationReport r
+        WHERE r.reportDate BETWEEN :fromDate AND :toDate
+          AND r.excavationFloor IS NOT NULL AND r.excavationFloor <> ''
+          AND (:departmentId IS NULL OR r.excavatorDevice.department.id = :departmentId)
+        ORDER BY r.excavationFloor
+        """)
+    List<String> findDistinctExcavationFloors(
+            @Param("fromDate") LocalDate fromDate,
+            @Param("toDate") LocalDate toDate,
+            @Param("departmentId") Long departmentId);
 }

@@ -26,4 +26,8 @@ public interface CargoTypeRepository extends JpaRepository<CargoType, Long> {
 
     Optional<CargoType> findByName(String name);
 
+    Optional<CargoType> findByCode(String code);
+
+    boolean existsByCodeAndIdNot(String code, Long id);
+
 }

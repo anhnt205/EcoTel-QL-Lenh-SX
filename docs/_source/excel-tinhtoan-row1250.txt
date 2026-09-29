@@ -1,0 +1,139 @@
+# Dong 1250 sheet "tinh toan" - dong du lieu that (dung de kiem chung so hoc)
+# LUU Y: cac o hien ": <so>" KHONG phai la "da dan cung thanh gia tri" - chung dung SHARED FORMULA
+# (the tu dong <f t="shared" si="..."/>) tro ve dong master (dong 5). Cong cu trich khong doc duoc
+# van ban cong thuc cua chung, chi doc duoc gia tri da tinh.
+# Nguon: Thang 5 doi ten xe.xlsx / xl/worksheets/sheet78.xml. KHONG SUA.
+
+### DONG 1250 cua xl/worksheets/sheet78.xml - 132 o
+A1250 = +'Cap nhat Slg ThanV+Dat B1'!A1248
+B1250 = +'Cap nhat Slg ThanV+Dat B1'!B1248
+C1250 = +'Cap nhat Slg ThanV+Dat B1'!C1248
+D1250 = +'Cap nhat Slg ThanV+Dat B1'!D1248
+E1250 = +'Cap nhat Slg ThanV+Dat B1'!E1248
+F1250 = +'Cap nhat Slg ThanV+Dat B1'!G1248
+G1250 = +'Cap nhat Slg ThanV+Dat B1'!F1248
+H1250 = +'Cap nhat Slg ThanV+Dat B1'!H1248
+I1250 = +'Cap nhat Slg ThanV+Dat B1'!M1248
+J1250 = IF(K1250=0,"",INDEX('Mohinh_TheTrong( ko dk xoa)'!$C$4:$AX$144,MATCH(K1250,'Mohinh_TheTrong( ko dk xoa)'!$B$4:$B$144,0),MATCH("Nhom_CLH",'Mohinh_TheTrong( ko dk xoa)'!$C$3:$AX$3,0)))
+K1250 = +'Cap nhat Slg ThanV+Dat B1'!N1248
+L1250 = +'Cap nhat Slg ThanV+Dat B1'!I1248
+M1250 = +'Cap nhat Slg ThanV+Dat B1'!J1248
+N1250 = 'Cap nhat Slg ThanV+Dat B1'!K1248
+O1250 = 'Cap nhat Slg ThanV+Dat B1'!L1248
+P1250 : 275
+Q1250 = +'Cap nhat Slg ThanV+Dat B1'!O1248
+R1250 = +'Cap nhat Slg ThanV+Dat B1'!P1248
+S1250 = IF('Cap nhat Slg ThanV+Dat B1'!$A$1="TKE",1,INDEX('AP Tdia(m3-tan-tkm)'!$S$7:$AJ$1000,MATCH(CR1250,'AP Tdia(m3-tan-tkm)'!$R$7:$R$1000,0),MATCH("HS_"&amp;$AG1250&amp;"_m3",'AP Tdia(m3-tan-tkm)'!$S$6:$AJ$6,0)))
+T1250 = IF('Cap nhat Slg ThanV+Dat B1'!$A$1="TKE",1,INDEX('AP Tdia(m3-tan-tkm)'!$S$7:$AJ$1000,MATCH(CR1250,'AP Tdia(m3-tan-tkm)'!$R$7:$R$1000,0),MATCH("HS_"&amp;$AG1250&amp;"_tan",'AP Tdia(m3-tan-tkm)'!$S$6:$AJ$6,0)))
+U1250 = IF('Cap nhat Slg ThanV+Dat B1'!$A$1="TKE",1,INDEX('AP Tdia(m3-tan-tkm)'!$S$7:$AJ$1000,MATCH(CR1250,'AP Tdia(m3-tan-tkm)'!$R$7:$R$1000,0),MATCH("HS_"&amp;$AG1250&amp;"_tkm",'AP Tdia(m3-tan-tkm)'!$S$6:$AJ$6,0)))
+W1250 = 'Cap nhat Slg ThanV+Dat B1'!W1248
+X1250 = +'Cap nhat Slg ThanV+Dat B1'!AC1248
+Y1250 = 'Cap nhat Slg ThanV+Dat B1'!Q1248
+Z1250 = 'Cap nhat Slg ThanV+Dat B1'!R1248
+AA1250 = 'Cap nhat Slg ThanV+Dat B1'!S1248
+AB1250 = 'Cap nhat Slg ThanV+Dat B1'!T1248
+AC1250 = IF(OR(AG1250="dat_TCN",AG1250="than_CN"),AI1250,IF(AND(AG1250&lt;&gt;"Dat_SX",AG1250&lt;&gt;"than_sx"),0,INDEX('STD(Dat+thanSX)'!$B$6:$P$1000,MATCH($CR1250,'STD(Dat+thanSX)'!$A$6:$A$1000,0),MATCH(IF(AG1250="Dat_SX","TheTrong_Dat_TĐ","TheTrong_Than_TĐ"),'STD(Dat+thanSX)'!$B$5:$P$5,0)))+IF(AG1250&lt;&gt;"Dat_CN",0,INDEX('STD(DatCN)'!$B$5:$H$301,MATCH($CR1250,'STD(DatCN)'!$A$5:$A$301,0),MATCH("DatCN_TT",'STD(DatCN)'!$B$4:$H$4,0))))
+AD1250 : DAT
+AE1250 = 'Cap nhat Slg ThanV+Dat B1'!V1248
+AF1250 = IF('Cap nhat Slg ThanV+Dat B1'!AM1248=0,1,'Cap nhat Slg ThanV+Dat B1'!AM1248)
+AG1250 = IF(AND(D1250="CS",N1250="DaXit.NK"),"Dat_SX",IF(K1250=0,"",INDEX('Mohinh_TheTrong( ko dk xoa)'!$C$4:$AX$144,MATCH(K1250,'Mohinh_TheTrong( ko dk xoa)'!$B$4:$B$144,0),MATCH("SP_NghiemThu",'Mohinh_TheTrong( ko dk xoa)'!$C$3:$AX$3,0))))
+AH1250 = 'Cap nhat Slg ThanV+Dat B1'!U1248
+AI1250 = IF(AB1250&lt;&gt;0,AB1250,INDEX('Mohinh_TheTrong( ko dk xoa)'!$C$4:$AX$144,MATCH(K1250,'Mohinh_TheTrong( ko dk xoa)'!$B$4:$B$144,0),MATCH(IF(D1250="CS","CS.","KC.")&amp;"TyTrong",'Mohinh_TheTrong( ko dk xoa)'!$C$3:$AX$3,0)))
+AJ1250 = ROUND(IF(R1250=0,0,IF(AA1250&lt;&gt;0,AA1250,INDEX('Mohinh_TheTrong( ko dk xoa)'!$C$4:$AX$149,MATCH($K1250,'Mohinh_TheTrong( ko dk xoa)'!$B$4:$B$149,0),MATCH($DA1250,'Mohinh_TheTrong( ko dk xoa)'!$C$3:$AX$3,0))*IF(Z1250="roda",2/3,IF(Z1250=0,1,Z1250)))),3)
+AK1250 : -225
+AL1250 : 37
+AM1250 : 96.828999999999994
+AN1250 : 382.47460000000001
+AO1250 : 3.95
+AP1250 = INDEX('DMNL T2-2025'!$A$7:$A$73,MATCH($L1250,'DMNL T2-2025'!$A$7:$A$73,1))
+AQ1250 = SMALL('DMNL T2-2025'!$A$7:$A$73,COUNTIF('DMNL T2-2025'!$A$7:$A$73,"&lt;"&amp;$L1250)+1)
+AR1250 = INDEX('DMNL T2-2025'!$B$7:$B$73,MATCH($P1250,'DMNL T2-2025'!$B$7:$B$73,1))
+AS1250 = SMALL('DMNL T2-2025'!$B$7:$B$73,COUNTIF('DMNL T2-2025'!$B$7:$B$73,"&lt;"&amp;$P1250)+1)
+AT1250 = INDEX('DMNL T2-2025'!$C$7:$AJR$73,MATCH($AR1250,'DMNL T2-2025'!$B$7:$B$73,0),MATCH(DE1250&amp;"_"&amp;$AP1250,'DMNL T2-2025'!$C$6:$AJR$6,0))
+AU1250 = INDEX('DMNL T2-2025'!$C$7:$AJR$73,MATCH($AS1250,'DMNL T2-2025'!$B$7:$B$73,0),MATCH(DE1250&amp;"_"&amp;$AP1250,'DMNL T2-2025'!$C$6:$AJR$6,0))
+AV1250 : 148
+AW1250 = INDEX('DMNL T2-2025'!$C$7:$AJR$73,MATCH($AR1250,'DMNL T2-2025'!$B$7:$B$73,0),MATCH(DE1250&amp;"_"&amp;$AQ1250,'DMNL T2-2025'!$C$6:$AJR$6,0))
+AX1250 = INDEX('DMNL T2-2025'!$C$7:$AJR$73,MATCH($AS1250,'DMNL T2-2025'!$B$7:$B$73,0),MATCH(DE1250&amp;"_"&amp;$AQ1250,'DMNL T2-2025'!$C$6:$AJR$6,0))
+AY1250 : 140
+AZ1250 : 140.80000000000001
+BA1250 : 140.80000000000001
+BB1250 : 140.80000000000001
+BC1250 : 149.24800000000002
+BD1250 : 149.24800000000002
+BE1250 : 1
+BF1250 : 149.24800000000002
+BG1250 : 57.083569100800005
+BH1250 : 0
+BI1250 : 0
+BJ1250 : 0
+BK1250 : 0.28541784550400001
+BL1250 : 0
+BM1250 : 0
+BN1250 : 0
+BP1250 : 57.368986946304005
+BQ1250 : 53.926847729525761
+BR1250 : 10
+BS1250 : 10175
+BT1250 = IF(K1250=0,"",INDEX('Mohinh_TheTrong( ko dk xoa)'!$C$4:$BB$144,MATCH(K1250,'Mohinh_TheTrong( ko dk xoa)'!$B$4:$B$144,0),MATCH("TTL_CLH",'Mohinh_TheTrong( ko dk xoa)'!$C$3:$BB$3,0)))
+BU1250 = _xlfn.SWITCH(BT1250, "xitNK", IF(OR(G1250={"Sàng 3.CS";"Sàng 1.CS";"Sàng 2B.CS"}), "daloaiNK", "xitCTNB"), "DAT_thai", IF(CQ1250="PA.PCMB.S+90", "thai.PCMB", BT1250), BT1250)
+CC1250 = +INDEX('Mohinh_TheTrong( ko dk xoa)'!$C$4:$AX$144,MATCH($K1250,'Mohinh_TheTrong( ko dk xoa)'!$B$4:$B$144,0),MATCH(IF($D1250="CS","CS.","KC.")&amp;"TyTrongKoQA",'Mohinh_TheTrong( ko dk xoa)'!$C$3:$AX$3,0))
+CD1250 : 96.828999999999994
+CE1250 : 382.47500000000002
+CF1250 = +INDEX('Mohinh_TheTrong( ko dk xoa)'!$C$4:$AX$144,MATCH($K1250,'Mohinh_TheTrong( ko dk xoa)'!$B$4:$B$144,0),MATCH(IF($D1250="CS","CS.","KC.")&amp;"TyTrong",'Mohinh_TheTrong( ko dk xoa)'!$C$3:$AX$3,0))
+CG1250 : 37
+CH1250 : 96.828999999999994
+CI1250 : 382.47500000000002
+CK1250 : 96.828999999999994
+CL1250 = 'Cap nhat Slg ThanV+Dat B1'!W1248
+CN1250 = INDEX('AP BBNT xe-SP'!$B$12:$E$1000,MATCH(CO1250,'AP BBNT xe-SP'!$A$12:$A$1000,0),4)
+CO1250 : Dat_SX_Nomin._11.TTCS_Băng tải.
+CP1250 : -225_p30.
+CQ1250 = VLOOKUP(G1250,'KBTC Xe&amp;May Xuc(ko dk xoa)'!$AD$4:$AE$150,2,0)
+CR1250 : 11._-225_p30._CS_BK
+CS1250 : 11._-225
+CT1250 : 11._-225_Băng tải.
+CU1250 : 11.TTCS_Băng tải.
+CV1250 : 11.TTCS_-225
+CW1250 : 11.TTCS_-225_Băng tải.
+CX1250 : 0
+CY1250 : CAT-950
+CZ1250 : CAT777E.CS.BK
+DA1250 : CAT777E.CS
+DB1250 : C2
+DC1250 : CAT777E_C
+DD1250 : VT4
+DE1250 : CAT777E.BK
+DF1250 : CAT777E
+DG1250 : P30.
+DH1250 : KomatsuPC2000
+DI1250 : A
+DJ1250 : KomatsuPC2000 _A
+DK1250 = INDEX($FT$5:$FT$15,MATCH(DH1250,$FS$5:$FS$15,0)*1)
+DL1250 : Kỳ 01, 1/5 den 7/5
+DM1250 : &gt;90 tan
+DN1250 : KhaiThac1.
+DO1250 : Ca 1+2
+DP1250 : CAT777E_C
+DQ1250 : CAT777E
+DR1250 : CAT777E_C
+DS1250 : 36.282990344126368
+DT1250 : 95.714725290896851
+DU1250 : 378.03555606865382
+DW1250 : 95.714528527805356
+DX1250 : 378.0723876848312
+DY1250 = IF(OR('Cap nhat Slg ThanV+Dat B1'!$A$1="TKE",LEFT(J1250,3)="TCN"),1,INDEX('Ap Tkm'!$Y$7:$AP$1000,MATCH(CR1250,'Ap Tkm'!$X$7:$X$1000,0),MATCH("HS_"&amp;$AG1250&amp;"_tan",'Ap Tkm'!$Y$6:$AP$6,0)))
+DZ1250 = IF(OR('Cap nhat Slg ThanV+Dat B1'!$A$1="TKE",LEFT(J1250,3)="TCN"),1,INDEX('Ap Tkm'!$Y$7:$AP$1000,MATCH(CR1250,'Ap Tkm'!$X$7:$X$1000,0),MATCH("HS_"&amp;$AG1250&amp;"_tkm",'Ap Tkm'!$Y$6:$AP$6,0)))
+EA1250 : CAT777E_C_DAT
+EB1250 : 56.703155925495125
+EC1250 : 0.94
+ED1250 : 0.98839388568196118
+EE1250 : 53.300966569965411
+EF1250 : 1
+EG1250 : 53.300966569965411
+EH1250 : 0
+EI1250 : 56.221607207377922
+FH1250 : 0
+FI1250 : 37
+FJ1250 : 0
+FK1250 : 0
+FL1250 : 0

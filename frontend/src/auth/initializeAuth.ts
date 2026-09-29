@@ -5,6 +5,9 @@ const VITE_API_KONG_URL = import.meta.env.VITE_API_KONG_URL;
 export interface AuthResult {
   ok: boolean;
   error?: string;
+  /** true = chưa đăng nhập (chế độ chạy độc lập) → hiện màn đăng nhập,
+   *  KHÁC với error = có token nhưng đổi/verify thất bại. */
+  needsLogin?: boolean;
 }
 
 // Module-level lock để chống race condition khi React 18 StrictMode mount useEffect 2 lần
@@ -23,10 +26,9 @@ export const initializeAppAuth = (): Promise<AuthResult> => {
     if (tokenService.hasValidPortalToken()) {
       return Promise.resolve({ ok: true });
     }
-    return Promise.resolve({ 
-      ok: false, 
-      error: "Không tìm thấy token. Vui lòng đăng nhập từ Portal." 
-    });
+    // Chế độ chạy độc lập: chưa có token thì hiện màn đăng nhập, không
+    // coi là lỗi xác thực nữa.
+    return Promise.resolve({ ok: false, needsLogin: true });
   }
 
   console.log("[Auth] Starting OTC exchange with code:", code);

@@ -7,11 +7,36 @@ CLAUDE.md gốc ở root repo factory — đọc cả hai trước khi làm vi�
 ## Đọc trước khi làm bất cứ việc gì
 
 1. `.factory/context.md` — trạng thái, quyết định, việc còn dang dở (nguồn
-   sự thật, tin hơn lịch sử chat).
-2. `docs/CODEBASE_MAP.md`, `docs/ARCHITECTURE_CURRENT.md` — bản đồ hệ
+   sự thật, tin hơn lịch sử chat). Phần "BÀN GIAO" ở cuối chỉ rõ đọc tiếp
+   gì tuỳ loại việc.
+2. **`docs/DECISIONS.md`** — quyết định nghiệp vụ chủ dự án đã chốt
+   trực tiếp (QĐ-01…QĐ-08) và mục tạm gác (TG-01). **Không hỏi lại chủ dự
+   án những gì đã có trong file này. Không tự đổi.**
+3. `docs/CODEBASE_MAP.md`, `docs/ARCHITECTURE_CURRENT.md` — bản đồ hệ
    thống, luồng auth qua Portal (đã bật lại).
-3. `docs/TECHNICAL_DEBT.md` — phần "Đã sửa" ghi rõ những gì đã thay đổi
+4. **`docs/DESIGN_SANLUONG.md`** — thiết kế mô hình dữ liệu + kiến trúc
+   tính toán sản lượng (chưa code). Đọc trước khi đụng vào phần sản lượng.
+5. `docs/TECHNICAL_DEBT.md` — phần "Đã sửa" ghi rõ những gì đã thay đổi
    2026-08-29 (lượt 2), phần còn lại là các phát hiện chưa xử lý.
+
+## Yêu cầu nghiệp vụ (thêm 2026-08-30) — có tài liệu gốc từ khách hàng
+
+Khách hàng đã cung cấp sơ đồ workflow, đặc tả `.docx`, và **2 workbook
+Excel đang chạy thật**. Đã trích xuất và phân tích xong:
+
+- `docs/REQUIREMENT_WORKFLOW.md` — luồng nghiệp vụ, vai trò, trường nhập liệu.
+- `docs/REQUIREMENT_SANLUONG.md` — danh mục + công thức (từ bản docx).
+- `docs/REQUIREMENT_SANLUONG_EXCEL.md` — **công thức THẬT từ Excel**.
+- `docs/_source/` — **nguyên bản, KHÔNG SỬA**; kèm `tools/` (script
+  PowerShell đọc .docx/.xlsx — máy này không có Python/Node).
+
+**Khi bản docx và bản Excel mâu thuẫn → TIN EXCEL** (docx viết công thức
+bằng văn xuôi nên thiếu ngoặc/sai tên ở nhiều chỗ).
+
+**Dòng chuẩn của bảng tính là dòng 5** sheet `tinh toan` — nó là dòng
+MASTER của shared formula, chứa văn bản công thức gốc. Dòng 4 là hàng tiêu
+đề (tên cột chính thức). Trước khi tự viết công cụ đọc .xlsx, **bắt buộc**
+đọc `docs/_source/tools/README.md` — có 2 cái bẫy đã gây kết luận sai.
 
 ## Bối cảnh quan trọng — đọc trước khi giả định về Mongo/TK-HATU
 

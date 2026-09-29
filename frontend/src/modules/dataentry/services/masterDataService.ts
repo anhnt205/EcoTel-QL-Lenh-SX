@@ -68,6 +68,48 @@ export interface CargoGroupApiItem {
   name: string;
 }
 
+export interface ExcavationAreaApiItem {
+  id: number;
+  code?: string;
+  name: string;
+  note?: string;
+}
+
+export interface ReceivingPointApiItem {
+  id: number;
+  code?: string;
+  name: string;
+  seamGroupId?: number;
+  seamGroupName?: string;
+  note?: string;
+}
+
+export interface UnloadingPointApiItem {
+  id: number;
+  code?: string;
+  name: string;
+  note?: string;
+}
+
+/**
+ * "Nơi chất tải" của phiếu báo chuyến Khai thác — danh mục Pickup Point
+ * (`/api/pickup-points`, bảng `pickup_points`), KHÔNG PHẢI danh mục
+ * "Locations" chung (`/api/locations`, bảng `locations`).
+ *
+ * Hai bảng này TÌNH CỜ có những dòng trùng TÊN (cả hai đều có "KX1".."KX4")
+ * nhưng ID KHÁC NHAU hẳn — `ExcavationReportService.create()` xác thực
+ * `receivingLocationId` qua `pickupPointRepository`, nên nếu dropdown lấy
+ * nhầm từ `/api/locations` thì save sẽ luôn 404 "Nơi chất tải không tồn
+ * tại: <id sai>" (đã xảy ra thật, vá ngày 2026-09-08 — xem
+ * `useMasterData.ts` và `MiningBatchEntryModal.tsx`).
+ */
+export interface PickupPointApiItem {
+  id: number;
+  code?: string;
+  name: string;
+  note?: string;
+}
+
 const extractData = <T>(res: any): T[] => {
   if (!res || !res.data) return [];
   // Spring Boot ApiResponse wrapping: { status: 200, success: true, data: [...] }
@@ -136,4 +178,25 @@ export const fetchCargoTypes = async (): Promise<CargoTypeApiItem[]> => {
 export const fetchCargoGroups = async (): Promise<CargoGroupApiItem[]> => {
   const res = await api.get(API.MASTER_DATA.CARGO_GROUPS, { params: { size: 1000 } });
   return extractData<CargoGroupApiItem>(res);
+};
+
+export const fetchExcavationAreas = async (): Promise<ExcavationAreaApiItem[]> => {
+  const res = await api.get(API.MASTER_DATA.EXCAVATION_AREAS, { params: { size: 1000 } });
+  return extractData<ExcavationAreaApiItem>(res);
+};
+
+export const fetchReceivingPoints = async (): Promise<ReceivingPointApiItem[]> => {
+  const res = await api.get(API.MASTER_DATA.RECEIVING_POINTS, { params: { size: 1000 } });
+  return extractData<ReceivingPointApiItem>(res);
+};
+
+export const fetchUnloadingPoints = async (): Promise<UnloadingPointApiItem[]> => {
+  const res = await api.get(API.MASTER_DATA.UNLOADING_POINTS, { params: { size: 1000 } });
+  return extractData<UnloadingPointApiItem>(res);
+};
+
+/** "Nơi chất tải" của báo chuyến Khai thác — xem javadoc {@link PickupPointApiItem}. */
+export const fetchPickupPoints = async (): Promise<PickupPointApiItem[]> => {
+  const res = await api.get(API.MASTER_DATA.PICKUP_POINTS, { params: { size: 1000 } });
+  return extractData<PickupPointApiItem>(res);
 };

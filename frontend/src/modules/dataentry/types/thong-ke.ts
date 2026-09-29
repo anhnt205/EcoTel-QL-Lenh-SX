@@ -4,7 +4,7 @@
 
 export type RoleType = "ROLE_TRANSPORT" | "ROLE_MINING" | "ROLE_STATISTICIAN";
 export type ReconcileWorkflowStatus =
-  "PENDING" | "APPROVED" | "REVISION_REQUESTED";
+  "PENDING" | "APPROVED" | "REVISION_REQUESTED" | "AWAITING_REAPPROVAL";
 export type DepartmentTarget = "MINING" | "TRANSPORT" | "BOTH";
 export type ApprovalStatus = "PENDING" | "APPROVED" | "REVISION_REQUESTED";
 

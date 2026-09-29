@@ -53,6 +53,9 @@ export interface TableToolbarProps {
   importExcelAccept?: string;
   showExport?: boolean;
   onExportCsv?: () => void;
+  /** Nhãn của mục xuất trong menu. Mặc định "Xuất CSV" để giữ nguyên hành
+   *  vi cũ; trang nào xuất .xlsx thì truyền nhãn đúng. */
+  exportCsvLabel?: string;
   onExportPdf?: () => void;
   onPrint?: () => void;
   showColumnToggle?: boolean;
@@ -84,6 +87,7 @@ const TableToolbar: React.FC<TableToolbarProps> = ({
   importExcelAccept = ".csv,.tsv,.txt,.xlsx,.xls",
   showExport = true,
   onExportCsv,
+  exportCsvLabel = "Xuất CSV",
   onExportPdf,
   onPrint,
   showColumnToggle = false,
@@ -325,7 +329,7 @@ const TableToolbar: React.FC<TableToolbarProps> = ({
                 {onExportCsv && (
                   <DropdownMenuItem onClick={onExportCsv}>
                     <TableIcon className="w-4 h-4 mr-2" />
-                    <span>Xuất CSV</span>
+                    <span>{exportCsvLabel}</span>
                   </DropdownMenuItem>
                 )}
                 {onExportPdf && (

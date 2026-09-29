@@ -10,6 +10,14 @@ import java.util.List;
 
 public interface TransportReportTripRepository extends JpaRepository<TransportReportTrip, Long> {
 
+    // ORDER BY bắt buộc — thiếu nó là lỗi thật đã tìm thấy qua Quality Gate
+    // của Codex (lượt 2, 2026-09-10): ReconciliationService.search() ghép
+    // cặp bằng Deque.poll() theo đúng THỨ TỰ trả về của truy vấn này; không
+    // ORDER BY thì Postgres không đảm bảo thứ tự ổn định giữa các lần gọi,
+    // khiến việc ghép cặp không xác định (không sai NGHIỆP VỤ — vẫn ghép
+    // đúng khoá — nhưng "ai ghép với ai" trong số nhiều chuyến CÙNG khoá có
+    // thể đổi qua lại giữa các lần tìm kiếm). Khớp đúng thứ tự
+    // {@code ExcavationReportTripRepository.findForReconciliation} đã dùng.
     @Query("""
         SELECT t FROM TransportReportTrip t
         JOIN FETCH t.transportReport r
@@ -24,10 +32,42 @@ public interface TransportReportTripRepository extends JpaRepository<TransportRe
         WHERE r.reportDate BETWEEN :fromDate AND :toDate
           AND (:shiftIds IS NULL OR r.shift.id IN :shiftIds)
           AND (:deviceIds IS NULL OR r.vehicle.id IN :deviceIds)
+        ORDER BY r.reportDate, t.id
         """)
     List<TransportReportTrip> findForReconciliation(
             @Param("fromDate") LocalDate fromDate,
             @Param("toDate") LocalDate toDate,
             @Param("shiftIds") List<Long> shiftIds,
             @Param("deviceIds") List<Long> deviceIds);
+
+    /**
+     * Toàn bộ chuyến trong một khoảng ngày — đầu vào của engine tính sản lượng.
+     *
+     * <p>Nạp sẵn (JOIN FETCH) mọi quan hệ mà công thức đụng tới. Không nạp sẵn
+     * thì mỗi chuyến sinh thêm cả chục truy vấn con; một kỳ vài nghìn chuyến
+     * sẽ thành hàng chục nghìn truy vấn.
+     *
+     * <p>{@code LEFT JOIN} với {@code vehicle} và {@code cargoGroup} vì thiếu
+     * chúng là lỗi nghiệp vụ cần báo rõ, không phải lý do để bỏ sót chuyến
+     * khỏi kết quả tính.
+     */
+    @Query("""
+        SELECT t FROM TransportReportTrip t
+        JOIN FETCH t.transportReport r
+        LEFT JOIN FETCH r.vehicle v
+        LEFT JOIN FETCH v.fuelClass
+        LEFT JOIN FETCH v.vehicleType
+        LEFT JOIN FETCH v.vehicleRank
+        LEFT JOIN FETCH t.excavationArea
+        LEFT JOIN FETCH t.excavator
+        LEFT JOIN FETCH t.loadingPoint
+        LEFT JOIN FETCH t.unloadingPoint
+        LEFT JOIN FETCH t.cargoType ct
+        LEFT JOIN FETCH ct.cargoGroup
+        WHERE r.reportDate BETWEEN :fromDate AND :toDate
+        ORDER BY r.reportDate, t.id
+        """)
+    List<TransportReportTrip> findByReportDateBetween(
+            @Param("fromDate") LocalDate fromDate,
+            @Param("toDate") LocalDate toDate);
 }

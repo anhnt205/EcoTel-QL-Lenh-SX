@@ -93,6 +93,34 @@ export function useMasterData(options: UseMasterDataOptions = {}) {
         enabled,
         staleTime: 0,
       },
+      {
+        queryKey: ["masterData", "excavationAreas"],
+        queryFn: masterDataService.fetchExcavationAreas,
+        enabled,
+        staleTime: 0,
+      },
+      {
+        queryKey: ["masterData", "receivingPoints"],
+        queryFn: masterDataService.fetchReceivingPoints,
+        enabled,
+        staleTime: 0,
+      },
+      {
+        queryKey: ["masterData", "unloadingPoints"],
+        queryFn: masterDataService.fetchUnloadingPoints,
+        enabled,
+        staleTime: 0,
+      },
+      {
+        // "Nơi chất tải" của báo chuyến Khai thác — xem javadoc
+        // `PickupPointApiItem` trong masterDataService.ts. KHÔNG gộp với
+        // query "locations" ở trên: hai danh mục khác nhau, tình cờ trùng
+        // tên vài dòng (KX1..KX4) nhưng ID khác hẳn.
+        queryKey: ["masterData", "pickupPoints"],
+        queryFn: masterDataService.fetchPickupPoints,
+        enabled,
+        staleTime: 0,
+      },
     ],
   });
 
@@ -106,6 +134,10 @@ export function useMasterData(options: UseMasterDataOptions = {}) {
     usersQ,
     cargoTypesQ,
     cargoGroupsQ,
+    excavationAreasQ,
+    receivingPointsQ,
+    unloadingPointsQ,
+    pickupPointsQ,
   ] = results;
 
   const rawShifts = shiftsQ.data ?? [];
@@ -118,6 +150,10 @@ export function useMasterData(options: UseMasterDataOptions = {}) {
   const rawUsers = usersQ.data ?? [];
   const rawCargoTypes = cargoTypesQ.data ?? [];
   const rawCargoGroups = cargoGroupsQ.data ?? [];
+  const rawExcavationAreas = excavationAreasQ.data ?? [];
+  const rawReceivingPoints = receivingPointsQ.data ?? [];
+  const rawUnloadingPoints = unloadingPointsQ.data ?? [];
+  const rawPickupPoints = pickupPointsQ.data ?? [];
 
   // Chuyển đổi thành mảng Option chuẩn
   const rawShiftOptions = rawShifts.map((s) => {
@@ -129,7 +165,12 @@ export function useMasterData(options: UseMasterDataOptions = {}) {
       rawData: s,
     };
   });
-  const shiftOptions = deduplicateOptions(rawShiftOptions);
+  // Luôn sắp Ca tăng dần (Ca 1 → Ca 4), KHÔNG phụ thuộc thứ tự API trả về:
+  // form nhập liệu dùng phần tử đầu tiên làm giá trị mặc định, nên nếu API đổi
+  // thứ tự là form âm thầm điền sai Ca (đã xảy ra thật — xem ShiftController).
+  const shiftOptions = deduplicateOptions(rawShiftOptions).sort(
+    (a, b) => Number(a.value) - Number(b.value),
+  );
   if (shiftOptions.length === 0) {
     shiftOptions.push(
       { value: "1", label: "Ca 1", rawData: { id: 1, name: "1" } },
@@ -176,6 +217,10 @@ export function useMasterData(options: UseMasterDataOptions = {}) {
 
   const cargoTypeOptions = toOptions(rawCargoTypes, "name", "name");
   const cargoGroupOptions = toOptions(rawCargoGroups, "name", "name");
+  const excavationAreaOptions = toOptions(rawExcavationAreas, "name", "name");
+  const receivingPointOptions = toOptions(rawReceivingPoints, "name", "name");
+  const unloadingPointOptions = toOptions(rawUnloadingPoints, "name", "name");
+  const pickupPointOptions = toOptions(rawPickupPoints, "name", "name");
 
   // Mảng chuỗi đơn giản dùng trực tiếp cho ComboboxInput / Select
   const shiftValues = shiftOptions.map((o) => o.value);
@@ -187,6 +232,10 @@ export function useMasterData(options: UseMasterDataOptions = {}) {
   const operatorBadgeValues = operatorOptions.map((o) => o.value);
   const cargoTypeValues = cargoTypeOptions.map((o) => o.value);
   const cargoGroupValues = cargoGroupOptions.map((o) => o.value);
+  const excavationAreaValues = excavationAreaOptions.map((o) => o.value);
+  const receivingPointValues = receivingPointOptions.map((o) => o.value);
+  const unloadingPointValues = unloadingPointOptions.map((o) => o.value);
+  const pickupPointValues = pickupPointOptions.map((o) => o.value);
 
   // Tra cứu tự động từ cache (thay thế cho lookup.ts)
   const getVehicleDetails = (
@@ -322,6 +371,10 @@ export function useMasterData(options: UseMasterDataOptions = {}) {
     rawUsers,
     rawCargoTypes,
     rawCargoGroups,
+    rawExcavationAreas,
+    rawReceivingPoints,
+    rawUnloadingPoints,
+    rawPickupPoints,
 
     // Option arrays
     shiftOptions,
@@ -333,6 +386,10 @@ export function useMasterData(options: UseMasterDataOptions = {}) {
     operatorOptions,
     cargoTypeOptions,
     cargoGroupOptions,
+    excavationAreaOptions,
+    receivingPointOptions,
+    unloadingPointOptions,
+    pickupPointOptions,
 
     // Value arrays (strings)
     shiftValues,
@@ -344,6 +401,10 @@ export function useMasterData(options: UseMasterDataOptions = {}) {
     operatorBadgeValues,
     cargoTypeValues,
     cargoGroupValues,
+    excavationAreaValues,
+    pickupPointValues,
+    receivingPointValues,
+    unloadingPointValues,
 
     // Lookup functions
     getVehicleDetails,

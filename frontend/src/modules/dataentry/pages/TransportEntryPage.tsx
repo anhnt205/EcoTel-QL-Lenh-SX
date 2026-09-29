@@ -1,5 +1,8 @@
 import React, { useState, useMemo } from "react";
-import type { TransportRecord } from "@/modules/dataentry/types/thong-ke";
+import type {
+  ApprovalStatus,
+  TransportRecord,
+} from "@/modules/dataentry/types/thong-ke";
 import {
   useTransportReportsQuery,
   fetchTransportReportById,
@@ -20,6 +23,7 @@ import { EntryPageHeader } from "@/modules/dataentry/components/EntryPageHeader"
 import { FilterResetButton } from "@/modules/dataentry/components/FilterResetButton";
 import { useEntryPageLogic } from "@/modules/dataentry/hooks/useEntryPageLogic";
 import { useMasterData } from "@/modules/dataentry/hooks/useMasterData";
+import { useLiveQueryInvalidation } from "@/hooks/useLiveQueryInvalidation";
 import { Input } from "@/components/ui/input";
 import {
   Combobox,
@@ -34,8 +38,9 @@ import {
   useComboboxAnchor,
 } from "@/components/ui/combobox";
 import { DatePickerString } from "@/components/common/DatePickerString";
-import { Search, Truck, Fuel, AlertTriangle } from "lucide-react";
+import { Search, Truck, Fuel } from "lucide-react";
 import { toast } from "sonner";
+import { currentMonthRange } from "@/lib/utils";
 
 export const TransportEntryPage: React.FC = () => {
   const role = "ROLE_TRANSPORT";
@@ -43,8 +48,14 @@ export const TransportEntryPage: React.FC = () => {
   const vehicleAnchorRef = useComboboxAnchor();
 
   // ── Main Top Filters ─────────────────────────────────────────────────────
-  const [startDate, setStartDate] = useState("2026-08-01");
-  const [endDate, setEndDate] = useState("2026-08-31");
+  // Mặc định = tháng hiện tại (trước đây cứng "2026-08-01".."2026-08-31" —
+  // bản ghi nhập ở tháng khác "biến mất" khỏi danh sách mặc định, hiểu nhầm
+  // thành lưu thất bại — cùng lỗi vừa gặp thật ở màn Khai thác, 2026-09-08).
+  // `useState` chỉ đọc giá trị khởi tạo ở lần render đầu, nên tháng không tự
+  // nhảy khi đồng hồ máy khách sang ngày mới giữa phiên làm việc.
+  const defaultDateRange = currentMonthRange();
+  const [startDate, setStartDate] = useState(defaultDateRange.from);
+  const [endDate, setEndDate] = useState(defaultDateRange.to);
   const [selectedShifts, setSelectedShifts] = useState<string[]>([]);
   const [selectedVehicles, setSelectedVehicles] = useState<string[]>([]);
   const [searchKeyword, setSearchKeyword] = useState("");
@@ -101,6 +112,11 @@ export const TransportEntryPage: React.FC = () => {
     shiftIds,
     deviceIds,
   });
+  // Đối chiếu yêu cầu chỉnh sửa (hoặc duyệt) 1 chuyến Vận tải thì trạng thái
+  // ở đây phải tự cập nhật ngay — chủ dự án chốt 2026-09-10 (lượt 2), trước
+  // đó chỉ áp cho màn Đối chiếu nên bên Vận tải phải tự tải lại trang mới
+  // thấy yêu cầu sửa mới.
+  useLiveQueryInvalidation([["transportReports"]]);
 
   const bulkDeleteReportMutation = useBulkDeleteTransportReportMutation();
   const bulkDeleteTripsMutation = useBulkDeleteTransportTripsMutation();
@@ -286,9 +302,29 @@ export const TransportEntryPage: React.FC = () => {
   // ── Table 1 Rows (Báo chuyến) ────────────────────────────────────────────
   const tripRows = filteredRecords;
 
-  // ── Số lượng bản ghi cần sửa ────────────────────────────────────────────
-  const changesRequestedCount = useMemo(() => {
-    return tripRows.filter((r) => r.status === "REVISION_REQUESTED").length;
+  // Bộ lọc trạng thái dạng checkbox (Tất cả/Đã gửi/Chờ duyệt/Cần sửa) — chỉ
+  // lọc phần HIỂN THỊ của Bảng báo chuyến, không đụng gì tới selection
+  // (tripSelection vẫn giữ nguyên toàn bộ tripRows như trước). Set rỗng =
+  // đang xem "Tất cả".
+  const [statusFilter, setStatusFilter] = useState<Set<ApprovalStatus>>(
+    new Set(),
+  );
+  const displayedTripRows = useMemo(() => {
+    if (statusFilter.size === 0) return tripRows;
+    return tripRows.filter((r) =>
+      statusFilter.has((r.status || "PENDING") as ApprovalStatus),
+    );
+  }, [tripRows, statusFilter]);
+
+  // Đếm theo trạng thái từ TOÀN BỘ tripRows (không phải displayedTripRows đã
+  // lọc) — để số đếm cạnh mỗi nhãn luôn ổn định, không co lại khi đang lọc.
+  const statusCounts = useMemo(() => {
+    const counts = { all: tripRows.length, APPROVED: 0, PENDING: 0, REVISION_REQUESTED: 0 };
+    tripRows.forEach((r) => {
+      const status = (r.status || "PENDING") as ApprovalStatus;
+      counts[status] = (counts[status] ?? 0) + 1;
+    });
+    return counts;
   }, [tripRows]);
 
   // ── Table 2 Rows (Báo nhiên liệu - deduplicated by date, shift, vehicleNo) ──
@@ -313,6 +349,7 @@ export const TransportEntryPage: React.FC = () => {
     setIsEntryModalOpen,
     handleAddNew,
     handleEditSelected,
+    handleEditRow,
     handleDeleteSelected,
     tripSelection,
     fuelSelection,
@@ -520,25 +557,21 @@ export const TransportEntryPage: React.FC = () => {
       {/* ══ BẢNG: BẢNG BÁO CHUYẾN ══════════════════════════════════════ */}
       <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm overflow-hidden space-y-3 p-4">
         {/* Table Title */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2.5 text-sm font-bold text-gray-900 dark:text-gray-100">
-            <Truck className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-            <span>BẢNG BÁO CHUYẾN</span>
-            {changesRequestedCount > 0 && (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-300 dark:bg-rose-950/60 dark:text-rose-300 dark:border-rose-800 animate-pulse">
-                <AlertTriangle className="w-3 h-3 text-rose-600" />
-                <span>{changesRequestedCount} bản ghi cần sửa</span>
-              </span>
-            )}
-          </div>
+        <div className="flex items-center gap-2.5 text-sm font-bold text-gray-900 dark:text-gray-100">
+          <Truck className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+          <span>BẢNG BÁO CHUYẾN</span>
         </div>
 
         {/* Table 1 Content */}
         <TransportTripsDataTable
-          data={tripRows}
+          data={displayedTripRows}
           selectedIds={tripSelection.selectedIds}
           onToggleSelectAll={tripSelection.toggleSelectAll}
           onToggleSelectRow={tripSelection.toggleSelect}
+          onEditRow={handleEditRow}
+          statusFilterValue={statusFilter}
+          onStatusFilterChange={setStatusFilter}
+          statusCounts={statusCounts}
         />
       </div>
 

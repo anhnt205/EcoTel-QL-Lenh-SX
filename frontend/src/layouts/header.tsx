@@ -10,12 +10,10 @@ import {
   GitCompareArrows,
   Menu,
   FolderTree,
-  Cog,
-  Layers,
-  MapPin,
-  Building2,
-  Clock,
+  Grid3x3,
+  Calculator,
   FileCheck,
+  Ruler,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -30,6 +28,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { ROUTES } from "@/constants/routes";
+import { CATALOG_MENU } from "./catalog-menu";
 import { useRoleStore, ROLE_DETAILS } from "@/stores/useRoleStore";
 import type { RoleType } from "@/modules/dataentry/types/thong-ke";
 
@@ -136,7 +135,11 @@ export function Header() {
           {/* Danh mục ∨ */}
           <DropdownMenu>
             <DropdownMenuTrigger
-              className={dropdownTriggerClass(pathname.startsWith("/danh-muc"))}
+              className={dropdownTriggerClass(
+                pathname.startsWith("/danh-muc") &&
+                  !pathname.startsWith(ROUTES.DANH_MUC.DINH_MUC_NHIEN_LIEU) &&
+                  !pathname.startsWith(ROUTES.DANH_MUC.AP_TRAC_DIA),
+              )}
             >
               <FolderTree className="h-4 w-4 mr-0.5" />
               Danh mục
@@ -150,110 +153,57 @@ export function Header() {
                 Quản lý danh mục
               </DropdownMenuLabel>
 
-              {/* Thiết bị (Sub Menu) */}
-              <DropdownMenuSub>
-                <DropdownMenuSubTrigger className="flex items-center gap-2 px-2.5 py-2 text-sm rounded hover:bg-blue-50 cursor-pointer">
-                  <Cog className="h-4 w-4 text-blue-600" />
-                  <span>Thiết bị</span>
-                </DropdownMenuSubTrigger>
-                <DropdownMenuSubContent className="w-48 p-1 bg-white text-gray-800 shadow-xl border border-gray-200 rounded-lg ml-1">
-                  <DropdownMenuItem asChild>
-                    <NavLink
-                      to={ROUTES.DANH_MUC.THONG_TIN_XE}
-                      className="flex items-center gap-2 px-2.5 py-2 text-sm rounded hover:bg-blue-50 cursor-pointer"
-                    >
-                      Thông tin xe
-                    </NavLink>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <NavLink
-                      to={ROUTES.DANH_MUC.THONG_TIN_MAY}
-                      className="flex items-center gap-2 px-2.5 py-2 text-sm rounded hover:bg-blue-50 cursor-pointer"
-                    >
-                      Thông tin máy
-                    </NavLink>
-                  </DropdownMenuItem>
-                </DropdownMenuSubContent>
-              </DropdownMenuSub>
-
-              {/* Nhóm hàng */}
-              <DropdownMenuItem asChild>
-                <NavLink
-                  to={ROUTES.DANH_MUC.NHOM_HANG}
-                  className="flex items-center gap-2 px-2.5 py-2 text-sm rounded hover:bg-blue-50 cursor-pointer"
-                >
-                  <FolderTree className="h-4 w-4 text-blue-600" />
-                  Nhóm hàng
-                </NavLink>
-              </DropdownMenuItem>
-
-              {/* Loại hàng */}
-              <DropdownMenuItem asChild>
-                <NavLink
-                  to={ROUTES.DANH_MUC.LOAI_HANG}
-                  className="flex items-center gap-2 px-2.5 py-2 text-sm rounded hover:bg-blue-50 cursor-pointer"
-                >
-                  <Layers className="h-4 w-4 text-blue-600" />
-                  Loại hàng
-                </NavLink>
-              </DropdownMenuItem>
-
-              {/* Vật liệu */}
-              <DropdownMenuItem asChild>
-                <NavLink
-                  to={ROUTES.DANH_MUC.VAT_LIEU}
-                  className="flex items-center gap-2 px-2.5 py-2 text-sm rounded hover:bg-blue-50 cursor-pointer"
-                >
-                  <Layers className="h-4 w-4 text-blue-600" />
-                  Vật liệu
-                </NavLink>
-              </DropdownMenuItem>
-
-              {/* Vị trí */}
-              <DropdownMenuItem asChild>
-                <NavLink
-                  to={ROUTES.DANH_MUC.DIEM_DO_TAI}
-                  className="flex items-center gap-2 px-2.5 py-2 text-sm rounded hover:bg-blue-50 cursor-pointer"
-                >
-                  <MapPin className="h-4 w-4 text-blue-600" />
-                  Vị trí
-                </NavLink>
-              </DropdownMenuItem>
-
-              {/* Đơn vị */}
-              <DropdownMenuItem asChild>
-                <NavLink
-                  to={ROUTES.DANH_MUC.DON_VI}
-                  className="flex items-center gap-2 px-2.5 py-2 text-sm rounded hover:bg-blue-50 cursor-pointer"
-                >
-                  <Building2 className="h-4 w-4 text-blue-600" />
-                  Đơn vị
-                </NavLink>
-              </DropdownMenuItem>
-
-              {/* Ca làm việc */}
-              <DropdownMenuItem asChild>
-                <NavLink
-                  to={ROUTES.DANH_MUC.CA_LAM_VIEC}
-                  className="flex items-center gap-2 px-2.5 py-2 text-sm rounded hover:bg-blue-50 cursor-pointer"
-                >
-                  <Clock className="h-4 w-4 text-blue-600" />
-                  Ca làm việc
-                </NavLink>
-              </DropdownMenuItem>
-
-              {/* Người dùng & Lái xe */}
-              <DropdownMenuItem asChild>
-                <NavLink
-                  to={ROUTES.DANH_MUC.NGUOI_DUNG}
-                  className="flex items-center gap-2 px-2.5 py-2 text-sm rounded hover:bg-blue-50 cursor-pointer"
-                >
-                  <User className="h-4 w-4 text-blue-600" />
-                  Người dùng & Lái xe
-                </NavLink>
-              </DropdownMenuItem>
+              {/* Gom nhóm theo CATALOG_MENU — muốn đổi nhóm/thứ tự/nhãn thì sửa
+                  ở file đó, KHÔNG sửa ở đây, để menu rộng và menu thu gọn luôn
+                  khớp nhau. */}
+              {CATALOG_MENU.map((group) => (
+                <DropdownMenuSub key={group.label}>
+                  <DropdownMenuSubTrigger className="flex items-center gap-2 px-2.5 py-2 text-sm rounded hover:bg-blue-50 cursor-pointer">
+                    <FolderTree className="h-4 w-4 text-blue-600" />
+                    <span>{group.label}</span>
+                  </DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent className="w-56 p-1 bg-white text-gray-800 shadow-xl border border-gray-200 rounded-lg ml-1 max-h-[70vh] overflow-y-auto">
+                    {group.items.map((item) => (
+                      <DropdownMenuItem asChild key={item.label}>
+                        <NavLink
+                          to={item.to}
+                          className="flex items-center gap-2 px-2.5 py-2 text-sm rounded hover:bg-blue-50 cursor-pointer"
+                        >
+                          {item.label}
+                        </NavLink>
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
+              ))}
             </DropdownMenuContent>
           </DropdownMenu>
+
+          {/* Định mức nhiên liệu — tách riêng khỏi Danh mục, đặt ngay cạnh */}
+          <NavLink
+            to={ROUTES.DANH_MUC.DINH_MUC_NHIEN_LIEU}
+            className={({ isActive }) =>
+              navItemClass(
+                isActive || pathname.startsWith(ROUTES.DANH_MUC.DINH_MUC_NHIEN_LIEU),
+              )
+            }
+          >
+            <Grid3x3 className="h-4 w-4 mr-0.5" />
+            Định mức nhiên liệu
+          </NavLink>
+
+          {/* Áp Trắc Địa — tách riêng khỏi Danh mục, đặt ngay cạnh */}
+          <NavLink
+            to={ROUTES.DANH_MUC.AP_TRAC_DIA}
+            className={({ isActive }) =>
+              navItemClass(
+                isActive || pathname.startsWith(ROUTES.DANH_MUC.AP_TRAC_DIA),
+              )
+            }
+          >
+            <Ruler className="h-4 w-4 mr-0.5" />
+            Áp Trắc Địa
+          </NavLink>
 
           {/* Đối chiếu */}
           <NavLink
@@ -280,6 +230,18 @@ export function Header() {
           >
             <FileCheck className="h-4 w-4 mr-0.5 text-blue-200" />
             Báo chuyến
+          </NavLink>
+
+          {/* Báo cáo thống kê — đầu ra cuối cùng, để ở cấp cao nhất chứ không
+              nằm trong nhóm Danh mục */}
+          <NavLink
+            to={ROUTES.BAO_CAO.THONG_KE}
+            className={({ isActive }) =>
+              navItemClass(isActive || pathname.startsWith(ROUTES.BAO_CAO.THONG_KE))
+            }
+          >
+            <Calculator className="h-4 w-4 mr-0.5 text-blue-200" />
+            Báo cáo thống kê
           </NavLink>
         </nav>
 
@@ -341,92 +303,26 @@ export function Header() {
                 Danh mục
               </DropdownMenuLabel>
 
-              <DropdownMenuSub>
-                <DropdownMenuSubTrigger className="flex items-center gap-2 px-2 py-2 text-sm font-medium rounded hover:bg-blue-50 cursor-pointer">
-                  <Cog className="h-4 w-4 text-blue-600" /> Thiết bị
-                </DropdownMenuSubTrigger>
-                <DropdownMenuSubContent className="w-56 p-1 bg-white text-zinc-800 shadow-xl border border-zinc-200 rounded-lg ml-1">
-                  <DropdownMenuItem asChild>
-                    <NavLink
-                      to={ROUTES.DANH_MUC.THONG_TIN_XE}
-                      className="flex items-center gap-2 px-2.5 py-2 text-sm rounded hover:bg-blue-50 cursor-pointer"
-                    >
-                      Thông tin xe
-                    </NavLink>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <NavLink
-                      to={ROUTES.DANH_MUC.THONG_TIN_MAY}
-                      className="flex items-center gap-2 px-2.5 py-2 text-sm rounded hover:bg-blue-50 cursor-pointer"
-                    >
-                      Thông tin máy
-                    </NavLink>
-                  </DropdownMenuItem>
-                </DropdownMenuSubContent>
-              </DropdownMenuSub>
-
-              <DropdownMenuItem asChild>
-                <NavLink
-                  to={ROUTES.DANH_MUC.NHOM_HANG}
-                  className="flex items-center gap-2 px-2 py-2 text-sm font-medium"
-                >
-                  <FolderTree className="h-4 w-4 text-blue-600" /> Nhóm hàng
-                </NavLink>
-              </DropdownMenuItem>
-
-              <DropdownMenuItem asChild>
-                <NavLink
-                  to={ROUTES.DANH_MUC.LOAI_HANG}
-                  className="flex items-center gap-2 px-2 py-2 text-sm font-medium"
-                >
-                  <Layers className="h-4 w-4 text-blue-600" /> Loại hàng
-                </NavLink>
-              </DropdownMenuItem>
-
-              <DropdownMenuItem asChild>
-                <NavLink
-                  to={ROUTES.DANH_MUC.VAT_LIEU}
-                  className="flex items-center gap-2 px-2 py-2 text-sm font-medium"
-                >
-                  <Layers className="h-4 w-4 text-blue-600" /> Vật liệu
-                </NavLink>
-              </DropdownMenuItem>
-
-              <DropdownMenuItem asChild>
-                <NavLink
-                  to={ROUTES.DANH_MUC.DIEM_DO_TAI}
-                  className="flex items-center gap-2 px-2 py-2 text-sm font-medium"
-                >
-                  <MapPin className="h-4 w-4 text-blue-600" /> Điểm đổ tải
-                </NavLink>
-              </DropdownMenuItem>
-
-              <DropdownMenuItem asChild>
-                <NavLink
-                  to={ROUTES.DANH_MUC.DON_VI}
-                  className="flex items-center gap-2 px-2 py-2 text-sm font-medium"
-                >
-                  <Building2 className="h-4 w-4 text-blue-600" /> Đơn vị
-                </NavLink>
-              </DropdownMenuItem>
-
-              <DropdownMenuItem asChild>
-                <NavLink
-                  to={ROUTES.DANH_MUC.CA_LAM_VIEC}
-                  className="flex items-center gap-2 px-2 py-2 text-sm font-medium"
-                >
-                  <Clock className="h-4 w-4 text-blue-600" /> Ca làm việc
-                </NavLink>
-              </DropdownMenuItem>
-
-              <DropdownMenuItem asChild>
-                <NavLink
-                  to={ROUTES.DANH_MUC.NGUOI_DUNG}
-                  className="flex items-center gap-2 px-2 py-2 text-sm font-medium"
-                >
-                  <User className="h-4 w-4 text-blue-600" /> Người dùng & Lái xe
-                </NavLink>
-              </DropdownMenuItem>
+              {/* Cùng nguồn CATALOG_MENU với menu màn rộng — xem chú thích ở trên. */}
+              {CATALOG_MENU.map((group) => (
+                <DropdownMenuSub key={group.label}>
+                  <DropdownMenuSubTrigger className="flex items-center gap-2 px-2 py-2 text-sm font-medium rounded hover:bg-blue-50 cursor-pointer">
+                    <FolderTree className="h-4 w-4 text-blue-600" /> {group.label}
+                  </DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent className="w-56 p-1 bg-white text-zinc-800 shadow-xl border border-zinc-200 rounded-lg ml-1 max-h-[60vh] overflow-y-auto">
+                    {group.items.map((item) => (
+                      <DropdownMenuItem asChild key={item.label}>
+                        <NavLink
+                          to={item.to}
+                          className="flex items-center gap-2 px-2 py-2 text-sm font-medium"
+                        >
+                          {item.label}
+                        </NavLink>
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
+              ))}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>

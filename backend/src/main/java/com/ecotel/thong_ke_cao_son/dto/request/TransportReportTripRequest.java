@@ -41,6 +41,15 @@ public class TransportReportTripRequest {
     @Min(value = 1, message = "Số chuyến phải >= 1")
     private Integer tripCount;
 
+    // Sáu trường "(Báo chuyến)" phục vụ tính sản lượng (B5). Để trống được;
+    // trống KHÁC 0 — xem ghi chú ở TransportReportTrip.
+    private java.math.BigDecimal weighedWeightTon;
+    private java.math.BigDecimal provisionalModel;
+    private java.math.BigDecimal provisionalDensity;
+    private java.math.BigDecimal ctnbDeviationCoefficient;
+    private java.math.BigDecimal deductionAmount;
+    private java.math.BigDecimal wasteRockTon;
+
     @NotNull(message = "Mức tải là bắt buộc")
     private LoadLevelType loadLevelType;
 

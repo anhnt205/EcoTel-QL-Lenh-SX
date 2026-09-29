@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { CustomNoteTooltip } from "@/modules/reconciliation/components/CustomNoteTooltip";
+import { ReconciliationHistoryPopover } from "@/modules/reconciliation/components/ReconciliationHistoryPopover";
 import {
   Check,
   AlertTriangle,
@@ -816,15 +817,55 @@ export function createReconciliationColumns(
         {
           id: "mismatched",
           header: "Sai lệch",
-          cell: ({ row }) =>
-            !meta().isMatched(row.original) ? (
-              <div className="w-5 h-5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-400 flex items-center justify-center mx-auto">
-                <AlertTriangle className="w-3.5 h-3.5 fill-amber-500 text-amber-100" />
+          cell: ({ row }) => {
+            const bRow = row.original.backendRow;
+            const hasHistory =
+              bRow?.transportHistoryAvailable || bRow?.excavationHistoryAvailable;
+            // Dòng đã duyệt thì coi như đã chốt xong: hiện dấu tích xanh thay
+            // cho cảnh báo lệch — thống kê viên đã xem và chấp nhận số liệu,
+            // để nguyên tam giác vàng sẽ gây hiểu nhầm là còn việc phải xử lý.
+            // Chốt 2026-09-09.
+            const isApproved =
+              row.original.reconciliationStatus === "APPROVED";
+            // Cặp ghép KHÔNG xác định rõ ràng (nhiều chuyến cùng khoá, không
+            // đúng 1 chuyến khớp nội dung) — backend đã chặn duyệt/yêu cầu
+            // sửa cho cặp này, FE phải cảnh báo RIÊNG (khác hẳn tam giác "sai
+            // lệch" thường — đây không phải lỗi số liệu mà là không chắc
+            // chắn đúng cặp). Quality Gate lượt 4 của Codex, 2026-09-15.
+            const isAmbiguous = !!bRow?.pairingAmbiguous && !isApproved;
+            return (
+              <div className="flex items-center justify-center gap-1">
+                {isAmbiguous ? (
+                  <div
+                    className="w-5 h-5 rounded-full bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300 flex items-center justify-center"
+                    title="Ghép cặp không chắc chắn — nhiều chuyến cùng ngày/ca/xe/máy xúc, không đúng 1 chuyến khớp nội dung. Không thể duyệt/yêu cầu sửa cho tới khi làm rõ dữ liệu."
+                  >
+                    <span className="text-[11px] font-bold leading-none">?</span>
+                  </div>
+                ) : isApproved ? (
+                  <div
+                    className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 flex items-center justify-center"
+                    title="Đã duyệt"
+                  >
+                    <Check className="w-3.5 h-3.5 stroke-[3]" />
+                  </div>
+                ) : !meta().isMatched(row.original) ? (
+                  <div className="w-5 h-5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-400 flex items-center justify-center">
+                    <AlertTriangle className="w-3.5 h-3.5 fill-amber-500 text-amber-100" />
+                  </div>
+                ) : (
+                  <span className="text-gray-400">-</span>
+                )}
+                {hasHistory && (
+                  <ReconciliationHistoryPopover
+                    transportReportTripId={bRow?.transportReportTripId}
+                    excavationReportTripId={bRow?.excavationReportTripId}
+                  />
+                )}
               </div>
-            ) : (
-              <span className="text-gray-400">-</span>
-            ),
-          size: 65,
+            );
+          },
+          size: 90,
         },
       ],
     },
@@ -851,29 +892,48 @@ export function createReconciliationColumns(
             const item = row.original;
             const status: ReconcileWorkflowStatus =
               item.reconciliationStatus || "PENDING";
+            const bRow = (item as any).backendRow;
+            // Trạng thái ĐÚNG BÊN của vai trò đang đăng nhập — KHÔNG dùng
+            // `status` (trạng thái gộp cả dòng) để quyết định vai trò đơn vị
+            // có "Gửi lại" hay không: 2 bên có trạng thái ĐỘC LẬP, nếu chỉ 1
+            // bên bị yêu cầu sửa thì bên còn lại không nên thấy/động vào nút
+            // "Gửi lại" (tránh gửi lại NHẦM sang bên không liên quan).
+            const ownSideStatus =
+              currentRole === "ROLE_TRANSPORT"
+                ? bRow?.transportStatus
+                : currentRole === "ROLE_MINING"
+                  ? bRow?.excavationStatus
+                  : undefined;
 
             // ── Vai trò THỐNG KÊ: Người Điều Hành (Gộp Duyệt, Sửa, Xóa thành icon) ──
             if (currentRole === "ROLE_STATISTICIAN") {
               const isRevisionRequested = status === "REVISION_REQUESTED";
+              // Cặp ghép không chắc chắn -> khoá luôn "Yêu cầu chỉnh sửa"
+              // (không riêng "Duyệt") — sửa dữ liệu dựa trên 1 liên kết tuỳ ý
+              // (có thể sai cặp) cũng vô nghĩa/gây nhầm y hệt duyệt nhầm.
+              // Quality Gate lượt 4 của Codex, 2026-09-15.
+              const isAmbiguous = !!bRow?.pairingAmbiguous;
+              const editDisabled = isRevisionRequested || isAmbiguous;
 
-              // ponytail: disable request button if already requested revision and waiting for units to update
               const editButton = (
                 <Button
                   size="sm"
                   variant="outline"
-                  disabled={isRevisionRequested}
+                  disabled={editDisabled}
                   onClick={() =>
-                    !isRevisionRequested && setRequestModalItem(item)
+                    !editDisabled && setRequestModalItem(item)
                   }
                   className={`h-7 w-7 p-0 rounded-lg shadow-2xs transition-all ${
-                    isRevisionRequested
+                    editDisabled
                       ? "opacity-50 cursor-not-allowed border-amber-200 text-amber-600 bg-amber-50/50 dark:border-amber-900/50 dark:text-amber-400 dark:bg-amber-950/20"
                       : "border-blue-200 text-blue-700 hover:bg-blue-50/70 hover:border-blue-300 dark:border-blue-800 dark:text-blue-300 dark:hover:bg-blue-950/40"
                   }`}
                   title={
-                    isRevisionRequested
-                      ? "Đang chờ đơn vị sửa lại"
-                      : "Yêu cầu chỉnh sửa"
+                    isAmbiguous
+                      ? "Cặp ghép không chắc chắn — cần làm rõ dữ liệu trước"
+                      : isRevisionRequested
+                        ? "Đang chờ đơn vị sửa lại"
+                        : "Yêu cầu chỉnh sửa"
                   }
                 >
                   <FileEdit className="w-3.5 h-3.5" />
@@ -896,7 +956,11 @@ export function createReconciliationColumns(
               );
 
               if (status === "APPROVED") {
-                // ponytail: khi đã duyệt, ẩn nút yêu cầu chỉnh sửa, chỉ hiển thị biểu tượng đã duyệt và nút xóa
+                // Đã duyệt: hiện dấu tích + VẪN GIỮ nút "Yêu cầu chỉnh sửa".
+                // Trước đây ẩn nút này đi, thành ra dòng đã duyệt bị khoá chết:
+                // backend chặn sửa chuyến đã duyệt (QĐ-17) mà Thống kê lại
+                // không còn đường gửi yêu cầu sửa — không ai sửa lại được số
+                // liệu đã duyệt nữa. Chốt 2026-09-09.
                 return (
                   <div className="flex items-center justify-center gap-1.5">
                     <span
@@ -905,6 +969,7 @@ export function createReconciliationColumns(
                     >
                       <Check className="w-4 h-4 stroke-[2.5]" />
                     </span>
+                    {editButtonWithTooltip}
                     <Button
                       size="sm"
                       variant="ghost"
@@ -921,15 +986,33 @@ export function createReconciliationColumns(
                 );
               }
 
+              // Chưa đủ dữ liệu 2 bên (1 bên chưa nhập) HOẶC dữ liệu 2 bên
+              // chưa khớp (Loại hàng/Số chuyến lệch nhau) thì KHÔNG cho
+              // duyệt — dùng đúng meta().isMatched, cùng logic đang quyết
+              // định tam giác cảnh báo ở cột "Sai lệch", để 2 chỗ không bao
+              // giờ lệch nhau. Chốt 2026-09-10. Cặp ghép KHÔNG chắc chắn
+              // (pairingAmbiguous) cũng chặn — backend đã từ chối duyệt cho
+              // cặp này ở API, khoá nút ở đây để người dùng không bấm vô ích
+              // (và không hiểu nhầm là bấm được). Quality Gate lượt 4.
+              const canApprove = meta().isMatched(item) && !isAmbiguous;
+
               return (
                 <div className="flex items-center justify-center gap-1.5">
                   <Button
                     size="sm"
+                    disabled={!canApprove}
                     onClick={() => {
+                      if (!canApprove) return;
                       onApproveItem?.(item.id);
                     }}
-                    className="h-7 w-7 p-0 bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-2xs transition-all"
-                    title="Duyệt bản ghi"
+                    className="h-7 w-7 p-0 bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-2xs transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-blue-600"
+                    title={
+                      isAmbiguous
+                        ? "Cặp ghép không chắc chắn — cần làm rõ dữ liệu trước khi duyệt"
+                        : canApprove
+                          ? "Duyệt bản ghi"
+                          : "Chưa đủ dữ liệu 2 bên hoặc dữ liệu chưa khớp — không thể duyệt"
+                    }
                   >
                     <Check className="w-3.5 h-3.5 stroke-[2.5]" />
                   </Button>
@@ -993,7 +1076,7 @@ export function createReconciliationColumns(
               );
             }
 
-            if (status === "REVISION_REQUESTED") {
+            if (ownSideStatus === "REVISION_REQUESTED") {
               const noteIcon = (
                 <div
                   className="h-7 w-7 inline-flex items-center justify-center text-blue-600 dark:text-blue-400 bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/50 dark:hover:bg-blue-900/50 border border-blue-200 dark:border-blue-800 rounded-lg transition-colors cursor-help shadow-2xs"
@@ -1023,6 +1106,16 @@ export function createReconciliationColumns(
                   >
                     <Send className="w-3 h-3" /> Gửi lại
                   </Button>
+                </div>
+              );
+            }
+
+            if (status === "AWAITING_REAPPROVAL") {
+              return (
+                <div className="flex items-center justify-center">
+                  <Badge className="bg-amber-500 hover:bg-amber-600 text-white gap-1 h-7.5 py-1 px-3 rounded-lg font-semibold">
+                    <Send className="w-3.5 h-3.5" /> Đã gửi lại — chờ Thống kê duyệt
+                  </Badge>
                 </div>
               );
             }

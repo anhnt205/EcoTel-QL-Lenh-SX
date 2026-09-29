@@ -2,13 +2,14 @@ import type { ColumnDef } from "@tanstack/react-table";
 import type { MiningRecord } from "@/modules/dataentry/types/thong-ke";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
-import { ArrowUpDown } from "lucide-react";
+import { ArrowUpDown, Pencil } from "lucide-react";
 import { ApprovalStatusBadge } from "@/modules/dataentry/components/ApprovalStatusBadge";
 
 export const getMiningTripsColumns = (
   selectedIds: Set<string>,
   onToggleSelectAll: (checked: boolean) => void,
   onToggleSelectRow: (id: string) => void,
+  onEditRow: (row: MiningRecord) => void,
 ): ColumnDef<MiningRecord>[] => [
   {
     id: "select",
@@ -37,16 +38,25 @@ export const getMiningTripsColumns = (
     cell: ({ row }) => {
       const rowId = row.original.id;
       return (
-        <div className="flex justify-center">
+        <div className="flex items-center justify-center gap-1.5">
           <Checkbox
             checked={!!(rowId && selectedIds.has(rowId))}
             onCheckedChange={() => rowId && onToggleSelectRow(rowId)}
             aria-label="Select row"
           />
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-950/40"
+            onClick={() => onEditRow(row.original)}
+            title="Chỉnh sửa chuyến"
+          >
+            <Pencil className="w-3.5 h-3.5" />
+          </Button>
         </div>
       );
     },
-    size: 70,
+    size: 95,
     enableSorting: false,
     enableHiding: false,
   },
@@ -58,6 +68,23 @@ export const getMiningTripsColumns = (
     ),
     size: 50,
     enableSorting: false,
+  },
+  {
+    // Cột riêng, ngay sau STT (đầu hàng) — xem chú thích ở bản Vận tải
+    // (transportTripsColumns.tsx), cùng lý do. Chốt 2026-09-10.
+    accessorKey: "status",
+    id: "status",
+    header: "Trạng thái",
+    cell: ({ row }) => (
+      <div className="flex justify-center">
+        <ApprovalStatusBadge
+          status={row.original.status}
+          note={row.original.changeRequestNote}
+        />
+      </div>
+    ),
+    size: 115,
+    enableHiding: false,
   },
   {
     accessorFn: (row) => {
@@ -208,7 +235,7 @@ export const getMiningTripsColumns = (
   {
     accessorKey: "vehicleManagementUnit",
     id: "vehicleManagementUnit",
-    header: "QLTB",
+    header: "Đơn vị quản lý thiết bị",
     cell: ({ row }) => row.original.vehicleManagementUnit || "VT7",
     size: 160,
   },
@@ -240,7 +267,7 @@ export const getMiningTripsColumns = (
   {
     accessorKey: "operatorUnit",
     id: "operatorUnit",
-    header: "PXVT",
+    header: "Đơn vị",
     cell: ({ row }) => row.original.operatorUnit || "VT7",
     size: 160,
   },
@@ -254,19 +281,5 @@ export const getMiningTripsColumns = (
       </span>
     ),
     size: 150,
-  },
-  {
-    accessorKey: "status",
-    id: "status",
-    header: "Trạng thái",
-    cell: ({ row }) => (
-      <div className="flex justify-center">
-        <ApprovalStatusBadge
-          status={row.original.status}
-          note={row.original.changeRequestNote}
-        />
-      </div>
-    ),
-    size: 115,
   },
 ];

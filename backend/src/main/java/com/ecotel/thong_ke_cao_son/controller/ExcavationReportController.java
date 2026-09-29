@@ -1,14 +1,15 @@
 package com.ecotel.thong_ke_cao_son.controller;
 
+import com.ecotel.thong_ke_cao_son.annotation.RequirePermission;
 import com.ecotel.thong_ke_cao_son.dto.request.BulkDeleteRequest;
 import com.ecotel.thong_ke_cao_son.dto.request.ExcavationReportRequest;
 import com.ecotel.thong_ke_cao_son.dto.request.ExcavationReportTripRequest;
+import com.ecotel.thong_ke_cao_son.dto.request.ExcavationReportTripUpdateRequest;
 import com.ecotel.thong_ke_cao_son.dto.request.ExcavationTripBulkUpdateItem;
 import com.ecotel.thong_ke_cao_son.dto.response.*;
 import com.ecotel.thong_ke_cao_son.excel.ExcavationReportExcelExporter;
 import com.ecotel.thong_ke_cao_son.excel.ExcavationReportExcelImporter;
 import com.ecotel.thong_ke_cao_son.model.ExcavationReport;
-import com.ecotel.thong_ke_cao_son.repository.ExcavationReportRepository;
 import com.ecotel.thong_ke_cao_son.service.ExcavationReportService;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -29,11 +30,11 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/excavation-reports")
+@RequirePermission(resource = "excavation-reports")
 @RequiredArgsConstructor
 public class ExcavationReportController {
 
     private final ExcavationReportService excavationReportService;
-    private final ExcavationReportRepository excavationReportRepository;
 
     private final ExcavationReportExcelExporter excelExporter;
     private final ExcavationReportExcelImporter excelImporter;
@@ -54,9 +55,23 @@ public class ExcavationReportController {
             @RequestParam LocalDate toDate,
             @RequestParam(required = false) List<Long> shiftIds,
             @RequestParam(required = false) List<Long> excavatorIds,
+            @RequestParam(required = false) List<Long> receivingLocationIds,
+            @RequestParam(required = false) List<String> excavationFloors,
             Pageable pageable) {
         return ApiResponse.success(
-                excavationReportService.search(fromDate, toDate, shiftIds, excavatorIds, pageable));
+                excavationReportService.search(fromDate, toDate, shiftIds, excavatorIds,
+                        receivingLocationIds, excavationFloors, pageable));
+    }
+
+    /**
+     * Toàn bộ giá trị Tầng xúc trong khoảng ngày — ĐỘC LẬP phân trang và mọi
+     * bộ lọc khác, để làm tuỳ chọn cho ô lọc "Tầng xúc" (xem javadoc
+     * {@code ExcavationReportRepository.findDistinctExcavationFloors}).
+     */
+    @GetMapping("/excavation-floors")
+    public ApiResponse<List<String>> excavationFloors(
+            @RequestParam LocalDate fromDate, @RequestParam LocalDate toDate) {
+        return ApiResponse.success(excavationReportService.getDistinctExcavationFloors(fromDate, toDate));
     }
 
     @PutMapping("/{id}")
@@ -98,7 +113,7 @@ public class ExcavationReportController {
     @PutMapping("/trips/{tripId}")
     public ApiResponse<ExcavationReportTripResponse> updateTrip(
             @PathVariable Long tripId,
-            @Valid @RequestBody ExcavationReportTripRequest request) {
+            @Valid @RequestBody ExcavationReportTripUpdateRequest request) {
         return ApiResponse.success(excavationReportService.updateTrip(tripId, request));
     }
 
@@ -125,11 +140,12 @@ public class ExcavationReportController {
             @RequestParam LocalDate fromDate,
             @RequestParam LocalDate toDate,
             @RequestParam(required = false) List<Long> shiftIds,
-            @RequestParam(required = false) List<Long> excavatorIds) {
+            @RequestParam(required = false) List<Long> excavatorIds,
+            @RequestParam(required = false) List<Long> receivingLocationIds,
+            @RequestParam(required = false) List<String> excavationFloors) {
 
-        List<ExcavationReport> reports = excavationReportRepository
-                .search(fromDate, toDate, shiftIds, excavatorIds, Pageable.unpaged())
-                .getContent();
+        List<ExcavationReport> reports = excavationReportService
+                .findAllForExport(fromDate, toDate, shiftIds, excavatorIds, receivingLocationIds, excavationFloors);
 
         byte[] excelBytes = excelExporter.export(reports);
 

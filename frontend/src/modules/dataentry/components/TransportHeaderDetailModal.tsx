@@ -18,7 +18,7 @@ import {
   SelectValue,
 } from "../../../components/ui/select.tsx";
 import { ComboboxInput } from "../../../components/ui/combobox-input.tsx";
-import { Plus, Trash2, Truck, X } from "lucide-react";
+import { MessageSquare, Plus, Trash2, Truck, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { useMasterData } from "@/modules/dataentry/hooks/useMasterData.ts";
@@ -63,7 +63,11 @@ export interface TransportTripRow {
   loadStatus: string; // Tải trọng (radio)
   loadStatusNote: string; // Ghi chú khi "Khác" (vd: "2/3", "1/2")
   isRainyDay: boolean; // Ngày mưa
-  isTraineeVehicle: boolean; // Xe bổ túc
+  weighedWeightTon: number | ""; // Khối lượng qua cân (tấn)
+  provisionalModel: number | ""; // Mô hình (tạm tính)
+  provisionalDensity: number | ""; // Tỷ trọng (tạm tính)
+  isTraineeVehicle: boolean; // Lái xe bổ túc
+  deductionAmount: number | ""; // Trừ vơi (đất-m3, than-tấn)
 }
 
 // ─── 1 bản ghi = 1 ca phân xưởng vận tải ─────────────────────────────────
@@ -71,6 +75,9 @@ export interface TransportSessionDraft {
   _tempId: string;
   reportId?: number; // ID báo cáo khi chỉnh sửa từ API Backend
   singleTripId?: number; // ID chuyến đơn lẻ khi chỉnh sửa trực tiếp 1 chuyến
+  /** Ghi chú Thống kê gửi khi yêu cầu sửa — hiện lên đầu form để đơn vị biết
+   *  phải sửa cái gì, không phải quay lại màn Đối chiếu tra. */
+  revisionNote?: string;
 
   // === Header (Thông tin chung) ===
   workingDate: string; // YYYY-MM-DD
@@ -123,7 +130,9 @@ export const TransportHeaderDetailModal: React.FC<
   const masterData = useMasterData({ enabled: isOpen });
   const {
     shiftOptions,
-    locationValues,
+    excavationAreaValues,
+    receivingPointValues,
+    unloadingPointValues,
     excavatorValues,
     vehicleValues,
     cargoGroupValues,
@@ -139,6 +148,9 @@ export const TransportHeaderDetailModal: React.FC<
     rawUsers = [],
     rawCargoTypes = [],
     rawDepartments = [],
+    rawExcavationAreas = [],
+    rawReceivingPoints = [],
+    rawUnloadingPoints = [],
   } = masterData;
 
   const createReportMutation = useCreateTransportReportMutation();
@@ -187,19 +199,26 @@ export const TransportHeaderDetailModal: React.FC<
         loadStatus: "Đủ tải",
         loadStatusNote: "",
         isRainyDay: false,
+        weighedWeightTon: "",
+        provisionalModel: "",
+        provisionalDensity: "",
         isTraineeVehicle: false,
+        deductionAmount: "",
       };
     },
     [],
   );
 
-  const firstShift = shiftOptions[0]?.value || "1";
-
+  // Ca để TRỐNG, bắt người nhập chọn rõ ràng — giống hệt form Khai thác
+  // (useMiningDraftStore cũng để ""). Trước đây tự điền sẵn shiftOptions[0], mà
+  // API trả Ca giảm dần nên mặc định thành "Ca 4": người nhập không để ý là lưu
+  // sai ca, chuyến hai bên không ghép cặp được ở Đối chiếu. Ca là trường bắt
+  // buộc (zod), để trống thì validate chặn ngay chứ không lưu nhầm. Chốt 2026-09-09.
   const createDefaultSession = useCallback((): TransportSessionDraft => {
     return {
       _tempId: `sess_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
       workingDate: todayStr(),
-      shift: firstShift,
+      shift: "",
       department: "",
       vehicleNo: "",
       equipmentUnit: "",
@@ -212,7 +231,7 @@ export const TransportHeaderDetailModal: React.FC<
       operatorName: "",
       operatorUnit: "",
     };
-  }, [firstShift, createDefaultTripRow]);
+  }, [createDefaultTripRow]);
 
   const tableBottomRef = useRef<HTMLDivElement>(null);
 
@@ -290,10 +309,45 @@ export const TransportHeaderDetailModal: React.FC<
           rawExcavators,
           rawCargoTypes,
           rawDepartments,
+          rawExcavationAreas,
+          rawReceivingPoints,
+          rawUnloadingPoints,
         });
+
+        // Ngày/Ca/Số xe/Số thẻ lương nằm trên PHIẾU chứ không trên chuyến —
+        // phải gửi kèm thì backend mới chuyển chuyến sang phiếu đúng được.
+        // Thiếu chúng thì người dùng đổi Ca xong bấm lưu vẫn thấy Ca cũ, mà
+        // API vẫn báo thành công (lỗi thật đã gặp). Chốt 2026-09-09.
+        const shiftItem = rawShifts.find(
+          (s: any) =>
+            String(s.name) === String(sess.shift) ||
+            String(s.id) === String(sess.shift) ||
+            String(s.name).replace(/^ca\s+/i, "").trim() ===
+              String(sess.shift).replace(/^ca\s+/i, "").trim(),
+        );
+        const vehicleItem = rawVehicles.find(
+          (v: any) =>
+            v.code === sess.vehicleNo ||
+            v.vehicleNumber === sess.vehicleNo ||
+            v.name === sess.vehicleNo ||
+            String(v.id) === String(sess.vehicleNo),
+        );
+        const userItem = rawUsers.find(
+          (u: any) =>
+            u.salaryCode === sess.operatorBadgeNo ||
+            u.username === sess.operatorBadgeNo ||
+            String(u.id) === String(sess.operatorBadgeNo),
+        );
+
         await updateTransportTripMutation.mutateAsync({
           tripId: sess.singleTripId!,
-          payload: tripPayload,
+          payload: {
+            ...tripPayload,
+            reportDate: sess.workingDate || undefined,
+            shiftId: shiftItem ? Number(shiftItem.id) : undefined,
+            vehicleId: vehicleItem ? Number(vehicleItem.id) : undefined,
+            employeeId: userItem ? Number(userItem.id) : undefined,
+          },
         });
         toast.success("Đã cập nhật chuyến thành công!");
         onSuccess();
@@ -334,6 +388,9 @@ export const TransportHeaderDetailModal: React.FC<
           rawUsers,
           rawCargoTypes,
           rawDepartments,
+          rawExcavationAreas,
+          rawReceivingPoints,
+          rawUnloadingPoints,
         });
         payloads.push(payload);
       } catch (err: any) {
@@ -499,6 +556,22 @@ export const TransportHeaderDetailModal: React.FC<
           className="flex-1 overflow-y-auto px-5 py-4 space-y-5"
           onKeyDown={handleKeyDown}
         >
+          {/* Ghi chú Thống kê gửi kèm khi yêu cầu sửa — hiện ngay đầu form để
+              đơn vị biết phải sửa gì, không phải quay lại màn Đối chiếu tra. */}
+          {sessions[activeIdx]?.revisionNote && (
+            <div className="flex items-start gap-2.5 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 dark:border-amber-800 dark:bg-amber-950/40">
+              <MessageSquare className="mt-0.5 h-4 w-4 shrink-0 text-amber-700 dark:text-amber-400" />
+              <div className="min-w-0">
+                <div className="text-xs font-bold text-amber-900 dark:text-amber-300">
+                  Yêu cầu chỉnh sửa từ Thống kê
+                </div>
+                <div className="mt-0.5 text-sm font-semibold break-words text-amber-950 dark:text-amber-100">
+                  {sessions[activeIdx].revisionNote}
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* ── HÀNG THÔNG TIN CHUNG: Thời gian · Ca · Số xe · Đơn vị QLTB · Chủng loại ── */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
             {/* Thời gian */}
@@ -668,8 +741,30 @@ export const TransportHeaderDetailModal: React.FC<
                     <th className="px-2 py-2 border-r border-b border-gray-200 dark:border-gray-700 text-center min-w-[80px]">
                       Ngày mưa
                     </th>
+                    <th className="px-2 py-2 border-r border-b border-gray-200 dark:border-gray-700 text-center min-w-[125px]">
+                      Khối lượng
+                      <br />
+                      qua cân (tấn)
+                    </th>
+                    <th className="px-2 py-2 border-r border-b border-gray-200 dark:border-gray-700 text-center min-w-[110px]">
+                      Mô hình
+                      <br />
+                      (tạm tính)
+                    </th>
+                    <th className="px-2 py-2 border-r border-b border-gray-200 dark:border-gray-700 text-center min-w-[110px]">
+                      Tỷ trọng
+                      <br />
+                      (tạm tính)
+                    </th>
                     <th className="px-2 py-2 border-r border-b border-gray-200 dark:border-gray-700 text-center min-w-[80px]">
-                      Xe bổ túc
+                      Lái xe
+                      <br />
+                      bổ túc
+                    </th>
+                    <th className="px-2 py-2 border-r border-b border-gray-200 dark:border-gray-700 text-center min-w-[125px]">
+                      Trừ vơi
+                      <br />
+                      (đất-m3, than-tấn)
                     </th>
                     <th className="px-2 py-2 border-b border-gray-200 dark:border-gray-700 text-center w-15" />
                   </tr>
@@ -694,7 +789,7 @@ export const TransportHeaderDetailModal: React.FC<
                         {/* Khu vực xúc */}
                         <td className="px-1.5 py-1.5 border-r border-b border-gray-200 dark:border-gray-700">
                           <ComboboxInput
-                            options={locationValues}
+                            options={excavationAreaValues}
                             value={trip.excavationArea}
                             onChange={(v) =>
                               handleUpdateTrip(tIdx, { excavationArea: v })
@@ -720,7 +815,7 @@ export const TransportHeaderDetailModal: React.FC<
                         {/* Nơi nhận tải */}
                         <td className="px-1.5 py-1.5 border-r border-b border-gray-200 dark:border-gray-700">
                           <ComboboxInput
-                            options={locationValues}
+                            options={receivingPointValues}
                             value={trip.pickupLocation}
                             onChange={(v) =>
                               handleUpdateTrip(tIdx, { pickupLocation: v })
@@ -841,7 +936,7 @@ export const TransportHeaderDetailModal: React.FC<
                         {/* Nơi dỡ tải */}
                         <td className="px-1.5 py-1.5 border-r border-b border-gray-200 dark:border-gray-700">
                           <ComboboxInput
-                            options={locationValues}
+                            options={unloadingPointValues}
                             value={trip.unloadLocationName}
                             onChange={(v) =>
                               handleUpdateTrip(tIdx, {
@@ -939,7 +1034,55 @@ export const TransportHeaderDetailModal: React.FC<
                           </div>
                         </td>
 
-                        {/* Xe bổ túc */}
+                        {/* Khối lượng qua cân (tấn) */}
+                        <td className="px-1 py-1.5 border-r border-b border-gray-200 dark:border-gray-700">
+                          <Input
+                            type="number"
+                            step="any"
+                            value={trip.weighedWeightTon}
+                            onChange={(e) =>
+                              handleUpdateTrip(tIdx, {
+                                weighedWeightTon:
+                                  e.target.value === "" ? "" : Number(e.target.value),
+                              })
+                            }
+                            className="h-8 text-xs text-center px-1 w-full"
+                          />
+                        </td>
+
+                        {/* Mô hình (tạm tính) */}
+                        <td className="px-1 py-1.5 border-r border-b border-gray-200 dark:border-gray-700">
+                          <Input
+                            type="number"
+                            step="any"
+                            value={trip.provisionalModel}
+                            onChange={(e) =>
+                              handleUpdateTrip(tIdx, {
+                                provisionalModel:
+                                  e.target.value === "" ? "" : Number(e.target.value),
+                              })
+                            }
+                            className="h-8 text-xs text-center px-1 w-full"
+                          />
+                        </td>
+
+                        {/* Tỷ trọng (tạm tính) */}
+                        <td className="px-1 py-1.5 border-r border-b border-gray-200 dark:border-gray-700">
+                          <Input
+                            type="number"
+                            step="any"
+                            value={trip.provisionalDensity}
+                            onChange={(e) =>
+                              handleUpdateTrip(tIdx, {
+                                provisionalDensity:
+                                  e.target.value === "" ? "" : Number(e.target.value),
+                              })
+                            }
+                            className="h-8 text-xs text-center px-1 w-full"
+                          />
+                        </td>
+
+                        {/* Lái xe bổ túc */}
                         <td className="px-1 py-1.5 border-r border-b border-gray-200 dark:border-gray-700 text-center min-w-[65px]">
                           <div className="flex justify-center pt-1">
                             <Checkbox
@@ -951,6 +1094,22 @@ export const TransportHeaderDetailModal: React.FC<
                               }
                             />
                           </div>
+                        </td>
+
+                        {/* Trừ vơi (đất-m3, than-tấn) */}
+                        <td className="px-1 py-1.5 border-r border-b border-gray-200 dark:border-gray-700">
+                          <Input
+                            type="number"
+                            step="any"
+                            value={trip.deductionAmount}
+                            onChange={(e) =>
+                              handleUpdateTrip(tIdx, {
+                                deductionAmount:
+                                  e.target.value === "" ? "" : Number(e.target.value),
+                              })
+                            }
+                            className="h-8 text-xs text-center px-1 w-full"
+                          />
                         </td>
 
                         {/* Nút xóa dòng */}

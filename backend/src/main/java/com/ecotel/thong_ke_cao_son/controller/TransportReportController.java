@@ -1,9 +1,11 @@
 package com.ecotel.thong_ke_cao_son.controller;
 
+import com.ecotel.thong_ke_cao_son.annotation.RequirePermission;
 import com.ecotel.thong_ke_cao_son.dto.request.BulkDeleteRequest;
 import com.ecotel.thong_ke_cao_son.dto.request.TransportReportBulkUpdateItem;
 import com.ecotel.thong_ke_cao_son.dto.request.TransportReportRequest;
 import com.ecotel.thong_ke_cao_son.dto.request.TransportReportTripRequest;
+import com.ecotel.thong_ke_cao_son.dto.request.TransportReportTripUpdateRequest;
 import com.ecotel.thong_ke_cao_son.dto.request.TripBulkUpdateItem;
 import com.ecotel.thong_ke_cao_son.dto.response.*;
 import com.ecotel.thong_ke_cao_son.excel.TransportReportExcelExporter;
@@ -32,6 +34,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/transport-reports")
+@RequirePermission(resource = "transport-reports")
 @RequiredArgsConstructor
 public class TransportReportController {
 
@@ -100,7 +103,7 @@ public class TransportReportController {
     @PutMapping("/trips/{tripId}")
     public ApiResponse<TransportReportTripResponse> updateTrip(
             @PathVariable Long tripId,
-            @Valid @RequestBody TransportReportTripRequest request) {
+            @Valid @RequestBody TransportReportTripUpdateRequest request) {
         return ApiResponse.success(transportReportService.updateTrip(tripId, request));
     }
 

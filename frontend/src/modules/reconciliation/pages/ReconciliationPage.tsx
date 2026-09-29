@@ -34,15 +34,18 @@ import { ReconciliationComparisonTables } from "../components/ReconciliationComp
 import { RequestChangeModal } from "../components/RequestChangeModal";
 import { excelService } from "@/modules/report/utils/excel-exporter";
 import { toast } from "sonner";
+import { currentMonthRange } from "@/lib/utils";
 import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 
 import { useMasterData } from "@/modules/dataentry/hooks/useMasterData";
 import { useRoleStore } from "@/stores/useRoleStore";
+import { useReconciliationLiveUpdates } from "../hooks/useReconciliationLiveUpdates";
 import {
   useReconciliationSearchQuery,
   useSaveReconciliationDecisionMutation,
   useSaveReconciliationDecisionsBulkMutation,
   useUpdateReconciliationTripsBulkMutation,
+  useResubmitReconciliationTripsMutation,
   mapRowResponseToReconciliationItem,
 } from "../services/reconciliation.service";
 import {
@@ -62,15 +65,30 @@ const isMatchedItem = (item: ReconciliationItem) => {
   );
 };
 
+// Cặp ghép KHÔNG xác định rõ ràng (backend đã từ chối duyệt/yêu cầu sửa cho
+// cặp này ở API) — dùng ở CẢ nút đơn lẻ (reconciliationColumns.tsx) LẪN
+// hàng loạt ở đây, để "Duyệt/Yêu cầu sửa hàng loạt" không lách được điều
+// kiện đã chặn ở nút đơn lẻ. Quality Gate lượt 4 của Codex, 2026-09-15.
+const isPairingAmbiguousItem = (item: ReconciliationItem) =>
+  !!(item as any).backendRow?.pairingAmbiguous;
+
 export const ReconciliationPage: React.FC = () => {
+  // Tự cập nhật khi Vận tải/Khai thác sửa dữ liệu, hoặc khi Thống kê
+  // duyệt/yêu cầu sửa/gửi lại — không cần bấm tải lại trang (chốt 2026-09-10).
+  useReconciliationLiveUpdates();
+
   const shiftAnchorRef = useComboboxAnchor();
   const vehicleAnchorRef = useComboboxAnchor();
 
   const masterData = useMasterData();
   const { rawShifts = [], rawVehicles = [] } = masterData;
 
-  const [startDate, setStartDate] = useState("2026-08-01");
-  const [endDate, setEndDate] = useState("2026-08-31");
+  // Mặc định = tháng hiện tại (trước đây cứng "2026-08-01".."2026-08-31" —
+  // dữ liệu ở tháng khác "biến mất" khỏi màn đối chiếu; cùng lỗi thật vừa
+  // gặp ở màn Khai thác, 2026-09-08).
+  const defaultDateRange = currentMonthRange();
+  const [startDate, setStartDate] = useState(defaultDateRange.from);
+  const [endDate, setEndDate] = useState(defaultDateRange.to);
   const [selectedShifts, setSelectedShifts] = useState<string[]>([]);
   const [selectedVehicles, setSelectedVehicles] = useState<string[]>([]);
   const [searchKeyword, setSearchKeyword] = useState("");
@@ -88,6 +106,7 @@ export const ReconciliationPage: React.FC = () => {
   const saveDecisionsBulkMutation =
     useSaveReconciliationDecisionsBulkMutation();
   const updateTripsBulkMutation = useUpdateReconciliationTripsBulkMutation();
+  const resubmitTripsMutation = useResubmitReconciliationTripsMutation();
 
   // Map selected Shift names to Shift IDs for API
   const shiftIds = useMemo(() => {
@@ -183,8 +202,14 @@ export const ReconciliationPage: React.FC = () => {
 
   const displayItems = useMemo(() => {
     if (cardFilter === "pending") {
+      // "Chờ đối soát" gộp cả AWAITING_REAPPROVAL (vàng nhạt — đã gửi lại,
+      // đang chờ thống kê viên xem lại) vào chung nhóm "cần thống kê viên
+      // xử lý", không tách card riêng.
       return baseFilteredItems.filter(
-        (i) => !i.reconciliationStatus || i.reconciliationStatus === "PENDING",
+        (i) =>
+          !i.reconciliationStatus ||
+          i.reconciliationStatus === "PENDING" ||
+          i.reconciliationStatus === "AWAITING_REAPPROVAL",
       );
     }
     if (cardFilter === "approved") {
@@ -210,7 +235,10 @@ export const ReconciliationPage: React.FC = () => {
 
   const pendingCount = useMemo(() => {
     return baseFilteredItems.filter(
-      (i) => !i.reconciliationStatus || i.reconciliationStatus === "PENDING",
+      (i) =>
+        !i.reconciliationStatus ||
+        i.reconciliationStatus === "PENDING" ||
+        i.reconciliationStatus === "AWAITING_REAPPROVAL",
     ).length;
   }, [baseFilteredItems]);
 
@@ -498,33 +526,36 @@ export const ReconciliationPage: React.FC = () => {
 
   const handleResubmitItem = async (rowId: string) => {
     const targetItem = rawItems.find((i) => i.id === rowId);
-    setRawItems((prev) =>
-      prev.map((item) => {
-        if (item.id === rowId) {
-          return {
-            ...item,
-            reconciliationStatus: "PENDING",
-          };
-        }
-        return item;
-      }),
-    );
+    if (!targetItem) return;
 
-    if (targetItem) {
-      const bRow =
-        (targetItem as any).backendRow ||
-        rawItems.find((i) => i.id === rowId)?.backendRow;
-      if (bRow) {
-        try {
-          await saveDecisionMutation.mutateAsync({
-            transportReportTripId: bRow.transportReportTripId,
-            excavationReportTripId: bRow.excavationReportTripId,
-            status: "PENDING",
-          });
-        } catch (err: any) {
-          console.error("Lỗi khi gửi lại chuyến:", err);
-        }
-      }
+    const bRow = (targetItem as any).backendRow;
+    if (!bRow) return;
+
+    // CHỈ gửi id của ĐÚNG BÊN vai trò đang đăng nhập, VÀ chỉ khi bên đó thật
+    // sự đang REVISION_REQUESTED. Hai điều kiện đều bắt buộc — xác nhận thật
+    // qua kiểm thử sống (2026-09-08): nếu chỉ lọc theo trạng thái mà không
+    // lọc theo vai trò, bấm "Gửi lại" bên Vận tải khi CẢ 2 bên đang đỏ sẽ vô
+    // tình gửi lại LUÔN cả bên Khai thác — sai, vì người bấm không hề chạm gì
+    // tới dữ liệu Khai thác. Không gửi cả 2 id với status:PENDING như code cũ
+    // (lỗi gốc: làm sai decision.status, xoá tín hiệu "đang chờ duyệt lại"
+    // của bên kia). Không optimistic-update reconciliationStatus ở đây — kết
+    // quả thật (đỏ/vàng/trắng) phụ thuộc CẢ 2 bên, để React Query
+    // invalidate/refetch tự cập nhật đúng ngay sau khi mutation thành công.
+    try {
+      await resubmitTripsMutation.mutateAsync({
+        transportReportTripId:
+          currentRole === "ROLE_TRANSPORT" &&
+          bRow.transportStatus === "REVISION_REQUESTED"
+            ? bRow.transportReportTripId
+            : undefined,
+        excavationReportTripId:
+          currentRole === "ROLE_MINING" &&
+          bRow.excavationStatus === "REVISION_REQUESTED"
+            ? bRow.excavationReportTripId
+            : undefined,
+      });
+    } catch (err: any) {
+      console.error("Lỗi khi gửi lại chuyến:", err);
     }
   };
 
@@ -541,13 +572,33 @@ export const ReconciliationPage: React.FC = () => {
       return;
     }
 
-    const unapprovedItems = rawItems.filter(
+    // Chưa đủ dữ liệu 2 bên (1 bên chưa nhập) HOẶC dữ liệu 2 bên chưa khớp
+    // thì KHÔNG được duyệt — dùng đúng isMatchedItem (cùng logic quyết định
+    // tam giác cảnh báo ở cột "Sai lệch" và nút Duyệt từng dòng), để "Duyệt
+    // hàng loạt" không lách được điều kiện đã chặn ở nút đơn lẻ. Bỏ qua các
+    // dòng đó thay vì chặn cả nút, vì 1 lượt chọn có thể lẫn cả dòng đủ điều
+    // kiện lẫn chưa đủ. Chốt 2026-09-10.
+    const selectedNotApproved = rawItems.filter(
       (i) =>
         selectedIds.includes(i.id) && i.reconciliationStatus !== "APPROVED",
     );
+    // Bỏ qua CẢ dòng chưa khớp LẪN dòng ghép cặp không chắc chắn — cùng lý
+    // do isMatchedItem ở trên: "Duyệt hàng loạt" không được lách qua điều
+    // kiện đã chặn ở nút đơn lẻ.
+    const unapprovedItems = selectedNotApproved
+      .filter(isMatchedItem)
+      .filter((i) => !isPairingAmbiguousItem(i));
+    const skippedMismatchCount =
+      selectedNotApproved.length - unapprovedItems.length;
 
     if (unapprovedItems.length === 0) {
-      toast.info("Tất cả các dòng đã chọn đều đã được phê duyệt!");
+      if (skippedMismatchCount > 0) {
+        toast.warning(
+          `Không có dòng nào đủ điều kiện duyệt — ${skippedMismatchCount} dòng đã chọn còn thiếu dữ liệu 1 bên hoặc chưa khớp.`,
+        );
+      } else {
+        toast.info("Tất cả các dòng đã chọn đều đã được phê duyệt!");
+      }
       return;
     }
 
@@ -595,6 +646,11 @@ export const ReconciliationPage: React.FC = () => {
       }
     }
     toast.success(`Đã duyệt thành công ${unapprovedItems.length} dòng!`);
+    if (skippedMismatchCount > 0) {
+      toast.warning(
+        `Bỏ qua ${skippedMismatchCount} dòng còn thiếu dữ liệu 1 bên hoặc chưa khớp — chưa được duyệt.`,
+      );
+    }
   };
 
   const handleBulkRequestChangeSubmit = async (
@@ -625,7 +681,21 @@ export const ReconciliationPage: React.FC = () => {
       }),
     );
 
-    const decisions = requests
+    // target="BOTH" gửi CẢ HAI id cùng lúc -> backend coi đây là thao tác
+    // trên 1 CẶP và từ chối nếu pairing không chắc chắn (Quality Gate lượt 4
+    // của Codex, 2026-09-15) — chặn ở FE trước để không gửi request vô ích
+    // và người dùng hiểu ngay lý do, thay vì chỉ thấy lỗi 400 chung chung.
+    // target="TRANSPORT"/"MINING" chỉ gửi 1 id (xem bên dưới) nên KHÔNG bị
+    // chặn — không giả định gì về pairing.
+    const ambiguousBothTargets = requests.filter(
+      (req) =>
+        req.target === "BOTH" && isPairingAmbiguousItem(req.item),
+    );
+    const eligibleRequests = requests.filter(
+      (req) => !ambiguousBothTargets.includes(req),
+    );
+
+    const decisions = eligibleRequests
       .filter((req) => (req.item as any).backendRow)
       .map((req) => {
         const bRow = (req.item as any).backendRow;
@@ -645,6 +715,12 @@ export const ReconciliationPage: React.FC = () => {
           note: req.note,
         };
       });
+
+    if (ambiguousBothTargets.length > 0) {
+      toast.warning(
+        `Bỏ qua ${ambiguousBothTargets.length} dòng ghép cặp không chắc chắn — cần làm rõ dữ liệu trước khi yêu cầu sửa cả 2 bên.`,
+      );
+    }
 
     if (decisions.length > 0) {
       try {
@@ -993,12 +1069,11 @@ export const ReconciliationPage: React.FC = () => {
                     const eligible = rawItems.filter(
                       (i) =>
                         rowSelection[i.id] &&
-                        i.reconciliationStatus !== "REVISION_REQUESTED" &&
-                        i.reconciliationStatus !== "APPROVED",
+                        i.reconciliationStatus !== "REVISION_REQUESTED",
                     );
                     if (eligible.length === 0) {
                       toast.warning(
-                        "Tất cả các dòng đã chọn đều đã được duyệt hoặc đang chờ đơn vị chỉnh sửa lại!",
+                        "Tất cả các dòng đã chọn đều đang chờ đơn vị chỉnh sửa lại!",
                       );
                       return;
                     }
@@ -1034,15 +1109,16 @@ export const ReconciliationPage: React.FC = () => {
           onResubmitItem={handleResubmitItem}
         />
 
-        {/* Modal Yêu cầu sửa hàng loạt (chỉ áp dụng các dòng chưa ở trạng thái REVISION_REQUESTED hoặc APPROVED) */}
+        {/* Modal Yêu cầu sửa hàng loạt — bỏ qua các dòng ĐANG chờ đơn vị sửa
+            (gửi lại lần nữa là thừa). Dòng ĐÃ DUYỆT vẫn gửi được: theo QĐ-17
+            đó là con đường DUY NHẤT để sửa lại số liệu đã duyệt. */}
         <RequestChangeModal
           isOpen={isBulkRequestModalOpen}
           onClose={() => setIsBulkRequestModalOpen(false)}
           items={rawItems.filter(
             (i) =>
               rowSelection[i.id] &&
-              i.reconciliationStatus !== "REVISION_REQUESTED" &&
-              i.reconciliationStatus !== "APPROVED",
+              i.reconciliationStatus !== "REVISION_REQUESTED",
           )}
           onSubmit={handleBulkRequestChangeSubmit}
         />

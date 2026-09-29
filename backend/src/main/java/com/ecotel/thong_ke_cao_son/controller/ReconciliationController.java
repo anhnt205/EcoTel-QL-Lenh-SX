@@ -1,12 +1,15 @@
 package com.ecotel.thong_ke_cao_son.controller;
 
+import com.ecotel.thong_ke_cao_son.annotation.RequirePermission;
 import com.ecotel.thong_ke_cao_son.dto.request.ReconciliationDecisionBulkRequest;
 import com.ecotel.thong_ke_cao_son.dto.request.ReconciliationDecisionRequest;
+import com.ecotel.thong_ke_cao_son.dto.request.ReconciliationResubmitRequest;
 import com.ecotel.thong_ke_cao_son.dto.request.ReconciliationSearchRequest;
 import com.ecotel.thong_ke_cao_son.dto.request.ReconciliationTripUpdateRequest;
 import com.ecotel.thong_ke_cao_son.dto.response.ApiResponse;
 import com.ecotel.thong_ke_cao_son.dto.response.PageResponse;
 import com.ecotel.thong_ke_cao_son.dto.response.ReconciliationDecisionResponse;
+import com.ecotel.thong_ke_cao_son.dto.response.ReconciliationHistoryEntryResponse;
 import com.ecotel.thong_ke_cao_son.dto.response.ReconciliationRowResponse;
 import com.ecotel.thong_ke_cao_son.enums.ApprovalStatus;
 import com.ecotel.thong_ke_cao_son.service.ReconciliationService;
@@ -20,6 +23,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/reconciliation")
+@RequirePermission(resource = "reconciliation")
 @RequiredArgsConstructor
 public class ReconciliationController {
 
@@ -46,12 +50,14 @@ public class ReconciliationController {
     }
 
     @PostMapping("/decisions")
+    @RequirePermission(resource = "reconciliation", action = "a")
     public ApiResponse<ReconciliationDecisionResponse> saveDecision(
             @Valid @RequestBody ReconciliationDecisionRequest request) {
         return ApiResponse.success(reconciliationService.saveDecision(request));
     }
 
     @PostMapping("/decisions/bulk")
+    @RequirePermission(resource = "reconciliation", action = "a")
     public ApiResponse<List<ReconciliationDecisionResponse>> saveDecisions(
             @Valid @RequestBody ReconciliationDecisionBulkRequest request) {
         return ApiResponse.success(reconciliationService.saveDecisions(request.getDecisions()));
@@ -62,5 +68,20 @@ public class ReconciliationController {
             @Valid @RequestBody List<@Valid ReconciliationTripUpdateRequest> requests) {
         reconciliationService.updateTrips(requests);
         return ApiResponse.success(null);
+    }
+
+    @PostMapping("/trips/resubmit")
+    @RequirePermission(resource = "reconciliation", action = "u")
+    public ApiResponse<Void> resubmitTrips(@Valid @RequestBody ReconciliationResubmitRequest request) {
+        reconciliationService.resubmitTrips(request);
+        return ApiResponse.success(null);
+    }
+
+    @GetMapping("/history")
+    public ApiResponse<List<ReconciliationHistoryEntryResponse>> getHistory(
+            @RequestParam(required = false) Long transportReportTripId,
+            @RequestParam(required = false) Long excavationReportTripId) {
+        return ApiResponse.success(
+                reconciliationService.getHistory(transportReportTripId, excavationReportTripId));
     }
 }

@@ -50,6 +50,24 @@ export const excavationTripReportRequestSchema = z.object({
 export type ExcavationTripReportTripRequest = z.infer<
   typeof excavationTripReportTripRequestSchema
 >;
+
+/**
+ * Payload sửa 1 chuyến Khai thác — xem javadoc bản Vận tải
+ * (`transportReportTripUpdateRequestSchema`) cho lý do đầy đủ. Phiếu Khai thác
+ * định danh bằng (Ngày, Ca, MÁY XÚC, Số thẻ lương); `vehicleId` đã có sẵn ở
+ * cấp chuyến nên không lặp lại ở đây.
+ */
+export const excavationTripReportTripUpdateRequestSchema =
+  excavationTripReportTripRequestSchema.extend({
+    reportDate: z.string().optional(),
+    shiftId: z.number().optional(),
+    excavatorDeviceId: z.number().optional(),
+    employeeId: z.number().optional(),
+  });
+
+export type ExcavationTripReportTripUpdateRequest = z.infer<
+  typeof excavationTripReportTripUpdateRequestSchema
+>;
 export type ExcavationTripReportRequest = z.infer<
   typeof excavationTripReportRequestSchema
 >;
@@ -66,6 +84,8 @@ export interface ExcavationReportTripResponse {
   id: number;
   status?: "PENDING" | "APPROVED" | "REVISION_REQUESTED";
   note?: string;
+  /** Ghi chú Thống kê gửi kèm khi yêu cầu sửa — chỉ có khi đang REVISION_REQUESTED. */
+  revisionNote?: string | null;
   vehicleId?: number;
   vehicleCode?: string;
   vehicleName?: string;
@@ -204,6 +224,14 @@ export function buildExcavationReportRequest(
   sess: MiningSessionDraft,
   masterData: {
     rawShifts: any[];
+    /**
+     * Danh mục "Nơi chất tải" — PHẢI là dữ liệu từ `/api/pickup-points`
+     * (`rawPickupPoints` của `useMasterData`), KHÔNG PHẢI `/api/locations`.
+     * Hai bảng tình cờ trùng tên vài dòng (KX1..KX4) nhưng ID khác hẳn —
+     * backend xác thực `receivingLocationId` qua `pickupPointRepository`,
+     * nên nhầm sang `/api/locations` sẽ khiến LƯU LUÔN 404 "Nơi chất tải
+     * không tồn tại: <id sai>" (bug thật, vá ngày 2026-09-08).
+     */
     rawLocations: any[];
     rawExcavators: any[];
     rawVehicles: any[];
@@ -355,6 +383,7 @@ export function mapExcavationTripResponseToDraft(
     _tempId: `sess_mining_trip_${tripRes.id}_${Date.now()}`,
     reportId: baseRecord?.reportId,
     singleTripId: tripRes.id,
+    revisionNote: tripRes.revisionNote || undefined,
     workingDate,
     shift: cleanShift || "1",
     department: baseRecord?.departmentName || "",
@@ -437,10 +466,28 @@ export async function fetchExcavationReports(params: {
   toDate?: string;
   shiftIds?: number[];
   excavatorIds?: number[];
+  receivingLocationIds?: number[];
+  excavationFloors?: string[];
   page?: number;
   size?: number;
 }): Promise<ApiResponse<PageResponse<ExcavationReportResponse> | ExcavationReportResponse[]>> {
   const res = await api.get("/excavation-reports", { params });
+  return res.data;
+}
+
+/**
+ * Gọi API GET /api/excavation-reports/excavation-floors — toàn bộ giá trị
+ * Tầng xúc trong khoảng ngày, ĐỘC LẬP phân trang và mọi bộ lọc khác. Dùng
+ * để dựng tuỳ chọn cho ô lọc "Tầng xúc": nếu gom từ danh sách chuyến đã
+ * phân trang, tầng chỉ xuất hiện ở trang chưa xem thì không chọn được.
+ */
+export async function fetchDistinctExcavationFloors(
+  fromDate: string,
+  toDate: string,
+): Promise<ApiResponse<string[]>> {
+  const res = await api.get("/excavation-reports/excavation-floors", {
+    params: { fromDate, toDate },
+  });
   return res.data;
 }
 
@@ -513,9 +560,10 @@ export interface ExcavationTripBulkUpdateItem {
  */
 export async function updateExcavationTrip(
   tripId: number,
-  payload: ExcavationTripReportTripRequest,
+  payload: ExcavationTripReportTripUpdateRequest,
 ): Promise<ApiResponse<ExcavationReportTripResponse>> {
-  const validatedPayload = excavationTripReportTripRequestSchema.parse(payload);
+  const validatedPayload =
+    excavationTripReportTripUpdateRequestSchema.parse(payload);
   const res = await api.put(`/excavation-reports/trips/${tripId}`, validatedPayload);
   return res.data;
 }
@@ -572,6 +620,8 @@ export async function exportExcavationReports(params: {
   toDate: string;
   shiftIds?: number[];
   excavatorIds?: number[];
+  receivingLocationIds?: number[];
+  excavationFloors?: string[];
 }): Promise<Blob> {
   const res = await api.get("/excavation-reports/export", {
     params,
@@ -698,6 +748,8 @@ export function useExcavationReportsQuery(
     toDate?: string;
     shiftIds?: number[];
     excavatorIds?: number[];
+    receivingLocationIds?: number[];
+    excavationFloors?: string[];
     page?: number;
     size?: number;
   },
@@ -732,7 +784,7 @@ export function useUpdateExcavationTripMutation() {
       payload,
     }: {
       tripId: number;
-      payload: ExcavationTripReportTripRequest;
+      payload: ExcavationTripReportTripUpdateRequest;
     }) => updateExcavationTrip(tripId, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["excavationReports"] });

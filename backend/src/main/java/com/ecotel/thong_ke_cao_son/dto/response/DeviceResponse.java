@@ -32,6 +32,21 @@ public class DeviceResponse {
     Double longitude;
     Double latitude;
     String note;
+
+    // Thuộc tính phục vụ tính sản lượng (S3)
+    String carRenovation;
+    String vehicleClass;
+    String qualityLevel;
+    Long fuelClassId;
+    String fuelClassName;
+    Long vehicleTypeId;
+    String vehicleTypeName;
+    Long vehicleRankId;
+    String vehicleRankName;
+    Long categoryClassId;
+    String categoryClassName;
+    java.math.BigDecimal bucketCapacity;
+
     List<String> files;
     Long createdById;
     String createdByName;

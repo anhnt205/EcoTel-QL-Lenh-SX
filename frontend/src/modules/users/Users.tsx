@@ -3,6 +3,7 @@ import { useQuery, keepPreviousData } from "@tanstack/react-query";
 
 import UserService from "./services/userService";
 import { getUserColumns } from "./columns";
+import { UserFormModal } from "./UserFormModal";
 
 import AppDataTable from "@/components/table/AppDataTable";
 import {
@@ -13,14 +14,16 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
+import type { User } from "@/types";
 
 const Users = () => {
-  // TODO: Bật lại isAdmin check khi cần phân quyền
   const isAdmin = true;
 
   const [searchValue, setSearchValue] = useState("");
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editing, setEditing] = useState<User | null>(null);
 
   const {
     data: pageData,
@@ -43,8 +46,15 @@ const Users = () => {
   const totalPages = pageData?.totalPages ?? 0;
 
   const columns = useMemo(
-    () => getUserColumns({ isAdmin }),
-    [isAdmin]
+    () =>
+      getUserColumns({
+        isAdmin,
+        onEdit: (u) => {
+          setEditing(u);
+          setModalOpen(true);
+        },
+      }),
+    [isAdmin],
   );
 
   return (
@@ -52,18 +62,18 @@ const Users = () => {
       <Breadcrumb>
         <BreadcrumbList>
           <BreadcrumbItem>
-            <BreadcrumbLink href="#">Danh mục</BreadcrumbLink>
+            <BreadcrumbLink href="#">Danh mục hệ thống</BreadcrumbLink>
           </BreadcrumbItem>
           <BreadcrumbSeparator />
           <BreadcrumbItem>
-            <BreadcrumbPage>Người dùng & Lái xe</BreadcrumbPage>
+            <BreadcrumbPage>Tài khoản</BreadcrumbPage>
           </BreadcrumbItem>
         </BreadcrumbList>
       </Breadcrumb>
 
       <div className="flex-1 min-h-0">
         <AppDataTable
-          title="Danh sách Người dùng / Lái xe"
+          title="Danh sách Tài khoản"
           data={users}
           columns={columns}
           loading={isLoading}
@@ -73,6 +83,10 @@ const Users = () => {
             setPage(0);
           }}
           onRefresh={refetch}
+          onAdd={() => {
+            setEditing(null);
+            setModalOpen(true);
+          }}
           showColumnToggle
           stickyHeader
           manualPagination
@@ -87,6 +101,13 @@ const Users = () => {
           }}
         />
       </div>
+
+      <UserFormModal
+        open={modalOpen}
+        editing={editing}
+        onClose={() => setModalOpen(false)}
+        onSaved={refetch}
+      />
     </div>
   );
 };

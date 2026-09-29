@@ -115,6 +115,7 @@ type BaseProps<TData> = {
   isImporting?: boolean;
   showExport?: boolean;
   onExportCsv?: (selectedRows: TData[]) => void;
+  exportCsvLabel?: string;
   onExportPdf?: () => void;
   onPrint?: () => void;
 
@@ -183,6 +184,7 @@ function AppDataTable<TData>({
   isImporting = false,
   showExport,
   onExportCsv,
+  exportCsvLabel,
   onExportPdf,
   onPrint,
 
@@ -446,6 +448,7 @@ function AppDataTable<TData>({
                 }
               : undefined
           }
+          exportCsvLabel={exportCsvLabel}
           onExportPdf={onExportPdf}
           onPrint={onPrint}
           showFilter={Boolean(filterFields?.length)}

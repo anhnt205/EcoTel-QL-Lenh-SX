@@ -27,12 +27,18 @@ export const API = {
     USERS: "/users",
     CARGO_GROUPS: "/cargo-groups",
     CARGO_TYPES: "/cargo-types",
+    EXCAVATION_AREAS: "/excavation-areas",
+    RECEIVING_POINTS: "/receiving-points",
+    UNLOADING_POINTS: "/unloading-points",
+    PICKUP_POINTS: "/pickup-points",
   },
   RECONCILIATION: {
     SEARCH: "/reconciliation",
     DECISIONS: "/reconciliation/decisions",
     DECISIONS_BULK: "/reconciliation/decisions/bulk",
     TRIPS_BULK: "/reconciliation/trips/bulk",
+    TRIPS_RESUBMIT: "/reconciliation/trips/resubmit",
+    HISTORY: "/reconciliation/history",
     REPORT_STATUS: "/reconciliation/report-status",
     REPORT_STATUS_BATCH: "/reconciliation/report-status/batch",
     PRODUCTION: {

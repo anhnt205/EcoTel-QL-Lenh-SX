@@ -9,6 +9,11 @@ import type {
 export const transportReportTripRequestSchema = z.object({
   rainyDay: z.boolean().optional(),
   supplementaryVehicle: z.boolean().optional(),
+  // Bốn trường "(Báo chuyến)" còn lại — để trống được, trống KHÁC 0.
+  weighedWeightTon: z.number().nullable().optional(),
+  provisionalModel: z.number().nullable().optional(),
+  provisionalDensity: z.number().nullable().optional(),
+  deductionAmount: z.number().nullable().optional(),
   excavationAreaId: z
     .number({ message: "Khu vực xúc không hợp lệ" })
     .min(1, "Khu vực xúc là bắt buộc"),
@@ -63,6 +68,25 @@ export const transportReportRequestSchema = z.object({
 export type TransportReportTripRequest = z.infer<
   typeof transportReportTripRequestSchema
 >;
+
+/**
+ * Payload sửa 1 chuyến: ngoài các trường cấp chuyến còn kèm 4 trường cấp PHIẾU
+ * (Ngày, Ca, Số xe, Số thẻ lương). Bắt buộc phải khai ở schema — `.parse()` của
+ * zod CẮT BỎ mọi key không khai báo, nên trước đây dù form có gửi kèm Ca thì
+ * cũng bị loại sạch trước khi ra khỏi trình duyệt. Backend nhận 4 trường này để
+ * chuyển chuyến sang phiếu đúng. Chốt 2026-09-09.
+ */
+export const transportReportTripUpdateRequestSchema =
+  transportReportTripRequestSchema.extend({
+    reportDate: z.string().optional(),
+    shiftId: z.number().optional(),
+    vehicleId: z.number().optional(),
+    employeeId: z.number().optional(),
+  });
+
+export type TransportReportTripUpdateRequest = z.infer<
+  typeof transportReportTripUpdateRequestSchema
+>;
 export type TransportReportRequest = z.infer<
   typeof transportReportRequestSchema
 >;
@@ -79,6 +103,8 @@ export interface TransportReportTripResponse {
   id: number;
   status?: "PENDING" | "APPROVED" | "REVISION_REQUESTED";
   note?: string;
+  /** Ghi chú Thống kê gửi kèm khi yêu cầu sửa — chỉ có khi đang REVISION_REQUESTED. */
+  revisionNote?: string | null;
   vehicleId?: number;
   vehicleCode?: string;
   vehicleName?: string;
@@ -86,6 +112,10 @@ export interface TransportReportTripResponse {
   vehicleCategoryName?: string;
   rainyDay?: boolean;
   supplementaryVehicle?: boolean;
+  weighedWeightTon?: number | null;
+  provisionalModel?: number | null;
+  provisionalDensity?: number | null;
+  deductionAmount?: number | null;
   excavationAreaId: number;
   excavationAreaName: string;
   excavatorDeviceId: number;
@@ -167,21 +197,20 @@ export function buildTransportTripRequestItem(
     rawExcavators: any[];
     rawCargoTypes: any[];
     rawDepartments?: any[];
+    rawExcavationAreas?: any[];
+    rawReceivingPoints?: any[];
+    rawUnloadingPoints?: any[];
   },
   idx: number = 0,
 ): TransportReportTripRequest {
-  // Map excavationAreaId (Khu vực xúc)
-  const areaItem =
-    masterData.rawLocations.find(
-      (l) =>
-        l.name === t.excavationArea ||
-        String(l.id) === String(t.excavationArea),
-    ) ||
-    (masterData.rawDepartments || []).find(
-      (d) =>
-        d.name === t.excavationArea ||
-        String(d.id) === String(t.excavationArea),
-    );
+  // Map excavationAreaId (Khu vực xúc) — tra đúng danh mục "excavation_areas"
+  // (FK thật của cột excavation_area_id), KHÔNG tra rawLocations/rawDepartments
+  // như trước đây (2 danh sách đó là danh mục KHÁC, id không tương ứng nên
+  // backend luôn từ chối với "Khu vực xúc không tồn tại: <id>").
+  const areaItem = (masterData.rawExcavationAreas || []).find(
+    (a) =>
+      a.name === t.excavationArea || String(a.id) === String(t.excavationArea),
+  );
   if (!areaItem) {
     throw new Error(
       `Chuyến #${idx + 1}: Khu vực xúc "${t.excavationArea}" không tồn tại trong hệ thống`,
@@ -203,11 +232,11 @@ export function buildTransportTripRequestItem(
   }
   const excavatorDeviceId = Number(excavatorItem.id);
 
-  // Map loadingPointId (Nơi nhận tải)
-  const loadingLocItem = masterData.rawLocations.find(
+  // Map loadingPointId (Nơi nhận tải) — tra danh mục "receiving_points"
+  // (FK thật của loading_point_id), không phải rawLocations.
+  const loadingLocItem = (masterData.rawReceivingPoints || []).find(
     (l) =>
-      l.name === t.pickupLocation ||
-      String(l.id) === String(t.pickupLocation),
+      l.name === t.pickupLocation || String(l.id) === String(t.pickupLocation),
   );
   if (!loadingLocItem) {
     throw new Error(
@@ -216,8 +245,9 @@ export function buildTransportTripRequestItem(
   }
   const loadingPointId = Number(loadingLocItem.id);
 
-  // Map unloadingPointId (Nơi dỡ tải)
-  const unloadingLocItem = masterData.rawLocations.find(
+  // Map unloadingPointId (Nơi dỡ tải) — tra danh mục "unloading_points"
+  // (FK thật của unloading_point_id), không phải rawLocations.
+  const unloadingLocItem = (masterData.rawUnloadingPoints || []).find(
     (l) =>
       l.name === t.unloadLocationName ||
       String(l.id) === String(t.unloadLocationName),
@@ -256,6 +286,10 @@ export function buildTransportTripRequestItem(
   return {
     rainyDay: Boolean(t.isRainyDay),
     supplementaryVehicle: Boolean(t.isTraineeVehicle),
+    weighedWeightTon: t.weighedWeightTon === "" ? null : Number(t.weighedWeightTon),
+    provisionalModel: t.provisionalModel === "" ? null : Number(t.provisionalModel),
+    provisionalDensity: t.provisionalDensity === "" ? null : Number(t.provisionalDensity),
+    deductionAmount: t.deductionAmount === "" ? null : Number(t.deductionAmount),
     excavationAreaId,
     excavatorDeviceId,
     loadingPointId,
@@ -302,6 +336,9 @@ export function buildTransportReportRequest(
     rawUsers: any[];
     rawCargoTypes: any[];
     rawDepartments?: any[];
+    rawExcavationAreas?: any[];
+    rawReceivingPoints?: any[];
+    rawUnloadingPoints?: any[];
   },
 ): TransportReportRequest {
   // 1. Map shiftId
@@ -429,7 +466,11 @@ export function mapReportResponseToDraft(
           : "Đủ tải",
       loadStatusNote: t.loadLevelCustomValue || "",
       isRainyDay: Boolean(t.rainyDay),
+      weighedWeightTon: t.weighedWeightTon ?? "",
+      provisionalModel: t.provisionalModel ?? "",
+      provisionalDensity: t.provisionalDensity ?? "",
       isTraineeVehicle: Boolean(t.supplementaryVehicle),
+      deductionAmount: t.deductionAmount ?? "",
     })),
   };
 }
@@ -455,6 +496,7 @@ export function mapTransportTripResponseToDraft(
     _tempId: `sess_trip_${tripRes.id}_${Date.now()}`,
     reportId: baseRecord?.reportId,
     singleTripId: tripRes.id,
+    revisionNote: tripRes.revisionNote || undefined,
     workingDate,
     shift: cleanShift || "1",
     department: baseRecord?.departmentName || "",
@@ -502,7 +544,11 @@ export function mapTransportTripResponseToDraft(
             : "Đủ tải",
         loadStatusNote: tripRes.loadLevelCustomValue || "",
         isRainyDay: Boolean(tripRes.rainyDay),
+        weighedWeightTon: tripRes.weighedWeightTon ?? "",
+        provisionalModel: tripRes.provisionalModel ?? "",
+        provisionalDensity: tripRes.provisionalDensity ?? "",
         isTraineeVehicle: Boolean(tripRes.supplementaryVehicle),
+        deductionAmount: tripRes.deductionAmount ?? "",
       },
     ],
   };
@@ -628,9 +674,9 @@ export interface TripBulkUpdateItem {
  */
 export async function updateTransportTrip(
   tripId: number,
-  payload: TransportReportTripRequest,
+  payload: TransportReportTripUpdateRequest,
 ): Promise<ApiResponse<TransportReportTripResponse>> {
-  const validatedPayload = transportReportTripRequestSchema.parse(payload);
+  const validatedPayload = transportReportTripUpdateRequestSchema.parse(payload);
   const res = await api.put(`/transport-reports/trips/${tripId}`, validatedPayload);
   return res.data;
 }
@@ -862,7 +908,7 @@ export function useUpdateTransportTripMutation() {
       payload,
     }: {
       tripId: number;
-      payload: TransportReportTripRequest;
+      payload: TransportReportTripUpdateRequest;
     }) => updateTransportTrip(tripId, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["transportReports"] });

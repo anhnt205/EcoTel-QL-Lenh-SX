@@ -11,6 +11,9 @@ import {
 
 export interface EntryPageHeaderProps {
   title: string;
+  /** Dòng mô tả nhỏ dưới tiêu đề. Bỏ trống thì không hiển thị gì (giữ nguyên
+   *  bố cục cũ cho các trang chưa dùng tới). */
+  subtitle?: string;
   icon?: React.ReactNode;
   fileInputRef?: React.RefObject<HTMLInputElement | null>;
   onFileInputChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
@@ -26,6 +29,7 @@ export interface EntryPageHeaderProps {
 
 export const EntryPageHeader: React.FC<EntryPageHeaderProps> = ({
   title,
+  subtitle,
   icon,
   fileInputRef,
   onFileInputChange,
@@ -57,6 +61,11 @@ export const EntryPageHeader: React.FC<EntryPageHeaderProps> = ({
           <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100 tracking-tight">
             {title}
           </h1>
+          {subtitle && (
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+              {subtitle}
+            </p>
+          )}
         </div>
       </div>
 

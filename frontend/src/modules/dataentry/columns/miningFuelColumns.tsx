@@ -136,7 +136,7 @@ export const getMiningFuelColumns = (
   {
     accessorKey: "vehicleManagementUnit",
     id: "vehicleManagementUnit",
-    header: "QLTB",
+    header: "Đơn vị quản lý thiết bị",
     cell: ({ row }) => row.original.vehicleManagementUnit || "VT7",
     size: 150,
   },
@@ -161,7 +161,7 @@ export const getMiningFuelColumns = (
   {
     accessorKey: "operatorUnit",
     id: "operatorUnit",
-    header: "PXVT",
+    header: "Đơn vị",
     cell: ({ row }) => row.original.operatorUnit || "VT7",
     size: 160,
   },
