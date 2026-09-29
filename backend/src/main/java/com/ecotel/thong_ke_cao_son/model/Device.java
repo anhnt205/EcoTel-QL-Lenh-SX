@@ -38,6 +38,13 @@ public class Device {
     @Column(name = "mongo_id", unique = true)
     private String mongoId;
 
+    // Gắn với đúng bản ghi TaiSan bên QL-TAISAN (nguồn gốc danh mục thiết bị)
+    // để đồng bộ lại (đổi tên, loại, công suất...) không bị nhân đôi bản ghi.
+    // Thiết bị nhập tay/import cũ (không qua đồng bộ) để trống field này.
+    // Xem service/TaiSanSyncService.java.
+    @Column(name = "external_tai_san_id", unique = true)
+    private String externalTaiSanId;
+
     @NotBlank(message = "Device code is required")
     @Column(name = "code", nullable = false)
     private String code;

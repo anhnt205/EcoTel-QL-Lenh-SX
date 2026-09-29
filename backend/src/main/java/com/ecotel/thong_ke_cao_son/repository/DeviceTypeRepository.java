@@ -15,6 +15,8 @@ public interface DeviceTypeRepository extends JpaRepository<DeviceType, Long> {
 
     Optional<DeviceType> findByMongoId(String mongoId);
 
+    Optional<DeviceType> findByExternalNhomTaiSanId(String externalNhomTaiSanId);
+
     @Query("""
         SELECT dt FROM DeviceType dt
         WHERE :keyword IS NULL OR :keyword = ''

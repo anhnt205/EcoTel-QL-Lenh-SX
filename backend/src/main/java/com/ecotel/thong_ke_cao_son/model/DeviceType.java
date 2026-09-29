@@ -30,6 +30,11 @@ public class DeviceType {
     @Column(name = "mongo_id", unique = true)
     private String mongoId;
 
+    // Gắn với idNhomTaiSan bên QL-TAISAN khi nhóm này được tạo tự động lúc
+    // đồng bộ thiết bị — xem service/TaiSanSyncService.java. Nhóm tạo tay để trống.
+    @Column(name = "external_nhom_tai_san_id", unique = true)
+    private String externalNhomTaiSanId;
+
     @NotBlank(message = "DeviceType is required")
     @Column(name = "name", nullable = false)
     private String name;

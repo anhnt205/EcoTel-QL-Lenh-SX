@@ -6,6 +6,7 @@ import com.ecotel.thong_ke_cao_son.dto.response.DeviceResponse;
 import com.ecotel.thong_ke_cao_son.dto.response.PageResponse;
 import com.ecotel.thong_ke_cao_son.enums.DeviceGroup;
 import com.ecotel.thong_ke_cao_son.service.DeviceService;
+import com.ecotel.thong_ke_cao_son.service.TaiSanSyncService;
 import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Pageable;
@@ -20,6 +21,15 @@ import org.springframework.web.bind.annotation.*;
 public class DeviceController {
 
     private final DeviceService deviceService;
+    private final TaiSanSyncService taiSanSyncService;
+
+    // Đồng bộ danh mục thiết bị từ QL-TAISAN (nguồn gốc) — xem TaiSanSyncService.
+    // Gọi thủ công (giống nút "Đồng bộ từ manifest" bên PORTAL-PM), không chạy
+    // nền tự động để tránh gọi khi chưa cấu hình đủ taisan.* (application.yaml).
+    @PostMapping("/sync-from-taisan")
+    public ApiResponse<TaiSanSyncService.SyncResult> syncFromTaiSan() {
+        return ApiResponse.success(taiSanSyncService.sync());
+    }
 
     @GetMapping
     public ApiResponse<PageResponse<DeviceResponse>> getAll(

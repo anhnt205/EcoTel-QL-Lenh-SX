@@ -18,6 +18,8 @@ public interface DeviceRepository extends JpaRepository<Device, Long> {
 
     Optional<Device> findByCode(String code);
 
+    Optional<Device> findByExternalTaiSanId(String externalTaiSanId);
+
     @Query("""
         SELECT d FROM Device d
         LEFT JOIN d.department dep
