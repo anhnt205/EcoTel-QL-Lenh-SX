@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import React, { useEffect, useMemo, useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Box,
   Button,
@@ -8,22 +8,25 @@ import {
   AccordionSummary,
   AccordionDetails,
   Paper,
-  IconButton
-} from '@mui/material';
+  IconButton,
+} from "@mui/material";
 import {
   Add as AddIcon,
   Delete,
   Edit,
   Visibility,
-  VisibilityOff
-} from '@mui/icons-material';
-import api from '../../../config/api.config';
-import { showConfirmAlert, showErrorAlert, showSuccessAlert } from '../../../components/Alert';
-import CustomDataGrid from '../../../components/Table/CustomDataGrid';
-import dayjs from 'dayjs';
-import { Table } from 'antd';
-import ModelEditor from './MaterialDensityEditor';
-
+  VisibilityOff,
+} from "@mui/icons-material";
+import api from "../../../config/api.config";
+import {
+  showConfirmAlert,
+  showErrorAlert,
+  showSuccessAlert,
+} from "../../../components/Alert";
+import CustomDataGrid from "../../../components/Table/CustomDataGrid";
+import dayjs from "dayjs";
+import { Table } from "antd";
+import ModelEditor from "./MaterialDensityEditor";
 
 interface HistoryTimeSlot {
   id: string;
@@ -32,23 +35,26 @@ interface HistoryTimeSlot {
 }
 
 const MaterialDensity: React.FC = () => {
-
   const [expanded, setExpanded] = useState(false);
-  const [selectedTimeSlot, setSelectedTimeSlot] = useState<HistoryTimeSlot | null>(null);
-  const [selectedTimeSlots, setSelectedTimeSlots] = useState<HistoryTimeSlot[]>([]);
+  const [selectedTimeSlot, setSelectedTimeSlot] =
+    useState<HistoryTimeSlot | null>(null);
+  const [selectedTimeSlots, setSelectedTimeSlots] = useState<HistoryTimeSlot[]>(
+    [],
+  );
   const [editorKey, setEditorKey] = useState(Date.now());
   const [expandedRowKeys, setExpandedRowKeys] = useState<React.Key[]>([]);
 
   const queryClient = useQueryClient();
 
-
   // 🟦 Load MATERIAL + density/dryDensity theo time slot
   const { data: materials = [] } = useQuery({
-    queryKey: ['materials', selectedTimeSlot],
+    queryKey: ["materials", selectedTimeSlot],
     queryFn: () =>
       api
-        .get(`/materials?startTime=${selectedTimeSlot?.startTime?.toISOString() ?? ''}&endTime=${selectedTimeSlot?.endTime?.toISOString() ?? ''}`)
-        .then(res => res.data.data),
+        .get(
+          `/materials?startTime=${selectedTimeSlot?.startTime?.toISOString() ?? ""}&endTime=${selectedTimeSlot?.endTime?.toISOString() ?? ""}`,
+        )
+        .then((res) => res.data.data),
   });
 
   // 🟦 Tự động tạo danh sách TimeSlot từ valueHistory
@@ -77,7 +83,6 @@ const MaterialDensity: React.FC = () => {
     });
   }, [materials]);
 
-
   // 🟦 Tạo TimeSlot mới
   const handleCreateNewSlot = () => {
     setExpanded(true);
@@ -86,15 +91,13 @@ const MaterialDensity: React.FC = () => {
     setExpandedRowKeys([]);
   };
 
-
   // 🟦 Các cột hiển thị trong bảng Expanded
   const defaultColumns = [
-    { id: "material", label: "Vật liệu",},
-    { id: "acceptedProduct", label: "Sản phẩm nghiệm thu", },
-    { id: "density", label: "Tỷ trọng quy ẩm", },
-    { id: "dryDensity", label: "Tỷ trọng không quy ẩm", }
+    { id: "material", label: "Vật liệu" },
+    { id: "acceptedProduct", label: "Sản phẩm nghiệm thu" },
+    { id: "density", label: "Tỷ trọng quy ẩm" },
+    { id: "dryDensity", label: "Tỷ trọng không quy ẩm" },
   ];
-
 
   // 🟦 Row bảng con
   const rows = useMemo(() => {
@@ -103,33 +106,33 @@ const MaterialDensity: React.FC = () => {
       material: m.name,
       acceptedProduct: m.acceptedProduct,
       density: m.density,
-      dryDensity: m.dryDensity
+      dryDensity: m.dryDensity,
     }));
   }, [materials]);
-
 
   // 🟦 Xóa TimeSlot
   const deleteMutation = useMutation({
     mutationFn: (slots: { startTime: string; endTime: string }[]) =>
-      api.delete(`/materials/timeslots`, { data: { slots } }).then(r => r.data),
+      api
+        .delete(`/materials/timeslots`, { data: { slots } })
+        .then((r) => r.data),
 
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['materials'] });
+      queryClient.invalidateQueries({ queryKey: ["materials"] });
       showSuccessAlert("Xóa thành công");
       setSelectedTimeSlots([]);
     },
 
-    onError: (err: any) => showErrorAlert(err.message)
+    onError: (err: any) => showErrorAlert(err.message),
   });
-
 
   const handleDelete = () => {
     if (selectedTimeSlots.length === 0)
       return showErrorAlert("Chọn ít nhất 1 khoảng thời gian");
 
-    showConfirmAlert("Xóa các khoảng thời gian đã chọn?").then(res => {
+    showConfirmAlert("Xóa các khoảng thời gian đã chọn?").then((res) => {
       if (res.isConfirmed) {
-        const payload = selectedTimeSlots.map(slot => ({
+        const payload = selectedTimeSlots.map((slot) => ({
           startTime: dayjs(slot.startTime).toISOString(),
           endTime: dayjs(slot.endTime).toISOString(),
         }));
@@ -138,7 +141,6 @@ const MaterialDensity: React.FC = () => {
       }
     });
   };
-
 
   // 🟦 Expand xem bảng tỷ trọng
   const handleExpand = (expanded: boolean, record: HistoryTimeSlot) => {
@@ -151,24 +153,29 @@ const MaterialDensity: React.FC = () => {
     }
   };
 
-
   return (
     <Box sx={{ mb: 2, mt: 2 }}>
-
       {/* FORM EDITOR */}
       <Accordion sx={{ mb: 2 }} expanded={expanded}>
         <AccordionSummary expandIcon={<></>}>
-
           <Box display="flex" gap={2}>
-            <Button variant="contained" onClick={handleCreateNewSlot} startIcon={<AddIcon />}>
+            <Button
+              variant="contained"
+              onClick={handleCreateNewSlot}
+              startIcon={<AddIcon />}
+            >
               Tạo mới
             </Button>
 
-            <Button variant="contained" startIcon={<Delete />} color="error" onClick={handleDelete}>
+            <Button
+              variant="contained"
+              startIcon={<Delete />}
+              color="error"
+              onClick={handleDelete}
+            >
               Xóa
             </Button>
           </Box>
-
         </AccordionSummary>
 
         <AccordionDetails>
@@ -186,9 +193,8 @@ const MaterialDensity: React.FC = () => {
         </AccordionDetails>
       </Accordion>
 
-
       {/* DANH SÁCH TIME SLOT */}
-      <Box sx={{ height: '60vh' }}>
+      <Box sx={{ height: "60vh" }}>
         <Paper>
           <Table
             columns={[
@@ -196,9 +202,10 @@ const MaterialDensity: React.FC = () => {
                 title: "Thời gian",
                 render: (_, r) => (
                   <Typography>
-                    Từ: {dayjs(r.startTime).format("DD-MM-YYYY")} — Đến: {dayjs(r.endTime).format("DD-MM-YYYY")}
+                    Từ: {dayjs(r.startTime).format("DD-MM-YYYY")} — Đến:{" "}
+                    {dayjs(r.endTime).format("DD-MM-YYYY")}
                   </Typography>
-                )
+                ),
               },
               {
                 title: "Xem",
@@ -210,7 +217,7 @@ const MaterialDensity: React.FC = () => {
                       {isEx ? <VisibilityOff /> : <Visibility />}
                     </IconButton>
                   );
-                }
+                },
               },
               {
                 title: "Sửa",
@@ -226,10 +233,9 @@ const MaterialDensity: React.FC = () => {
                   >
                     <Edit />
                   </IconButton>
-                )
+                ),
               },
             ]}
-
             rowKey="id"
             dataSource={timeSlots}
             expandable={{
@@ -237,16 +243,19 @@ const MaterialDensity: React.FC = () => {
               onExpand: handleExpand,
               showExpandColumn: false,
               expandedRowRender: () => (
-                <Box sx={{ maxWidth: '92vw' }}>
-                  <CustomDataGrid rows={rows} defaultColumns={defaultColumns} />
+                <Box sx={{ maxWidth: "92vw" }}>
+                  <CustomDataGrid
+                    rows={rows}
+                    defaultColumns={defaultColumns}
+                    rowCount={rows.length}
+                  />
                 </Box>
-              )
+              ),
             }}
-
             rowSelection={{
               type: "checkbox",
-              selectedRowKeys: selectedTimeSlots.map(s => s.id),
-              onChange: (_, rows) => setSelectedTimeSlots(rows)
+              selectedRowKeys: selectedTimeSlots.map((s) => s.id),
+              onChange: (_, rows) => setSelectedTimeSlots(rows),
             }}
           />
         </Paper>

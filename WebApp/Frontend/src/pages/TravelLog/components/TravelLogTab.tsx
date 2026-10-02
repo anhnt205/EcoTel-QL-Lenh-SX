@@ -10,7 +10,6 @@ import {
   IconButton,
   Typography,
   TextField,
-  Autocomplete,
   Accordion,
   AccordionSummary,
   AccordionDetails,
@@ -25,7 +24,7 @@ import {
 } from "@mui/icons-material";
 import { FormikProvider, useFormik } from "formik";
 import api from "../../../config/api.config";
-import { Device, Location, Shift, TravelLog } from "../../../types";
+import { TravelLog } from "../../../types";
 import { DatePicker, LocalizationProvider } from "@mui/x-date-pickers";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import dayjs, { Dayjs } from "dayjs";
@@ -39,21 +38,18 @@ import { userAtom } from "../../../atoms/userAtoms";
 import { trvelLogValidationSchema } from "../../../utils/validation";
 import TravelLogService from "../../../services/travelLogService";
 import { AcceptedProductEnum, RoleEnum } from "../../../enums";
-import { getFormikFieldProps } from "../../../utils/helper";
-import { StyledPopper } from "../../../ui/poppers";
-import { parseAxiosError } from "../../../utils/handleApiError";
-import { Table, TableColumnsType } from "antd";
 import ImportErrorDialog from "../../../components/Modal/ImportErrorDialog";
 import ExportTravelLogDialog from "../components/ExportTravelLogDialog";
 import FieldDate from "../../../components/field/FieldDate";
 import FieldAutoCompleted from "../../../components/field/FieldAutoCompleted";
 import FieldInput from "../../../components/field/FieldInput";
+import { Table, TableColumnsType } from "antd";
 
 interface props {
-  type: string;
+  type: AcceptedProductEnum;
 }
 
-const Coals: React.FC<props> = ({ type }) => {
+const TravelLogTab: React.FC<props> = ({ type }) => {
   const [open, setOpen] = useState(false);
   const [startTime, setStartTime] = useState<Dayjs | null>(null);
   const [endTime, setEndTime] = useState<Dayjs | null>(null);
@@ -254,7 +250,7 @@ const Coals: React.FC<props> = ({ type }) => {
       TravelLogService.importFile(
         formData,
         setProgress,
-        AcceptedProductEnum.COAL,
+        type,
       ),
     onMutate: () => {
       setIsUploading(true);
@@ -335,7 +331,7 @@ const Coals: React.FC<props> = ({ type }) => {
       shift: undefined,
       area: "",
       location: undefined,
-      acceptedProduct: AcceptedProductEnum.COAL,
+      acceptedProduct: type,
       excavationLevel: "",
       dumpHeightActual: "",
       fullDistanceKm: undefined as number | undefined,
@@ -749,22 +745,6 @@ const Coals: React.FC<props> = ({ type }) => {
         </Accordion>
         <Box display="flex" alignItems="center" sx={{ mb: 2, mt: 2 }}>
           <Typography variant="h4">Bảng cung độ</Typography>
-          {/* <IconButton onClick={(e) => setAnchorEl(e.currentTarget)}>
-                            <Settings sx={{ fontSize: 30 }} />
-                        </IconButton> */}
-          {/* <Menu
-                            anchorEl={anchorEl}
-                            open={Boolean(anchorEl)}
-                            onClose={() => setAnchorEl(null)}
-                            sx={{ maxHeight: 400 }}
-                        >
-                            {defaultColumns.map((col) => (
-                                <MenuItem key={col.id} onClick={() => handleToggleColumn(col.id)}>
-                                    <Switch checked={visibleColumns.includes(col.id)} />
-                                    <ListItemText primary={col.label} />
-                                </MenuItem>
-                            ))}
-                        </Menu> */}
         </Box>
         <Paper>
           <Table
@@ -816,4 +796,4 @@ const Coals: React.FC<props> = ({ type }) => {
   );
 };
 
-export default Coals;
+export default TravelLogTab;

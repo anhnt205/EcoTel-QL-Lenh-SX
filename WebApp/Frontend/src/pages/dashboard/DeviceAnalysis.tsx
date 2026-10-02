@@ -26,6 +26,7 @@ import Deviceprocess from "./DeviceProcess";
 import { useAtom } from "jotai";
 import { userAtom } from "../../atoms/userAtoms";
 import { RoleEnum, StatusDeviceEnum } from "../../enums";
+import FieldAutoCompleted from "../../components/field/FieldAutoCompleted";
 
 const filter = [
   "Thuê ngoài AB",
@@ -148,16 +149,14 @@ export default function DeviceAnalysic({
         </IconButton>
         <Box display="flex" alignItems="center" gap={2}>
           {[RoleEnum.ADMIN, RoleEnum.DISPATCHER].includes(user?.role) && (
-            <Autocomplete
+            <FieldAutoCompleted
+              title="Đơn vị"
+              data={departments}
+              labelkey="code"
+              value={department}
+              setValue={setDepartment}
               size="small"
-              options={departments}
-              getOptionLabel={(option: any) => option.code || ""}
-              value={departments.find((p: any) => p._id === department) || null}
-              onChange={(event, newValue) => {
-                setDepartment(newValue?._id || "");
-              }}
-              sx={{ width: 200 }}
-              renderInput={(params) => <TextField {...params} label="Đơn vị" />}
+              autocompleteSx={{ width: "200px" }}
             />
           )}
           <RealTimeClock />

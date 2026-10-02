@@ -11,6 +11,8 @@ const Position = require("../models/Position");
 const Department = require("../models/Department");
 const mongoose = require("mongoose");
 const { ROLE } = require("../config/config");
+const { paginateQuery } = require("../utils/pagination");
+
 // Get all users
 function parseBool(v) {
   if (v === undefined || v === null) return undefined; // không lọc
@@ -26,9 +28,6 @@ router.get("/", verifyToken, async (req, res) => {
     const query = {};
 
     const active = parseBool(req.query.active);
-    if (active !== undefined) {
-      query.active = active;
-    }
 
     if (user?.role === ROLE.MANAGER) {
       query.department = user?.department?._id;
@@ -58,15 +57,41 @@ router.get("/", verifyToken, async (req, res) => {
       ];
     }
 
-    const users = await User.find(query)
+    const activeCountsAgg = await User.aggregate([
+      { $match: query },
+      { $group: { _id: "$active", count: { $sum: 1 } } },
+    ]);
+
+    let totalAll = 0;
+    let activeCount = 0;
+    let inactiveCount = 0;
+    for (const item of activeCountsAgg) {
+      totalAll += item.count;
+      if (item._id === true) activeCount = item.count;
+      if (item._id === false) inactiveCount = item.count;
+    }
+
+    // ---- Áp filter active (nếu có) cho query chính ----
+    if (active !== undefined) {
+      query.active = active;
+    }
+
+    const modelQuery = User.find(query)
       .populate("department", "name code")
       .populate("position", "name")
       .collation({ locale: "vi", strength: 1 })
       .sort({ fullName: 1 });
-    req.logger.info(`✅ Lấy thành công ${users.length} người dùng.`);
+
+    const result = await paginateQuery(modelQuery, User, query, req.query);
+    req.logger.info(`✅ Lấy thành công ${result.results} người dùng.`);
     res.json({
       status: "success",
-      data: users,
+      ...result,
+      statusCounts: {
+        all: totalAll,
+        active: activeCount,
+        inactive: inactiveCount,
+      },
     });
   } catch (error) {
     req.logger.error("❌ Lỗi khi lấy danh sách người dùng", error);
@@ -289,12 +314,10 @@ router.put("/changepass", verifyToken, async (req, res) => {
     const hasEdgeSpace = (s) => s !== s.trim();
     if (hasEdgeSpace(newpass) || hasEdgeSpace(repass)) {
       req.logger.warn(`⚠️ Mật khẩu mới không được có khoảng trắng ở đầu/cuối.`);
-      return res
-        .status(400)
-        .send({
-          status: "error",
-          message: "Mật khẩu mới không được có khoảng trắng ở đầu/cuối",
-        });
+      return res.status(400).send({
+        status: "error",
+        message: "Mật khẩu mới không được có khoảng trắng ở đầu/cuối",
+      });
     }
 
     newpass = newpass.trim();
@@ -361,12 +384,10 @@ router.put("/addphone", verifyToken, async (req, res) => {
       req.logger.warn(
         "⚠️ Thêm số điện thoại thất bại - Không tìm thấy người dùng.",
       );
-      return res
-        .status(404)
-        .send({
-          status: "error",
-          message: "Thêm số điện thoại không thành công",
-        });
+      return res.status(404).send({
+        status: "error",
+        message: "Thêm số điện thoại không thành công",
+      });
     }
     const userData = userUpdate.toObject();
     delete userData.password;
@@ -590,12 +611,10 @@ router.post(
         req.logger.warn(
           "⚠️ Import file thất bại - Không tìm thấy dữ liệu hợp lệ.",
         );
-        return res
-          .status(400)
-          .json({
-            status: "error",
-            message: "Không tìm thấy dữ liệu người dùng hợp lệ trong file.",
-          });
+        return res.status(400).json({
+          status: "error",
+          message: "Không tìm thấy dữ liệu người dùng hợp lệ trong file.",
+        });
       }
 
       const uniqueDepartments = [

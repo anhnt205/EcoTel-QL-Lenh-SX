@@ -3,7 +3,6 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Login from "./pages/auth/Login";
 import Orders from "./pages/orders/Orders";
-import Devices from "./pages/vehicles/Vehicles";
 import Departments from "./pages/departments/Departments";
 import Reports from "./pages/reports/Reports";
 import Notifications from "./pages/notifications/Notifications";
@@ -19,7 +18,6 @@ import { useAtom } from "jotai";
 import DeviceTypes from "./pages/deviceTypes/DeviceTypes";
 import DispatcherOrders from "./pages/dispatcherOrder/DispatcherOrders";
 import SafetyMeasures from "./pages/safetyMeasures/SafetyMeasures";
-import Machines from "./pages/machine/Machine";
 import Shifts from "./pages/shift/Shifts";
 import OrderByUsers from "./pages/orders/OrderByUser";
 import "./index.css";
@@ -29,8 +27,9 @@ import MainLayout from "./layout/MainLayout";
 import DashBoard from "./pages/dashboard/Dashboard";
 import DeviceModels from "./pages/deviceModels/DeviceModels";
 import Models from "./pages/model/Model";
-import { RoleEnum } from "./enums";
+import { DeviceTypeEnum, RoleEnum } from "./enums";
 import SystemDashboard from "./pages/dashboard/System";
+import Devices from "./pages/devices/Devices";
 
 interface PrivateRouteProps {
   children: React.ReactNode;
@@ -131,7 +130,7 @@ const App = () => {
           path="/vehicles"
           element={
             <PrivateRoute>
-              <Devices />
+              <Devices type={DeviceTypeEnum.VEHICLE} />
             </PrivateRoute>
           }
         />
@@ -147,7 +146,7 @@ const App = () => {
           path="/machines"
           element={
             <PrivateRoute>
-              <Machines />
+              <Devices type={DeviceTypeEnum.MACHINE} />
             </PrivateRoute>
           }
         />

@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Box,
@@ -9,9 +9,6 @@ import {
   IconButton,
   Paper,
   Typography,
-  TextField,
-  MenuItem,
-  Autocomplete,
   InputAdornment,
   Grid,
   Checkbox,
@@ -29,16 +26,13 @@ import {
   Visibility,
   VisibilityOff,
   UploadFile,
-  Close,
   InfoOutlined,
   Download,
-  Search,
   ResetTv,
 } from "@mui/icons-material";
-import { useFormik } from "formik";
+import { FormikProvider, useFormik } from "formik";
 import api from "../../config/api.config";
-import { Department, Position, User } from "../../types";
-import { DataGrid, GridColDef, GridToolbar } from "@mui/x-data-grid";
+import { User } from "../../types";
 import { useAtom } from "jotai";
 import { userAtom } from "../../atoms/userAtoms";
 import imageCompression from "browser-image-compression";
@@ -48,7 +42,6 @@ import {
   showErrorAlert,
   showSuccessAlert,
 } from "../../components/Alert";
-import { StyledPopper } from "../../ui/poppers";
 import { userValidationSchema } from "../../utils/validation";
 import UserService from "../../services/userService";
 import PositionService from "../../services/positionService";
@@ -57,6 +50,12 @@ import { RoleEnum } from "../../enums";
 import { ROLE_TYPE_OPTIONS } from "../../utils/const";
 import { parseAxiosError } from "../../utils/handleApiError";
 import ImageUploadBox from "../../components/ImageUploadBox";
+import CustomDataGrid, {
+  ColumnDef,
+} from "../../components/Table/CustomDataGrid";
+import FieldSearch from "../../components/field/FieldSearch";
+import FieldAutoCompleted from "../../components/field/FieldAutoCompleted";
+import FieldInput from "../../components/field/FieldInput";
 
 const Users: React.FC = () => {
   const [open, setOpen] = useState(false);
@@ -70,6 +69,11 @@ const Users: React.FC = () => {
   const queryClient = useQueryClient();
   const [user] = useAtom(userAtom);
 
+  const [paginationModel, setPaginationModel] = useState({
+    pageSize: 10,
+    page: 0,
+  });
+
   const [showPassword, setShowPassword] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const formRef = useRef<HTMLDivElement>(null);
@@ -77,28 +81,33 @@ const Users: React.FC = () => {
     setShowPassword((prev) => !prev);
   };
 
-  const { data: users = [], isLoading } = useQuery({
-    queryKey: ["users", value, department, active],
+  const {
+    data: users = {
+      data: [],
+      totalDocs: 0,
+      statusCounts: { all: 0, active: 0, inactive: 0 },
+    },
+    isLoading,
+  } = useQuery({
+    queryKey: ["users", value, department, active, paginationModel],
     queryFn: () =>
       UserService.getAll({
         q: value,
         department: department,
+        active: active,
+        page: paginationModel.page + 1,
+        pageSize: paginationModel.pageSize,
       }),
+    placeholderData: (previousData) => previousData,
   });
-  const filteredOrders = React.useMemo(() => {
-    if (!active) return users;
-    return users.filter(
-      (o: User) => o.active === (active === "true" ? true : false),
-    );
-  }, [users, active]);
 
-  const { data: positions = [] } = useQuery({
+  const { data: positions = { data: [] } } = useQuery({
     queryKey: ["positions"],
-    queryFn: PositionService.getAll,
+    queryFn: () => PositionService.getAll(),
   });
-  const { data: departments = [] } = useQuery({
+  const { data: departments = { data: [] } } = useQuery({
     queryKey: ["departments"],
-    queryFn: DepartmentService.getAll,
+    queryFn:()=> DepartmentService.getAll(),
   });
 
   const createMutation = useMutation({
@@ -210,7 +219,7 @@ const Users: React.FC = () => {
       salaryCode: "",
       department: user?.role === RoleEnum.ADMIN ? user?.department?._id : "",
       position: undefined,
-      role: "",
+      role: RoleEnum.EMPLOYEE,
       ...selectedUser,
     },
     validationSchema: userValidationSchema,
@@ -322,60 +331,50 @@ const Users: React.FC = () => {
     }
   };
 
-  const userColumns: GridColDef[] = [
+  const userColumns: ColumnDef[] = [
     {
-      field: "fullName",
-      headerName: "Họ tên",
+      id: "fullName",
+      label: "Họ tên",
       flex: 1,
       minWidth: 150,
-      headerAlign: "center",
     },
     {
-      field: "salaryCode",
-      headerName: "Thẻ lương",
+      id: "salaryCode",
+      label: "Thẻ lương",
       align: "center",
       minWidth: 150,
       resizable: true,
-      headerAlign: "center",
     },
     {
-      field: "username",
-      headerName: "Tài khoản",
+      id: "username",
+      label: "Tài khoản",
       flex: 1,
       minWidth: 150,
-      headerAlign: "center",
     },
     {
-      field: "gender",
-      headerName: "Giới tính",
+      id: "gender",
+      label: "Giới tính",
       minWidth: 120,
-      headerAlign: "center",
-      align: "center",
     },
     {
-      field: "phone",
-      headerName: "Số điện thoại",
+      id: "phone",
+      label: "Số điện thoại",
       minWidth: 150,
-      headerAlign: "center",
-      align: "center",
     },
     {
-      field: "email",
-      headerName: "Email",
+      id: "email",
+      label: "Email",
       minWidth: 150,
-      headerAlign: "center",
-      align: "center",
     },
     {
-      field: "position",
-      headerName: "Chức danh, nghề nghiệp",
+      id: "position",
+      label: "Chức danh, nghề nghiệp",
       renderCell: (params: any) => params?.row?.position?.name || "",
       minWidth: 250,
-      headerAlign: "center",
     },
     {
-      field: "department",
-      headerName: "Đơn vị",
+      id: "department",
+      label: "Đơn vị",
       renderCell: (params: any) => {
         const dept = params?.row?.department;
         return typeof dept === "object" && dept !== null
@@ -384,14 +383,14 @@ const Users: React.FC = () => {
       },
       minWidth: 250,
       flex: 1,
-      headerAlign: "center",
+      headerAlign: "center" as "center",
     },
     {
-      field: "role",
-      headerName: "Phân quyền",
+      id: "role",
+      label: "Phân quyền",
       width: 150,
-      headerAlign: "center",
-      renderCell: (params) => (
+      headerAlign: "center" as "center",
+      renderCell: (params: any) => (
         <Typography>
           {params.row.role === RoleEnum.ADMIN
             ? "Quản trị hệ thống"
@@ -404,12 +403,12 @@ const Users: React.FC = () => {
       ),
     },
     {
-      field: "active",
-      headerName: "Trạng thái",
+      id: "active",
+      label: "Trạng thái",
       width: 100,
-      headerAlign: "center",
-      align: "center",
-      renderCell: (params) => (
+      headerAlign: "center" as "center",
+      align: "center" as "center",
+      renderCell: (params: any) => (
         <Checkbox
           checked={params.row?.active}
           onChange={(e) =>
@@ -422,11 +421,11 @@ const Users: React.FC = () => {
       ),
     },
     {
-      field: "info",
-      headerName: "Xem",
+      id: "info",
+      label: "Xem",
       width: 60,
-      headerAlign: "center",
-      renderCell: (params) => (
+      headerAlign: "center" as "center",
+      renderCell: (params: any) => (
         <>
           <IconButton
             color="info"
@@ -443,11 +442,11 @@ const Users: React.FC = () => {
       filterable: false,
     },
     {
-      field: "edit",
-      headerName: "Sửa",
+      id: "edit",
+      label: "Sửa",
       width: 60,
-      headerAlign: "center",
-      renderCell: (params) => (
+      headerAlign: "center" as "center",
+      renderCell: (params: any) => (
         <>
           <IconButton
             color="primary"
@@ -472,11 +471,11 @@ const Users: React.FC = () => {
       filterable: false,
     },
     {
-      field: "resetpass",
-      headerName: "Reset MK",
+      id: "resetpass",
+      label: "Reset MK",
       width: 100,
-      headerAlign: "center",
-      renderCell: (params) => (
+      headerAlign: "center" as "center",
+      renderCell: (params: any) => (
         <>
           <IconButton
             color="primary"
@@ -501,11 +500,14 @@ const Users: React.FC = () => {
     user?.role === RoleEnum.ADMIN
       ? userColumns
       : userColumns.filter(
-          (col: GridColDef) =>
-            col.field !== "resetpass" &&
-            col.field !== "active" &&
-            col.field !== "edit",
+          (col) =>
+            col.id !== "resetpass" && col.id !== "active" && col.id !== "edit",
         );
+
+  const roles = useMemo(
+    () => ROLE_TYPE_OPTIONS.map((r) => ({ _id: r.label, name: r.value })),
+    [],
+  );
 
   return (
     <Box>
@@ -590,33 +592,19 @@ const Users: React.FC = () => {
               }}
             >
               <Box sx={{ display: "flex", gap: 4 }}>
-                <TextField
-                  fullWidth
-                  size="small"
-                  value={value}
-                  placeholder="Tìm kiếm theo tên, mã thẻ lương cán bộ, nhân viên"
-                  onChange={(e) => setValue(e.target.value)}
-                  InputProps={{
-                    endAdornment: (
-                      <InputAdornment position="end">
-                        <Search sx={{ fontSize: 24 }} />
-                      </InputAdornment>
-                    ),
-                  }}
-                ></TextField>
+                <FieldSearch
+                  titleSearch={`Tìm kiếm theo tên, mã thẻ lương cán bộ, nhân viên`}
+                  searchValue={value}
+                  setSearchValue={setValue}
+                />
                 {user?.role === RoleEnum.ADMIN && (
-                  <Autocomplete
-                    fullWidth
+                  <FieldAutoCompleted
+                    data={departments.data}
+                    labelkey="code"
+                    title="Tìm kiếm theo đơn vị"
+                    value={department}
+                    setValue={setDepartment}
                     size="small"
-                    options={departments}
-                    getOptionLabel={(option: Department) => option.code || ""}
-                    onChange={(event, newValue) => {
-                      setDepartment(newValue?._id || "");
-                    }}
-                    PopperComponent={StyledPopper}
-                    renderInput={(params) => (
-                      <TextField {...params} label="Tìm kiếm theo đơn vị" />
-                    )}
                   />
                 )}
               </Box>
@@ -679,221 +667,85 @@ const Users: React.FC = () => {
             {selectedUser ? "Sửa người dùng" : "Thêm người dùng"}
           </DialogTitle>
           <DialogContent>
-            <Box component="form" onSubmit={formik.handleSubmit} sx={{ mt: 2 }}>
-              <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                <TextField
-                  fullWidth
-                  id="username"
-                  name="username"
-                  label="Tên đăng nhập"
-                  value={formik.values.username}
-                  onChange={formik.handleChange}
-                  error={
-                    formik.touched.username && Boolean(formik.errors.username)
-                  }
-                  helperText={formik.touched.username && formik.errors.username}
-                />
-                {!selectedUser && (
-                  <TextField
-                    fullWidth
-                    id="password"
-                    name="password"
-                    label="Mật khẩu"
-                    type={showPassword ? "text" : "password"}
-                    InputProps={{
-                      endAdornment: (
-                        <InputAdornment position="end">
-                          <IconButton onClick={handleTogglePassword} edge="end">
-                            {showPassword ? (
-                              <Visibility />
-                            ) : (
-                              <VisibilityOff />
-                            )}{" "}
-                          </IconButton>
-                        </InputAdornment>
-                      ),
-                    }}
-                    value={formik.values.password}
-                    onChange={formik.handleChange}
-                    error={
-                      formik.touched.password && Boolean(formik.errors.password)
-                    }
-                    helperText={
-                      formik.touched.password && formik.errors.password
-                    }
-                  />
-                )}
-                <TextField
-                  fullWidth
-                  id="fullName"
-                  name="fullName"
-                  label="Họ tên"
-                  value={formik.values.fullName}
-                  onChange={formik.handleChange}
-                  error={
-                    formik.touched.fullName && Boolean(formik.errors.fullName)
-                  }
-                  helperText={formik.touched.fullName && formik.errors.fullName}
-                />
-                <TextField
-                  fullWidth
-                  select
-                  id="gender"
-                  name="gender"
-                  label="Giới tính"
-                  value={formik.values.gender}
-                  onChange={formik.handleChange}
-                  error={formik.touched.gender && Boolean(formik.errors.gender)}
-                  helperText={formik.touched.gender && formik.errors.gender}
-                >
-                  <MenuItem value="Nam">Nam</MenuItem>
-                  <MenuItem value="Nữ">Nữ</MenuItem>
-                </TextField>
-                <TextField
-                  fullWidth
-                  id="salaryCode"
-                  name="salaryCode"
-                  label="Mã thẻ lương"
-                  value={formik.values.salaryCode}
-                  onChange={formik.handleChange}
-                  error={
-                    formik.touched.salaryCode &&
-                    Boolean(formik.errors.salaryCode)
-                  }
-                  helperText={
-                    formik.touched.salaryCode && formik.errors.salaryCode
-                  }
-                />
-                <TextField
-                  fullWidth
-                  id="email"
-                  name="email"
-                  label="Email"
-                  value={formik.values.email || ""}
-                  onChange={formik.handleChange}
-                  error={formik.touched.email && Boolean(formik.errors.email)}
-                  helperText={formik.touched.email && formik.errors.email}
-                />
-                <TextField
-                  fullWidth
-                  id="phone"
-                  name="phone"
-                  label="Số điện thoại"
-                  value={formik.values.phone || ""}
-                  onChange={formik.handleChange}
-                  error={formik.touched.phone && Boolean(formik.errors.phone)}
-                  helperText={formik.touched.phone && formik.errors.phone}
-                />
-                <Autocomplete
-                  fullWidth
-                  options={positions}
-                  getOptionLabel={(option: Position) => option.name || ""}
-                  value={
-                    positions.find(
-                      (d: Position) => d._id === formik.values.position,
-                    ) || null
-                  }
-                  onChange={(event, newValue) => {
-                    formik.setFieldValue("position", newValue?._id || "");
-                  }}
-                  PopperComponent={StyledPopper}
-                  renderInput={(params) => (
-                    <TextField
-                      {...params}
-                      label="Chức danh, nghề nghiệp"
-                      error={
-                        formik.touched.position &&
-                        Boolean(formik.errors.position)
-                      }
-                      helperText={
-                        formik.touched.position &&
-                        typeof formik.errors.position === "string"
-                          ? formik.errors.position
-                          : ""
-                      }
-                    />
-                  )}
-                />
-                <Autocomplete
-                  fullWidth
-                  options={departments}
-                  getOptionLabel={(option: Department) => option.name || ""}
-                  value={
-                    departments.find(
-                      (p: any) =>
-                        p._id ===
-                        (user?.role === RoleEnum.MANAGER
-                          ? user?.department?._id
-                          : formik.values.department),
-                    ) || null
-                  }
-                  onChange={(event, newValue) => {
-                    formik.setFieldValue("department", newValue?._id || "");
-                  }}
-                  PopperComponent={StyledPopper}
-                  renderInput={(params) => (
-                    <TextField
-                      {...params}
-                      label="Đơn vị"
-                      error={
-                        formik.touched.department &&
-                        Boolean(formik.errors.department)
-                      }
-                      helperText={
-                        formik.touched.department &&
-                        typeof formik.errors.department === "string"
-                          ? formik.errors.department
-                          : ""
-                      }
-                    />
-                  )}
-                />
-                <TextField
-                  fullWidth
-                  select
-                  id="role"
-                  name="role"
-                  label="Phân quyền"
-                  SelectProps={{
-                    displayEmpty: true,
-                    MenuProps: {
-                      style: {
-                        maxHeight: 300,
-                      },
-                    },
-                  }}
-                  value={formik.values.role || ""}
-                  onChange={formik.handleChange}
-                  error={formik.touched.role && Boolean(formik.errors.role)}
-                  helperText={formik.touched.role && formik.errors.role}
-                  disabled={selectedUser?.role === RoleEnum.ADMIN}
-                >
-                  {ROLE_TYPE_OPTIONS.map((i) => (
-                    <MenuItem
-                      key={i.label}
-                      value={i.label}
-                      hidden={user?.role !== RoleEnum.ADMIN}
-                    >
-                      {i.value}
-                    </MenuItem>
-                  ))}
-                </TextField>
-
-                <Grid container spacing={2}>
-                  <Grid item>
-                    <ImageUploadBox
-                      type="avatar"
-                      currentKey={avatar}
-                      onClear={() => {
-                        setAvatar("");
-                        formik.setFieldValue("avatar", "");
+            <FormikProvider value={formik}>
+              <Box
+                component="form"
+                onSubmit={formik.handleSubmit}
+                sx={{ mt: 2 }}
+              >
+                <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                  <FieldInput name="username" title="Tên đăng nhập" />
+                  {!selectedUser && (
+                    <FieldInput
+                      name="password"
+                      title="Mật khẩu"
+                      type={showPassword ? "text" : "password"}
+                      InputProps={{
+                        endAdornment: (
+                          <InputAdornment position="end">
+                            <IconButton
+                              onClick={handleTogglePassword}
+                              edge="end"
+                            >
+                              {showPassword ? (
+                                <Visibility />
+                              ) : (
+                                <VisibilityOff />
+                              )}{" "}
+                            </IconButton>
+                          </InputAdornment>
+                        ),
                       }}
-                      onUpload={handleImageUpload}
                     />
+                  )}
+                  <FieldInput name="fullName" title="Họ tên" />
+                  <FieldAutoCompleted
+                    name="gender"
+                    title="Giới tính"
+                    data={[
+                      { _id: "Nam", name: "Nam" },
+                      { _id: "Nữ", name: "Nữ" },
+                    ]}
+                    labelkey="name"
+                  />
+                  <FieldInput name="salaryCode" title="Mã thẻ lương" />
+                  <FieldInput name="email" title="Email" />
+                  <FieldInput name="phone" title="Số điện thoại" />
+                  <FieldAutoCompleted
+                    name="position"
+                    title="Chức danh, nghề nghiệp"
+                    data={positions.data}
+                    labelkey="name"
+                  />
+                  <FieldAutoCompleted
+                    name="department"
+                    title="Đơn vị"
+                    data={departments.data}
+                    labelkey="name"
+                  />
+                  <FieldAutoCompleted
+                    name="role"
+                    title="Phân quyền"
+                    data={roles}
+                    labelkey="name"
+                  />
+
+                  <Grid container spacing={2}>
+                    <Grid item>
+                      <ImageUploadBox
+                        type="avatar"
+                        currentKey={avatar}
+                        onClear={() => {
+                          setAvatar("");
+                          formik.setFieldValue("avatar", "");
+                        }}
+                        onUpload={handleImageUpload}
+                      />
+                    </Grid>
                   </Grid>
-                </Grid>
+                </Box>
               </Box>
-            </Box>
+            </FormikProvider>
           </DialogContent>
           <DialogActions>
             <Button onClick={handleClose}>Hủy</Button>
@@ -939,7 +791,7 @@ const Users: React.FC = () => {
                 onChange={() => setActive("")}
               />
               <ListItemText
-                primary={`Tất cả (${users.length})`}
+                primary={`Tất cả (${users.statusCounts?.all})`}
                 sx={{ color: "blue" }}
               />
             </Box>
@@ -951,7 +803,7 @@ const Users: React.FC = () => {
                 onChange={() => setActive("true")}
               />
               <ListItemText
-                primary={`Hoạt động (${users.filter((o: User) => o.active).length})`}
+                primary={`Hoạt động (${users.statusCounts?.active})`}
                 sx={{ color: "grey" }}
               />
             </Box>
@@ -963,58 +815,24 @@ const Users: React.FC = () => {
                 onChange={() => setActive("false")}
               />
               <ListItemText
-                primary={`Không hoạt động (${users.filter((o: User) => !o.active).length})`}
+                primary={`Không hoạt động (${users.statusCounts?.inactive})`}
                 sx={{ color: "grey" }}
               />
             </Box>
           </Box>
         </Box>
-        <DataGrid
-          rows={filteredOrders}
-          columns={visibleColumns}
-          getRowId={(row) => row._id}
-          pageSizeOptions={[10, 20, 50]}
-          autoHeight
-          disableRowSelectionOnClick
-          checkboxSelection={user?.role === RoleEnum.ADMIN}
+        <CustomDataGrid
+          rows={users.data}
+          defaultColumns={visibleColumns}
+          paginationModel={paginationModel}
+          onPaginationModelChange={setPaginationModel}
+          paginationMode="server"
+          rowCount={users.totalDocs}
+          isAdmin={user?.role === RoleEnum.ADMIN}
           isRowSelectable={(params) => params.row.role !== RoleEnum.ADMIN}
-          onRowSelectionModelChange={(newSelection) => {
-            setSelectedUsers(newSelection as string[]);
-          }}
-          slots={{ toolbar: GridToolbar }}
-          localeText={{
-            toolbarColumns: "Cột",
-            toolbarFilters: "Bộ lọc",
-            toolbarDensity: "Mật độ",
-          }}
-          slotProps={{
-            filterPanel: { disableAddFilterButton: false },
-            toolbar: {
-              csvOptions: { disableToolbarButton: true },
-              printOptions: { disableToolbarButton: true },
-            },
-          }}
-          initialState={{
-            pagination: {
-              paginationModel: { pageSize: 10, page: 0 },
-            },
-            density: "compact",
-          }}
-          loading={isLoading}
-          sx={{
-            "& .MuiDataGrid-columnHeaderTitle": {
-              // width: '100%',
-              textAlign: "center",
-              fontWeight: "bold",
-              fontSize: 18,
-            },
-            "& .MuiDataGrid-row:nth-of-type(odd)": {
-              backgroundColor: "#e3f2fd",
-            },
-            "& .MuiDataGrid-row:nth-of-type(even)": {
-              backgroundColor: "white",
-            },
-          }}
+          onEdit={handleOpen}
+          onSelectionChange={setSelectedUsers}
+          isLoading={isLoading}
         />
       </Paper>
 

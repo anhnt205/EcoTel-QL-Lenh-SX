@@ -1,4 +1,10 @@
-import React, { Dispatch, SetStateAction, useEffect, useState } from "react";
+import React, {
+  Dispatch,
+  SetStateAction,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import {
   Box,
   Button,
@@ -17,13 +23,17 @@ import { Close } from "@mui/icons-material";
 import imageCompression from "browser-image-compression";
 import api from "../../config/api.config";
 import * as yup from "yup";
-import { useFormik } from "formik";
+import { FormikProvider, useFormik } from "formik";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Department, User } from "../../types";
 import { showErrorAlert, showSuccessAlert } from "../Alert";
 import { RoleEnum } from "../../enums";
 import { ROLE_TYPE_OPTIONS } from "../../utils/const";
 import ImageUploadBox from "../ImageUploadBox";
+import FieldInput from "../field/FieldInput";
+import FieldAutoCompleted from "../field/FieldAutoCompleted";
+import PositionService from "../../services/positionService";
+import DepartmentService from "../../services/departmentService";
 
 export default function Profile({
   open,
@@ -42,14 +52,13 @@ export default function Profile({
     queryFn: () => api.get(`/auth/me`).then((res) => res.data.data.user),
   });
 
-  const { data: positions = [] } = useQuery({
+  const { data: positions = { data: [] } } = useQuery({
     queryKey: ["positions"],
-    queryFn: () => api.get("/positions").then((res) => res.data.data),
+    queryFn: () => PositionService.getAll(),
   });
-
-  const { data: departments = [] } = useQuery({
+  const { data: departments = { data: [] } } = useQuery({
     queryKey: ["departments"],
-    queryFn: () => api.get("/departments").then((res) => res.data.data),
+    queryFn: () => DepartmentService.getAll(),
   });
 
   const updateMutation = useMutation({
@@ -164,145 +173,88 @@ export default function Profile({
     }
   };
 
+  const roles = useMemo(
+    () => ROLE_TYPE_OPTIONS.map((r) => ({ _id: r.label, name: r.value })),
+    [],
+  );
+
   return (
     <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth>
       <DialogTitle>Thông tin người dùng</DialogTitle>
       <DialogContent>
-        <Box component="form" onSubmit={formik.handleSubmit} sx={{ mt: 2 }}>
-          <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-            <TextField
-              fullWidth
-              name="username"
-              label="Tên đăng nhập"
-              value={formik.values.username}
-              InputProps={{ readOnly: true }}
-            />
+        <FormikProvider value={formik}>
+          <Box component="form" onSubmit={formik.handleSubmit} sx={{ mt: 2 }}>
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+              <FieldInput name="username" title="Tên đằng nhập" disabled />
 
-            <TextField
-              fullWidth
-              name="fullName"
-              label="Họ tên"
-              value={formik.values.fullName}
-              onChange={formik.handleChange}
-              error={!!formik.errors.fullName}
-              helperText={formik.errors.fullName}
-            />
+              <FieldInput name="fullName" title="Họ tên" />
 
-            <TextField
-              fullWidth
-              select
-              name="gender"
-              label="Giới tính"
-              value={formik.values.gender}
-              onChange={formik.handleChange}
-            >
-              <MenuItem value="Nam">Nam</MenuItem>
-              <MenuItem value="Nữ">Nữ</MenuItem>
-            </TextField>
+              <FieldAutoCompleted
+                name="gender"
+                title="Giới tính"
+                data={[
+                  { _id: "Nam", name: "Nam" },
+                  { _id: "Nữ", name: "Nữ" },
+                ]}
+                labelkey="name"
+              />
 
-            <TextField
-              fullWidth
-              name="salaryCode"
-              label="Mã thẻ lương"
-              value={formik.values.salaryCode}
-              onChange={formik.handleChange}
-            />
+              <FieldInput name="salaryCode" title="Mã thẻ lương" />
 
-            <TextField
-              fullWidth
-              name="email"
-              label="Email"
-              value={formik.values.email}
-              onChange={formik.handleChange}
-              error={!!formik.errors.email}
-              helperText={formik.errors.email}
-            />
+              <FieldInput name="email" title="Email" />
 
-            <TextField
-              fullWidth
-              name="phone"
-              label="Số điện thoại"
-              value={formik.values.phone}
-              onChange={formik.handleChange}
-            />
+              <FieldInput name="phone" title="Số điện thoại" />
 
-            <TextField
-              fullWidth
-              select
-              name="position"
-              label="Chức danh, nghề nghiệp"
-              value={formik.values.position}
-              onChange={formik.handleChange}
-            >
-              {positions.map((p: any) => (
-                <MenuItem key={p._id} value={p._id}>
-                  {p.name}
-                </MenuItem>
-              ))}
-            </TextField>
+              <FieldAutoCompleted
+                name="position"
+                title="Chức danh, nghề nghiệp"
+                data={positions.data}
+                labelkey="name"
+              />
 
-            <Autocomplete
-              fullWidth
-              options={departments}
-              getOptionLabel={(option: Department) => option.name || ""}
-              value={
-                departments.find(
-                  (d: Department) => d._id === formik.values.department,
-                ) || null
-              }
-              onChange={(e, val) =>
-                formik.setFieldValue("department", val?._id || "")
-              }
-              renderInput={(params) => <TextField {...params} label="Đơn vị" />}
-            />
+              <FieldAutoCompleted
+                name="department"
+                title="Đơn vị"
+                data={departments.data}
+                labelkey="name"
+              />
 
-            <TextField
-              fullWidth
-              select
-              name="role"
-              label="Phân quyền"
-              disabled
-              value={formik.values.role}
-              onChange={formik.handleChange}
-            >
-              {ROLE_TYPE_OPTIONS.map((i) => (
-                <MenuItem
-                  key={i.label}
-                  value={i.label}
-                  hidden={user?.role !== RoleEnum.ADMIN}
-                >
-                  {i.value}
-                </MenuItem>
-              ))}
-            </TextField>
+              <FieldAutoCompleted
+                name="role"
+                title="Phân quyền"
+                data={roles}
+                labelkey="name"
+                disabled
+              />
 
-            <Grid container spacing={2}>
-              <Grid item>
-                <ImageUploadBox
-                  type="avatar"
-                  currentKey={avatar}
-                  onClear={() => {
-                    setAvatar("");
-                    formik.setFieldValue("avatar", "");
-                  }}
-                  onUpload={handleImageUpload}
-                />
+              <Grid container spacing={2}>
+                <Grid item>
+                  <ImageUploadBox
+                    type="avatar"
+                    currentKey={avatar}
+                    onClear={() => {
+                      setAvatar("");
+                      formik.setFieldValue("avatar", "");
+                    }}
+                    onUpload={handleImageUpload}
+                  />
+                </Grid>
+
+                <Grid item>
+                  <ImageUploadBox
+                    type="signature"
+                    currentKey={signatureUrl}
+                    onClear={() => {
+                      setSignatureUrl("");
+                      formik.setFieldValue("signature", "");
+                    }}
+                    onUpload={handleImageUpload}
+                  />
+                </Grid>
               </Grid>
-
-              <Grid item>
-                <ImageUploadBox
-                  type="signature"
-                  currentKey={signatureUrl}
-                  onClear={() => {
-                    setSignatureUrl("");
-                    formik.setFieldValue("signature", "");
-                  }}
-                  onUpload={handleImageUpload}
-                />
-              </Grid>
-            </Grid>
+            </Box>
           </Box>
-        </Box>
+        </FormikProvider>
       </DialogContent>
       <DialogActions>
         <Button onClick={handleClose}>Hủy</Button>

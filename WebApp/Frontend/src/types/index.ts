@@ -264,3 +264,20 @@ export interface SystemInfo {
     used: number;
   };
 }
+
+export interface ListParams {
+  q?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface ListResponse {
+  status: string;
+  results: number;
+  page?: number;
+  pageSize?: number;
+  totalDocs: number;
+  totalPages?: number;
+  statusCounts?: Record<string, number>;
+  data: any[];
+}

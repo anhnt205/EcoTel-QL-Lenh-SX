@@ -1,15 +1,17 @@
 import React from "react";
 import { Box, Typography, Tabs, Tab } from "@mui/material";
 
-import Lands from "./Tab/Land";
-import Coals from "./Tab/Coal";
+import TravelLogTab from "./components/TravelLogTab";
+import { AcceptedProductEnum } from "../../enums";
 
 const TravelLogs: React.FC = () => {
-  const [value, setValue] = React.useState<"Đất" | "Than" | "Nội bộ">("Đất");
+  const [value, setValue] = React.useState<AcceptedProductEnum>(
+    AcceptedProductEnum.LAND,
+  );
 
   const handleChange = (
     event: React.SyntheticEvent,
-    newValue: "Đất" | "Than" | "Nội bộ",
+    newValue: AcceptedProductEnum,
   ) => {
     setValue(newValue);
   };
@@ -28,11 +30,11 @@ const TravelLogs: React.FC = () => {
           aria-label="wrapped label tabs example"
         >
           <Tab
-            value="Đất"
+            value={AcceptedProductEnum.COAL}
             label={<b style={{ fontSize: 17 }}>Cung độ vận chuyển đất</b>}
           />
           <Tab
-            value="Than"
+            value={AcceptedProductEnum.LAND}
             label={
               <b style={{ fontSize: 17 }}>Cung độ vận chuyển than và SPNT</b>
             }
@@ -40,8 +42,8 @@ const TravelLogs: React.FC = () => {
           {/* <Tab value="Nội bộ" label={<b>Cung độ nội bộ</b>} /> */}
         </Tabs>
       </Box>
-      {value === "Đất" && <Lands type={value} />}
-      {value === "Than" && <Coals type={value} />}
+      {value === "Đất" && <TravelLogTab type={value} />}
+      {value === "Than" && <TravelLogTab type={value} />}
       {/* {value === "Nội bộ" && <Internals type={value} />} */}
     </Box>
   );

@@ -22,15 +22,22 @@ const dayjs = require("dayjs");
 
 const { verifyToken, restrictTo } = require("../middleware/auth.middleware");
 const Order = require("../models/Order");
-
 router.get("/", verifyToken, async (req, res, next) => {
   try {
     const user = req.user;
     const query = {};
 
+    // Lọc theo loại: xe hoặc máy (thay vì filter ở frontend)
+    if (req.query.type) {
+      const matchedTypes = await DeviceType.find(
+        { group: new RegExp(`^${req.query.type}$`, "i") },
+        { _id: 1 },
+      ).lean();
+      query.category = { $in: matchedTypes.map((t) => t._id) };
+    }
+
     if (req.query.q) {
       const regex = new RegExp(req.query.q, "i");
-
       const matchedModels = await DeviceModel.find(
         { name: regex },
         { _id: 1 },
@@ -43,24 +50,56 @@ router.get("/", verifyToken, async (req, res, next) => {
         { material: { $in: modelIds } },
       ];
     }
+
     if (req.query.department) {
       query.department = req.query.department;
-    }
-    if (req.query.status) {
-      query.status = req.query.status;
     }
 
     if ([ROLE.MANAGER, ROLE.EMPLOYEE].includes(user.role)) {
       query.department = user.department._id;
     }
 
-    const devices = await Device.find(query)
+    // ---- Đếm số lượng theo status (dựa trên filter hiện tại, KHÔNG áp status) ----
+    const statusCountsAgg = await Device.aggregate([
+      { $match: query },
+      { $group: { _id: "$status", count: { $sum: 1 } } },
+    ]);
+
+    const statusCounts = {};
+    let totalAll = 0;
+    for (const item of statusCountsAgg) {
+      const key = item._id || "UNKNOWN";
+      statusCounts[key] = item.count;
+      totalAll += item.count;
+    }
+
+    // ---- Áp filter status (nếu có) cho query chính ----
+    if (req.query.status) {
+      query.status = req.query.status;
+    }
+
+    const totalDocs = req.query.status
+      ? statusCounts[req.query.status] || 0
+      : totalAll;
+
+    // ---- Phân trang: không truyền page/pageSize thì lấy hết ----
+    const page = parseInt(req.query.page);
+    const pageSize = parseInt(req.query.pageSize);
+    const hasPagination =
+      !isNaN(page) && !isNaN(pageSize) && page > 0 && pageSize > 0;
+
+    let devicesQuery = Device.find(query)
       .populate("department", "name code createdAt")
       .populate("category")
       .populate("material")
       .collation({ locale: "vi", strength: 1 })
       .sort({ code: 1 });
 
+    if (hasPagination) {
+      devicesQuery = devicesQuery.skip((page - 1) * pageSize).limit(pageSize);
+    }
+
+    const devices = await devicesQuery;
     const deviceIds = devices.map((d) => d._id);
 
     // Sử dụng aggregation để lấy DUY NHẤT 1 lệnh mới nhất cho mỗi phương tiện
@@ -154,6 +193,14 @@ router.get("/", verifyToken, async (req, res, next) => {
     res.status(200).json({
       status: "success",
       results: devicesWithAssignedInfo.length,
+      page: hasPagination ? page : undefined,
+      pageSize: hasPagination ? pageSize : undefined,
+      totalDocs,
+      totalPages: hasPagination ? Math.ceil(totalDocs / pageSize) : undefined,
+      statusCounts: {
+        all: totalAll,
+        ...statusCounts,
+      },
       data: devicesWithAssignedInfo,
     });
   } catch (err) {
@@ -360,7 +407,7 @@ router.get("/:id", verifyToken, async (req, res, next) => {
       { $unwind: "$vehicleSummaries" },
       {
         $match: {
-          "vehicleSummaries.vehicle": { $in: deviceIds },
+          "vehicleSummaries.vehicle": deviceId,
           "vehicleSummaries.travelHours": { $ne: null }, // bỏ qua bản ghi không có giá trị
         },
       },
@@ -874,6 +921,12 @@ router.post(
             });
             continue;
           }
+        } else {
+          invalidRows.push({
+            row: row,
+            error: "Loại xe/máy là bắt buộc.",
+          });
+          continue;
         }
         if (categoryId) {
           updateData.category = categoryId;
@@ -883,7 +936,7 @@ router.post(
         let materialId = null;
         if (material) {
           materialId = deviceModelMap.get(material);
-          if (!categoryId) {
+          if (!materialId) {
             invalidRows.push({
               row: row,
               error: `Chủng loại không hợp lệ: ${material}`,
@@ -941,12 +994,43 @@ router.post(
   restrictTo(ROLE.MANAGER, ROLE.ADMIN, ROLE.DISPATCHER),
   async (req, res, next) => {
     try {
-      const data = req.body.data;
+      const { type, q, department, status } = req.body;
       const user = req.user;
       const query = {};
       if (user.role === ROLE.MANAGER) {
         query.department = user.department._id;
+      } else if (department) {
+        query.department = department;
       }
+      if (type) {
+        const matchedTypes = await DeviceType.find(
+          { group: new RegExp(`^${type}$`, "i") },
+          { _id: 1 },
+        ).lean();
+        query.category = { $in: matchedTypes.map((t) => t._id) };
+      }
+
+      if (q) {
+        const regex = new RegExp(q, "i");
+        const matchedModels = await DeviceModel.find(
+          { name: regex },
+          { _id: 1 },
+        ).lean();
+        query.$or = [
+          { code: regex },
+          { name: regex },
+          { vehicleNumber: regex },
+          { material: { $in: matchedModels.map((m) => m._id) } },
+        ];
+      }
+      if (status) query.status = status;
+
+      const data = await Device.find(query)
+        .populate("department", "name code")
+        .populate("category")
+        .populate("material")
+        .collation({ locale: "vi", strength: 1 })
+        .sort({ code: 1 });
 
       const departments = await Department.find();
       const deviceTypes = await DeviceType.find();

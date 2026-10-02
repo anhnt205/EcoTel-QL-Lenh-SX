@@ -15,7 +15,7 @@ export const trvelLogValidationSchema = yup.object({
 });
 
 // thong tin xe
-export const vehicleValidationSchema = yup.object({
+export const deviceValidationSchema = yup.object({
     code: yup.string().required('Vui lòng nhập biển số'),
     name: yup.string(),
     category: yup.string().required('Vui lòng chọn loại thiết bị'),
@@ -27,18 +27,6 @@ export const vehicleValidationSchema = yup.object({
     status: yup.string().oneOf(Object.values(StatusDeviceEnum)).required('Vui lòng chọn trạng thái'),
 });
 
-// thong tin may
-export const machineValidationSchema = yup.object({
-    code: yup.string().required('Vui lòng nhập biển số'),
-    name: yup.string(),
-    coordinates: yup.object({
-        lng: yup.number().required('Vui lòng chọn vĩ độ'),
-        lat: yup.number().required('Vui lòng chọn kinh độ'),
-    }).required('Vui lòng chọn tọa độ'),
-    department: yup.string().required('Vui lòng chọn đơn vị'),
-    category: yup.string().required('Vui lòng chọn loại máy'),
-    status: yup.string().oneOf(Object.values(StatusDeviceEnum)).required('Vui lòng chọn trạng thái'),
-});
 
 // nguoi dung
 export const userValidationSchema = yup.object({

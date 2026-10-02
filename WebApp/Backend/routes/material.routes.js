@@ -197,89 +197,127 @@ router.put('/:id', verifyToken, restrictTo(ROLE.MANAGER, ROLE.ADMIN), async (req
     }
 });
 // Get device usage history
-router.get('/', verifyToken, async (req, res) => {
-    try {
-        const { startTime, endTime } = req.query;
-        const query = {}
-        if (req.query.name) {
-            const regex = new RegExp(req.query.name, 'i');
-            query.name = regex;
-        }
-        let materials;
-
-        if (startTime && endTime) {
-            const filterStartTime = new Date(startTime);
-            const filterEndTime = new Date(endTime);
-            materials = await Material.aggregate([
-                { $match: query },
-                {
-                    $addFields: {
-                        currentHistory: {
-                            $filter: {
-                                input: '$valueHistory',
-                                as: 'h',
-                                cond: {
-                                    $and: [
-                                        { $eq: ['$$h.startTime', filterStartTime] },
-                                        { $eq: ['$$h.endTime', filterEndTime] }
-                                    ]
-                                }
-                            }
-                        }
-                    }
-                },
-                {
-                    $addFields: {
-                        density: {
-                            $ifNull: [
-                                { $arrayElemAt: ['$currentHistory.density', 0] },
-                                null
-                            ]
-                        },
-                        dryDensity: {
-                            $ifNull: [
-                                { $arrayElemAt: ['$currentHistory.dryDensity', 0] },
-                                null
-                            ]
-                        },
-                        startTime: {
-                            $ifNull: [
-                                { $arrayElemAt: ['$currentHistory.startTime', 0] },
-                                null
-                            ]
-                        },
-                        endTime: {
-                            $ifNull: [
-                                { $arrayElemAt: ['$currentHistory.endTime', 0] },
-                                null
-                            ]
-                        }
-                    }
-                },
-                {
-                    $project: {
-                        name: 1,
-                        acceptedProduct: 1,
-                        valueHistory: 1,
-                        density: 1,
-                        dryDensity: 1,
-                        startTime: 1,
-                        endTime: 1,
-                        createdAt: 1,
-                        updatedAt: 1
-                    }
-                },
-                { $sort: { name: 1 } }
-            ]);
-        } else {
-            materials = await Material.find(query);
-        }
-        req.logger.info(`🔥 Load thành công`);
-        res.status(200).send({ status: 'success', data: materials });
-    } catch (err) {
-        req.logger.error("❌ Lỗi", err);
-        res.status(500).send({ status: 'error', message: err.message, stack: err.stack })
+router.get("/", verifyToken, async (req, res) => {
+  try {
+    const { startTime, endTime } = req.query;
+    const query = {};
+    if (req.query.name) {
+      const regex = new RegExp(req.query.name, "i");
+      query.name = regex;
     }
+
+    // Phân trang: không truyền page/pageSize thì lấy hết
+    const page = parseInt(req.query.page);
+    const pageSize = parseInt(req.query.pageSize);
+    const hasPagination =
+      !isNaN(page) && !isNaN(pageSize) && page > 0 && pageSize > 0;
+
+    let materials;
+    let totalDocs;
+
+    if (startTime && endTime) {
+      const filterStartTime = new Date(startTime);
+      const filterEndTime = new Date(endTime);
+
+      const basePipeline = [
+        { $match: query },
+        {
+          $addFields: {
+            currentHistory: {
+              $filter: {
+                input: "$valueHistory",
+                as: "h",
+                cond: {
+                  $and: [
+                    { $eq: ["$$h.startTime", filterStartTime] },
+                    { $eq: ["$$h.endTime", filterEndTime] },
+                  ],
+                },
+              },
+            },
+          },
+        },
+        {
+          $addFields: {
+            density: {
+              $ifNull: [{ $arrayElemAt: ["$currentHistory.density", 0] }, null],
+            },
+            dryDensity: {
+              $ifNull: [
+                { $arrayElemAt: ["$currentHistory.dryDensity", 0] },
+                null,
+              ],
+            },
+            startTime: {
+              $ifNull: [
+                { $arrayElemAt: ["$currentHistory.startTime", 0] },
+                null,
+              ],
+            },
+            endTime: {
+              $ifNull: [{ $arrayElemAt: ["$currentHistory.endTime", 0] }, null],
+            },
+          },
+        },
+        {
+          $project: {
+            name: 1,
+            acceptedProduct: 1,
+            valueHistory: 1,
+            density: 1,
+            dryDensity: 1,
+            startTime: 1,
+            endTime: 1,
+            createdAt: 1,
+            updatedAt: 1,
+          },
+        },
+        { $sort: { name: 1 } },
+      ];
+
+      const facetPipeline = [
+        ...basePipeline,
+        {
+          $facet: {
+            data: hasPagination
+              ? [{ $skip: (page - 1) * pageSize }, { $limit: pageSize }]
+              : [],
+            totalCount: [{ $count: "total" }],
+          },
+        },
+      ];
+
+      const [result] = await Material.aggregate(facetPipeline);
+      materials = result?.data || [];
+      totalDocs = result?.totalCount?.[0]?.total || 0;
+    } else {
+      totalDocs = await Material.countDocuments(query);
+
+      let materialsQuery = Material.find(query).sort({ name: 1 });
+      if (hasPagination) {
+        materialsQuery = materialsQuery
+          .skip((page - 1) * pageSize)
+          .limit(pageSize);
+      }
+      materials = await materialsQuery;
+    }
+
+    req.logger.info(`🔥 Load thành công`);
+    res.status(200).send({
+      status: "success",
+      results: materials.length,
+      page: hasPagination ? page : undefined,
+      pageSize: hasPagination ? pageSize : undefined,
+      totalDocs,
+      totalPages: hasPagination ? Math.ceil(totalDocs / pageSize) : undefined,
+      data: materials,
+    });
+  } catch (err) {
+    req.logger.error("❌ Lỗi", err);
+    res
+      .status(500)
+      .send({ status: "error", message: err.message, stack: err.stack });
+  }
 });
 router.get('/:id', verifyToken, async (req, res, next) => {
     try {

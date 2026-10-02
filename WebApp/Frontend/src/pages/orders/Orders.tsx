@@ -67,6 +67,9 @@ import DepartmentService from "../../services/departmentService";
 import OrderService from "../../services/orderService";
 import { parseAxiosError } from "../../utils/handleApiError";
 import { Route } from "lucide-react";
+import FieldSearch from "../../components/field/FieldSearch";
+import FieldAutoCompleted from "../../components/field/FieldAutoCompleted";
+import FieldDate from "../../components/field/FieldDate";
 
 const Orders: React.FC = () => {
   const [open, setOpen] = useState(false);
@@ -74,8 +77,8 @@ const Orders: React.FC = () => {
   const [shiftReport, setShiftReport] = useState(false);
   const [transfer, setTransfer] = useState(false);
   const [status, setStatus] = useState("");
-  const [startTime, setStartTime] = useState<Dayjs | null>(null);
-  const [endTime, setEndTime] = useState<Dayjs | null>(null);
+  const [startTime, setStartTime] = useState("");
+  const [endTime, setEndTime] = useState("");
   const [department, setDepartment] = useState("");
   const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
   const [selectedRow, setSelectedRow] = useState<any | null>(null);
@@ -147,7 +150,7 @@ const Orders: React.FC = () => {
     Record<string, string | null>
   >({});
 
-  const { data: departments = [] } = useQuery({
+  const { data: departments = { data: [] } } = useQuery({
     queryKey: ["departments"],
     queryFn: () => DepartmentService.getAll(),
   });
@@ -173,8 +176,8 @@ const Orders: React.FC = () => {
         limit: paginationModel.pageSize,
         department: department,
         status: status || undefined,
-        startTime: startTime ? startTime.toISOString() : "",
-        endTime: endTime ? endTime.toISOString() : "",
+        startTime: startTime ? startTime : "",
+        endTime: endTime ? endTime : "",
         q: value,
 
         // filters từ Table
@@ -826,64 +829,31 @@ const Orders: React.FC = () => {
                 },
               }}
             >
-              <TextField
-                fullWidth
-                size="small"
-                value={value}
-                placeholder="Thẻ lương, công việc ..."
-                onChange={(e) => setValue(e.target.value)}
-                InputProps={{
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <Search sx={{ fontSize: 24 }} />
-                    </InputAdornment>
-                  ),
-                }}
-              ></TextField>
+              <FieldSearch
+                titleSearch={`Thẻ lương, công việc ...`}
+                searchValue={value}
+                setSearchValue={setValue}
+              />
               {user?.role === RoleEnum.ADMIN && (
-                <Autocomplete
-                  fullWidth
-                  options={departments}
-                  getOptionLabel={(option: any) => option.code || ""}
-                  value={
-                    departments.find((p: any) => p._id === department) || null
-                  }
-                  onChange={(event, newValue) => {
-                    setDepartment(newValue?._id || "");
-                  }}
-                  PopperComponent={StyledPopper}
-                  renderInput={(params) => (
-                    <TextField
-                      {...params}
-                      fullWidth
-                      size="small"
-                      label="Đơn vị"
-                    />
-                  )}
+                <FieldAutoCompleted
+                  name="department"
+                  title="Đơn vị"
+                  data={departments.data}
+                  labelkey="name"
                 />
               )}
-              <LocalizationProvider dateAdapter={AdapterDayjs}>
-                <DatePicker
-                  label="Từ ngày"
-                  inputFormat="DD/MM/YYYY"
-                  value={startTime ? dayjs(startTime) : null}
-                  onChange={(value) => setStartTime(value)}
-                  renderInput={(params) => (
-                    <TextField {...params} fullWidth size="small" />
-                  )}
-                />
-              </LocalizationProvider>
-              <LocalizationProvider dateAdapter={AdapterDayjs}>
-                <DatePicker
-                  label="Đến ngày"
-                  inputFormat="DD/MM/YYYY"
-                  value={endTime ? dayjs(endTime) : null}
-                  onChange={(value) => setEndTime(value)}
-                  renderInput={(params) => (
-                    <TextField {...params} fullWidth size="small" />
-                  )}
-                />
-              </LocalizationProvider>
+              <FieldDate
+                selectedDate={startTime}
+                setSelectedDate={setStartTime}
+                title="Từ ngày"
+                size="small"
+              />
+              <FieldDate
+                selectedDate={endTime}
+                setSelectedDate={setEndTime}
+                title="Đến ngày"
+                size="small"
+              />
             </Box>
           </Box>
         </AccordionSummary>
