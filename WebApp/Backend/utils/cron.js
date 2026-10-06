@@ -11,8 +11,21 @@ const {
   getTravellog,
 } = require("./reportGrouping");
 const { ROLE, JOB_TYPE } = require("../config/config");
+const { sweepRecentlyCompleted } = require("../services/orderFreeze");
 
 // cron
+
+// Bộ quét chốt lệnh: đường xử lý chính (PUT /api/orders/:id) chốt ngay khi lệnh hoàn thành; bộ quét này chốt bù
+// các lệnh vừa hoàn thành mà bị bỏ sót (lỗi giữa chừng, sửa trực tiếp CSDL...). Mỗi 10 phút, chỉ xét lệnh cập
+// nhật trong 48 giờ qua.
+cron.schedule("*/10 * * * *", async () => {
+  try {
+    const { frozen } = await sweepRecentlyCompleted();
+    if (frozen > 0) console.log(`[CRON] Đã chốt bù ${frozen} lệnh hoàn thành`);
+  } catch (error) {
+    console.error("[CRON ERROR] Lỗi khi quét chốt lệnh:", error);
+  }
+});
 
 cron.schedule("* 14 * * *", async () => {
   console.log("Bắt đầu tiến hành tính sản lượng...");

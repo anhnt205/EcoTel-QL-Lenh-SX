@@ -128,6 +128,19 @@ const orderSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
     },
+    // Bản chụp ("chốt") thông tin tham chiếu của lệnh khi hoàn thành: đơn vị, nhân viên, thiết bị, công việc...
+    // Lệnh đã chốt luôn hiển thị theo bản chụp này, không đổi theo dữ liệu gốc về sau (xem services/orderSnapshot.js).
+    frozen: {
+      at: { type: Date }, // thời điểm chốt
+      editedAt: { type: Date }, // lần admin sửa lệnh đã chốt gần nhất (nếu có)
+      editedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+      // completion = chốt đúng lúc hoàn thành; sweep = bù do bộ quét; history / creation / user-history / backfill = khôi phục cho lệnh cũ
+      source: {
+        type: String,
+        enum: ["completion", "sweep", "history", "creation", "user-history", "backfill"],
+      },
+      data: { type: mongoose.Schema.Types.Mixed },
+    },
   },
   {
     timestamps: true,
@@ -142,6 +155,7 @@ orderSchema.index({ job: 1 });
 orderSchema.index({ department: 1 });
 orderSchema.index({ workingDate: 1 });
 orderSchema.index({ shift: 1 });
+orderSchema.index({ status: 1, "frozen.at": 1 }); // tìm lệnh hoàn thành chưa chốt (bộ quét / khôi phục)
 
 orderSchema.virtual("shiftReport", {
   ref: "ShiftReport", // Model cần populate

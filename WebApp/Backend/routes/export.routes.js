@@ -2,7 +2,9 @@ const express = require("express");
 const router = express.Router();
 const axios = require("axios");
 const ExcelJS = require("exceljs");
-const Order = require("../models/Order");
+const OrderModel = require("../models/Order");
+const { applyFrozenAll } = require("../services/orderSnapshot");
+const { attendanceRoster } = require("../utils/roster");
 const Shift = require("../models/Shift");
 const Report = require("../models/Report");
 const Department = require("../models/Department");
@@ -34,6 +36,25 @@ const {
   JOB_TYPE,
   ACCEPTED_PRODUCT,
 } = require("../config/config");
+
+// Mọi báo cáo / xuất file trong file này đọc lệnh qua Order.find(...). Bọc để lệnh đã hoàn thành luôn dùng
+// bản chụp đã chốt (đơn vị, nhân viên, thiết bị, công việc... không đổi theo dữ liệu gốc về sau; xem
+// services/orderSnapshot.js). Chỉ `find` được bọc (kết quả thành đối tượng thường, đã được rà soát là không
+// có chỗ nào gọi phương thức document trên lệnh); mọi hàm khác của model giữ nguyên.
+const Order = new Proxy(OrderModel, {
+  get(target, prop) {
+    if (prop === "find") {
+      return (...args) => {
+        const query = target.find(...args);
+        const exec = query.exec.bind(query);
+        query.exec = async (...a) => applyFrozenAll(await exec(...a));
+        return query;
+      };
+    }
+    const value = Reflect.get(target, prop, target);
+    return typeof value === "function" ? value.bind(target) : value;
+  },
+});
 // lệnh sx
 router.post(
   "/order/bulk",
@@ -10239,12 +10260,8 @@ router.post(
       // Ngày cuối tháng (23:59:59.999)
       const endDate = inputDate.endOf("month").toDate();
 
-      // Bước 2: lấy danh sách nhân viên trong phòng ban
-      const users = await User.find({ department: dep })
-        .select("_id fullName salaryCode")
-        .lean();
-
       // Bước 3: lấy tất cả order trong range ngày
+      // (Bước 2 — danh sách nhân viên — làm sau khi có lệnh, vì phụ thuộc vào lệnh đã chốt: xem utils/roster.js)
       const orders = await Order.find({
         department: dep,
         status: { $in: [STATUS_ORDER.INPROGRESS, STATUS_ORDER.COMPLETED] },
@@ -10256,6 +10273,10 @@ router.post(
         .populate("assignedTo", "fullName salaryCode")
         .populate("shift", "name")
         .lean();
+
+      // Bước 2: danh sách nhân viên = người có lệnh ở đơn vị trong tháng + thành viên đơn vị vào cuối tháng
+      // (không còn lấy theo đơn vị HIỆN TẠI của nhân viên nên chuyển đơn vị không làm lệch tháng cũ)
+      const users = await attendanceRoster({ depId: dep, endDate, orders });
 
       // Bước 4: group theo user + ngày + ca
       const attendanceMap = {};
@@ -10368,10 +10389,6 @@ router.post(
 
       // Bước 2 & 3: Lấy danh sách nhân viên và Orders
       // ... (Logic lấy users và orders giữ nguyên)
-      const users = await User.find({ department: depId })
-        .select("_id fullName salaryCode")
-        .lean();
-
       const orders = await Order.find({
         department: depId,
         status: { $in: [STATUS_ORDER.INPROGRESS, STATUS_ORDER.COMPLETED] },
@@ -10383,6 +10400,10 @@ router.post(
         .populate("assignedTo", "fullName salaryCode")
         .populate("shift", "name")
         .lean();
+
+      // Danh sách nhân viên = người có lệnh ở đơn vị trong tháng + thành viên đơn vị vào cuối tháng
+      // (không còn lấy theo đơn vị HIỆN TẠI của nhân viên nên chuyển đơn vị không làm lệch tháng cũ)
+      const users = await attendanceRoster({ depId, endDate, orders });
 
       // Bước 4: group theo user + ngày + ca (Giữ nguyên)
       const attendanceMap = {};

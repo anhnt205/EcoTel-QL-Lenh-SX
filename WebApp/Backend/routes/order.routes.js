@@ -31,6 +31,12 @@ const { verifyToken, restrictTo } = require("../middleware/auth.middleware");
 const { paginateQuery } = require("../utils/pagination");
 const CheckIn = require("../models/CheckIn");
 const sendPushNotification = require("../utils/sendNotification");
+const {
+  applyFrozen,
+  applyFrozenAll,
+  changedProtectedFields,
+} = require("../services/orderSnapshot");
+const { freezeOrder } = require("../services/orderFreeze");
 
 router.get("/", verifyToken, async (req, res, next) => {
   try {
@@ -247,6 +253,9 @@ router.get("/", verifyToken, async (req, res, next) => {
       dataFilter,
       req.query,
     );
+
+    // Lệnh đã hoàn thành hiển thị theo bản chụp đã chốt (xem services/orderSnapshot.js)
+    paginationResult.data = applyFrozenAll(paginationResult.data);
 
     // ---- Sort bổ sung theo shift.name ở JS ----
     paginationResult.data.sort((a, b) => {
@@ -555,7 +564,8 @@ router.post(
 router.put("/:id", verifyToken, async (req, res, next) => {
   try {
     const user = req.user;
-    const { status, ...body } = req.body;
+    // `frozen` (bản chụp đã chốt) và `forceEditFrozen` không bao giờ được ghi thẳng từ request
+    const { status, forceEditFrozen, frozen: _ignoredFrozen, ...body } = req.body;
     const { id } = req.params;
     req.logger.info(`🔍 Bắt đầu cập nhật lệnh với ID: ${id}`);
 
@@ -570,6 +580,32 @@ router.put("/:id", verifyToken, async (req, res, next) => {
       return res
         .status(404)
         .send({ status: "error", message: "Không tìm thấy lệnh với ID này." });
+    }
+
+    // Lệnh đã hoàn thành = đã chốt: không được đổi thông tin lệnh (đơn vị, nhân viên, thiết bị, công việc,
+    // ca, ngày làm việc, giờ bắt đầu/kết thúc...) và không được mở lại. Gửi lại đúng giá trị cũ thì vẫn
+    // được (vd app gửi nguyên lệnh). Chỉ admin được sửa khi gửi kèm forceEditFrozen: true; trường bị sửa
+    // được chụp lại, phần còn lại giữ nguyên.
+    const wasFrozen = order.status === STATUS_ORDER.COMPLETED;
+    const adminForce =
+      wasFrozen && user?.role === ROLE.ADMIN && forceEditFrozen === true;
+    let frozenEditKeys = [];
+    if (wasFrozen) {
+      frozenEditKeys = changedProtectedFields(order, body);
+      const reopen = status !== undefined && status !== STATUS_ORDER.COMPLETED;
+      if ((frozenEditKeys.length > 0 || reopen) && !adminForce) {
+        req.logger.warn(
+          `⚠️ ${user?.username} sửa lệnh đã chốt ${id} bị từ chối (${
+            reopen ? `đổi trạng thái sang ${status}` : frozenEditKeys.join(", ")
+          })`,
+        );
+        return res.status(409).send({
+          status: "error",
+          message:
+            "Lệnh đã hoàn thành và đã được chốt thông tin nên không thể thay đổi.",
+          fields: reopen ? ["status"] : frozenEditKeys,
+        });
+      }
     }
 
     // 2. Chuẩn bị đối tượng cập nhật
@@ -640,6 +676,12 @@ router.put("/:id", verifyToken, async (req, res, next) => {
         break;
 
       case STATUS_ORDER.COMPLETED:
+        if (wasFrozen) {
+          // Báo hoàn thành lại một lệnh đã hoàn thành: giữ nguyên giờ kết thúc và KHÔNG giải phóng thiết bị
+          // lần nữa (thiết bị có thể đã được giao cho lệnh khác)
+          updateObject.status = status;
+          break;
+        }
         updateObject.endTime = new Date();
         updateObject.status = status;
         if (order.device && order.device.length > 0) {
@@ -768,6 +810,33 @@ router.put("/:id", verifyToken, async (req, res, next) => {
       })
       .populate({ path: "createdBy", select: "_id fullName phone salaryCode" })
       .sort("-createdAt");
+
+    // 4b. Lệnh hoàn thành thì chốt thông tin ngay (hoặc chụp lại phần admin vừa sửa). Lỗi ở bước này không
+    // làm hỏng việc hoàn thành lệnh: bộ quét định kỳ (utils/cron.js) sẽ chốt bù.
+    if (updatedOrder.status === STATUS_ORDER.COMPLETED) {
+      try {
+        const refreeze = adminForce && frozenEditKeys.length > 0;
+        await freezeOrder(id, {
+          source: "completion",
+          refreeze,
+          keys: frozenEditKeys,
+          editedBy: req.user._id,
+        });
+        if (refreeze) {
+          await new History({
+            entity: updatedOrder._id,
+            changedBy: req.userId,
+            snapshot: {
+              ...updatedOrder.toObject(),
+              forceEditedFrozen: true,
+              forceEditedFields: frozenEditKeys,
+            },
+          }).save();
+        }
+      } catch (freezeErr) {
+        req.logger.error("❌ Không chốt được thông tin lệnh", freezeErr);
+      }
+    }
 
     // 5. Tạo lịch sử và thông báo (chỉ khi có thay đổi trạng thái cần ghi nhận)
     if (order.status !== updatedOrder.status) {
@@ -1062,6 +1131,9 @@ router.get("/user", verifyToken, async (req, res, next) => {
       req.query,
     );
 
+    // Lệnh đã hoàn thành hiển thị theo bản chụp đã chốt (xem services/orderSnapshot.js)
+    paginationResult.data = applyFrozenAll(paginationResult.data);
+
     paginationResult.data?.sort((a, b) => {
       // 1. So sánh workingDate (DESC)
       const dateA = new Date(a.workingDate);
@@ -1100,7 +1172,7 @@ router.get("/:id", verifyToken, async (req, res, next) => {
     }
 
     req.logger.info("✅ Đã tìm thấy chi tiết lệnh.");
-    res.status(200).send({ status: "success", data: order });
+    res.status(200).send({ status: "success", data: applyFrozen(order) });
   } catch (err) {
     req.logger.error("❌ Lỗi khi lấy chi tiết lệnh", err);
     res
@@ -1351,7 +1423,9 @@ router.post(
           select: "fullName",
         })
         .sort("-workingDate")
-        .lean();
+        .lean()
+        // lệnh đã hoàn thành dùng bản chụp đã chốt (đơn vị, nhân viên... không đổi theo dữ liệu gốc về sau)
+        .then(applyFrozenAll);
 
       // 3. Nhóm Orders theo Department Code
       const ordersByDepartment = orders.reduce((acc, order) => {
@@ -1585,7 +1659,9 @@ router.post(
           select: "fullName",
         })
         .sort("-workingDate") // Tăng dần: ngày cũ lên trước, ngày mới xuống sau
-        .lean();
+        .lean()
+        // lệnh đã hoàn thành dùng bản chụp đã chốt (đơn vị, nhân viên... không đổi theo dữ liệu gốc về sau)
+        .then(applyFrozenAll);
 
       // Lấy danh sách các kỳ trong tháng (theo thứ tự)
       const periods = getPeriodsInMonth(localYear, localMonth);
