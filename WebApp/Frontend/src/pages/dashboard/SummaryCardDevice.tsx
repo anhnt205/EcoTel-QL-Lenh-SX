@@ -1,13 +1,18 @@
 import { Box, Card, Popover, Table, TableBody, TableCell, TableHead, TableRow, Typography } from '@mui/material';
 import React, { useState } from 'react'
-import {
-    Devices as DeviceIcon,
-} from '@mui/icons-material';
 import { Device } from '../../types';
 import { useQuery } from '@tanstack/react-query';
 import api from '../../config/api.config';
 import { useNavigate } from 'react-router-dom';
 import { DeviceTypeEnum, StatusDeviceEnum } from '../../enums';
+
+const STATUS_ROWS = [
+    { status: StatusDeviceEnum.AVAILABLE, label: 'Chờ điều động', color: '#2e7d32' },
+    { status: StatusDeviceEnum.IN_USE, label: 'Đang hoạt động', color: '#d32f2f' },
+    { status: StatusDeviceEnum.MAINTENANCE, label: 'SC; BD', color: '#ed6c02' },
+    { status: StatusDeviceEnum.RETIRED, label: 'Niêm cất', color: '#9e9e9e' },
+];
+
 export default function SummaryCardDevice(
     {
         title,
@@ -59,34 +64,19 @@ export default function SummaryCardDevice(
         <Card
             sx={{
                 height: '100%',
-                p: 3,
-                padding: '4px 16px',
-                borderRadius: 3,
-                boxShadow: '0 4px 20px rgba(0,0,0,0.05)',
-                transition: 'transform 0.2s, box-shadow 0.2s',
-                '&:hover': {
-                    transform: 'translateY(-5px)',
-                    boxShadow: '0 8px 30px rgba(0,0,0,0.1)',
-                },
+                px: 1.5,
+                py: 1,
+                borderRadius: 2,
+                border: '1px solid #e5e9f0',
+                boxShadow: 'none',
             }}
         >
-            <Box sx={{
-                display: 'flex',
-                alignItems: 'center',
-            }}>
-                <Box sx={{ flexGrow: 1 }}>
-                    <Typography variant="h4" sx={{ fontWeight: 'bold', cursor: 'pointer' }} gutterBottom
-                        onClick={() => { navigate(`${type === DeviceTypeEnum.MACHINE ? '/machines' : '/vehicles'}`) }}>
-                        {title}
-                    </Typography>
-                    <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
-                        {value}
-                    </Typography>
-                </Box>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, mb: 0.75 }}>
                 <Box
                     sx={{
-                        width: 60,
-                        height: 60,
+                        width: 34,
+                        height: 34,
+                        flexShrink: 0,
                         bgcolor: color,
                         borderRadius: '50%',
                         display: 'flex',
@@ -95,43 +85,33 @@ export default function SummaryCardDevice(
                         color: 'white',
                     }}
                 >
-                    {React.cloneElement(icon as React.ReactElement, { sx: { fontSize: 32 } })}
+                    {React.cloneElement(icon as React.ReactElement, { sx: { fontSize: 20 } })}
                 </Box>
+                <Typography
+                    sx={{ flexGrow: 1, fontSize: 13, fontWeight: 700, color: '#334155', cursor: 'pointer', '&:hover': { color: '#1d4ed8' } }}
+                    onClick={() => { navigate(`${type === DeviceTypeEnum.MACHINE ? '/machines' : '/vehicles'}`) }}>
+                    {title}
+                </Typography>
+                <Typography sx={{ fontSize: 22, fontWeight: 800, lineHeight: 1 }}>
+                    {value}
+                </Typography>
             </Box>
-            <Box sx={{
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 2
-            }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <Box display="flex" gap={2} alignItems={'center'}>
-                        <DeviceIcon sx={{ color: 'green' }} fontSize='medium' />
-                        <Typography variant='h6' onClick={(e) => handleSummaryClick(e, StatusDeviceEnum.AVAILABLE)} sx={{ fontWeight: 'bold', cursor: 'pointer' }}>Chờ điều động</Typography>
+            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', columnGap: 1.5, rowGap: '3px' }}>
+                {STATUS_ROWS.map((row) => (
+                    <Box key={row.status} sx={{ display: 'flex', alignItems: 'center', gap: 0.75, minWidth: 0 }}>
+                        <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: row.color, flexShrink: 0 }} />
+                        <Typography
+                            noWrap
+                            onClick={(e) => handleSummaryClick(e, row.status)}
+                            sx={{ flexGrow: 1, fontSize: 12, color: '#475569', cursor: 'pointer', '&:hover': { color: row.color } }}
+                        >
+                            {row.label}
+                        </Typography>
+                        <Typography sx={{ fontSize: 13, fontWeight: 800, color: row.color }}>
+                            {data.filter((o: Device) => o.status === row.status).length}
+                        </Typography>
                     </Box>
-                    <Typography variant='h6' sx={{ fontWeight: 'bold', }}>{data.filter((o: Device) => o.status === StatusDeviceEnum.AVAILABLE).length}</Typography>
-                </Box>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <Box display="flex" gap={2} alignItems={'center'}>
-                        <DeviceIcon color='error' fontSize='medium' />
-                        <Typography variant='h6' onClick={(e) => handleSummaryClick(e, StatusDeviceEnum.IN_USE)} sx={{ fontWeight: 'bold', cursor: 'pointer' }}>Đang hoạt động</Typography>
-                    </Box>
-                    <Typography variant='h6' sx={{ fontWeight: 'bold', }}>{data.filter((o: Device) => o.status === StatusDeviceEnum.IN_USE).length}</Typography>
-                </Box>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <Box display="flex" gap={2} alignItems={'center'}>
-                        <DeviceIcon color='warning' fontSize='medium' />
-                        <Typography variant='h6' onClick={(e) => handleSummaryClick(e, StatusDeviceEnum.MAINTENANCE)} sx={{ fontWeight: 'bold', cursor: 'pointer' }}>SC; BD</Typography>
-
-                    </Box>
-                    <Typography variant='h6' sx={{ fontWeight: 'bold', }}>{data.filter((o: Device) => o.status === StatusDeviceEnum.MAINTENANCE).length}</Typography>
-                </Box>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <Box display="flex" gap={2} alignItems={'center'}>
-                        <DeviceIcon color='disabled' fontSize='medium' />
-                        <Typography variant='h6' onClick={(e) => handleSummaryClick(e, StatusDeviceEnum.RETIRED)} sx={{ fontWeight: 'bold', cursor: 'pointer' }}>Niêm cất</Typography>
-                    </Box>
-                    <Typography variant='h6' sx={{ fontWeight: 'bold', }}>{data.filter((o: Device) => o.status === StatusDeviceEnum.RETIRED).length}</Typography>
-                </Box>
+                ))}
             </Box>
             <Popover
                 open={Boolean(anchorElSummary)}
@@ -139,8 +119,8 @@ export default function SummaryCardDevice(
                 onClose={handleSummaryClose}
                 anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
             >
-                <Box sx={{ p: 2, maxHeight: 300, overflowY: 'auto' }}>
-                    <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold', }}>Danh sách thiết bị</Typography>
+                <Box sx={{ p: 1.5, maxHeight: 300, overflowY: 'auto' }}>
+                    <Typography sx={{ fontSize: 14, fontWeight: 700, mb: 0.5 }}>Danh sách thiết bị</Typography>
 
                     {selectedSummaryDevices.length > 0 ? (
                         <Table size="small">
@@ -153,7 +133,7 @@ export default function SummaryCardDevice(
                             </TableHead>
                             <TableBody>
                                 {selectedSummaryDevices.map((d) => (
-                                    <TableRow>
+                                    <TableRow key={d.typeName}>
                                         <TableCell>{d.typeName}</TableCell>
                                         <TableCell>{d.total}</TableCell>
                                     </TableRow>

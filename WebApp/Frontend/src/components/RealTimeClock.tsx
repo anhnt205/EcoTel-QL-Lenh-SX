@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import dayjs from "dayjs";
 import { Typography } from "@mui/material";
 
-const RealTimeClock: React.FC = () => {
+const RealTimeClock: React.FC<{ compact?: boolean }> = ({ compact = false }) => {
   const [time, setTime] = useState(dayjs());
 
   useEffect(() => {
@@ -15,10 +15,11 @@ const RealTimeClock: React.FC = () => {
 
   return (
     <Typography
-      variant="h5"
+      variant={compact ? "body2" : "h5"}
       sx={{
         fontVariantNumeric: "tabular-nums",
-        minWidth: 200,
+        minWidth: compact ? 0 : 200,
+        ...(compact && { fontWeight: 700, whiteSpace: "nowrap", color: "#334155" }),
       }}
     >
       {time.format("DD/MM/YYYY HH:mm:ss")}

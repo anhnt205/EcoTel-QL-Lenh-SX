@@ -6,7 +6,6 @@ import {
     TableHead,
     TableCell,
     TableBody,
-    Grid,
     Box,
     Autocomplete,
     TextField,
@@ -28,6 +27,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '../../config/api.config';
 import { Typography } from 'antd';
 import { AlertSnackbar } from '../../components/Alert';
+import ExpandablePanel from '../../components/ExpandablePanel';
 import localforage from 'localforage';
 import { RoleEnum } from '../../enums';
 
@@ -193,162 +193,156 @@ export default function ProductionAnalysic({ departments }: { departments: any[]
 
 
     return (
-        <Paper variant="outlined" sx={{ borderRadius: 2 }}>
+        <ExpandablePanel>
+        {({ expanded, expandButton, viewportHeight }) => (
+        <Paper variant="outlined" sx={{ borderRadius: 2, overflow: 'hidden' }}>
             <AlertSnackbar alert={alert} setAlert={setAlert} />
-            {/* Bảng và Biểu đồ */}
-            <Grid container spacing={2}>
-                <Grid item xs={12} lg={7}>
-                    <TableContainer sx={{ maxHeight: 600 }}>
-                        <Table
-                            stickyHeader
+            <Box
+                sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    flexWrap: 'wrap',
+                    gap: 1,
+                    pl: 1.25,
+                    pr: 5.5, // chừa chỗ cho nút mở rộng ở góc phải
+                    py: 0.5,
+                    bgcolor: '#ffe8d6',
+                    borderBottom: '1px solid #e5e9f0',
+                    position: 'sticky',
+                    top: 0,
+                    zIndex: 3,
+                    flex: 'none',
+                }}
+            >
+                <IconButton
+                    size="small"
+                    title="Tính lại sản lượng"
+                    onClick={() => caculate.mutate()}
+                    disabled={isLoading}
+                >
+                    {isLoading ? (
+                        <CircularProgress size={20} />
+                    ) : (
+                        <RotateLeft
                             sx={{
-                                '& td, & th': { border: '1px solid #e0e0e0', padding: '4px' },
+                                transition: "transform 0.3s ease",
+                                "&:hover": { transform: "rotate(-180deg)" }, // xoay khi hover
+                                color: "primary.main",
                             }}
-                        >
-                            <TableHead>
-                                <TableRow>
-                                    <TableCell
-                                        colSpan={7}
-                                        align="center"
-                                        sx={{ bgcolor: '#ffe8d6', fontWeight: 'bold', fontSize: 18, position: 'relative' }}
-                                    >
-                                        <IconButton
-                                            sx={{
-                                                position: 'absolute',
-                                                left: 8,
-                                                top: '50%',
-                                                transform: 'translateY(-50%)',
-                                            }}
-                                            onClick={() => caculate.mutate()}
-                                            disabled={isLoading}
-                                        >
-                                            {isLoading ? (
-                                                <CircularProgress size={24} />
-                                            ) : (
-                                                <RotateLeft
-                                                    sx={{
-                                                        transition: "transform 0.3s ease",
-                                                        "&:hover": { transform: "rotate(-180deg)" }, // xoay khi hover
-                                                        color: "primary.main",
-                                                    }}
-                                                />
-                                            )}
-                                        </IconButton>
-                                        SẢN LƯỢNG
-                                    </TableCell>
-                                </TableRow>
-                                <TableRow>
-                                    <TableCell align="center" colSpan={2} sx={{ fontWeight: 'bold', fontSize: 16 }}>
-                                        Sản lượng
-                                    </TableCell>
-                                    <TableCell align="center" sx={{ fontWeight: 'bold', fontSize: 16 }}>Ca 1</TableCell>
-                                    <TableCell align="center" sx={{ fontWeight: 'bold', fontSize: 16 }}>Ca 2</TableCell>
-                                    <TableCell align="center" sx={{ fontWeight: 'bold', fontSize: 16 }}>Ca 3</TableCell>
-                                    <TableCell align="center" sx={{ fontWeight: 'bold', fontSize: 16 }}>Ngày</TableCell>
-                                    <TableCell align="center" sx={{ fontWeight: 'bold', fontSize: 16 }}>Lũy kế</TableCell>
-                                </TableRow>
-                            </TableHead>
-                            <TableBody>
-                                {productions.map((item) => {
-                                    const typeData = analysicsData.find((r: any) => r.jobType === item.key);
-
-                                    const ca1 = typeData?.selectedDay?.shifts?.find((s: any) => s.shift === 1)?.production || 0;
-                                    const ca2 = typeData?.selectedDay?.shifts?.find((s: any) => s.shift === 2)?.production || 0;
-                                    const ca3 = typeData?.selectedDay?.shifts?.find((s: any) => s.shift === 3)?.production || 0;
-                                    const dayTotal = typeData?.selectedDay?.dayTotal || 0;
-                                    const cumulativeTotal = typeData?.cumulativeTotal || 0;
-
-                                    return (
-                                        <TableRow
-                                            key={item.key}
-                                            sx={{ '&:nth-of-type(odd)': { bgcolor: '#fafafa' } }}
-                                        >
-                                            <TableCell align="center" sx={{ width: '2%' }}>
-                                                <Radio
-                                                    onChange={() => setSelectedKey(item.key)}
-                                                    checked={selectedKey === item.key}
-                                                    size="small"
-                                                />
-                                            </TableCell>
-                                            <TableCell sx={{ width: '20%' }}>{item.name}</TableCell>
-                                            <TableCell align="center" sx={{ width: '10%' }}>
-                                                {
-                                                    Number(Number(ca1).toFixed(1)).toLocaleString()
-                                                }
-                                            </TableCell>
-                                            <TableCell align="center" sx={{ width: '10%' }}>
-                                                {
-                                                    Number(Number(ca2).toFixed(1)).toLocaleString()
-                                                }
-                                            </TableCell>
-                                            <TableCell align="center" sx={{ width: '10%' }}>
-                                                {
-                                                    Number(Number(ca3).toFixed(1)).toLocaleString()
-                                                }
-                                            </TableCell>
-                                            <TableCell align="center" sx={{ width: '10%' }}>{Number(Number(dayTotal).toFixed(1)).toLocaleString()}</TableCell>
-                                            <TableCell align="center" sx={{ width: '10%' }}>{Number(Number(cumulativeTotal).toFixed(1)).toLocaleString()}</TableCell>
-                                        </TableRow>
-                                    );
-                                })}
-                            </TableBody>
-                        </Table>
-                    </TableContainer>
-                </Grid>
-
-                <Grid item xs={12} lg={5}>
-                    <Box
-                        sx={{
-                            display: 'flex',
-                            justifyContent: 'flex-end',
-                            alignItems: 'center',
-                            p: 2,
-                        }}
-                    >
-                        <Box sx={{ display: 'flex', gap: 2 }}>
-                            <IconButton onClick={() => setOpen(true)}>
-                                <BarChart color="primary" sx={{ fontSize: 30 }} />
-                            </IconButton>
-                            {(user?.role === RoleEnum.ADMIN || user?.role === RoleEnum.DISPATCHER) && (
-                                <Autocomplete
-                                    size="small"
-                                    options={departments}
-                                    getOptionLabel={(option: any) => option.code || ''}
-                                    value={departments.find((p: any) => p._id === department) || null}
-                                    onChange={(event, newValue) => {
-                                        setDepartment(newValue?._id || '');
-                                    }}
-                                    sx={{ width: 200 }}
-                                    renderInput={(params) => <TextField {...params} label="Đơn vị" />}
-                                />
-                            )}
-                            <LocalizationProvider dateAdapter={AdapterDayjs}>
-                                <LocalizationProvider dateAdapter={AdapterDayjs}>
-                                    <DatePicker
-                                        inputFormat="DD/MM/YYYY"
-                                        label="Ngày"
-                                        value={date ? dayjs(date) : null}
-                                        onChange={(newValue) => setDate(newValue)}
-                                        renderInput={(params) => <TextField {...params} size="small" sx={{ width: 200 }} />}
-                                    />
-                                </LocalizationProvider>
-                            </LocalizationProvider>
-                        </Box>
-                    </Box>
-                    {isLoading ?
-                        <Box display="flex" flexDirection={"column"} minHeight={300} alignItems={"center"} justifyContent={"center"}>
-                            <CircularProgress />
-                            <Typography>Đang tải dữ liệu ...</Typography>
-                        </Box>
-                        :
-                        <LineChartProduction
-                            dataset={dataset}
-                            selectedName={selectedName}
-                            selectedKey={selectedKey}
                         />
-                    }
-                </Grid>
-            </Grid>
+                    )}
+                </IconButton>
+                <Typography.Text strong style={{ fontSize: 14 }}>SẢN LƯỢNG</Typography.Text>
+                <Box sx={{ flex: 1 }} />
+                <IconButton size="small" title="Biểu đồ sản lượng theo thiết bị" onClick={() => setOpen(true)}>
+                    <BarChart color="primary" sx={{ fontSize: 26 }} />
+                </IconButton>
+                {(user?.role === RoleEnum.ADMIN || user?.role === RoleEnum.DISPATCHER) && (
+                    <Autocomplete
+                        size="small"
+                        options={departments}
+                        getOptionLabel={(option: any) => option.code || ''}
+                        value={departments.find((p: any) => p._id === department) || null}
+                        onChange={(event, newValue) => {
+                            setDepartment(newValue?._id || '');
+                        }}
+                        sx={{ width: 150, bgcolor: '#fff', borderRadius: 1 }}
+                        renderInput={(params) => <TextField {...params} label="Đơn vị" />}
+                    />
+                )}
+                <LocalizationProvider dateAdapter={AdapterDayjs}>
+                    <DatePicker
+                        inputFormat="DD/MM/YYYY"
+                        label="Ngày"
+                        value={date ? dayjs(date) : null}
+                        onChange={(newValue) => setDate(newValue)}
+                        renderInput={(params) => <TextField {...params} size="small" sx={{ width: 150, bgcolor: '#fff', borderRadius: 1 }} />}
+                    />
+                </LocalizationProvider>
+                {expandButton}
+            </Box>
+
+            <TableContainer sx={{ flex: 'none' }}>
+                <Table
+                    size="small"
+                    sx={{
+                        '& td, & th': {
+                            border: '1px solid #e8ecf1',
+                            padding: expanded ? '6px 10px' : '2px 6px',
+                            fontSize: expanded ? 15 : 13,
+                        },
+                    }}
+                >
+                    <TableHead>
+                        <TableRow>
+                            <TableCell align="center" colSpan={2} sx={{ fontWeight: 'bold' }}>
+                                Sản lượng
+                            </TableCell>
+                            <TableCell align="center" sx={{ fontWeight: 'bold' }}>Ca 1</TableCell>
+                            <TableCell align="center" sx={{ fontWeight: 'bold' }}>Ca 2</TableCell>
+                            <TableCell align="center" sx={{ fontWeight: 'bold' }}>Ca 3</TableCell>
+                            <TableCell align="center" sx={{ fontWeight: 'bold' }}>Ngày</TableCell>
+                            <TableCell align="center" sx={{ fontWeight: 'bold' }}>Lũy kế</TableCell>
+                        </TableRow>
+                    </TableHead>
+                    <TableBody>
+                        {productions.map((item) => {
+                            const typeData = analysicsData.find((r: any) => r.jobType === item.key);
+
+                            const ca1 = typeData?.selectedDay?.shifts?.find((s: any) => s.shift === 1)?.production || 0;
+                            const ca2 = typeData?.selectedDay?.shifts?.find((s: any) => s.shift === 2)?.production || 0;
+                            const ca3 = typeData?.selectedDay?.shifts?.find((s: any) => s.shift === 3)?.production || 0;
+                            const dayTotal = typeData?.selectedDay?.dayTotal || 0;
+                            const cumulativeTotal = typeData?.cumulativeTotal || 0;
+
+                            return (
+                                <TableRow
+                                    key={item.key}
+                                    sx={{ '&:nth-of-type(odd)': { bgcolor: '#fafafa' } }}
+                                >
+                                    <TableCell align="center" sx={{ width: 34, p: '0 !important' }}>
+                                        <Radio
+                                            onChange={() => setSelectedKey(item.key)}
+                                            checked={selectedKey === item.key}
+                                            size="small"
+                                            sx={{ p: 0.25 }}
+                                        />
+                                    </TableCell>
+                                    <TableCell>{item.name}</TableCell>
+                                    <TableCell align="center" sx={{ width: '9%' }}>
+                                        {Number(Number(ca1).toFixed(1)).toLocaleString()}
+                                    </TableCell>
+                                    <TableCell align="center" sx={{ width: '9%' }}>
+                                        {Number(Number(ca2).toFixed(1)).toLocaleString()}
+                                    </TableCell>
+                                    <TableCell align="center" sx={{ width: '9%' }}>
+                                        {Number(Number(ca3).toFixed(1)).toLocaleString()}
+                                    </TableCell>
+                                    <TableCell align="center" sx={{ width: '10%' }}>{Number(Number(dayTotal).toFixed(1)).toLocaleString()}</TableCell>
+                                    <TableCell align="center" sx={{ width: '11%' }}>{Number(Number(cumulativeTotal).toFixed(1)).toLocaleString()}</TableCell>
+                                </TableRow>
+                            );
+                        })}
+                    </TableBody>
+                </Table>
+            </TableContainer>
+
+            <Box sx={{ px: 1, pt: 0.5, ...(expanded && { flex: 1, minHeight: 0 }) }}>
+                {isLoading ?
+                    <Box display="flex" flexDirection={"column"} minHeight={200} alignItems={"center"} justifyContent={"center"}>
+                        <CircularProgress />
+                        <Typography.Text>Đang tải dữ liệu ...</Typography.Text>
+                    </Box>
+                    :
+                    <LineChartProduction
+                        dataset={dataset}
+                        selectedName={selectedName}
+                        selectedKey={selectedKey}
+                        // Mở rộng: biểu đồ chiếm phần màn hình còn lại dưới thanh tiêu đề + bảng
+                        height={expanded ? Math.max(280, viewportHeight - 400) : 230}
+                    />
+                }
+            </Box>
 
             <VehicleProductionChart
                 open={open}
@@ -357,5 +351,7 @@ export default function ProductionAnalysic({ departments }: { departments: any[]
                 data={deviceProduction}
             />
         </Paper>
+        )}
+        </ExpandablePanel>
     );
 }

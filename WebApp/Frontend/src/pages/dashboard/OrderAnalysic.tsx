@@ -1,5 +1,4 @@
 import {
-    Grid,
     Box,
     Paper,
     TableContainer,
@@ -13,6 +12,7 @@ import {
     IconButton,
     CircularProgress,
     AlertColor,
+    Typography,
 } from '@mui/material';
 import { useState } from 'react'
 import PieChartOrder from '../../components/PieChartOrder'
@@ -27,6 +27,7 @@ import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { useAtom } from 'jotai';
 import { userAtom } from '../../atoms/userAtoms';
 import { AlertSnackbar } from '../../components/Alert';
+import ExpandablePanel from '../../components/ExpandablePanel';
 import { RoleEnum, StatusOrderEnum } from '../../enums';
 
 export default function OrderAnalysic({ departments }: { departments: any[] }) {
@@ -67,108 +68,123 @@ export default function OrderAnalysic({ departments }: { departments: any[] }) {
 
 
     return (
-        <Paper variant="outlined" sx={{ borderRadius: 2 }}>
+        <ExpandablePanel>
+        {({ expanded, expandButton }) => (
+        <Paper variant="outlined" sx={{ borderRadius: 2, overflow: 'hidden' }}>
             <AlertSnackbar alert={alert} setAlert={setAlert} />
-            <Grid container spacing={2}>
-                <Grid item xs={12} lg={7}>
-                    <TableContainer sx={{ maxHeight: 300 }}>
-                        <Table stickyHeader sx={{ '& td, & th': { border: '1px solid #e0e0e0', padding: '8px', } }}>
-                            <TableHead>
-                                <TableRow>
-                                    <TableCell colSpan={7} align="center" sx={{ bgcolor: '#dcf1d8', fontWeight: 'bold', fontSize: 18, position: 'relative' }}>
-                                        <IconButton
-                                            sx={{
-                                                position: 'absolute',
-                                                left: 8,
-                                                top: '50%',
-                                                transform: 'translateY(-50%)',
-                                            }}
-                                            onClick={async () => {
-                                                try {
-                                                    await refetchOrderCount(); // đợi xong refetch
-                                                    setAlert({ open: true, message: 'Cập nhật thành công', severity: 'success' });
-                                                } catch (e) {
-                                                    setAlert({ open: true, message: 'Cập nhật thất bại', severity: 'error' });
-                                                }
-                                            }}
-                                            disabled={isLoadingOrderCount}
-                                        >
-                                            {isLoadingOrderCount ? (
-                                                <CircularProgress size={24} />
-                                            ) : (
-                                                <RotateLeftIcon
-                                                    sx={{
-                                                        transition: "transform 0.3s ease",
-                                                        "&:hover": { transform: "rotate(-180deg)" }, // xoay khi hover
-                                                        color: "primary.main",
-                                                    }}
-                                                />
-                                            )}
-                                        </IconButton>
-                                        LỆNH SẢN XUẤT
-                                    </TableCell>
-                                </TableRow>
-                                <TableRow>
-                                    <TableCell align="center" sx={{ fontWeight: 'bold', fontSize: 18, width: '24%' }}>Lệnh sản xuất</TableCell>
-                                    <TableCell align="center" sx={{ fontWeight: 'bold', fontSize: 18, width: '12%' }}>Ca 1</TableCell>
-                                    <TableCell align="center" sx={{ fontWeight: 'bold', fontSize: 18, width: '12%' }}>Ca 2</TableCell>
-                                    <TableCell align="center" sx={{ fontWeight: 'bold', fontSize: 18, width: '12%' }}>Ca 3</TableCell>
-                                    <TableCell align="center" sx={{ fontWeight: 'bold', fontSize: 18, width: '12%' }}>Ngày</TableCell>
-                                </TableRow>
-                            </TableHead>
-                            <TableBody>
-                                {orderStatus.map((item, index) => (
-                                    <TableRow key={item.key} sx={{ '&:nth-of-type(odd)': { bgcolor: '#f9f9f9' } }}>
-                                        <TableCell sx={{ color: item.color, fontWeight: 'bold' }}>{item.name}</TableCell>
-                                        <TableCell align="center">{orderCount[item.key]?.ca1 ?? 0}</TableCell>
-                                        <TableCell align="center">{orderCount[item.key]?.ca2 ?? 0}</TableCell>
-                                        <TableCell align="center">{orderCount[item.key]?.ca3 ?? 0}</TableCell>
-                                        <TableCell align="center">{orderCount[item.key]?.day ?? 0}</TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    </TableContainer>
-                </Grid>
-                <Grid item xs={12} lg={5} sx={{ maxHeight: 300 }}>
-                    <Box
+            <Box
+                sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    flexWrap: 'wrap',
+                    gap: 1,
+                    pl: 1.25,
+                    pr: 5.5, // chừa chỗ cho nút mở rộng ở góc phải
+                    py: 0.5,
+                    bgcolor: '#dcf1d8',
+                    borderBottom: '1px solid #e5e9f0',
+                    position: 'sticky',
+                    top: 0,
+                    zIndex: 3,
+                    flex: 'none',
+                }}
+            >
+                <IconButton
+                    size="small"
+                    title="Cập nhật lệnh sản xuất"
+                    onClick={async () => {
+                        try {
+                            await refetchOrderCount(); // đợi xong refetch
+                            setAlert({ open: true, message: 'Cập nhật thành công', severity: 'success' });
+                        } catch (e) {
+                            setAlert({ open: true, message: 'Cập nhật thất bại', severity: 'error' });
+                        }
+                    }}
+                    disabled={isLoadingOrderCount}
+                >
+                    {isLoadingOrderCount ? (
+                        <CircularProgress size={20} />
+                    ) : (
+                        <RotateLeftIcon
+                            sx={{
+                                transition: "transform 0.3s ease",
+                                "&:hover": { transform: "rotate(-180deg)" }, // xoay khi hover
+                                color: "primary.main",
+                            }}
+                        />
+                    )}
+                </IconButton>
+                <Typography sx={{ fontWeight: 800, fontSize: 14 }}>LỆNH SẢN XUẤT</Typography>
+                <Box sx={{ flex: 1 }} />
+                {user?.role === RoleEnum.ADMIN && <Autocomplete
+                    size="small"
+                    options={departments}
+                    getOptionLabel={(option: any) =>
+                        option.code || ''
+                    }
+                    value={departments.find((p: any) => p._id === department) || null}
+                    onChange={(event, newValue) => {
+                        setDepartment(newValue?._id || '');
+                    }}
+                    sx={{ width: 150, bgcolor: '#fff', borderRadius: 1 }}
+                    renderInput={(params) => <TextField {...params} label="Đơn vị" />}
+                />}
+                <LocalizationProvider dateAdapter={AdapterDayjs}>
+                    <DatePicker
+                        inputFormat="DD/MM/YYYY"
+                        label="Ngày"
+                        value={date}
+                        onChange={(newValue) => setDate(newValue)}
+                        renderInput={(params) => <TextField {...params} size="small" sx={{ width: 150, bgcolor: '#fff', borderRadius: 1 }} />}
+                    />
+                </LocalizationProvider>
+                {expandButton}
+            </Box>
+            <Box
+                sx={{
+                    display: 'grid',
+                    gridTemplateColumns: { xs: 'minmax(0, 1fr)', md: 'minmax(0, 1.3fr) minmax(0, 1fr)' },
+                    alignItems: 'center',
+                    ...(expanded && { flex: 1, alignContent: 'center', p: 2, gap: 2 }),
+                }}
+            >
+                <TableContainer>
+                    <Table
+                        size="small"
                         sx={{
-                            display: 'flex',
-                            justifyContent: 'flex-end',
-                            alignItems: 'center',
-                            mb: 2,
-                            p: 2
+                            '& td, & th': {
+                                border: '1px solid #e8ecf1',
+                                padding: expanded ? '10px 14px' : '3px 8px',
+                                fontSize: expanded ? 16 : 13,
+                            },
                         }}
                     >
-                        <Box sx={{ display: 'flex', gap: 2 }}>
-                            {user?.role === RoleEnum.ADMIN && <Autocomplete
-                                size="small"
-                                options={departments}
-                                getOptionLabel={(option: any) =>
-                                    option.code || ''
-                                }
-                                value={departments.find((p: any) => p._id === department) || null}
-                                onChange={(event, newValue) => {
-                                    setDepartment(newValue?._id || '');
-                                }}
-                                sx={{ width: 200 }}
-                                renderInput={(params) => <TextField {...params} label="Đơn vị" />}
-                            />}
-                            <LocalizationProvider dateAdapter={AdapterDayjs}>
-                                <DatePicker
-                                    inputFormat="DD/MM/YYYY"
-                                    label="Ngày"
-                                    value={date}
-                                    onChange={(newValue) => setDate(newValue)}
-                                    renderInput={(params) => <TextField {...params} size="small" sx={{ width: 200 }} />}
-                                />
-                            </LocalizationProvider>
-                        </Box>
-                    </Box>
-                    <PieChartOrder data={orderCount} />
-                </Grid>
-            </Grid>
-
+                        <TableHead>
+                            <TableRow>
+                                <TableCell align="center" sx={{ fontWeight: 'bold', width: '28%' }}>Lệnh sản xuất</TableCell>
+                                <TableCell align="center" sx={{ fontWeight: 'bold' }}>Ca 1</TableCell>
+                                <TableCell align="center" sx={{ fontWeight: 'bold' }}>Ca 2</TableCell>
+                                <TableCell align="center" sx={{ fontWeight: 'bold' }}>Ca 3</TableCell>
+                                <TableCell align="center" sx={{ fontWeight: 'bold' }}>Ngày</TableCell>
+                            </TableRow>
+                        </TableHead>
+                        <TableBody>
+                            {orderStatus.map((item) => (
+                                <TableRow key={item.key} sx={{ '&:nth-of-type(odd)': { bgcolor: '#f9f9f9' } }}>
+                                    <TableCell sx={{ color: item.color, fontWeight: 'bold' }}>{item.name}</TableCell>
+                                    <TableCell align="center">{orderCount[item.key]?.ca1 ?? 0}</TableCell>
+                                    <TableCell align="center">{orderCount[item.key]?.ca2 ?? 0}</TableCell>
+                                    <TableCell align="center">{orderCount[item.key]?.ca3 ?? 0}</TableCell>
+                                    <TableCell align="center">{orderCount[item.key]?.day ?? 0}</TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </TableContainer>
+                <PieChartOrder data={orderCount} scale={expanded ? 2.2 : 1} />
+            </Box>
         </Paper>
+        )}
+        </ExpandablePanel>
     )
 }

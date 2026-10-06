@@ -3,7 +3,8 @@ import { ChartsLegend, ChartsTooltip, PiePlot, ResponsiveChartContainer } from '
 import React from 'react'
 import { StatusOrderEnum } from '../enums';
 
-export default function PieChartOrder({ data }: { data: any }) {
+// scale > 1 phóng biểu đồ to lên (dùng khi thẻ mở rộng toàn màn hình)
+export default function PieChartOrder({ data, scale = 1 }: { data: any, scale?: number }) {
 
     const theme = useTheme();
 
@@ -33,6 +34,8 @@ export default function PieChartOrder({ data }: { data: any }) {
         { label: 'Đã hủy', value: data[StatusOrderEnum.CANCEL]?.day || 0, color: 'purple' },
     ];
 
+    const markerSize = Math.round(responsiveMarkerSize * Math.min(scale, 1.5));
+
     // Tính tổng giá trị của tất cả các mục dữ liệu
     const totalValue = chartData.reduce((sum, item) => sum + item.value, 0);
 
@@ -47,14 +50,14 @@ export default function PieChartOrder({ data }: { data: any }) {
                 textAlign: 'center',
             }}>Không có dữ liệu</Typography>}
             <ResponsiveChartContainer
-                height={200}
+                height={Math.round(165 * scale)}
                 series={[{
                     type: 'pie',
-                    innerRadius: 30,
-                    outerRadius: 60,
+                    innerRadius: Math.round(26 * scale),
+                    outerRadius: Math.round(54 * scale),
                     data: chartData
                 }]}
-                margin={{ top: -40, left: 0, right: 0, bottom: 0 }}
+                margin={{ top: Math.round(-28 * scale), left: 0, right: 0, bottom: 0 }}
             >
                 <PiePlot />
                 <ChartsTooltip trigger="item" />
@@ -62,10 +65,10 @@ export default function PieChartOrder({ data }: { data: any }) {
                     slotProps={{
                         legend: {
                             labelStyle: {
-                                fontSize: responsiveMarkerSize,
+                                fontSize: markerSize,
                             },
-                            itemMarkHeight: responsiveMarkerSize,
-                            itemMarkWidth: responsiveMarkerSize,
+                            itemMarkHeight: markerSize,
+                            itemMarkWidth: markerSize,
                         }
                     }} />
             </ResponsiveChartContainer>

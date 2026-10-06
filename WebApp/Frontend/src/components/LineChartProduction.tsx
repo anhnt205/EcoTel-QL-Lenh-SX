@@ -11,7 +11,7 @@ import {
 } from "@mui/x-charts";
 
 
-export default function ResponsiveLineChartProduction({ dataset, selectedName, selectedKey }: { dataset: any, selectedName: string, selectedKey: string }) {
+export default function ResponsiveLineChartProduction({ dataset, selectedName, selectedKey, height = 230 }: { dataset: any, selectedName: string, selectedKey: string, height?: number }) {
     const theme = useTheme();
 
     const isLargeScreen = useMediaQuery(theme.breakpoints.up('lg'));
@@ -34,7 +34,7 @@ export default function ResponsiveLineChartProduction({ dataset, selectedName, s
         <Box sx={{ width: "100%", height: '100%', display: 'flex', alignItems: 'flex-start' }}>
 
             <ResponsiveChartContainer
-                height={320}
+                height={height}
                 dataset={dataset}
                 xAxis={[{
                     dataKey: "date", scaleType: "point",
@@ -45,7 +45,7 @@ export default function ResponsiveLineChartProduction({ dataset, selectedName, s
                     { type: "line", dataKey: `${selectedKey}_cum`, label: `${selectedName} (lũy kế)`, area: true },
                     { type: "line", dataKey: selectedKey, label: `${selectedName} (ngày)`, area: true },
                 ]}
-                margin={{ top: 10, left: 50, right: 10, bottom: 80 }}
+                margin={{ top: 8, left: 50, right: 10, bottom: 70 }}
             >
 
                 <AreaPlot // Sử dụng AreaPlot để tô màu vùng

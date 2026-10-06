@@ -24,30 +24,19 @@ export default function SummaryCard(
                 height: '100%',
                 display: 'flex',
                 alignItems: 'center',
-                p: 3,
-                padding: '4px 16px',
-                borderRadius: 3,
-                boxShadow: '0 4px 20px rgba(0,0,0,0.05)',
-                transition: 'transform 0.2s, box-shadow 0.2s',
-                '&:hover': {
-                    transform: 'translateY(-5px)',
-                    boxShadow: '0 8px 30px rgba(0,0,0,0.1)',
-                },
+                gap: 1.25,
+                px: 1.5,
+                py: 1,
+                borderRadius: 2,
+                border: '1px solid #e5e9f0',
+                boxShadow: 'none',
             }}
         >
-            <Box sx={{ flexGrow: 1 }}>
-                <Typography variant="h4" sx={{ fontWeight: 'bold', cursor: 'pointer' }} gutterBottom
-                    onClick={() => { navigate(`${type === "department" ? '/departments' : '/users'}`) }}>
-                    {title}
-                </Typography>
-                <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
-                    {value}
-                </Typography>
-            </Box>
             <Box
                 sx={{
-                    width: 60,
-                    height: 60,
+                    width: 34,
+                    height: 34,
+                    flexShrink: 0,
                     bgcolor: color,
                     borderRadius: '50%',
                     display: 'flex',
@@ -56,7 +45,17 @@ export default function SummaryCard(
                     color: 'white',
                 }}
             >
-                {React.cloneElement(icon as React.ReactElement, { sx: { fontSize: 32 } })}
+                {React.cloneElement(icon as React.ReactElement, { sx: { fontSize: 20 } })}
+            </Box>
+            <Box sx={{ minWidth: 0 }}>
+                <Typography
+                    sx={{ fontSize: 12, fontWeight: 600, color: '#64748b', cursor: 'pointer', '&:hover': { color: '#1d4ed8' } }}
+                    onClick={() => { navigate(`${type === "department" ? '/departments' : '/users'}`) }}>
+                    {title}
+                </Typography>
+                <Typography sx={{ fontSize: 22, fontWeight: 800, lineHeight: 1.1 }}>
+                    {value}
+                </Typography>
             </Box>
         </Card>
     )
