@@ -49,7 +49,7 @@ export default function SummaryCard(
             </Box>
             <Box sx={{ minWidth: 0 }}>
                 <Typography
-                    sx={{ fontSize: 12, fontWeight: 600, color: '#64748b', cursor: 'pointer', '&:hover': { color: '#1d4ed8' } }}
+                    sx={{ fontSize: 12, fontWeight: 600, color: '#64748b', cursor: 'pointer', '&:hover': { color: 'brand.strong' } }}
                     onClick={() => { navigate(`${type === "department" ? '/departments' : '/users'}`) }}>
                     {title}
                 </Typography>

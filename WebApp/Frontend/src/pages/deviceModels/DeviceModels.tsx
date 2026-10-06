@@ -284,7 +284,7 @@ const DeviceModels: React.FC = () => {
             <Box
                 sx={{ display: "flex", justifyContent: "space-between", mb: 3, mt: 3 }}
             >
-                <Typography variant="h3" color={"blue"}>
+                <Typography variant="h3" color="brand.title">
                     Chủng loại thiết bị
                 </Typography>
             </Box>

@@ -27,7 +27,8 @@ import {
   DEFAULT_LOGO,
   DEFAULT_PRIMARY,
   brandAccent,
-  brandNavy,
+  brandHeaderBg,
+  brandOnColor,
   useBranding,
 } from "../../branding/BrandingProvider";
 import { showConfirmAlert, showErrorAlert, showSuccessAlert } from "../../components/Alert";
@@ -129,7 +130,8 @@ export default function BrandingSettings() {
   const previewColor = colorValid ? primaryColor : saved.primaryColor;
   // Giống hệt cách Header thật tô màu (màu mặc định giữ đúng sắc đã duyệt)
   const previewAccent = useMemo(() => brandAccent(previewColor), [previewColor]);
-  const previewNavy = useMemo(() => brandNavy(previewColor), [previewColor]);
+  const previewHeaderBg = useMemo(() => brandHeaderBg(previewColor), [previewColor]);
+  const previewHeaderFg = brandOnColor(previewHeaderBg);
   const hasCustomPreviewLogo = logo === undefined ? saved.hasCustomLogo : logo !== null;
 
   const dirty =
@@ -344,7 +346,7 @@ export default function BrandingSettings() {
               })}
             </Box>
             <Typography variant="caption" color="textSecondary" sx={{ display: "block", mt: 1 }}>
-              Dùng cho nút, tab đang chọn, biểu đồ và nền thanh đầu trang (tự làm đậm hơn).
+              Áp dụng cho toàn bộ giao diện: nền thanh đầu trang, tiêu đề các trang, nút, tab đang chọn, dòng xen kẽ của bảng và biểu đồ. Màu trạng thái (xanh/đỏ/cam của thiết bị, lệnh) giữ nguyên để dễ phân biệt.
             </Typography>
 
             <Divider sx={{ my: 3 }} />
@@ -399,7 +401,7 @@ export default function BrandingSettings() {
 
             {/* Thanh đầu trang */}
             <Box sx={{ borderRadius: 2, overflow: "hidden", border: `1px solid ${LINE}`, fontFamily: '"Inter","Segoe UI",Roboto,Arial,sans-serif' }}>
-              <Box sx={{ bgcolor: previewNavy, color: "#fff", display: "flex", alignItems: "center", gap: 1.5, px: 2, minHeight: 56 }}>
+              <Box sx={{ bgcolor: previewHeaderBg, color: previewHeaderFg, display: "flex", alignItems: "center", gap: 1.5, px: 2, minHeight: 56 }}>
                 <img
                   src={previewLogo}
                   alt=""
@@ -414,7 +416,7 @@ export default function BrandingSettings() {
                   <Typography noWrap sx={{ fontSize: 15, fontWeight: 800, lineHeight: 1.25, fontFamily: "inherit" }}>
                     {softwareName.trim() || DEFAULT_HEADER_TITLE}
                   </Typography>
-                  <Typography noWrap sx={{ fontSize: 11.5, color: "rgba(255,255,255,.82)", lineHeight: 1.3, fontFamily: "inherit" }}>
+                  <Typography noWrap sx={{ fontSize: 11.5, color: alpha(previewHeaderFg, 0.82), lineHeight: 1.3, fontFamily: "inherit" }}>
                     {companyName.trim() || DEFAULT_COMPANY}
                   </Typography>
                 </Box>

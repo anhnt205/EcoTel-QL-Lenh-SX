@@ -74,8 +74,8 @@ export default function ReportListPanel({
           sx={{
             px: 0.75,
             borderRadius: 1,
-            bgcolor: "#eef2ff",
-            color: "#3b5bdb",
+            bgcolor: "brand.chipBg",
+            color: "brand.chipText",
             fontSize: 11,
             fontWeight: 700,
             lineHeight: "18px",
@@ -132,9 +132,9 @@ export default function ReportListPanel({
                 px: 1,
                 py: 0.9,
                 borderRadius: 1.5,
-                color: active ? "#1d4ed8" : "#1e293b",
-                bgcolor: active ? "#e8f0fe" : "transparent",
-                "&:hover": { bgcolor: active ? "#e8f0fe" : "#f1f5f9" },
+                color: active ? "brand.strong" : "#1e293b",
+                bgcolor: active ? "brand.tint" : "transparent",
+                "&:hover": { bgcolor: active ? "brand.tint" : "#f1f5f9" },
               }}
             >
               <Box
@@ -147,10 +147,11 @@ export default function ReportListPanel({
                   fontWeight: 700,
                   lineHeight: "18px",
                   fontVariantNumeric: "tabular-nums",
-                  border: `1px solid ${active ? "#93b4f5" : "#dbe2ea"}`,
+                  border: "1px solid",
+                  borderColor: active ? "brand.border" : "#dbe2ea",
                   borderRadius: "5px",
                   bgcolor: active ? "#fff" : "#f8fafc",
-                  color: active ? "#1d4ed8" : "#64748b",
+                  color: active ? "brand.strong" : "#64748b",
                 }}
               >
                 {String(item.no).padStart(2, "0")}

@@ -721,7 +721,7 @@ const Orders: React.FC = () => {
     <Box>
       <AlertSnackbar alert={alert} setAlert={setAlert} />
       <Box sx={{ display: "flex", justifyContent: "space-between", mb: 3 }}>
-        <Typography variant="h3" color={"blue"}>
+        <Typography variant="h3" color="brand.title">
           Lệnh sản xuất
         </Typography>
       </Box>
@@ -921,7 +921,7 @@ const Orders: React.FC = () => {
           />
           <ListItemText
             primary={`Tất cả (${statusCounts.all})`}
-            sx={{ color: "blue" }}
+            sx={{ color: "brand.title" }}
           />
         </Box>
         <Box display="flex" alignItems={"center"}>

@@ -129,7 +129,7 @@ const Notifications: React.FC = () => {
                         {paginatedData.map((notification: any, index: number) => (
                             <TableRow key={notification._id} sx={{
                                 // Dùng chỉ mục index để tạo màu xen kẽ
-                                backgroundColor: index % 2 === 0 ? 'white' : '#e3f2fd',
+                                backgroundColor: index % 2 === 0 ? 'white' : 'brand.zebra',
                             }}>
                                 <TableCell sx={{}}>{notification.title}</TableCell>
                                 <TableCell sx={{}}>

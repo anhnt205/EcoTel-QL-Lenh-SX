@@ -55,7 +55,7 @@ import Profile from "../components/Modal/Profile";
 import { RoleEnum } from "../enums";
 import { ThemeProvider, alpha } from "@mui/material/styles";
 import { appFontTheme, uiSansTheme, UI_FONT } from "../theme/uiTheme";
-import { brandAccent, brandNavy, useBranding } from "../branding/BrandingProvider";
+import { brandAccent, brandHeaderBg, brandNavy, brandOnColor, useBranding } from "../branding/BrandingProvider";
 
 export default function Header() {
   const navigate = useNavigate();
@@ -68,7 +68,9 @@ export default function Header() {
   // Logo, tên phần mềm, tên công ty và màu chủ đạo lấy từ Hệ thống > Cấu hình giao diện
   const branding = useBranding();
   const HDR_BLUE = brandAccent(theme.palette.primary.main);
-  const HDR_NAVY = brandNavy(theme.palette.primary.main); // nền thanh trên: màu chủ đạo làm đậm
+  const HDR_BG = brandHeaderBg(theme.palette.primary.main); // nền thanh trên: đúng màu chủ đạo đã chọn
+  const HDR_FG = brandOnColor(HDR_BG); // chữ + biểu tượng trên thanh trên (trắng, hoặc tối nếu nền quá sáng)
+  const HDR_NAVY = brandNavy(theme.palette.primary.main); // sắc đậm cho biểu tượng ảnh đại diện
   const isMobile = useMediaQuery(theme.breakpoints.down("lg"));
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [openProfile, setOpenProfile] = useState(false);
@@ -210,8 +212,8 @@ export default function Header() {
         {/* Thanh trên: logo + tên hệ thống + thông báo + tài khoản */}
         <Box
           sx={{
-            bgcolor: HDR_NAVY,
-            color: "#fff",
+            bgcolor: HDR_BG,
+            color: HDR_FG,
             display: "flex",
             alignItems: "center",
             gap: { xs: 1, lg: 2 },
@@ -353,7 +355,7 @@ export default function Header() {
           />
           {!isMobile && (
             <Box
-              sx={{ width: "1px", height: 30, bgcolor: "rgba(255,255,255,.28)" }}
+              sx={{ width: "1px", height: 30, bgcolor: alpha(HDR_FG, 0.28) }}
             />
           )}
           <Box
@@ -375,7 +377,7 @@ export default function Header() {
               noWrap
               sx={{
                 fontSize: { xs: 11, lg: 12.5 },
-                color: "rgba(255,255,255,.82)",
+                color: alpha(HDR_FG, 0.82),
                 lineHeight: 1.3,
               }}
             >
@@ -400,7 +402,7 @@ export default function Header() {
             </IconButton>
           </Tooltip>
           <Box
-            sx={{ width: "1px", height: 30, bgcolor: "rgba(255,255,255,.28)" }}
+            sx={{ width: "1px", height: 30, bgcolor: alpha(HDR_FG, 0.28) }}
           />
           <Tooltip title="Tài khoản">
             <ButtonBase
@@ -410,8 +412,8 @@ export default function Header() {
                 px: 1,
                 py: 0.5,
                 borderRadius: "10px",
-                color: "#fff",
-                "&:hover": { bgcolor: "rgba(255,255,255,.1)" },
+                color: HDR_FG,
+                "&:hover": { bgcolor: alpha(HDR_FG, 0.1) },
               }}
             >
               <Avatar
@@ -515,7 +517,7 @@ export default function Header() {
                           sx={{
                             borderLeft:
                               location.pathname === item.path
-                                ? "4px solid #1d6ff2"
+                                ? `4px solid ${HDR_BLUE}`
                                 : "4px solid transparent",
                             display: "flex",
                             gap: 1.5,

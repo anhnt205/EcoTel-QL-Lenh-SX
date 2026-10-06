@@ -614,7 +614,7 @@ function Reports() {
                 <Chip
                   size="small"
                   label={`Biểu ${reportNo}`}
-                  sx={{ height: 20, fontSize: 11, fontWeight: 700, bgcolor: "#eef2ff", color: "#3b5bdb" }}
+                  sx={{ height: 20, fontSize: 11, fontWeight: 700, bgcolor: "brand.chipBg", color: "brand.chipText" }}
                 />
               )}
               <Box sx={{ flex: 1 }} />
@@ -753,8 +753,9 @@ function Reports() {
                     fontWeight: 700,
                     fontSize: 13,
                     px: 2,
-                    bgcolor: "#1d5fd1",
-                    "&:hover": { bgcolor: "#174fb0" },
+                    bgcolor: "brand.solid",
+                    color: "brand.onSolid",
+                    "&:hover": { bgcolor: "brand.solidHover" },
                   }}
                 >
                   {reportView.isPending ? "Đang tải..." : "Xem báo cáo"}

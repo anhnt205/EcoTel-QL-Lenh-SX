@@ -477,7 +477,7 @@ const Machines: React.FC = () => {
           mt: 3,
         }}
       >
-        <Typography variant="h3" color={"blue"}>
+        <Typography variant="h3" color="brand.title">
           Thông tin máy
         </Typography>
       </Box>
@@ -911,7 +911,7 @@ const Machines: React.FC = () => {
           />
           <ListItemText
             primary={`Tất cả (${allMachines.length})`}
-            sx={{ color: "blue" }}
+            sx={{ color: "brand.title" }}
           />
         </Box>
         <Box display="flex" alignItems={"center"}>

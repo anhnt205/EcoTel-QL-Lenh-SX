@@ -212,7 +212,7 @@ const Shifts: React.FC = () => {
             <Box
                 sx={{ display: "flex", justifyContent: "space-between", mt: 3, mb: 3 }}
             >
-                <Typography variant="h3" color={"blue"}>
+                <Typography variant="h3" color="brand.title">
                     Ca làm việc
                 </Typography>
             </Box>

@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ThemeProvider, darken } from "@mui/material/styles";
 import { ConfigProvider } from "antd";
 import BrandingService, { BrandingRaw } from "../services/brandingService";
-import { buildAppTheme, DEFAULT_PRIMARY } from "../theme";
+import { buildAppTheme, brandHeaderBg, brandOnColor, DEFAULT_PRIMARY } from "../theme";
 
 // Giá trị mặc định (dùng khi quản trị viên chưa tuỳ chỉnh trong Hệ thống > Cấu hình giao diện)
 export const DEFAULT_LOGO = "/image/logo.png";
@@ -69,11 +69,14 @@ export const resolveBranding = (raw: BrandingRaw): Branding => ({
 });
 
 // Màu của Header / giao diện mới theo màu chủ đạo. Chưa tuỳ chỉnh (màu mặc định) thì giữ ĐÚNG màu đã
-// duyệt theo ảnh mẫu (navy #0f2a55, xanh #1d6ff2); màu tuỳ chỉnh thì dùng màu đó, nền thanh trên làm đậm.
+// duyệt theo ảnh mẫu (navy #0f2a55, xanh #1d6ff2); màu tuỳ chỉnh thì dùng ĐÚNG màu đó.
 const isDefaultPrimary = (primary: string) =>
   primary.toLowerCase() === DEFAULT_PRIMARY;
 export const brandAccent = (primary: string) =>
   isDefaultPrimary(primary) ? "#1d6ff2" : primary;
+// Nền Header (brandHeaderBg) và màu chữ trên nền màu (brandOnColor) nằm ở theme/index.ts (hàm thuần, có test)
+export { brandHeaderBg, brandOnColor };
+/** Sắc đậm của màu chủ đạo dùng cho chữ / biểu tượng (không dùng làm nền Header). */
 export const brandNavy = (primary: string) =>
   isDefaultPrimary(primary) ? "#0f2a55" : darken(primary, 0.6);
 

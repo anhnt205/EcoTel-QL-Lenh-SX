@@ -88,7 +88,7 @@ export default function SummaryCardDevice(
                     {React.cloneElement(icon as React.ReactElement, { sx: { fontSize: 20 } })}
                 </Box>
                 <Typography
-                    sx={{ flexGrow: 1, fontSize: 13, fontWeight: 700, color: '#334155', cursor: 'pointer', '&:hover': { color: '#1d4ed8' } }}
+                    sx={{ flexGrow: 1, fontSize: 13, fontWeight: 700, color: '#334155', cursor: 'pointer', '&:hover': { color: 'brand.strong' } }}
                     onClick={() => { navigate(`${type === DeviceTypeEnum.MACHINE ? '/machines' : '/vehicles'}`) }}>
                     {title}
                 </Typography>

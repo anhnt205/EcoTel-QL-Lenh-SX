@@ -100,7 +100,7 @@ const CustomDataGrid: React.FC<CustomDataGridProps> = ({
                             fontSize: 16,
                         },
                         "& .MuiDataGrid-row:nth-of-type(odd)": {
-                            backgroundColor: "#e3f2fd",
+                            backgroundColor: "brand.zebra",
                         },
                         "& .MuiDataGrid-row:nth-of-type(even)": {
                             backgroundColor: "white",

@@ -17,7 +17,7 @@ const TravelLogs: React.FC = () => {
   return (
     <Box>
       <Box sx={{ display: "flex", justifyContent: "space-between", mb: 3 }}>
-        <Typography variant="h3" color={"blue"}>
+        <Typography variant="h3" color="brand.title">
           Cung độ
         </Typography>
       </Box>

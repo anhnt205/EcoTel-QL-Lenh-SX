@@ -184,7 +184,7 @@ const OrderByUsers: React.FC = () => {
     return (
         <Box>
             <AlertSnackbar alert={alert} setAlert={setAlert} />
-            <Typography variant="h3" color='blue'>Công việc của tôi</Typography>
+            <Typography variant="h3" color="brand.title">Công việc của tôi</Typography>
             <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', mt: 3, mb: 3, border: '1px solid white', p: 1, boxShadow: 2 }}>
                 <Box display={'flex'} gap={2} flex={1}>
                     <LocalizationProvider dateAdapter={AdapterDayjs}>
@@ -224,7 +224,7 @@ const OrderByUsers: React.FC = () => {
                 <Box display="flex" alignItems={'center'}>
                     <Checkbox color='info' name="status" checked={status === ''}
                         onChange={() => handleChange('')} />
-                    <ListItemText primary={`Tất cả (${statusCounts.all})`} sx={{ color: 'blue' }} />
+                    <ListItemText primary={`Tất cả (${statusCounts.all})`} sx={{ color: "brand.title" }} />
                 </Box>
                 <Box display="flex" alignItems={'center'}>
                     <Checkbox color='default' name="status" checked={status === StatusOrderEnum.PENDING}

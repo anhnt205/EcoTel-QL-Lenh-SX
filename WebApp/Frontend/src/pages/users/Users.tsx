@@ -516,7 +516,7 @@ const Users: React.FC = () => {
       <Box
         sx={{ display: "flex", justifyContent: "space-between", mb: 3, mt: 3 }}
       >
-        <Typography variant="h3" color={"blue"}>
+        <Typography variant="h3" color="brand.title">
           Người dùng
         </Typography>
       </Box>
@@ -940,7 +940,7 @@ const Users: React.FC = () => {
               />
               <ListItemText
                 primary={`Tất cả (${users.length})`}
-                sx={{ color: "blue" }}
+                sx={{ color: "brand.title" }}
               />
             </Box>
             <Box display="flex" alignItems={"center"}>
@@ -1009,7 +1009,7 @@ const Users: React.FC = () => {
               fontSize: 18,
             },
             "& .MuiDataGrid-row:nth-of-type(odd)": {
-              backgroundColor: "#e3f2fd",
+              backgroundColor: "brand.zebra",
             },
             "& .MuiDataGrid-row:nth-of-type(even)": {
               backgroundColor: "white",
