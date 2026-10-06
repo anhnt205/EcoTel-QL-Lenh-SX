@@ -9,7 +9,9 @@ import {
     Paper,
     IconButton,
     InputAdornment,
+    useTheme,
 } from '@mui/material';
+import { darken } from '@mui/material/styles';
 import { VisibilityOff, Visibility } from '@mui/icons-material';
 import { useFormik } from 'formik';
 import * as yup from 'yup';
@@ -19,6 +21,7 @@ import { useAtom } from 'jotai';
 import { userAtom } from '../../atoms/userAtoms';
 import { showErrorAlert } from '../../components/Alert';
 import { RoleEnum } from '../../enums';
+import { useBranding } from '../../branding/BrandingProvider';
 
 const loginValidationSchema = yup.object({
     username: yup.string().required('Vui lòng nhập tên đăng nhập'),
@@ -30,6 +33,9 @@ const Login = () => {
     const navigate = useNavigate();
     const [, setUser] = useAtom(userAtom)
     const [showPassword, setShowPassword] = useState(false);
+    // Logo, tên phần mềm, màu chủ đạo lấy từ Hệ thống > Cấu hình giao diện
+    const theme = useTheme();
+    const branding = useBranding();
 
     const handleTogglePassword = () => {
         setShowPassword((prev) => !prev);
@@ -78,7 +84,8 @@ const Login = () => {
         >
             <Box
                 sx={{
-                    background: "#035bb4ff", // màu xanh giống ảnh
+                    // màu xanh giống ảnh; đã chọn màu chủ đạo riêng thì dùng màu đó (làm đậm nhẹ)
+                    background: branding.hasCustomColor ? darken(theme.palette.primary.main, 0.1) : "#035bb4ff",
                     color: "white",
                     py: 2,
                     px: 3,
@@ -95,7 +102,7 @@ const Login = () => {
                                 sm: 20,
                                 xs: 14
                             },
-                        }} textAlign={'center'}>HỆ THỐNG QUẢN LÝ ĐIỀU PHỐI VÀ SỬ DỤNG MÁY MÓC THIẾT BỊ</Typography>
+                        }} textAlign={'center'}>{branding.loginTitle}</Typography>
                     </Box>
                 </Box>
             </Box>
@@ -121,7 +128,7 @@ const Login = () => {
                         }}
                     >
                         <Paper elevation={3} sx={{ p: 4, width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-                            <img src="/image/logo.png" style={{ width: 150, height: 150, }} />
+                            <img src={branding.logoUrl} alt="logo" style={{ width: 150, height: 150, objectFit: 'contain' }} />
                             <Typography component="h1" variant="h5" align="center" gutterBottom>
                                 Đăng nhập
                             </Typography>

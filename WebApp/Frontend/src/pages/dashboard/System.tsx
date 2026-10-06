@@ -9,10 +9,13 @@ import {
   useTheme,
   alpha,
   Chip,
+  Tabs,
+  Tab,
 } from "@mui/material";
 import MemoryIcon from "@mui/icons-material/Memory";
 import StorageIcon from "@mui/icons-material/Storage";
 import SpeedIcon from "@mui/icons-material/Speed";
+import PaletteIcon from "@mui/icons-material/Palette";
 import {
   AreaChart,
   Area,
@@ -24,6 +27,7 @@ import {
 } from "recharts";
 import { useQuery } from "@tanstack/react-query";
 import SystemService from "../../services/SystemService";
+import BrandingSettings from "./BrandingSettings";
 
 type CpuPoint = {
   time: string;
@@ -58,7 +62,8 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   return null;
 };
 
-export default function SystemDashboard() {
+// Tab "Giám sát hệ thống": CPU / RAM / ổ cứng theo thời gian thực (nội dung cũ của trang này)
+function SystemMonitor() {
   const theme = useTheme();
   const [cpuHistory, setCpuHistory] = useState<CpuPoint[]>([]);
 
@@ -354,6 +359,38 @@ export default function SystemDashboard() {
           </Card>
         </Grid>
       </Grid>
+    </Box>
+  );
+}
+
+// Trang Hệ thống (chỉ admin): các tab Giám sát hệ thống / Cấu hình giao diện.
+// Tab không được chọn không được dựng nên chỉ tab giám sát mới tải số liệu CPU mỗi 5 giây.
+export default function SystemDashboard() {
+  const [tab, setTab] = useState(0);
+  return (
+    <Box sx={{ bgcolor: "#f4f6f8", minHeight: "100vh" }}>
+      <Box sx={{ bgcolor: "#fff", borderBottom: "1px solid #e5e9f0", px: 2 }}>
+        <Tabs
+          value={tab}
+          onChange={(_, value: number) => setTab(value)}
+          aria-label="Các tab của trang Hệ thống"
+        >
+          <Tab
+            icon={<SpeedIcon fontSize="small" />}
+            iconPosition="start"
+            label="Giám sát hệ thống"
+            sx={{ textTransform: "none", fontWeight: 600, minHeight: 48 }}
+          />
+          <Tab
+            icon={<PaletteIcon fontSize="small" />}
+            iconPosition="start"
+            label="Cấu hình giao diện"
+            sx={{ textTransform: "none", fontWeight: 600, minHeight: 48 }}
+          />
+        </Tabs>
+      </Box>
+      {tab === 0 && <SystemMonitor />}
+      {tab === 1 && <BrandingSettings />}
     </Box>
   );
 }

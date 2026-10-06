@@ -1,12 +1,21 @@
 import { createTheme } from '@mui/material/styles';
 
-const theme = createTheme({
+// Màu chủ đạo mặc định của ứng dụng; có thể đổi trong Hệ thống > Cấu hình giao diện.
+export const DEFAULT_PRIMARY = '#1976d2';
+
+/**
+ * Dựng theme gốc của ứng dụng. Không truyền màu (hoặc truyền đúng màu mặc định) thì ra đúng theme cũ;
+ * màu tuỳ chỉnh thì để MUI tự tính light / dark / contrastText từ màu chính.
+ */
+export const buildAppTheme = (primary: string = DEFAULT_PRIMARY) => createTheme({
     palette: {
-        primary: {
-            main: '#1976d2',
-            light: '#42a5f5',
-            dark: '#1565c0',
-        },
+        primary: primary.toLowerCase() === DEFAULT_PRIMARY
+            ? {
+                main: DEFAULT_PRIMARY,
+                light: '#42a5f5',
+                dark: '#1565c0',
+            }
+            : { main: primary },
         secondary: {
             main: '#9c27b0',
             light: '#ba68c8',
@@ -75,4 +84,6 @@ const theme = createTheme({
     },
 });
 
-export default theme; 
+const theme = buildAppTheme();
+
+export default theme;

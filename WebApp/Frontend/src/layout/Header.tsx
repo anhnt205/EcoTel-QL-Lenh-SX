@@ -53,12 +53,9 @@ import { useLocation, useNavigate } from "react-router-dom";
 import ChangePassword from "../components/Modal/ChangePassword";
 import Profile from "../components/Modal/Profile";
 import { RoleEnum } from "../enums";
-import { ThemeProvider } from "@mui/material/styles";
-import appTheme from "../theme";
-import { uiSansTheme, UI_FONT } from "../theme/uiTheme";
-
-const HDR_NAVY = "#0f2a55";
-const HDR_BLUE = "#1d6ff2";
+import { ThemeProvider, alpha } from "@mui/material/styles";
+import { appFontTheme, uiSansTheme, UI_FONT } from "../theme/uiTheme";
+import { brandAccent, brandNavy, useBranding } from "../branding/BrandingProvider";
 
 export default function Header() {
   const navigate = useNavigate();
@@ -68,6 +65,10 @@ export default function Header() {
     null,
   );
   const theme = useTheme();
+  // Logo, tên phần mềm, tên công ty và màu chủ đạo lấy từ Hệ thống > Cấu hình giao diện
+  const branding = useBranding();
+  const HDR_BLUE = brandAccent(theme.palette.primary.main);
+  const HDR_NAVY = brandNavy(theme.palette.primary.main); // nền thanh trên: màu chủ đạo làm đậm
   const isMobile = useMediaQuery(theme.breakpoints.down("lg"));
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [openProfile, setOpenProfile] = useState(false);
@@ -190,9 +191,9 @@ export default function Header() {
     fontWeight: 600,
     whiteSpace: "nowrap",
     color: active ? HDR_BLUE : "#334155",
-    bgcolor: active ? "#eef4ff" : "transparent",
+    bgcolor: active ? alpha(HDR_BLUE, 0.1) : "transparent",
     borderBottom: `3px solid ${active ? HDR_BLUE : "transparent"}`,
-    "&:hover": { bgcolor: active ? "#eef4ff" : "#f6f8fb" },
+    "&:hover": { bgcolor: active ? alpha(HDR_BLUE, 0.1) : "#f6f8fb" },
     "& .MuiButton-startIcon": { mr: 0.75 },
   });
 
@@ -340,9 +341,15 @@ export default function Header() {
             </>
           )}
           <img
-            src="/image/logo.png"
+            src={branding.logoUrl}
             alt="logo"
-            style={{ width: 40, height: 40, borderRadius: "50%" }}
+            style={{
+              width: 40,
+              height: 40,
+              objectFit: "contain",
+              // logo mặc định là huy hiệu tròn; logo tuỳ chỉnh có thể chữ nhật nên không cắt tròn
+              borderRadius: branding.hasCustomLogo ? 6 : "50%",
+            }}
           />
           {!isMobile && (
             <Box
@@ -362,7 +369,7 @@ export default function Header() {
                 lineHeight: 1.25,
               }}
             >
-              ĐIỀU PHỐI MÁY MÓC THIẾT BỊ
+              {branding.headerTitle}
             </Typography>
             <Typography
               noWrap
@@ -372,7 +379,7 @@ export default function Header() {
                 lineHeight: 1.3,
               }}
             >
-              CÔNG TY CP THAN CAO SƠN - TKV
+              {branding.companyName}
             </Typography>
           </Box>
           <Box sx={{ flex: 1 }} />
@@ -627,7 +634,7 @@ export default function Header() {
             </Popover>
 
         {/* Đổi mật khẩu / thông tin cá nhân giữ nguyên theme gốc */}
-        <ThemeProvider theme={appTheme}>
+        <ThemeProvider theme={appFontTheme}>
           <ChangePassword
             open={openChangePassword}
             setOpen={setOpenChangePassword}

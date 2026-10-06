@@ -7,26 +7,23 @@ import 'leaflet/dist/leaflet.css';
 import 'leaflet.markercluster/dist/MarkerCluster.css';
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
 import './fixLeafletIcon';
-import { ThemeProvider } from '@mui/material/styles';
-import CssBaseline from '@mui/material/CssBaseline';
-import theme from './theme';
-import { ConfigProvider } from 'antd';
+import BrandingProvider from './branding/BrandingProvider';
 
 const root = ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement
 );
 const queryClient = new QueryClient();
 
+// BrandingProvider vừa lấy cấu hình giao diện (logo, tên, màu chủ đạo) vừa dựng theme MUI + antd,
+// nên phải nằm TRONG QueryClientProvider (trước đây ThemeProvider/ConfigProvider là theme cố định).
 root.render(
   <React.StrictMode>
-    <ThemeProvider theme={theme}>
-      <ConfigProvider theme={{ token: { fontFamily: "'Times New Roman', Times, serif" } }}>
-        <QueryClientProvider client={queryClient}>
-          <App />
-        </QueryClientProvider>
-      </ConfigProvider>
-    </ThemeProvider>
+    <QueryClientProvider client={queryClient}>
+      <BrandingProvider>
+        <App />
+      </BrandingProvider>
+    </QueryClientProvider>
   </React.StrictMode>
 );
 
-reportWebVitals(); 
+reportWebVitals();

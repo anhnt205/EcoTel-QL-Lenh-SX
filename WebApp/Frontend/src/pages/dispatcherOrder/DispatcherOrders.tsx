@@ -29,7 +29,7 @@ import {
     Autocomplete,
     Typography,
 } from '@mui/material';
-import { ThemeProvider } from '@mui/material/styles';
+import { ThemeProvider, darken, lighten, useTheme } from '@mui/material/styles';
 import { format } from 'date-fns';
 import {
     Add as AddIcon,
@@ -66,8 +66,8 @@ import OrderService from '../../services/orderService';
 import { StatusOrderEnum } from '../../enums';
 import OrderHistories from '../../components/Modal/OrderHistories';
 import { parseAxiosError } from '../../utils/handleApiError';
-import appTheme from '../../theme';
-import { uiSansTheme, UI_FONT } from '../../theme/uiTheme';
+import { appFontTheme, uiSansTheme, UI_FONT } from '../../theme/uiTheme';
+import { brandAccent } from '../../branding/BrandingProvider';
 import OrderDetailPanel from '../orders/OrderDetailPanel';
 import DateRangeFilter from '../orders/DateRangeFilter';
 import { ORDER_STATUS_META, StatusPill } from '../orders/orderStatus';
@@ -75,7 +75,6 @@ import { ORDER_STATUS_META, StatusPill } from '../orders/orderStatus';
 const LINE = '#e5e9f0';
 const INK = '#0f172a';
 const MUTED = '#64748b';
-const BLUE = '#1d6ff2';
 
 // Ô 2 dòng: dòng trên đậm, dòng dưới nhỏ xám (đúng kiểu ảnh mẫu)
 const TwoLine = ({ top, bottom, bold }: { top?: string; bottom?: string; bold?: boolean }) => (
@@ -117,6 +116,14 @@ const NoOrders = () => (
 );
 
 const DispatcherOrders: React.FC = () => {
+    // Màu chủ đạo lấy từ Hệ thống > Cấu hình giao diện; các sắc nhạt phải ĐẶC (không trong suốt) vì ô ghim cột đè lên nội dung cuộn
+    const theme = useTheme();
+    const BLUE = brandAccent(theme.palette.primary.main);
+    const BLUE_DARK = darken(BLUE, 0.2);
+    const tintLight = lighten(BLUE, 0.95);
+    const tintMid = lighten(BLUE, 0.9);
+    const tintStrong = lighten(BLUE, 0.82);
+    const edge = lighten(BLUE, 0.6);
     const [open, setOpen] = useState(false);
     const [history, setHistory] = useState(false);
     const [transfer, setTransfer] = useState(false);
@@ -436,7 +443,7 @@ const DispatcherOrders: React.FC = () => {
     };
 
     const statusPills = [
-        { key: '', label: 'Tất cả', color: BLUE, bg: '#e8f0fe', dot: BLUE, solid: BLUE },
+        { key: '', label: 'Tất cả', color: BLUE, bg: tintMid, dot: BLUE, solid: BLUE },
         ...ORDER_STATUS_META,
     ].map(m => ({
         ...m,
@@ -542,7 +549,7 @@ const DispatcherOrders: React.FC = () => {
                             variant='contained'
                             startIcon={<AddIcon />}
                             onClick={() => handleOpen()}
-                            sx={{ ...headerBtnSx, color: '#fff', bgcolor: BLUE, borderColor: BLUE, boxShadow: 'none', '&:hover': { bgcolor: '#1259cf', boxShadow: 'none' } }}
+                            sx={{ ...headerBtnSx, color: '#fff', bgcolor: BLUE, borderColor: BLUE, boxShadow: 'none', '&:hover': { bgcolor: BLUE_DARK, boxShadow: 'none' } }}
                         >
                             Tạo lệnh
                         </Button>
@@ -551,16 +558,16 @@ const DispatcherOrders: React.FC = () => {
 
                 {/* Form tạo / sửa / sao chép: mở ngay dưới tiêu đề */}
                 <Collapse in={expanded} ref={formRef}>
-                    <Paper variant='outlined' sx={{ mb: 1.5, borderRadius: 3, borderColor: '#bfd7f5', overflow: 'hidden' }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 2, py: 0.75, bgcolor: '#eaf3fd', borderBottom: '1px solid #bfd7f5' }}>
+                    <Paper variant='outlined' sx={{ mb: 1.5, borderRadius: 3, borderColor: edge, overflow: 'hidden' }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 2, py: 0.75, bgcolor: tintMid, borderBottom: `1px solid ${edge}` }}>
                             <Typography sx={{ flex: 1, fontSize: 15, fontWeight: 800 }}>{panelTitle}</Typography>
                             <IconButton size='small' onClick={handleClose} title='Đóng' aria-label='Đóng form'>
                                 <CloseIcon fontSize='small' />
                             </IconButton>
                         </Box>
                         {/* Các form giữ nguyên theme/phông gốc của ứng dụng */}
-                        <ThemeProvider theme={appTheme}>
-                            <Box sx={{ p: 2, fontFamily: appTheme.typography.fontFamily }}>
+                        <ThemeProvider theme={appFontTheme}>
+                            <Box sx={{ p: 2, fontFamily: '"Times New Roman", Times, serif' }}>
                                 {selectedOrder.length > 0 && open && <OrderFormEdit
                                     initialValues={selectedOrder}
                                     onSubmit={handleSubmit}
@@ -769,8 +776,8 @@ const DispatcherOrders: React.FC = () => {
                                         return (
                                             <React.Fragment key={batchId}>
                                                 {/* HÀNG TIÊU ĐỀ LÔ */}
-                                                <TableRow sx={{ bgcolor: '#f4f8ff' }}>
-                                                    <TableCell colSpan={colCount} sx={{ ...cellSx, py: 0.5, position: 'sticky', left: 0, bgcolor: '#f4f8ff' }}>
+                                                <TableRow sx={{ bgcolor: tintLight }}>
+                                                    <TableCell colSpan={colCount} sx={{ ...cellSx, py: 0.5, position: 'sticky', left: 0, bgcolor: tintLight }}>
                                                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
                                                             <Checkbox
                                                                 size='small'
@@ -797,11 +804,11 @@ const DispatcherOrders: React.FC = () => {
                                                                     Lô: {batchId === 'no-batch' ? 'Không có lô' : batchId}
                                                                 </Typography>
                                                             </ButtonBase>
-                                                            <Box component='span' sx={{ px: 1, height: 22, borderRadius: '11px', bgcolor: '#dfeafc', color: '#1d4ed8', fontSize: 12, fontWeight: 700, display: 'inline-flex', alignItems: 'center' }}>
+                                                            <Box component='span' sx={{ px: 1, height: 22, borderRadius: '11px', bgcolor: tintStrong, color: BLUE_DARK, fontSize: 12, fontWeight: 700, display: 'inline-flex', alignItems: 'center' }}>
                                                                 {batchOrders.length} lệnh
                                                             </Box>
                                                             {/* Nút đứng ngay cạnh tên lô (không đẩy sang mép phải bảng rộng, tránh phải cuộn ngang) */}
-                                                            <Button size='small' variant='outlined' startIcon={<EditIcon />} onClick={() => handleOpen(batchOrders)} sx={{ ...toolBtnSx, height: 30, color: '#1d4ed8' }}>
+                                                            <Button size='small' variant='outlined' startIcon={<EditIcon />} onClick={() => handleOpen(batchOrders)} sx={{ ...toolBtnSx, height: 30, color: BLUE_DARK }}>
                                                                 Sửa lô
                                                             </Button>
                                                             <Button size='small' variant='outlined' startIcon={<CopyAll />} onClick={() => handleCopy(batchOrders)} sx={{ ...toolBtnSx, height: 30, color: '#15803d' }}>
@@ -818,12 +825,12 @@ const DispatcherOrders: React.FC = () => {
                                                 {batchExpanded && batchOrders.map((order: any, index: number) => {
                                                     const checked = selectedOrders.some(o => o._id === order._id);
                                                     const active = info && selectedRow?._id === order._id;
-                                                    const rowBg = active ? '#e0efff' : checked ? '#eaf3ff' : '#fff';
+                                                    const rowBg = active ? tintStrong : checked ? tintMid : '#fff';
                                                     return (
                                                         <TableRow
                                                             key={order._id}
                                                             hover
-                                                            sx={{ cursor: 'pointer', bgcolor: rowBg, '&:hover': { bgcolor: active ? '#e0efff' : checked ? '#eaf3ff' : '#f8fafc' } }}
+                                                            sx={{ cursor: 'pointer', bgcolor: rowBg, '&:hover': { bgcolor: active ? tintStrong : checked ? tintMid : '#f8fafc' } }}
                                                             onClick={() => setSelectedRow(order)}
                                                         >
                                                             <TableCell align='center' sx={{ ...cellSx, position: 'sticky', left: 0, zIndex: 1, width: 50, minWidth: 50, px: 0.5, bgcolor: 'inherit' }}>
@@ -1020,7 +1027,7 @@ const DispatcherOrders: React.FC = () => {
                 </Menu>
 
                 {/* Hộp thoại lịch sử giữ nguyên theme/phông gốc */}
-                <ThemeProvider theme={appTheme}>
+                <ThemeProvider theme={appFontTheme}>
                     <OrderHistories open={history} setOpen={setHistory} selectedOrders={selectedOrders} setSelectedOrders={setSelectedOrders} />
                 </ThemeProvider>
             </Box>
