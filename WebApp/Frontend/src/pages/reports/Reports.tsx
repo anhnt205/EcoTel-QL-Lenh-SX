@@ -1,21 +1,15 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   Typography,
-  Grid,
   TextField,
-  MenuItem,
   Button,
   Box,
-  Paper,
   Autocomplete,
-  LinearProgress,
-  List,
-  ListItemButton,
-  ListItemIcon,
-  ListItemText,
-  Stack,
-  Divider,
+  Chip,
+  CircularProgress,
+  GlobalStyles,
 } from "@mui/material";
+import { ThemeProvider } from "@mui/material/styles";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import api from "../../config/api.config";
 import { Department, Shift } from "../../types";
@@ -28,7 +22,15 @@ import ExcavatorTripReport from "./ExcavatorTripReport";
 import CarTripReport from "./CarTripReport";
 import WorkLogReport from "./WorkLogReport";
 import mealRequestReport from "./MealRepuestReport";
-import { Close, Edit } from "@mui/icons-material";
+import {
+  Description,
+  Download,
+  Edit,
+  Menu as MenuIcon,
+  MenuOpen,
+  Print,
+  TableView,
+} from "@mui/icons-material";
 import { showErrorAlert, showSuccessAlert } from "../../components/Alert";
 import { useAtom } from "jotai";
 import { userAtom } from "../../atoms/userAtoms";
@@ -49,7 +51,52 @@ import AssignmentManagerReport from "./AssignmentManagerReport";
 import AssignmentToReport from "./AssignmentToReport";
 import ProductionReport from "./ProductionReport";
 import DailyOrderReport from "./DailyOrderReport";
-import { ArrowRightIcon, Eye } from "lucide-react";
+import { Eye } from "lucide-react";
+import appTheme from "../../theme";
+import uiTheme from "../../theme/uiTheme";
+import ReportListPanel from "./ReportListPanel";
+import { REPORT_ORDER } from "./reportOrder";
+import { downloadCsv, elementToCsv } from "../../utils/exportCsv";
+import { printElement } from "../../utils/printElement";
+
+const LINE = "#e5e9f0";
+
+// Điều kiện hiển thị bộ lọc theo từng biểu mẫu — giữ nguyên như bản cũ.
+const NO_RANGE_REPORTS = [
+  ReportEnum.SHIFT_HANDOVER,
+  ReportEnum.PRODUCTION_FUEL_MONITORING,
+  ReportEnum.STAFF_SHIFT_HANDOVER,
+  ReportEnum.DATE_TRIP_CAR,
+  ReportEnum.TIMESHEET,
+  ReportEnum.DAILY_PRODUCTION_CAR_REPORT,
+  ReportEnum.DAILY_ORDER,
+];
+const DAY_REPORTS = [
+  ReportEnum.PRODUCTION_FUEL_MONITORING,
+  ReportEnum.STAFF_SHIFT_HANDOVER,
+  ReportEnum.DATE_TRIP_CAR,
+  ReportEnum.DAILY_PRODUCTION_CAR_REPORT,
+  ReportEnum.DAILY_ORDER,
+];
+const NO_SHIFT_REPORTS = [
+  ReportEnum.SHIFT_HANDOVER,
+  ReportEnum.DAILY_PRODUCTION_EXCAVATOR_REPORT,
+  ReportEnum.TIMESHEET,
+  ReportEnum.DAILY_PRODUCTION_CAR_REPORT,
+  ReportEnum.PRODUCTIVITY_CAR_REPORT,
+  ReportEnum.PRODUCTION_LAND_CAR_REPORT,
+  ReportEnum.PRODUCTION_COAL_CAR_REPORT,
+];
+
+const toolButtonSx = {
+  fontSize: 13,
+  fontWeight: 600,
+  color: "#334155",
+  borderColor: LINE,
+  bgcolor: "#fff",
+  px: 1.25,
+  "&:hover": { borderColor: "#cbd5e1", bgcolor: "#f8fafc" },
+} as const;
 
 function Reports() {
   const [startDate, setStartDate] = useState<dayjs.Dayjs | null>(null);
@@ -408,366 +455,390 @@ function Reports() {
     title !== ReportEnum.PRODUCTION_FUEL_MONITORING &&
     title !== ReportEnum.DAILY_ORDER;
 
+  const [listOpen, setListOpen] = useState(true);
+  const sheetRef = useRef<HTMLDivElement>(null);
+
+  const showPreview = preview && !!PreviewComponent && reportView.isSuccess;
+  const reportNo = title ? REPORT_ORDER.indexOf(title as ReportEnum) + 1 : 0;
+  const listItems = REPORT_ORDER.map((name, index) => ({
+    name,
+    no: index + 1,
+  }));
+
+  const handleSelect = (name: string) => {
+    setTitle(name);
+    setPreview(false);
+    setData([]);
+    setMaterials([]);
+  };
+
+  const handleView = () => {
+    if (!title) return showErrorAlert("Vui lòng chọn loại báo cáo");
+    reportView.mutate();
+    setPreview(true);
+  };
+
+  const handleExcel = () => {
+    if (!title) {
+      showErrorAlert("Vui lòng chọn loại báo cáo");
+      return;
+    }
+    reportExcel.mutate();
+  };
+
+  const handlePrint = () => {
+    if (sheetRef.current) printElement(sheetRef.current);
+  };
+
+  const handleCsv = () => {
+    if (!sheetRef.current) return;
+    const result = elementToCsv(sheetRef.current);
+    if (!result.ok) {
+      showErrorAlert(result.reason);
+      return;
+    }
+    downloadCsv(
+      `${title || "bao-cao"}-${dayjs().format("YYYYMMDD-HHmm")}.csv`,
+      result.csv,
+    );
+  };
+
+  const renderDate = (
+    label: string,
+    value: dayjs.Dayjs | null,
+    onChange: (v: dayjs.Dayjs | null) => void,
+    extra: Record<string, any> = {},
+  ) => (
+    <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale={extra.locale}>
+      <DatePicker
+        label={label}
+        inputFormat={extra.inputFormat ?? "DD/MM/YYYY"}
+        views={extra.views}
+        openTo={extra.openTo}
+        value={value ? dayjs(value) : null}
+        onChange={onChange}
+        renderInput={(params) => (
+          <TextField {...params} size="small" sx={{ width: 168 }} />
+        )}
+      />
+    </LocalizationProvider>
+  );
+
   return (
-    // <Box
-    //   sx={{
-    //     display: "flex",
-    //     gap: 3,
-    //     p: 2,
-    //     bgcolor: "#f4f6f8",
-    //     minHeight: "100vh",
-    //   }}
-    // >
-    <Grid container spacing={2}>
-      <Grid item xs={3}>
-        {/* CỘT TRÁI: DANH MỤC BÁO CÁO (Thay thế cho Dropdown cũ) */}
-        <Paper
-          sx={{
-            elevation: 2,
-            borderRadius: 2,
-            overflow: "hidden",
-            maxHeight: "70vh", // Limit height to viewport height minus some padding
-            overflowY: "auto", // Enable vertical scrolling if content overflows
-            position: "sticky", // Make it sticky
-            top: 100, // Stick to the top with some margin
-            bottom: 32,
-            flexShrink: 0,
-            height: "fit-content",
-          }}
-        >
-          <Box
+    <ThemeProvider theme={uiTheme}>
+      <GlobalStyles
+        styles={{
+          "@media print": {
+            "[data-print-hide]": { display: "none !important" },
+            body: { background: "#fff !important" },
+          },
+        }}
+      />
+      <Box sx={{ color: "#0f172a" }}>
+        {/* Tiêu đề trang */}
+        <Box sx={{ mb: 1.5 }}>
+          <Typography sx={{ fontSize: 12, color: "#64748b" }}>
+            Không gian làm việc / Trung tâm báo cáo
+          </Typography>
+          <Typography
+            component="h1"
             sx={{
-              p: 2,
-              bgcolor: "#035bb4ff",
-              color: "white",
-              position: "sticky",
-              top: 0,
-              zIndex: 1,
+              fontSize: 28,
+              fontWeight: 800,
+              lineHeight: 1.2,
+              letterSpacing: "-0.01em",
             }}
           >
-            <Typography
-              variant="subtitle1"
-              fontWeight="bold"
-              textTransform="uppercase"
-            >
-              Danh mục báo cáo
-            </Typography>
-          </Box>
-
-          <List component="nav" sx={{ py: 0 }}>
-            {reportNames.map((report, index) => (
-              <Box key={report.name}>
-                <ListItemButton
-                  selected={title === report.name}
-                  onClick={() => {
-                    setTitle(report.name);
-                    setPreview(false);
-                    setData([]);
-                    setMaterials([]);
-                  }}
-                  sx={{
-                    py: 1.5,
-                    "&.Mui-selected": {
-                      bgcolor: "#e8f5e9",
-                      color: "#035bb4ff",
-                      borderLeft: "4px solid #035bb4ff",
-                      "&:hover": { bgcolor: "#c8e6c9" },
-                    },
-                    "&:hover": { bgcolor: "#f1f1f1" },
-                  }}
-                >
-                  <ListItemIcon
-                    sx={{
-                      minWidth: 30,
-                      color: title === report.name ? "#035bb4ff" : "inherit",
-                    }}
-                  >
-                    <ArrowRightIcon fontSize="small" />
-                  </ListItemIcon>
-                  <ListItemText
-                    primary={report.name}
-                    primaryTypographyProps={{
-                      variant: "body2",
-                      fontWeight: title === report.name ? "bold" : "medium",
-                    }}
-                  />
-                </ListItemButton>
-                {index < reportNames.length - 1 && <Divider />}
-              </Box>
-            ))}
-          </List>
-        </Paper>
-      </Grid>
-      <Grid item xs={9}>
-        {/* CỘT PHẢI: BỘ LỌC VÀ NỘI DUNG */}
-        <Paper elevation={3} sx={{ p: 4, borderRadius: 2, mb: 3 }}>
-          {/* Tiêu đề động dựa trên mục đã chọn */}
-          <Typography
-            variant="h5"
-            align="center"
-            sx={{ mb: 4, fontWeight: "bold", color: "#333" }}
-          >
-            {title || "Vui lòng chọn một loại báo cáo từ danh sách"}
+            Trung tâm báo cáo
           </Typography>
+          <Typography sx={{ fontSize: 13, color: "#64748b", mt: 0.25 }}>
+            Chọn biểu mẫu bên trái, xem trước và xuất ngay tại vùng bên phải.
+          </Typography>
+        </Box>
 
-          <Grid container spacing={3} justifyContent="center">
-            {/* Bộ chọn Đơn vị (Hiện ra nếu là Admin) */}
-            {user?.role === RoleEnum.ADMIN && (
-              <Grid item xs={12} md={10}>
-                <Autocomplete
-                  fullWidth
-                  size="small"
-                  options={departments}
-                  getOptionLabel={(option) => option?.code || ""}
-                  value={departments.find(
-                    (d: any) => d._id === department?._id,
-                  )}
-                  onChange={(event, newValue) => setDepartment(newValue)}
-                  renderInput={(params) => (
-                    <TextField {...params} label="Chọn đơn vị" />
-                  )}
-                />
-              </Grid>
-            )}
+        <Box
+          sx={{
+            display: "grid",
+            gap: 1.5,
+            alignItems: "start",
+            gridTemplateColumns: {
+              xs: "minmax(0, 1fr)",
+              md: listOpen ? "300px minmax(0, 1fr)" : "minmax(0, 1fr)",
+            },
+          }}
+        >
+          {listOpen && (
+            <ReportListPanel
+              items={listItems}
+              selected={title}
+              onSelect={handleSelect}
+              onHide={() => setListOpen(false)}
+            />
+          )}
 
-            {/* Khu vực chứa các DatePicker (Tùy biến theo title) */}
-            <Grid item xs={12} md={10}>
-              <Stack direction="row" spacing={2}>
-                {/* Từ ngày - Thời gian bắt đầu */}
-                {![
-                  ReportEnum.SHIFT_HANDOVER,
-                  ReportEnum.PRODUCTION_FUEL_MONITORING,
-                  ReportEnum.STAFF_SHIFT_HANDOVER,
-                  ReportEnum.DATE_TRIP_CAR,
-                  ReportEnum.TIMESHEET,
-                  ReportEnum.DAILY_PRODUCTION_CAR_REPORT,
-                  ReportEnum.DAILY_ORDER,
-                ].includes(title as ReportEnum) && (
-                  <Grid item xs={6}>
-                    <LocalizationProvider dateAdapter={AdapterDayjs}>
-                      <DatePicker
-                        label="Từ ngày"
-                        inputFormat="DD/MM/YYYY" // v5 vẫn hỗ trợ
-                        value={startDate ? dayjs(startDate) : null}
-                        onChange={(value) => setStartDate(value)}
-                        renderInput={(params) => (
-                          <TextField {...params} fullWidth size="small" />
-                        )}
-                      />
-                    </LocalizationProvider>
-                  </Grid>
-                )}
-                {/* Từ ngày - Thời gian bắt đầu */}
-                {![
-                  ReportEnum.SHIFT_HANDOVER,
-                  ReportEnum.PRODUCTION_FUEL_MONITORING,
-                  ReportEnum.STAFF_SHIFT_HANDOVER,
-                  ReportEnum.DATE_TRIP_CAR,
-                  ReportEnum.TIMESHEET,
-                  ReportEnum.DAILY_PRODUCTION_CAR_REPORT,
-                  ReportEnum.DAILY_ORDER,
-                ].includes(title as ReportEnum) && (
-                  <Grid item xs={6}>
-                    <LocalizationProvider dateAdapter={AdapterDayjs}>
-                      <DatePicker
-                        label="Đến ngày"
-                        inputFormat="DD/MM/YYYY" // v5 vẫn hỗ trợ
-                        value={endDate ? dayjs(endDate) : null}
-                        onChange={(value) => setEndDate(value)}
-                        renderInput={(params) => (
-                          <TextField {...params} fullWidth size="small" />
-                        )}
-                      />
-                    </LocalizationProvider>
-                  </Grid>
-                )}
-                {[ReportEnum.TIMESHEET].includes(title as ReportEnum) && (
-                  <Grid item xs={12}>
-                    <LocalizationProvider
-                      dateAdapter={AdapterDayjs}
-                      adapterLocale="vi"
-                    >
-                      <DatePicker
-                        label="Chọn tháng"
-                        inputFormat="MM/YYYY" // v5 vẫn hỗ trợ
-                        views={["year", "month"]}
-                        openTo="month"
-                        value={date ? dayjs(date) : null}
-                        onChange={(value) => setDate(value)}
-                        renderInput={(params) => (
-                          <TextField {...params} fullWidth size="small" />
-                        )}
-                      />
-                    </LocalizationProvider>
-                  </Grid>
-                )}
-                {[
-                  ReportEnum.PRODUCTION_FUEL_MONITORING,
-                  ReportEnum.STAFF_SHIFT_HANDOVER,
-                  ReportEnum.DATE_TRIP_CAR,
-                  ReportEnum.DAILY_PRODUCTION_CAR_REPORT,
-                  ReportEnum.DAILY_ORDER,
-                ].includes(title as ReportEnum) && (
-                  <Grid item xs={12}>
-                    <LocalizationProvider
-                      dateAdapter={AdapterDayjs}
-                      adapterLocale="vi"
-                    >
-                      <DatePicker
-                        label="Chọn ngày"
-                        inputFormat="DD/MM/YYYY" // v5 vẫn hỗ trợ
-                        value={day ? dayjs(day) : null}
-                        onChange={(value) => setDay(value)}
-                        renderInput={(params) => (
-                          <TextField {...params} fullWidth size="small" />
-                        )}
-                      />
-                    </LocalizationProvider>
-                  </Grid>
-                )}
-                {![
-                  ReportEnum.SHIFT_HANDOVER,
-                  ReportEnum.DAILY_PRODUCTION_EXCAVATOR_REPORT,
-                  ReportEnum.TIMESHEET,
-                  ReportEnum.DAILY_PRODUCTION_CAR_REPORT,
-                  ReportEnum.PRODUCTIVITY_CAR_REPORT,
-                  ReportEnum.PRODUCTION_LAND_CAR_REPORT,
-                  ReportEnum.PRODUCTION_COAL_CAR_REPORT,
-                ].includes(title as ReportEnum) && (
-                  <Grid item xs={12}>
-                    <Autocomplete
-                      multiple={isMultiple}
-                      fullWidth
-                      filterSelectedOptions
-                      size="small"
-                      options={shifts}
-                      getOptionLabel={(option: Shift) =>
-                        `Ca ${option.name} (${option.startTime})`
-                      }
-                      value={
-                        isMultiple
-                          ? shifts.filter((s: Shift) => shift.includes(s))
-                          : shift.length > 0
-                            ? shift[0]
-                            : null
-                      }
-                      onChange={(event, newValue) => {
-                        const finalValue = Array.isArray(newValue)
-                          ? newValue
-                          : newValue
-                            ? [newValue]
-                            : [];
-
-                        setShift(finalValue);
-                      }}
-                      renderInput={(params) => (
-                        <TextField {...params} label="Ca" />
-                      )}
-                    />
-                  </Grid>
-                )}
-              </Stack>
-            </Grid>
-
-            {/* Các nút chức năng (Giống ảnh mẫu) */}
-            <Grid
-              item
-              xs={12}
-              md={10}
+          {/* Vùng bên phải: thanh công cụ + bộ lọc + bản xem trước */}
+          <Box
+            sx={{
+              minWidth: 0,
+              border: `1px solid ${LINE}`,
+              borderRadius: 2,
+              bgcolor: "#fff",
+              overflow: "hidden",
+            }}
+          >
+            <Box
               sx={{
-                mt: 2,
                 display: "flex",
-                justifyContent: "space-between",
                 alignItems: "center",
-                pt: 2,
-                borderTop: "1px solid #eee",
+                gap: 1,
+                flexWrap: "wrap",
+                px: 1.5,
+                py: 1,
+                borderBottom: `1px solid ${LINE}`,
               }}
             >
               <Button
-                variant="contained"
-                color="success"
-                size="large"
-                startIcon={<Eye />}
-                onClick={() => {
-                  if (!title)
-                    return showErrorAlert("Vui lòng chọn loại báo cáo");
-                  reportView.mutate();
-                  setPreview(true);
-                }}
-                sx={{ bgcolor: "#035bb4ff", px: 4, borderRadius: 2 }}
+                size="small"
+                variant="outlined"
+                startIcon={listOpen ? <MenuOpen /> : <MenuIcon />}
+                onClick={() => setListOpen((open) => !open)}
+                sx={toolButtonSx}
               >
-                Xem trước
+                Danh sách
               </Button>
+              <Box sx={{ width: "1px", height: 20, bgcolor: LINE }} />
+              <Typography noWrap sx={{ fontWeight: 700, fontSize: 14, minWidth: 0 }}>
+                {title || "Chưa chọn báo cáo"}
+              </Typography>
+              {reportNo > 0 && (
+                <Chip
+                  size="small"
+                  label={`Biểu ${reportNo}`}
+                  sx={{ height: 20, fontSize: 11, fontWeight: 700, bgcolor: "#eef2ff", color: "#3b5bdb" }}
+                />
+              )}
+              <Box sx={{ flex: 1 }} />
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={<Edit />}
+                onClick={() => getSignatureAndS3Url.mutate()}
+                sx={toolButtonSx}
+              >
+                {signatureUrl ? "Đã thêm chữ ký" : "Thêm chữ ký"}
+              </Button>
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={<TableView />}
+                onClick={handleExcel}
+                disabled={reportExcel.isPending}
+                sx={toolButtonSx}
+              >
+                Excel
+              </Button>
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={<Print />}
+                onClick={handlePrint}
+                disabled={!showPreview}
+                sx={toolButtonSx}
+              >
+                In / PDF
+              </Button>
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={<Download />}
+                onClick={handleCsv}
+                disabled={!showPreview}
+                sx={toolButtonSx}
+              >
+                CSV
+              </Button>
+            </Box>
 
-              <Stack direction="row" spacing={1}>
-                <Button
-                  variant="contained"
-                  sx={{ bgcolor: "#035bb4ff", minWidth: 48, p: 1 }}
-                  startIcon={<Edit />}
-                  onClick={() => {
-                    getSignatureAndS3Url.mutate();
-                  }}
-                >
-                  Thêm chữ ký
-                </Button>
-                {/* Nút Excel */}
-                <Button
-                  variant="contained"
-                  sx={{
-                    bgcolor: "#035bb4ff",
-                    minWidth: 48,
-                    p: 1,
-                    display: "flex",
-                    gap: 1,
-                  }}
-                  onClick={() => {
-                    if (!title) {
-                      showErrorAlert("Vui lòng chọn loại báo cáo");
-                      return;
+            {title && (
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  flexWrap: "wrap",
+                  gap: 1.25,
+                  px: 1.5,
+                  py: 1.25,
+                  bgcolor: "#f8fafc",
+                  borderBottom: `1px solid ${LINE}`,
+                }}
+              >
+                {/* Bộ chọn Đơn vị (chỉ Admin) */}
+                {user?.role === RoleEnum.ADMIN && (
+                  <Autocomplete
+                    size="small"
+                    options={departments}
+                    getOptionLabel={(option) => option?.code || ""}
+                    value={
+                      departments.find((d: any) => d._id === department?._id) ??
+                      null
                     }
-                    reportExcel.mutate();
+                    onChange={(event, newValue) => setDepartment(newValue)}
+                    sx={{ width: 190 }}
+                    renderInput={(params) => (
+                      <TextField {...params} label="Chọn đơn vị" />
+                    )}
+                  />
+                )}
+
+                {!NO_RANGE_REPORTS.includes(title as ReportEnum) && (
+                  <>
+                    {renderDate("Từ ngày", startDate, setStartDate)}
+                    {renderDate("Đến ngày", endDate, setEndDate)}
+                  </>
+                )}
+                {title === ReportEnum.TIMESHEET &&
+                  renderDate("Chọn tháng", date, setDate, {
+                    locale: "vi",
+                    inputFormat: "MM/YYYY",
+                    views: ["year", "month"],
+                    openTo: "month",
+                  })}
+                {DAY_REPORTS.includes(title as ReportEnum) &&
+                  renderDate("Chọn ngày", day, setDay, { locale: "vi" })}
+
+                {!NO_SHIFT_REPORTS.includes(title as ReportEnum) && (
+                  <Autocomplete
+                    multiple={isMultiple}
+                    filterSelectedOptions
+                    size="small"
+                    limitTags={2}
+                    options={shifts}
+                    getOptionLabel={(option: Shift) =>
+                      `Ca ${option.name} (${option.startTime})`
+                    }
+                    value={
+                      isMultiple
+                        ? shifts.filter((s: Shift) => shift.includes(s))
+                        : shift.length > 0
+                          ? shift[0]
+                          : null
+                    }
+                    onChange={(event, newValue) => {
+                      const finalValue = Array.isArray(newValue)
+                        ? newValue
+                        : newValue
+                          ? [newValue]
+                          : [];
+
+                      setShift(finalValue);
+                    }}
+                    sx={{ minWidth: 220, maxWidth: 380 }}
+                    renderInput={(params) => <TextField {...params} label="Ca" />}
+                  />
+                )}
+
+                <Button
+                  variant="contained"
+                  disableElevation
+                  startIcon={
+                    reportView.isPending ? (
+                      <CircularProgress size={16} color="inherit" />
+                    ) : (
+                      <Eye size={16} />
+                    )
+                  }
+                  onClick={handleView}
+                  disabled={reportView.isPending}
+                  sx={{
+                    fontWeight: 700,
+                    fontSize: 13,
+                    px: 2,
+                    bgcolor: "#1d5fd1",
+                    "&:hover": { bgcolor: "#174fb0" },
                   }}
                 >
-                  <Box
-                    component="img"
-                    src="https://img.icons8.com/color/24/000000/microsoft-excel-2019.png"
-                  />
-                  Tải xuống
+                  {reportView.isPending ? "Đang tải..." : "Xem báo cáo"}
                 </Button>
-                {/* Nút In */}
-              </Stack>
-            </Grid>
-          </Grid>
-        </Paper>
+              </Box>
+            )}
 
-        {/* Khu vực Preview hiển thị dữ liệu */}
-        {preview && PreviewComponent && (
-          <Paper
-            elevation={3}
-            sx={{
-              p: 5,
-              bgcolor: "white",
-              borderRadius: 1,
-              minHeight: "600px",
-            }}
-          >
-            <PreviewComponent
-              data={data}
-              signatureUrl={signatureUrl}
-              maxTrip={maxTrip}
-              materials={materials}
-              startDate={startDate}
-              endDate={endDate}
-              shifts={shift}
-              department={department}
-              date={date}
-              day={day}
-            />
-          </Paper>
-        )}
-      </Grid>
-    </Grid>
-    // </Box>
+            {/* Khu vực xem trước: nền xám + "tờ giấy" trắng */}
+            <Box sx={{ bgcolor: "#eef1f5", p: { xs: 1, md: 2 }, minHeight: 360 }}>
+              {showPreview && PreviewComponent ? (
+                <ThemeProvider theme={appTheme}>
+                  <Box
+                    id="report-print-area"
+                    ref={sheetRef}
+                    sx={{
+                      bgcolor: "#fff",
+                      borderRadius: 1,
+                      boxShadow:
+                        "0 1px 2px rgba(15,23,42,.08), 0 8px 24px rgba(15,23,42,.06)",
+                      p: { xs: 1, md: 2.5 },
+                      overflowX: "auto",
+                      "& .MuiPaper-root": { boxShadow: "none" },
+                    }}
+                  >
+                    <PreviewComponent
+                      data={data}
+                      signatureUrl={signatureUrl}
+                      maxTrip={maxTrip}
+                      materials={materials}
+                      startDate={startDate}
+                      endDate={endDate}
+                      shifts={shift}
+                      department={department}
+                      date={date}
+                      day={day}
+                    />
+                  </Box>
+                </ThemeProvider>
+              ) : reportView.isPending ? (
+                <Box
+                  sx={{
+                    minHeight: 320,
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 1.5,
+                    color: "#64748b",
+                  }}
+                >
+                  <CircularProgress size={28} />
+                  <Typography sx={{ fontSize: 13 }}>Đang tải dữ liệu báo cáo...</Typography>
+                </Box>
+              ) : (
+                <Box
+                  sx={{
+                    minHeight: 320,
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 1,
+                    color: "#94a3b8",
+                    textAlign: "center",
+                  }}
+                >
+                  <Description sx={{ fontSize: 44 }} />
+                  <Typography sx={{ fontSize: 14, fontWeight: 600, color: "#475569" }}>
+                    {title
+                      ? "Thiết lập bộ lọc rồi bấm \"Xem báo cáo\""
+                      : "Chọn một biểu mẫu từ danh sách"}
+                  </Typography>
+                  <Typography sx={{ fontSize: 12.5 }}>
+                    {title
+                      ? "Bản xem trước sẽ hiện ngay tại đây, sẵn sàng để in hoặc xuất file."
+                      : "Bản xem trước và nút xuất file sẽ hiện ở vùng này."}
+                  </Typography>
+                </Box>
+              )}
+            </Box>
+          </Box>
+        </Box>
+      </Box>
+    </ThemeProvider>
   );
 }
 
