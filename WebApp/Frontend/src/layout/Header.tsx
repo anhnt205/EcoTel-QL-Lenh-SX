@@ -3,14 +3,13 @@ import api from "../config/api.config";
 import { useAtom } from "jotai";
 import { useQuery } from "@tanstack/react-query";
 import {
-  AppBar,
-  Toolbar,
   IconButton,
   Typography,
   Box,
   Avatar,
   Badge,
   Tooltip,
+  ButtonBase,
   Menu,
   MenuItem,
   Button,
@@ -54,6 +53,12 @@ import { useLocation, useNavigate } from "react-router-dom";
 import ChangePassword from "../components/Modal/ChangePassword";
 import Profile from "../components/Modal/Profile";
 import { RoleEnum } from "../enums";
+import { ThemeProvider } from "@mui/material/styles";
+import appTheme from "../theme";
+import { uiSansTheme, UI_FONT } from "../theme/uiTheme";
+
+const HDR_NAVY = "#0f2a55";
+const HDR_BLUE = "#1d6ff2";
 
 export default function Header() {
   const navigate = useNavigate();
@@ -165,78 +170,58 @@ export default function Header() {
     },
   ].filter(Boolean);
 
+
+  // ---- Lớp trình bày theo ảnh mẫu: thanh trên xanh đậm + hàng tab trắng ----
+  const isActive = (path: string) => location.pathname === path;
+  const catalogActive = menuItems.some(
+    (it: any) =>
+      it &&
+      (it.path === location.pathname ||
+        it.submenu?.some((s: any) => s.path === location.pathname)),
+  );
+  const displayName = user?.fullName || user?.username || "";
+  const navBtnSx = (active: boolean) => ({
+    height: 46,
+    px: 2,
+    gap: 0.5,
+    borderRadius: 0,
+    textTransform: "none",
+    fontSize: 15,
+    fontWeight: 600,
+    whiteSpace: "nowrap",
+    color: active ? HDR_BLUE : "#334155",
+    bgcolor: active ? "#eef4ff" : "transparent",
+    borderBottom: `3px solid ${active ? HDR_BLUE : "transparent"}`,
+    "&:hover": { bgcolor: active ? "#eef4ff" : "#f6f8fb" },
+    "& .MuiButton-startIcon": { mr: 0.75 },
+  });
+
   return (
-    <>
+    <ThemeProvider theme={uiSansTheme}>
       <Box
         sx={{
-          background:
-            "linear-gradient(to right, #0b109aff, #709727ff, #644921ff, #0b109aff)",
-          color: "white",
-          py: 2,
-          px: 3,
+          position: "sticky",
+          top: 0,
+          zIndex: (t) => t.zIndex.appBar,
+          fontFamily: UI_FONT,
         }}
       >
+        {/* Thanh trên: logo + tên hệ thống + thông báo + tài khoản */}
         <Box
-          display="flex"
-          justifyContent="center"
-          alignItems={"center"}
-          gap={2}
+          sx={{
+            bgcolor: HDR_NAVY,
+            color: "#fff",
+            display: "flex",
+            alignItems: "center",
+            gap: { xs: 1, lg: 2 },
+            px: { xs: 1.5, lg: 3 },
+            minHeight: { xs: 56, lg: 60 },
+          }}
         >
-          <img
-            src="/image/logo.png"
-            style={{ width: 100, height: 100 }}
-            alt="logo"
-          />
-          <Box>
-            <Typography
-              variant="h6"
-              sx={{
-                fontWeight: "bold",
-                fontSize: {
-                  md: 30,
-                  xs: 18,
-                },
-              }}
-              textAlign={"center"}
-            >
-              HỆ THỐNG QUẢN LÝ ĐIỀU PHỐI VÀ SỬ DỤNG MÁY MÓC THIẾT BỊ
-            </Typography>
-            <Typography
-              variant="h5"
-              textAlign={"center"}
-              sx={{
-                fontWeight: "bold",
-                mt: 1,
-                fontSize: { xs: 14, md: 22 },
-              }}
-            >
-              CÔNG TY CP THAN CAO SƠN - KTV
-            </Typography>
-            <Box
-              display="flex"
-              alignItems="center"
-              justifyContent={"center"}
-              sx={{ mt: 1.5, gap: 4 }}
-            >
-              <Box display="flex" alignItems="center" gap={0.5}>
-                <Typography variant="body1">
-                  Điện thoại: 024.35180141
-                </Typography>
-              </Box>
-              <Box display="flex" alignItems="center" gap={0.5}>
-                <Typography variant="body1">Fax: 024.38510724</Typography>
-              </Box>
-            </Box>
-          </Box>
-        </Box>
-      </Box>
-
-      <AppBar position="sticky">
-        <Toolbar sx={{ justifyContent: "space-between" }}>
-          {isMobile ? (
+          {isMobile && (
             <>
               <IconButton color="inherit" onClick={() => setDrawerOpen(true)}>
-                <MenuOpen sx={{ fontSize: 40 }} />
+                <MenuOpen sx={{ fontSize: 30 }} />
               </IconButton>
               <Drawer
                 anchor="left"
@@ -353,64 +338,144 @@ export default function Header() {
                 </List>
               </Drawer>
             </>
-          ) : (
-            <Box display="flex" gap={2} maxWidth="xl" justifyContent="center">
+          )}
+          <img
+            src="/image/logo.png"
+            alt="logo"
+            style={{ width: 40, height: 40, borderRadius: "50%" }}
+          />
+          {!isMobile && (
+            <Box
+              sx={{ width: "1px", height: 30, bgcolor: "rgba(255,255,255,.28)" }}
+            />
+          )}
+          <Box
+            sx={{ minWidth: 0 }}
+            title="Điện thoại: 024.35180141 · Fax: 024.38510724"
+          >
+            <Typography
+              noWrap
+              sx={{
+                fontSize: { xs: 13, lg: 17 },
+                fontWeight: 800,
+                letterSpacing: 0.3,
+                lineHeight: 1.25,
+              }}
+            >
+              ĐIỀU PHỐI MÁY MÓC THIẾT BỊ
+            </Typography>
+            <Typography
+              noWrap
+              sx={{
+                fontSize: { xs: 11, lg: 12.5 },
+                color: "rgba(255,255,255,.82)",
+                lineHeight: 1.3,
+              }}
+            >
+              CÔNG TY CP THAN CAO SƠN - TKV
+            </Typography>
+          </Box>
+          <Box sx={{ flex: 1 }} />
+
+          {/* Thông báo + tài khoản (giữ nguyên chức năng cũ) */}
+          <Tooltip
+            title={`Thông báo${notificationCount ? ` (${notificationCount} chưa đọc)` : ""}`}
+          >
+            <IconButton color="inherit" onClick={() => navigate("/notifications")}>
+              <Badge
+                variant="dot"
+                color="error"
+                invisible={!notificationCount}
+                overlap="circular"
+              >
+                <Notifications />
+              </Badge>
+            </IconButton>
+          </Tooltip>
+          <Box
+            sx={{ width: "1px", height: 30, bgcolor: "rgba(255,255,255,.28)" }}
+          />
+          <Tooltip title="Tài khoản">
+            <ButtonBase
+              onClick={(e) => setAvatarAnchorEl(e.currentTarget)}
+              sx={{
+                gap: 1,
+                px: 1,
+                py: 0.5,
+                borderRadius: "10px",
+                color: "#fff",
+                "&:hover": { bgcolor: "rgba(255,255,255,.1)" },
+              }}
+            >
+              <Avatar
+                src={url}
+                sx={{ width: 34, height: 34, bgcolor: "#e2e8f0", color: HDR_NAVY }}
+              />
+              {!isMobile && (
+                <Typography sx={{ fontSize: 14, fontWeight: 700 }}>
+                  {displayName}
+                </Typography>
+              )}
+              <ExpandMore fontSize="small" />
+            </ButtonBase>
+          </Tooltip>
+        </Box>
+
+        {/* Hàng tab điều hướng (màn rộng); màn hẹp dùng ngăn kéo ở trên */}
+        {!isMobile && (
+          <Box
+            sx={{
+              bgcolor: "#fff",
+              borderBottom: "1px solid #e5e9f0",
+              boxShadow: "0 1px 2px rgba(15,23,42,.05)",
+              px: 3,
+              display: "flex",
+              alignItems: "stretch",
+              gap: 0.5,
+            }}
+          >
+            <Button
+              color="inherit"
+              startIcon={<Dashboard />}
+              sx={navBtnSx(isActive("/"))}
+              onClick={() => navigate("/")}
+            >
+              Tổng quan
+            </Button>
+            <Button
+              color="inherit"
+              startIcon={<ClipboardPaste size={20} style={{ color: "inherit" }} />}
+              sx={navBtnSx(isActive("/orders"))}
+              onClick={() => navigate("/orders")}
+            >
+              Lệnh sản xuất
+            </Button>
+            {[RoleEnum.MANAGER].includes(user?.role) && (
               <Button
                 color="inherit"
-                startIcon={<Dashboard />}
-                sx={{
-                  fontSize: 20,
-                  borderBottom:
-                    location.pathname === "/" ? "5px solid red" : "",
-                }}
-                onClick={() => navigate("/")}
+                startIcon={<WorkOutline />}
+                sx={navBtnSx(isActive("/orderByUsers"))}
+                onClick={() => navigate("/orderByUsers")}
               >
-                Tổng quan
+                Công việc của tôi
               </Button>
-              <Button
-                color="inherit"
-                startIcon={<ClipboardPaste style={{ color: "inherit" }} />}
-                sx={{
-                  fontSize: 20,
-                  borderBottom:
-                    location.pathname === "/orders" ? "5px solid red" : "",
-                }}
-                onClick={() => navigate("/orders")}
-              >
-                Lệnh sản xuất
-              </Button>
-              {[RoleEnum.MANAGER].includes(user?.role) && (
+            )}
+            {menuItems.length > 0 && (
+              <>
                 <Button
                   color="inherit"
-                  startIcon={<WorkOutline />}
-                  sx={{
-                    fontSize: 20,
-                    borderBottom:
-                      location.pathname === "/orderByUsers"
-                        ? "5px solid red"
-                        : "",
-                  }}
-                  onClick={() => navigate("/orderByUsers")}
+                  sx={navBtnSx(catalogActive)}
+                  onClick={(e) => setMenuAnchorEl(e.currentTarget)}
+                  startIcon={<Category />}
+                  endIcon={<ExpandMore />}
                 >
-                  Công việc của tôi
+                  Danh mục
                 </Button>
-              )}
-              {menuItems.length > 0 && (
-                <>
-                  <Button
-                    color="inherit"
-                    sx={{ fontSize: 20 }}
-                    onClick={(e) => setMenuAnchorEl(e.currentTarget)}
-                    startIcon={<Category />}
-                    endIcon={<ExpandMore />}
-                  >
-                    Danh mục
-                  </Button>
-                  <Menu
-                    anchorEl={menuAnchorEl}
-                    open={Boolean(menuAnchorEl)}
-                    onClose={() => setMenuAnchorEl(null)}
-                  >
+                <Menu
+                  anchorEl={menuAnchorEl}
+                  open={Boolean(menuAnchorEl)}
+                  onClose={() => setMenuAnchorEl(null)}
+                >
                     {menuItems.map((item: any) => {
                       if (!item) return null;
                       if (item.submenu) {
@@ -443,7 +508,7 @@ export default function Header() {
                           sx={{
                             borderLeft:
                               location.pathname === item.path
-                                ? "4px solid red"
+                                ? "4px solid #1d6ff2"
                                 : "4px solid transparent",
                             display: "flex",
                             gap: 1.5,
@@ -461,61 +526,34 @@ export default function Header() {
                         </MenuItem>
                       );
                     })}
-                  </Menu>
-                </>
-              )}
-              {[RoleEnum.ADMIN, RoleEnum.MANAGER, RoleEnum.DISPATCHER].includes(
-                user?.role,
-              ) && (
-                <Button
-                  color="inherit"
-                  startIcon={
-                    <ChartNoAxesCombined style={{ color: "inherit" }} />
-                  }
-                  sx={{
-                    fontSize: 20,
-                    borderBottom:
-                      location.pathname === "/reports" ? "5px solid red" : "",
-                  }}
-                  onClick={() => navigate("/reports")}
-                >
-                  Báo cáo
-                </Button>
-              )}
-              {[RoleEnum.ADMIN].includes(user?.role) && (
-                <Button
-                  color="inherit"
-                  startIcon={<MonitorCog style={{ color: "inherit" }} />}
-                  sx={{
-                    fontSize: 20,
-                    borderBottom:
-                      location.pathname === "/system" ? "5px solid red" : "",
-                  }}
-                  onClick={() => navigate("/system")}
-                >
-                  Hệ thống
-                </Button>
-              )}
-            </Box>
-          )}
-
-          {/* Avatar, thông báo giữ nguyên */}
-          <Box display="flex" alignItems="center" gap={2}>
-            <Tooltip title="Thông báo">
-              <IconButton
+                </Menu>
+              </>
+            )}
+            {[RoleEnum.ADMIN, RoleEnum.MANAGER, RoleEnum.DISPATCHER].includes(
+              user?.role,
+            ) && (
+              <Button
                 color="inherit"
-                onClick={() => navigate("/notifications")}
+                startIcon={<ChartNoAxesCombined size={20} style={{ color: "inherit" }} />}
+                sx={navBtnSx(isActive("/reports"))}
+                onClick={() => navigate("/reports")}
               >
-                <Badge badgeContent={notificationCount} color="error">
-                  <Notifications />
-                </Badge>
-              </IconButton>
-            </Tooltip>
-            <Tooltip title="Tài khoản">
-              <IconButton onClick={(e) => setAvatarAnchorEl(e.currentTarget)}>
-                <Avatar src={url} sx={{ bgcolor: "white" }} />
-              </IconButton>
-            </Tooltip>
+                Báo cáo
+              </Button>
+            )}
+            {[RoleEnum.ADMIN].includes(user?.role) && (
+              <Button
+                color="inherit"
+                startIcon={<MonitorCog size={20} style={{ color: "inherit" }} />}
+                sx={navBtnSx(isActive("/system"))}
+                onClick={() => navigate("/system")}
+              >
+                Hệ thống
+              </Button>
+            )}
+          </Box>
+        )}
+
             <Popover
               open={Boolean(avatarAnchorEl)}
               anchorEl={avatarAnchorEl}
@@ -587,14 +625,16 @@ export default function Header() {
                 ))}
               </MenuList>
             </Popover>
-          </Box>
-        </Toolbar>
-        <ChangePassword
-          open={openChangePassword}
-          setOpen={setOpenChangePassword}
-        />
-        <Profile open={openProfile} setOpen={setOpenProfile} />
-      </AppBar>
-    </>
+
+        {/* Đổi mật khẩu / thông tin cá nhân giữ nguyên theme gốc */}
+        <ThemeProvider theme={appTheme}>
+          <ChangePassword
+            open={openChangePassword}
+            setOpen={setOpenChangePassword}
+          />
+          <Profile open={openProfile} setOpen={setOpenProfile} />
+        </ThemeProvider>
+      </Box>
+    </ThemeProvider>
   );
 }
