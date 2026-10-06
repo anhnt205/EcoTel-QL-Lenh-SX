@@ -782,12 +782,16 @@ function groupDrill(trips) {
 
 // khoi luong, trong luong tam tinh
 
+// acceptedProduct (tuỳ chọn): loại sản phẩm nghiệm thu của vật liệu cần dùng để tính. Chuyến của lệnh đã hoàn thành
+// truyền loại ĐÃ CHỐT (xem services/reportSnapshot.js) để việc đổi loại sản phẩm của vật liệu về sau không làm đổi
+// sản lượng cũ; không truyền thì lấy theo vật liệu hiện tại như trước.
 async function caculatorWeight(
   materialId,
   deviceModel,
   quantity,
   totalDistance,
   date,
+  acceptedProduct,
 ) {
   let cubicMeter = 0;
   let ton = 0;
@@ -805,10 +809,11 @@ async function caculatorWeight(
   const dryDensity = getTyTrongAtDate(material, normalizeDateToUTC(date));
   const valueModel = getMohinhAtDate(data, normalizeDateToUTC(date));
 
-  if (data && data.material?.acceptedProduct === ACCEPTED_PRODUCT.COAL) {
+  const product = acceptedProduct || data.material?.acceptedProduct;
+  if (product === ACCEPTED_PRODUCT.COAL) {
     ton = valueModel * (quantity || 0) * dryDensity;
     production = valueModel * (totalDistance || 0) * dryDensity;
-  } else if (data && data.material?.acceptedProduct === ACCEPTED_PRODUCT.LAND) {
+  } else if (product === ACCEPTED_PRODUCT.LAND) {
     cubicMeter = valueModel * (quantity || 0);
     production = (totalDistance || 0) * valueModel * dryDensity;
   }

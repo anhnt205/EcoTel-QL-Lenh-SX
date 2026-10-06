@@ -4,9 +4,10 @@ const axios = require("axios");
 const ExcelJS = require("exceljs");
 const OrderModel = require("../models/Order");
 const { applyFrozenAll } = require("../services/orderSnapshot");
+const { applyFrozenReportAll } = require("../services/reportSnapshot");
 const { attendanceRoster } = require("../utils/roster");
 const Shift = require("../models/Shift");
-const Report = require("../models/Report");
+const ReportModel = require("../models/Report");
 const Department = require("../models/Department");
 const User = require("../models/User");
 const dayjs = require("dayjs");
@@ -48,6 +49,24 @@ const Order = new Proxy(OrderModel, {
         const query = target.find(...args);
         const exec = query.exec.bind(query);
         query.exec = async (...a) => applyFrozenAll(await exec(...a));
+        return query;
+      };
+    }
+    const value = Reflect.get(target, prop, target);
+    return typeof value === "function" ? value.bind(target) : value;
+  },
+});
+
+// Tương tự cho báo chuyến: Report.find(...) -> chuyến của lệnh đã hoàn thành dùng thông tin ĐÃ CHỐT (mã/loại/model xe,
+// máy xúc, tên địa điểm, vật liệu...; xem services/reportSnapshot.js). Chuyến chưa chốt giữ nguyên là document;
+// chuyến đã chốt thành đối tượng thường nhưng vẫn có toObject() (nhiều chỗ ở đây gọi). Chỉ `find` được bọc.
+const Report = new Proxy(ReportModel, {
+  get(target, prop) {
+    if (prop === "find") {
+      return (...args) => {
+        const query = target.find(...args).select("+frozen");
+        const exec = query.exec.bind(query);
+        query.exec = async (...a) => applyFrozenReportAll(await exec(...a));
         return query;
       };
     }

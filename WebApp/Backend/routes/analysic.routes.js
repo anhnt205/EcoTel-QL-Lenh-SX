@@ -113,7 +113,16 @@ async function summariseVehicleOrdersAggFull(jobType, selectedDate, startOfMonth
                     {
                         $group: {
                             _id: '$device._id',
-                            code: { $first: '$device.code' },
+                            // Mã thiết bị theo bản chụp lúc lệnh hoàn thành (nếu chuyến đã chốt và vẫn là xe đó)
+                            code: {
+                                $first: {
+                                    $cond: [
+                                        { $eq: ['$reports.frozen.data.device._id', '$reports.device'] },
+                                        '$reports.frozen.data.device.code',
+                                        '$device.code'
+                                    ]
+                                }
+                            },
                             totalProduction: { $sum: '$productionValue' }
                         }
                     },

@@ -7,6 +7,19 @@ const ReportHistory = require('../models/ReportHistory');
 const { verifyToken, restrictTo } = require('../middleware/auth.middleware');
 const { production_vehicle, production_excavator } = require('../utils/cron');
 const { JOB_TYPE } = require('../config/config');
+const { applyFrozen } = require('../services/orderSnapshot');
+const { applyFrozenReport, applyFrozenReportAll } = require('../services/reportSnapshot');
+const { syncReportFrozen } = require('../services/orderFreeze');
+
+// Chuyến của lệnh đã hoàn thành được chốt thông tin tham chiếu (xem services/reportSnapshot.js). Gọi sau khi tạo/sửa
+// chuyến để chuyến mới / chuyến bị sửa sang xe, vật liệu... khác được chụp đúng; lỗi ở đây không làm hỏng việc lưu chuyến.
+const syncFrozen = async (req, reportId) => {
+    try {
+        await syncReportFrozen(reportId);
+    } catch (err) {
+        req.logger.error(`❌ Lỗi khi chốt thông tin báo chuyến ${reportId}`, err);
+    }
+};
 
 
 router.post('/', verifyToken, async (req, res, next) => {
@@ -42,6 +55,7 @@ router.post('/', verifyToken, async (req, res, next) => {
         newReport.totalCubicMeter = result.totalCubicMeter;
         newReport.totalTon = result.totalTon;
         const report = await newReport.save();
+        await syncFrozen(req, report._id);
 
         req.logger.info(`✅ Tạo báo cáo thành công cho Order ID: ${orderId}`);
         res.status(200).send({ status: 'success', message: "Tạo thành công", data: report });
@@ -53,13 +67,14 @@ router.post('/', verifyToken, async (req, res, next) => {
 
 router.get('/getByOrder/:orderId', verifyToken, async (req, res, next) => {
     try {
-        const reports = await Report.find({ orderId: req.params.orderId })
+        const reports = applyFrozenReportAll(await Report.find({ orderId: req.params.orderId })
+            .select("+frozen")
             .sort({ createdAt: -1 })
             .populate("device", "code")
             .populate("excavator", "code")
             .populate("fromLocation", "name")
             .populate("toLocation", "name")
-            .populate("material", "name");
+            .populate("material", "name"));
         req.logger.info(`✅ Lấy thành công ${reports.length} báo cáo cho Order ID: ${req.params.orderId}`);
         res.status(200).send({ status: 'success', data: reports });
     } catch (err) {
@@ -102,7 +117,8 @@ router.put('/:id', verifyToken, async (req, res) => {
             return res.status(404).send({ status: 'error', message: "Not found" });
         }
 
-        const updates = req.body;
+        // `frozen` là bản chụp do hệ thống giữ, request không được ghi đè
+        const { frozen: _ignoredFrozen, frozenAt: _ignoredFrozenAt, ...updates } = req.body;
         const changes = [];
 
         // So sánh các field cần track
@@ -155,6 +171,7 @@ router.put('/:id', verifyToken, async (req, res) => {
 
         // 5️⃣ Lưu lại kết quả sau tính toán
         await report.save();
+        await syncFrozen(req, report._id);
 
         req.logger.info(`✅ ${user?.username} Cập nhật báo cáo thành công cho ID: ${req.params.id}`);
         res.status(200).send({ status: 'success', message: "Sửa thành công", data: report });
@@ -168,7 +185,8 @@ router.put('/:id', verifyToken, async (req, res) => {
 router.put('/update/:id', verifyToken, async (req, res) => {
     try {
         const user = req.user;
-        const report = await Report.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        const { frozen: _ignoredFrozen, frozenAt: _ignoredFrozenAt, ...body } = req.body;
+        const report = await Report.findByIdAndUpdate(req.params.id, body, { new: true });
         if (!report) {
             req.logger.warn(`⚠️ Không tìm thấy báo cáo với ID: ${req.params.id}`);
             return res.status(404).send({ status: 'error', message: "Not found" });
@@ -189,6 +207,7 @@ router.put('/update/:id', verifyToken, async (req, res) => {
 
         // 5️⃣ Lưu lại kết quả sau tính toán
         await report.save();
+        await syncFrozen(req, report._id);
         req.logger.info(`✅ ${user?.username} Đồng bộ dữ liệu báo chuyến thành công`);
         res.status(200).send({ status: 'success', message: "Sửa thành công", data: report });
 
@@ -277,16 +296,21 @@ async function caculate(report) {
 
     let order = report.orderId;
     if (!order || !order.workingDate) {
-        order = await Order.findById(report.orderId)
+        // lệnh đã hoàn thành: loại công việc / ca theo bản chụp lúc hoàn thành
+        order = applyFrozen(await Order.findById(report.orderId)
             .populate('job', 'type')
             .populate('shift', 'name')
-            .lean();
+            .lean());
     }
-    report = {
+    // chuyến của lệnh đã hoàn thành: tính theo thông tin đã chốt (model xe, loại sản phẩm của vật liệu...); tham chiếu
+    // vừa bị sửa sang đối tượng khác thì tự dùng dữ liệu hiện tại (bản chụp chỉ phủ khi còn trỏ đúng đối tượng đã chụp)
+    const savedFrozen = report._id ? await Report.findById(report._id).select('frozen').lean() : null;
+    report = applyFrozenReport({
         ...report.toObject(),
+        frozen: savedFrozen && savedFrozen.frozen,
         shift: order?.shift,
         workingDate: order?.workingDate,
-    }
+    })
     const jobType = order.job?.type;
     if (jobType === JOB_TYPE.VAN_HANH_XE) {
         const value = await production_vehicle(report);

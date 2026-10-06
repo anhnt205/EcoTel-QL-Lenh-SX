@@ -161,6 +161,22 @@ const snapMaterial = (m) =>
 
 const list = (arr, fn) => (Array.isArray(arr) ? arr.filter(Boolean).map(fn) : []);
 
+/**
+ * Thiết bị được nhắc trong báo cáo ca của lệnh (vehicleSummaries[].vehicle, vehicleRepair[].device), gom theo id:
+ * { [deviceId]: bản chụp thiết bị }. Báo cáo ca có thể được nộp/sửa SAU khi lệnh hoàn thành nên bản chụp này nằm
+ * ở lệnh (bổ sung thêm khi báo cáo ca thay đổi — xem syncShiftDevices trong services/orderFreeze.js).
+ */
+const buildShiftDevices = (shiftReport) => {
+  const out = {};
+  if (!shiftReport || typeof shiftReport !== "object") return out;
+  const add = (d) => {
+    if (d && typeof d === "object" && d._id && !isObjectIdLike(d)) out[String(d._id)] = snapDevice(d);
+  };
+  (Array.isArray(shiftReport.vehicleSummaries) ? shiftReport.vehicleSummaries : []).forEach((i) => i && add(i.vehicle));
+  (Array.isArray(shiftReport.vehicleRepair) ? shiftReport.vehicleRepair : []).forEach((i) => i && add(i.device));
+  return out;
+};
+
 /** Từ lệnh đã populate đầy đủ -> bản chụp gọn (cùng hình dạng với kết quả populate). */
 const buildFrozenData = (order) => ({
   assignedTo: snapPerson(order.assignedTo),
@@ -176,6 +192,7 @@ const buildFrozenData = (order) => ({
   excavator: list(order.excavator, (e) => ({ _id: e._id, device: snapDevice(e.device), status: e.status })),
   location: list(order.location, snapLocation),
   material: list(order.material, snapMaterial),
+  shiftDevices: buildShiftDevices(order.shiftReport),
 });
 
 // --- Phủ bản chụp lên lệnh khi đọc ---------------------------------------------------------------
@@ -204,7 +221,12 @@ const shapeLike = (snap, live) => {
     return snap.map((s) => shapeLike(s, s && s._id ? liveMap.get(String(s._id)) : undefined));
   }
   if (!isPlainObject(snap)) return snap;
-  if (!isPlainObject(live)) return snap;
+  if (!isPlainObject(live)) {
+    // Truy vấn không populate trường này (live là id trần) mà bản chụp là đối tượng: giữ kiểu id nhưng là id ĐÃ CHỤP
+    // (vd thiết bị populate "code material" thì material là id của model thiết bị lúc chốt)
+    if (isObjectIdLike(live) && snap._id !== undefined) return snap._id;
+    return snap;
+  }
   const out = {};
   Object.keys(snap).forEach((k) => {
     if (k === "_id" || Object.prototype.hasOwnProperty.call(live, k)) {
@@ -224,6 +246,22 @@ const isPopulatedValue = (live) => {
   return isPlainObject(live);
 };
 
+/** Thay thiết bị đã populate trong báo cáo ca bằng bản chụp (theo id thiết bị); thiết bị chưa có bản chụp giữ nguyên. */
+const overlayShiftDevices = (shiftReport, devices) => {
+  if (!shiftReport || typeof shiftReport !== "object" || !devices) return shiftReport;
+  const sr = typeof shiftReport.toObject === "function" ? shiftReport.toObject() : shiftReport;
+  const swap = (v) =>
+    isPlainObject(v) && v._id !== undefined && devices[String(v._id)] ? shapeLike(devices[String(v._id)], v) : v;
+  const out = { ...sr };
+  if (Array.isArray(sr.vehicleSummaries)) {
+    out.vehicleSummaries = sr.vehicleSummaries.map((i) => (i ? { ...i, vehicle: swap(i.vehicle) } : i));
+  }
+  if (Array.isArray(sr.vehicleRepair)) {
+    out.vehicleRepair = sr.vehicleRepair.map((i) => (i ? { ...i, device: swap(i.device) } : i));
+  }
+  return out;
+};
+
 const applyFrozen = (order) => {
   if (!order) return order;
   // Lệnh chưa chốt: trả NGUYÊN BẢN (document hoặc đối tượng) như trước khi có tính năng này
@@ -236,6 +274,9 @@ const applyFrozen = (order) => {
       rest[k] = shapeLike(frozen.data[k], plain[k]);
     }
   });
+  if (frozen.data.shiftDevices && isPlainObject(plain.shiftReport)) {
+    rest.shiftReport = overlayShiftDevices(plain.shiftReport, frozen.data.shiftDevices);
+  }
   rest.frozenAt = frozen.at;
   rest.frozenSource = frozen.source;
   return rest;
@@ -302,6 +343,15 @@ module.exports = {
   sameIdSet,
   changedProtectedFields,
   pick,
+  isPlainObject,
+  isPopulatedValue,
+  isObjectIdLike,
+  snapDepartment,
+  snapPerson,
+  snapDevice,
+  snapLocation,
+  snapMaterial,
+  buildShiftDevices,
   buildFrozenData,
   shapeLike,
   applyFrozen,

@@ -12,6 +12,7 @@ const {
 } = require("./reportGrouping");
 const { ROLE, JOB_TYPE } = require("../config/config");
 const { sweepRecentlyCompleted } = require("../services/orderFreeze");
+const { applyFrozenReportAll } = require("../services/reportSnapshot");
 
 // cron
 
@@ -20,8 +21,8 @@ const { sweepRecentlyCompleted } = require("../services/orderFreeze");
 // nhật trong 48 giờ qua.
 cron.schedule("*/10 * * * *", async () => {
   try {
-    const { frozen } = await sweepRecentlyCompleted();
-    if (frozen > 0) console.log(`[CRON] Đã chốt bù ${frozen} lệnh hoàn thành`);
+    const { frozen, reports } = await sweepRecentlyCompleted();
+    if (frozen > 0 || reports > 0) console.log(`[CRON] Đã chốt bù ${frozen} lệnh hoàn thành, ${reports} báo chuyến`);
   } catch (error) {
     console.error("[CRON ERROR] Lỗi khi quét chốt lệnh:", error);
   }
@@ -177,25 +178,37 @@ async function getOrders(query) {
         workingDate: 1,
         shift: "$shiftDetails",
         job: "$jobDetails", // ⚠️ Đưa thông tin Job đã lookup vào trường 'job'
+        frozenJob: "$frozen.data.job",
+        frozenShift: "$frozen.data.shift",
       },
     },
   ]);
 
-  return vehicleOrders;
+  // Lệnh đã chốt: loại công việc / ca theo bản chụp lúc hoàn thành (quyết định cách tính sản lượng)
+  return vehicleOrders.map(({ frozenJob, frozenShift, ...o }) => ({
+    ...o,
+    job: frozenJob && frozenJob._id ? { ...o.job, ...frozenJob } : o.job,
+    shift: frozenShift && frozenShift._id ? { ...o.shift, ...frozenShift } : o.shift,
+  }));
 }
 
 // ... Hàm getReports giữ nguyên ...
 async function getReports(order) {
-  const allReports = await safeQuery(() =>
-    Report.find({ orderId: order._id })
-      .populate({
-        path: "device",
-        select: "code material",
-      })
-      .populate("material", "name acceptedProduct")
-      .populate("excavator", "code")
-      .populate("fromLocation", "name")
-      .populate("toLocation", "name"),
+  // Chuyến của lệnh đã hoàn thành tính lại theo thông tin ĐÃ CHỐT (model xe, loại sản phẩm của vật liệu...), không
+  // theo dữ liệu hiện tại — nếu không, đổi model xe / loại vật liệu sẽ làm sản lượng tháng cũ đổi theo.
+  const allReports = applyFrozenReportAll(
+    await safeQuery(() =>
+      Report.find({ orderId: order._id })
+        .select("+frozen")
+        .populate({
+          path: "device",
+          select: "code material",
+        })
+        .populate("material", "name acceptedProduct")
+        .populate("excavator", "code")
+        .populate("fromLocation", "name")
+        .populate("toLocation", "name"),
+    ),
   );
   // 🔹 3. Gán thông tin Order vào Report
   const allVehicleReports = allReports.map((r) => {
@@ -246,6 +259,7 @@ async function production_vehicle(t) {
     t.quantity,
     totalDistance,
     t.workingDate,
+    t.material?.acceptedProduct,
   );
 
   return value;
@@ -257,6 +271,7 @@ async function production_excavator(t) {
     t.quantity,
     0,
     t.workingDate,
+    t.material?.acceptedProduct,
   );
 
   return value;

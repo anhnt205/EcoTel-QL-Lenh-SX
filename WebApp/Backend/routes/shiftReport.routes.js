@@ -4,6 +4,17 @@ const { AppError } = require("../utils/errorHandler");
 const ShiftReport = require("../models/ShiftReport");
 const Device = require("../models/Device");
 const ReportHistory = require("../models/ReportHistory");
+const { syncShiftDevices } = require("../services/orderFreeze");
+
+// Báo cáo ca có thể nộp/sửa sau khi lệnh hoàn thành: bổ sung bản chụp thiết bị (mã xe...) vào lệnh đã chốt để báo cáo
+// cũ không đổi theo dữ liệu thiết bị hiện tại. Lỗi ở đây không làm hỏng việc lưu báo cáo ca.
+const syncFrozenDevices = async (req, orderId) => {
+  try {
+    await syncShiftDevices(orderId);
+  } catch (err) {
+    req.logger.error(`❌ Lỗi khi chốt thiết bị trong báo cáo ca của lệnh ${orderId}`, err);
+  }
+};
 
 const { verifyToken, restrictTo } = require("../middleware/auth.middleware");
 const { STATUS_DEVICE, STATUS_REPAIR } = require("../config/config");
@@ -90,6 +101,7 @@ router.post("/", verifyToken, async (req, res, next) => {
       risks,
     });
     await newShiftReport.save();
+    await syncFrozenDevices(req, orderId);
     req.logger.info(`✅ Tạo báo cáo ca thành công với Order ID: ${orderId}`);
     res.status(200).send({ status: "success", message: "Tạo thành công" });
   } catch (err) {
@@ -293,6 +305,7 @@ router.put("/:id", verifyToken, async (req, res) => {
     // 🔹 Update dữ liệu mới
     Object.assign(shiftReport, updates);
     await shiftReport.save();
+    await syncFrozenDevices(req, shiftReport.orderId);
 
     req.logger.info(
       `✅ ${user?.username} Cập nhật báo cáo ca thành công cho ID: ${req.params.id}`,
