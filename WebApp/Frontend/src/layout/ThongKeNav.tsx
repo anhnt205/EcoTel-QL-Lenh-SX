@@ -14,7 +14,6 @@ import {
 import { Category, ExpandLess, ExpandMore } from "@mui/icons-material";
 import {
   Calculator,
-  FileCheck,
   GitCompareArrows,
   Grid3x3,
   Pickaxe,
@@ -38,7 +37,6 @@ const ICONS: Record<string, JSX.Element> = {
   "/danh-muc/dinh-muc-nhien-lieu": <Grid3x3 size={20} style={{ color: "inherit" }} />,
   "/danh-muc/ap-tracdia": <Ruler size={20} style={{ color: "inherit" }} />,
   "/nhap-lieu/doi-chieu": <GitCompareArrows size={20} style={{ color: "inherit" }} />,
-  "/nhap-lieu/bao-chuyen": <FileCheck size={20} style={{ color: "inherit" }} />,
   "/bao-cao/thong-ke": <Calculator size={20} style={{ color: "inherit" }} />,
 };
 

@@ -39,10 +39,9 @@ const MODULES = [
   m("tk-entry-mining", "Nhập liệu Khai thác", G_TK_ENTRY, ADM_DISP, ["excavation-reports"]),
   m("tk-entry-transport", "Nhập liệu Vận tải", G_TK_ENTRY, ADM_DISP, ["transport-reports"]),
   m("tk-reconciliation", "Đối chiếu", G_TK_ENTRY, ADM_DISP, ["reconciliation"]),
-  m("tk-trip-report", "Báo chuyến", G_TK_ENTRY, ADM_DISP, ["reconciliation"]),
   m("tk-fuel-norm", "Định mức nhiên liệu", G_TK_ENTRY, ADM_DISP, ["matrix-catalogs"]),
   m("tk-survey", "Áp Trắc Địa", G_TK_ENTRY, ADM_DISP, ["production"]),
-  m("tk-stat-report", "Báo cáo thống kê (tính sản lượng, chốt kỳ)", G_TK_ENTRY, ADM_DISP, ["production", "report-periods"]),
+  m("tk-stat-report", "Thống kê sản lượng (tính sản lượng, chốt kỳ)", G_TK_ENTRY, ADM_DISP, ["production", "report-periods"]),
 
   // --- Danh mục: Vật liệu, hàng hoá ---
   m("tk-cargo-types", "Chủng loại hàng", G_MATERIAL, ADM_DISP, ["cargo-types"]),

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import {
   Typography,
   TextField,
@@ -58,11 +58,6 @@ import ReportListPanel from "./ReportListPanel";
 import { REPORT_ORDER } from "./reportOrder";
 import { downloadCsv, elementToCsv } from "../../utils/exportCsv";
 import { printElement } from "../../utils/printElement";
-import { useSearchParams } from "react-router-dom";
-import { Tab, Tabs } from "@mui/material";
-import { TK_EMBED } from "../../config/features";
-import { canSeeTkModule, TK_REPORT_MODULE } from "../../layout/thongkeMenu";
-import ThongKeFrame from "../../components/thongke/ThongKeFrame";
 
 const LINE = "#e5e9f0";
 
@@ -103,7 +98,7 @@ const toolButtonSx = {
   "&:hover": { borderColor: "#cbd5e1", bgcolor: "#f8fafc" },
 } as const;
 
-function DispatchReports() {
+function Reports() {
   const [startDate, setStartDate] = useState<dayjs.Dayjs | null>(null);
   const [endDate, setEndDate] = useState<dayjs.Dayjs | null>(null);
   const [date, setDate] = useState<dayjs.Dayjs | null>(null);
@@ -543,7 +538,7 @@ function DispatchReports() {
         {/* Tiêu đề trang */}
         <Box sx={{ mb: 1.5 }}>
           <Typography sx={{ fontSize: 12, color: "#64748b" }}>
-            Không gian làm việc / Trung tâm báo cáo
+            Không gian làm việc / Tổng hợp báo cáo
           </Typography>
           <Typography
             component="h1"
@@ -554,7 +549,7 @@ function DispatchReports() {
               letterSpacing: "-0.01em",
             }}
           >
-            Trung tâm báo cáo
+            Tổng hợp báo cáo
           </Typography>
           <Typography sx={{ fontSize: 13, color: "#64748b", mt: 0.25 }}>
             Chọn biểu mẫu bên trái, xem trước và xuất ngay tại vùng bên phải.
@@ -848,47 +843,5 @@ function DispatchReports() {
   );
 }
 
-
-// Khi nhúng Thống kê (REACT_APP_TK_EMBED): trang Báo cáo có 2 tab — "Báo cáo" (Trung tâm báo
-// cáo của Điều phối, giữ nguyên) và "Báo cáo thống kê" (màn báo cáo của Thống kê trong khung
-// nhúng). Cờ tắt: chỉ còn trung tâm báo cáo như cũ.
-function Reports() {
-  const [user] = useAtom(userAtom);
-  const [params, setParams] = useSearchParams();
-  const showTk = TK_EMBED && canSeeTkModule(user, TK_REPORT_MODULE);
-  const tab = showTk && params.get("tab") === "thong-ke" ? "thong-ke" : "bao-cao";
-  // Giữ khung Thống kê sống sau lần mở đầu để chuyển qua lại không mất việc đang xem.
-  const [tkOpened, setTkOpened] = useState(tab === "thong-ke");
-  // Chọn "Báo cáo thống kê" từ menu khi đang ở trang Báo cáo: mở khung ngay.
-  useEffect(() => {
-    if (tab === "thong-ke") setTkOpened(true);
-  }, [tab]);
-
-  if (!showTk) return <DispatchReports />;
-
-  return (
-    <Box>
-      <Tabs
-        value={tab}
-        onChange={(_, v) => {
-          if (v === "thong-ke") setTkOpened(true);
-          setParams(v === "thong-ke" ? { tab: "thong-ke" } : {}, { replace: true });
-        }}
-        sx={{ mb: 1.5, borderBottom: "1px solid #e5e9f0" }}
-      >
-        <Tab value="bao-cao" label="Tổng hợp báo cáo" sx={{ textTransform: "none", fontWeight: 600 }} />
-        <Tab value="thong-ke" label="Báo cáo thống kê" sx={{ textTransform: "none", fontWeight: 600 }} />
-      </Tabs>
-      <Box sx={{ display: tab === "bao-cao" ? "block" : "none" }}>
-        <DispatchReports />
-      </Box>
-      {tkOpened && (
-        <Box sx={{ display: tab === "thong-ke" ? "block" : "none", mx: -3, mb: -3 }}>
-          <ThongKeFrame path="/bao-cao/thong-ke" />
-        </Box>
-      )}
-    </Box>
-  );
-}
 
 export default Reports;

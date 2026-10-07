@@ -64,7 +64,7 @@ describe("menu Danh mục gộp (Thống kê + Điều phối)", () => {
       "Định mức nhiên liệu",
       "Áp Trắc Địa",
       "Đối chiếu",
-      "Báo chuyến",
+      "Thống kê sản lượng",
     ]);
   });
 
