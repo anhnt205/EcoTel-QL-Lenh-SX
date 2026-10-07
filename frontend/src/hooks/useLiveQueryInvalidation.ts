@@ -35,8 +35,15 @@ export function useLiveQueryInvalidation(queryKeys: QueryKey[]) {
     if (!token) return;
 
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    // Lấy theo VITE_API_KONG_URL (vd "/api" khi chạy độc lập, "/tk-api/api" khi
+    // nhúng dưới Điều phối) thay vì hardcode "/api" — hardcode sẽ rơi vào
+    // backend của Điều phối khi cùng domain. Mặc định "/api" = hành vi cũ.
+    const apiBase = (import.meta.env.VITE_API_KONG_URL || "/api").replace(/\/+$/, "");
+    const wsBase = /^https?:\/\//i.test(apiBase)
+      ? apiBase.replace(/^http/i, "ws")
+      : `${protocol}//${window.location.host}${apiBase}`;
     const client = new Client({
-      brokerURL: `${protocol}//${window.location.host}/api/ws`,
+      brokerURL: `${wsBase}/ws`,
       // JWT gửi trong header STOMP CONNECT (không phải header HTTP lúc bắt
       // tay — trình duyệt không cho gắn header tuỳ ý vào đó) — xem
       // WebSocketConfig.java phía backend.

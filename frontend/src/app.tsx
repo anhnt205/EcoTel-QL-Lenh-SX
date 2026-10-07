@@ -7,6 +7,8 @@ import { mainRoutes } from "@/modules/main/router";
 import { NotFoundPage } from "@/components/not-found-page";
 import { ROUTES } from "@/constants/routes";
 import { AuthGate } from "@/auth/AuthGate";
+import { EmbedBridge } from "@/layouts/embed-bridge";
+import { routerBasename } from "@/lib/embed";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -45,7 +47,8 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthGate>
-        <BrowserRouter>
+        <BrowserRouter basename={routerBasename()}>
+          <EmbedBridge />
           <AppRoutes />
           <Toaster position="top-right" richColors />
           <MinimizedModalsTray />
