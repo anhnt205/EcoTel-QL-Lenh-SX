@@ -1,4 +1,5 @@
 import { tokenService } from "./tokenService";
+import { isEmbedded, requestParentToken } from "@/lib/embed";
 
 const VITE_API_KONG_URL = import.meta.env.VITE_API_KONG_URL;
 
@@ -14,6 +15,26 @@ export interface AuthResult {
 let inFlightAuthPromise: Promise<AuthResult> | null = null;
 
 export const initializeAppAuth = (): Promise<AuthResult> => {
+  // Nhúng trong Điều phối: KHÔNG có màn đăng nhập riêng — luôn xin token mới từ Điều
+  // phối (không dùng token cũ còn trong sessionStorage vì có thể của người dùng trước).
+  if (isEmbedded()) {
+    if (!inFlightAuthPromise) {
+      inFlightAuthPromise = requestParentToken()
+        .then((appToken): AuthResult => {
+          tokenService.saveTokens(appToken, appToken);
+          return { ok: true };
+        })
+        .catch((e): AuthResult => ({
+          ok: false,
+          error: e instanceof Error ? e.message : "Không lấy được phiên đăng nhập từ Điều phối",
+        }))
+        .finally(() => {
+          inFlightAuthPromise = null;
+        });
+    }
+    return inFlightAuthPromise;
+  }
+
   if (inFlightAuthPromise) {
     console.log("[Auth] Re-using in-flight auth promise...");
     return inFlightAuthPromise;

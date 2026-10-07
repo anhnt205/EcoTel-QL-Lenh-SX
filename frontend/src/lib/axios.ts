@@ -1,5 +1,6 @@
 import axios from "axios";
 import { tokenService } from "../auth/tokenService";
+import { isEmbedded, requestParentToken } from "./embed";
 
 const API_URL = import.meta.env.VITE_API_KONG_URL;
 
@@ -19,6 +20,12 @@ api.interceptors.request.use((config) => {
 let refreshPromise: Promise<string> | null = null;
 
 async function doRefresh(): Promise<string> {
+  // Nhúng trong Điều phối: xin token mới từ khung cha thay vì gọi /auth/refresh.
+  if (isEmbedded()) {
+    const appToken = await requestParentToken();
+    tokenService.saveTokens(appToken, appToken);
+    return appToken;
+  }
   const stored = tokenService.get();
   if (!stored?.refreshToken) {
     throw new Error("No refresh token");

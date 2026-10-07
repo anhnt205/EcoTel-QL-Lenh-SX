@@ -29,3 +29,48 @@ export const routerBasename = (): string => {
 /** Thông điệp giữa khung cha (Điều phối) và Thống kê. */
 export const MSG_NAVIGATE = "tk:navigate"; // cha -> con: { type, path }
 export const MSG_LOCATION = "tk:location"; // con -> cha: { type, path }
+
+/** Xin/cấp token qua khung cha (Điều phối) — đăng nhập một lần ở Điều phối. */
+export const MSG_REQUEST_TOKEN = "tk:request-token"; // con -> cha: { type }
+export const MSG_TOKEN = "tk:token"; // cha -> con: { type, appToken }
+export const MSG_TOKEN_ERROR = "tk:token-error"; // cha -> con: { type, message }
+
+const TOKEN_TIMEOUT_MS = 10000;
+let inFlightToken: Promise<string> | null = null;
+
+/**
+ * Xin token mới từ khung cha (Điều phối đã đăng nhập). Chỉ chạy ở chế độ nhúng.
+ * Gộp các lời gọi đồng thời thành 1 (nhiều request 401 cùng lúc chỉ xin 1 lần).
+ * Chỉ nhận trả lời từ CHÍNH khung cha và cùng origin.
+ */
+export function requestParentToken(): Promise<string> {
+  if (inFlightToken) return inFlightToken;
+  inFlightToken = new Promise<string>((resolve, reject) => {
+    if (window.parent === window) {
+      reject(new Error("Không có khung cha để xin phiên đăng nhập"));
+      return;
+    }
+    const done = () => {
+      window.removeEventListener("message", onMessage);
+      window.clearTimeout(timer);
+      inFlightToken = null;
+    };
+    const onMessage = (e: MessageEvent) => {
+      if (e.source !== window.parent || e.origin !== window.location.origin) return;
+      if (e.data?.type === MSG_TOKEN && typeof e.data.appToken === "string") {
+        done();
+        resolve(e.data.appToken);
+      } else if (e.data?.type === MSG_TOKEN_ERROR) {
+        done();
+        reject(new Error(String(e.data.message || "Điều phối không cấp được phiên Thống kê")));
+      }
+    };
+    const timer = window.setTimeout(() => {
+      done();
+      reject(new Error("Hết thời gian chờ Điều phối cấp phiên đăng nhập"));
+    }, TOKEN_TIMEOUT_MS);
+    window.addEventListener("message", onMessage);
+    window.parent.postMessage({ type: MSG_REQUEST_TOKEN }, window.location.origin);
+  });
+  return inFlightToken;
+}
