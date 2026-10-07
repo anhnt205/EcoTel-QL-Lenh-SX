@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Typography,
   TextField,
@@ -859,6 +859,10 @@ function Reports() {
   const tab = showTk && params.get("tab") === "thong-ke" ? "thong-ke" : "bao-cao";
   // Giữ khung Thống kê sống sau lần mở đầu để chuyển qua lại không mất việc đang xem.
   const [tkOpened, setTkOpened] = useState(tab === "thong-ke");
+  // Chọn "Báo cáo thống kê" từ menu khi đang ở trang Báo cáo: mở khung ngay.
+  useEffect(() => {
+    if (tab === "thong-ke") setTkOpened(true);
+  }, [tab]);
 
   if (!showTk) return <DispatchReports />;
 
@@ -872,7 +876,7 @@ function Reports() {
         }}
         sx={{ mb: 1.5, borderBottom: "1px solid #e5e9f0" }}
       >
-        <Tab value="bao-cao" label="Báo cáo" sx={{ textTransform: "none", fontWeight: 600 }} />
+        <Tab value="bao-cao" label="Tổng hợp báo cáo" sx={{ textTransform: "none", fontWeight: 600 }} />
         <Tab value="thong-ke" label="Báo cáo thống kê" sx={{ textTransform: "none", fontWeight: 600 }} />
       </Tabs>
       <Box sx={{ display: tab === "bao-cao" ? "block" : "none" }}>

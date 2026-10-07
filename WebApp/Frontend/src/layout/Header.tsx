@@ -59,6 +59,8 @@ import { brandAccent, brandHeaderBg, brandNavy, brandOnColor, useBranding } from
 import { TK_EMBED } from "../config/features";
 import { CATALOG_PATHS_MOVED_TO_TK } from "./thongkeMenu";
 import ThongKeNav from "./ThongKeNav";
+import HeaderBanner from "./HeaderBanner";
+import { canSeeThongKe } from "./thongkeMenu";
 
 export default function Header() {
   const navigate = useNavigate();
@@ -206,7 +208,7 @@ export default function Header() {
   );
   const displayName = user?.fullName || user?.username || "";
   const navBtnSx = (active: boolean) => ({
-    height: 46,
+    height: 54,
     px: TK_EMBED ? 1.25 : 2,
     gap: 0.5,
     borderRadius: 0,
@@ -218,8 +220,12 @@ export default function Header() {
     bgcolor: active ? alpha(HDR_BLUE, 0.1) : "transparent",
     borderBottom: `3px solid ${active ? HDR_BLUE : "transparent"}`,
     "&:hover": { bgcolor: active ? alpha(HDR_BLUE, 0.1) : "#f6f8fb" },
-    "& .MuiButton-startIcon": { mr: 0.75 },
+    "& .MuiButton-startIcon": { mr: 0.75, color: HDR_BLUE },
   });
+
+  // Menu Báo cáo dạng dropdown khi nhúng Thống kê: "Tổng hợp báo cáo" + "Báo cáo thống kê"
+  const canTkReports = TK_EMBED && canSeeThongKe(user?.role);
+  const [reportAnchor, setReportAnchor] = useState<null | HTMLElement>(null);
 
   return (
     <ThemeProvider theme={uiSansTheme}>
@@ -231,7 +237,21 @@ export default function Header() {
           fontFamily: UI_FONT,
         }}
       >
-        {/* Thanh trên: logo + tên hệ thống + thông báo + tài khoản */}
+        {/* Màn rộng: banner theo ảnh mẫu (logo, tên công ty, tên hệ thống, ảnh toà nhà). */}
+        {!isMobile && (
+          <HeaderBanner
+            logoUrl={branding.logoUrl}
+            hasCustomLogo={branding.hasCustomLogo}
+            title={branding.loginTitle}
+            companyName={branding.companyName}
+            baseColor={HDR_BG}
+            hasCustomColor={branding.hasCustomColor}
+            textColor={HDR_FG}
+          />
+        )}
+
+        {/* Màn hẹp: thanh trên gọn có nút mở ngăn kéo + thông báo + tài khoản */}
+        {isMobile && (
         <Box
           sx={{
             bgcolor: HDR_BG,
@@ -350,7 +370,21 @@ export default function Header() {
                       <ListItemIcon sx={{ color: "primary.main" }}>
                         <ChartNoAxesCombined color="currentColor" />
                       </ListItemIcon>
-                      <ListItemText primary="Báo cáo" />
+                      <ListItemText primary={canTkReports ? "Tổng hợp báo cáo" : "Báo cáo"} />
+                    </ListItem>
+                  )}
+                  {canTkReports && (
+                    <ListItem
+                      button
+                      onClick={() => {
+                        navigate("/reports?tab=thong-ke");
+                        setDrawerOpen(false);
+                      }}
+                    >
+                      <ListItemIcon sx={{ color: "primary.main" }}>
+                        <ChartNoAxesCombined color="currentColor" />
+                      </ListItemIcon>
+                      <ListItemText primary="Báo cáo thống kê" />
                     </ListItem>
                   )}
                   {[RoleEnum.ADMIN].includes(user?.role) && (
@@ -458,6 +492,7 @@ export default function Header() {
             </ButtonBase>
           </Tooltip>
         </Box>
+        )}
 
         {/* Hàng tab điều hướng (màn rộng); màn hẹp dùng ngăn kéo ở trên */}
         {!isMobile && (
@@ -468,11 +503,12 @@ export default function Header() {
               boxShadow: "0 1px 2px rgba(15,23,42,.05)",
               px: 3,
               display: "flex",
-              alignItems: "stretch",
-              gap: 0.5,
-              flexWrap: TK_EMBED ? "wrap" : "nowrap",
+              alignItems: "center",
+              gap: 1,
             }}
           >
+            {/* Các mục menu: tự xuống dòng khi nhiều; chuông + tài khoản luôn ở góc phải hàng đầu */}
+            <Box sx={{ display: "flex", alignItems: "stretch", gap: 0.5, flexWrap: TK_EMBED ? "wrap" : "nowrap", flex: 1, minWidth: 0 }}>
             <Button
               color="inherit"
               startIcon={<Dashboard />}
@@ -571,7 +607,44 @@ export default function Header() {
             {TK_EMBED && (
               <ThongKeNav role={user?.role} variant="bar" navBtnSx={navBtnSx} />
             )}
-            {[RoleEnum.ADMIN, RoleEnum.MANAGER, RoleEnum.DISPATCHER].includes(
+            {canTkReports && (
+              <>
+                <Button
+                  color="inherit"
+                  startIcon={<ChartNoAxesCombined size={20} style={{ color: "inherit" }} />}
+                  endIcon={<ExpandMore />}
+                  sx={{ ...navBtnSx(isActive("/reports")), px: 1.25, fontSize: 14 }}
+                  onClick={(e) => setReportAnchor(e.currentTarget)}
+                >
+                  Báo cáo
+                </Button>
+                <Menu
+                  anchorEl={reportAnchor}
+                  open={Boolean(reportAnchor)}
+                  onClose={() => setReportAnchor(null)}
+                >
+                  <MenuItem
+                    selected={isActive("/reports") && !location.search.includes("tab=thong-ke")}
+                    onClick={() => {
+                      navigate("/reports");
+                      setReportAnchor(null);
+                    }}
+                  >
+                    Tổng hợp báo cáo
+                  </MenuItem>
+                  <MenuItem
+                    selected={isActive("/reports") && location.search.includes("tab=thong-ke")}
+                    onClick={() => {
+                      navigate("/reports?tab=thong-ke");
+                      setReportAnchor(null);
+                    }}
+                  >
+                    Báo cáo thống kê
+                  </MenuItem>
+                </Menu>
+              </>
+            )}
+            {!canTkReports && [RoleEnum.ADMIN, RoleEnum.MANAGER, RoleEnum.DISPATCHER].includes(
               user?.role,
             ) && (
               <Button
@@ -593,6 +666,49 @@ export default function Header() {
                 Hệ thống
               </Button>
             )}
+
+            </Box>
+
+            {/* Thông báo + tài khoản nằm bên phải hàng menu (theo ảnh mẫu) */}
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1, pl: 1, alignSelf: "flex-start", height: 54, flexShrink: 0 }}>
+              <Tooltip
+                title={`Thông báo${notificationCount ? ` (${notificationCount} chưa đọc)` : ""}`}
+              >
+                <IconButton onClick={() => navigate("/notifications")} sx={{ color: HDR_BLUE }}>
+                  <Badge
+                    variant="dot"
+                    color="error"
+                    invisible={!notificationCount}
+                    overlap="circular"
+                  >
+                    <Notifications />
+                  </Badge>
+                </IconButton>
+              </Tooltip>
+              <Box sx={{ width: "1px", height: 34, bgcolor: "#dbe2ec" }} />
+              <Tooltip title="Tài khoản">
+                <ButtonBase
+                  onClick={(e) => setAvatarAnchorEl(e.currentTarget)}
+                  sx={{
+                    gap: 1,
+                    px: 1,
+                    py: 0.5,
+                    borderRadius: "10px",
+                    color: "#1e293b",
+                    "&:hover": { bgcolor: "#f6f8fb" },
+                  }}
+                >
+                  <Avatar
+                    src={url || branding.logoUrl}
+                    sx={{ width: 38, height: 38, bgcolor: "#e2e8f0", color: HDR_NAVY }}
+                  />
+                  <Typography sx={{ fontSize: 14, fontWeight: 700 }}>
+                    {displayName}
+                  </Typography>
+                  <ExpandMore fontSize="small" />
+                </ButtonBase>
+              </Tooltip>
+            </Box>
           </Box>
         )}
 
