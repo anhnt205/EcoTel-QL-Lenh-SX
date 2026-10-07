@@ -65,3 +65,42 @@ describe('catalogLock', () => {
         });
     });
 });
+
+describe('catalogLock: vật liệu và điểm đổ tải (khoá một phần)', () => {
+    const { lockMaterialCatalogWrites, lockLocationCatalogWrites } = require('../middleware/catalogLock');
+    const OLD = process.env.CATALOG_MASTER;
+    beforeEach(() => { process.env.CATALOG_MASTER = 'thongke'; });
+    afterEach(() => { process.env.CATALOG_MASTER = OLD; if (OLD === undefined) delete process.env.CATALOG_MASTER; });
+
+    test('vật liệu: tạo/xoá/nhập file bị chặn, xuất file và tỷ trọng theo khung giờ vẫn chạy', () => {
+        expect(run(lockMaterialCatalogWrites, 'POST', '/').res.statusCode).toBe(403);
+        expect(run(lockMaterialCatalogWrites, 'DELETE', '/').res.statusCode).toBe(403);
+        expect(run(lockMaterialCatalogWrites, 'POST', '/importFile').res.statusCode).toBe(403);
+        expect(run(lockMaterialCatalogWrites, 'POST', '/exportFile').nexted).toBe(true);
+        expect(run(lockMaterialCatalogWrites, 'POST', '/save-timeslot').nexted).toBe(true);
+        expect(run(lockMaterialCatalogWrites, 'DELETE', '/timeslots').nexted).toBe(true);
+    });
+
+    test('vật liệu: PUT chỉ giữ valueHistory (tỷ trọng), bỏ tên và sản phẩm nghiệm thu', () => {
+        const vh = [{ density: 1.5 }];
+        const { req, nexted } = run(lockMaterialCatalogWrites, 'PUT', '/abc', { name: 'Đổi', acceptedProduct: 'Than', valueHistory: vh });
+        expect(nexted).toBe(true);
+        expect(req.body).toEqual({ valueHistory: vh });
+    });
+
+    test('điểm đổ tải: tạo/xoá bị chặn; PUT chỉ giữ distance + coordinates', () => {
+        expect(run(lockLocationCatalogWrites, 'POST', '/').res.statusCode).toBe(403);
+        expect(run(lockLocationCatalogWrites, 'DELETE', '/').res.statusCode).toBe(403);
+        const coords = { lng: 1, lat: 2 };
+        const { req, nexted } = run(lockLocationCatalogWrites, 'PUT', '/abc', { name: 'Đổi', distance: 3.5, coordinates: coords });
+        expect(nexted).toBe(true);
+        expect(req.body).toEqual({ distance: 3.5, coordinates: coords });
+    });
+
+    test('cờ tắt: không đổi gì', () => {
+        delete process.env.CATALOG_MASTER;
+        const { req, nexted } = run(lockMaterialCatalogWrites, 'PUT', '/abc', { name: 'Đổi' });
+        expect(nexted).toBe(true);
+        expect(req.body).toEqual({ name: 'Đổi' });
+    });
+});

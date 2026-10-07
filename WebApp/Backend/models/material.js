@@ -10,6 +10,12 @@ const Material = new mongoose.Schema({
     acceptedProduct: {
         type: String
     },
+    // Gắn với chủng loại hàng gốc bên Thống kê — xem services/tkCatalogSync.js.
+    externalTkId: {
+        type: String,
+        index: true,
+        sparse: true,
+    },
     valueHistory: [
         {
             density: Number,

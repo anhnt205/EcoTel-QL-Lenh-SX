@@ -159,3 +159,51 @@ describe('buildPlan', () => {
         expect(Object.values(item.set)).not.toContain(null);
     });
 });
+
+describe('vật liệu <- chủng loại hàng, điểm đổ tải <- nơi dỡ/nhận tải', () => {
+    const base = () => ({ departments: [], positions: [], shifts: [], devices: [] });
+    const emptyDpmm = () => ({ department: [], position: [], shift: [], material: [], location: [], deviceType: [], deviceModel: [], device: [] });
+
+    test('acceptedProduct chỉ lấy khi tên khớp enum Điều phối (Đất/Than), không khớp thì bỏ', () => {
+        const tk = normalizeTk({
+            ...base(),
+            cargoTypes: [
+                { id: 1, name: 'Than cục', acceptanceProductName: 'than' },
+                { id: 2, name: 'Đất đá', acceptanceProductName: 'Đất' },
+                { id: 3, name: 'Quặng', acceptanceProductName: 'Sản phẩm lạ' },
+            ],
+        });
+        expect(tk.material.map((m) => m.acceptedProduct)).toEqual(['Than', 'Đất', undefined]);
+    });
+
+    test('nơi dỡ + nơi nhận tải gộp theo tên, id mang tiền tố nguồn', () => {
+        const tk = normalizeTk({
+            ...base(),
+            unloadingPoints: [{ id: 5, name: 'Bãi A' }, { id: 6, name: 'Bãi B' }],
+            receivingPoints: [{ id: 5, name: 'Bãi B' }, { id: 7, name: 'Điểm C' }],
+        });
+        expect(tk.location.map((l) => l.tkId)).toEqual(['unloading:5', 'unloading:6', 'receiving:7']);
+        expect(tk.notes.duplicateLocationNames).toEqual(['Bãi B']);
+    });
+
+    test('ghép vật liệu/điểm đổ cũ theo tên, giữ _id và không đụng tỷ trọng/khoảng cách/toạ độ', () => {
+        const tk = normalizeTk({
+            ...base(),
+            cargoTypes: [{ id: 1, name: 'Than cục', acceptanceProductName: 'Than' }],
+            unloadingPoints: [{ id: 5, name: 'Bãi A' }],
+        });
+        const dpmm = emptyDpmm();
+        dpmm.material = [{ _id: 'm1', name: 'than cục', valueHistory: [{ density: 1.4 }] }];
+        dpmm.location = [{ _id: 'l1', name: 'Bãi A', distance: 2.5, coordinates: { coordinates: [1, 2] } }];
+        const { plan } = buildPlan(tk, dpmm);
+        expect(plan.material.update[0].id).toBe('m1');
+        expect(plan.material.update[0].set).toEqual({ name: 'Than cục', acceptedProduct: 'Than', externalTkId: '1' }); // tên theo Thống kê (gốc), không có valueHistory
+        expect(plan.location.update[0].id).toBe('l1');
+        expect(plan.location.update[0].set).toEqual({ externalTkId: 'unloading:5' });
+        expect(plan.material.create).toHaveLength(0);
+    });
+
+    test('thiếu cargoTypes/unloadingPoints trong dữ liệu (bản cũ) vẫn chạy được', () => {
+        expect(() => buildPlan(normalizeTk(base()), emptyDpmm())).not.toThrow();
+    });
+});

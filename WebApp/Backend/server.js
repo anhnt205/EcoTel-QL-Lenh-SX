@@ -43,6 +43,8 @@ const CatalogSyncRoutes = require("./routes/catalogSync.routes");
 const {
   lockCatalogWrites,
   lockDeviceCatalogWrites,
+  lockMaterialCatalogWrites,
+  lockLocationCatalogWrites,
 } = require("./middleware/catalogLock");
 
 require("./utils/cron");
@@ -137,6 +139,8 @@ app.use(
   lockCatalogWrites,
 );
 app.use("/api/devices", lockDeviceCatalogWrites);
+app.use("/api/materials", lockMaterialCatalogWrites);
+app.use("/api/locations", lockLocationCatalogWrites);
 
 // Routes
 app.use("/api/auth", authRoutes);

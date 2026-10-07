@@ -9,6 +9,12 @@ const Location = new mongoose.Schema({
     distance: {
         type: Number
     },
+    // Gắn với nơi dỡ/nhận tải gốc bên Thống kê ("unloading:<id>" | "receiving:<id>") — xem services/tkCatalogSync.js.
+    externalTkId: {
+        type: String,
+        index: true,
+        sparse: true,
+    },
     coordinates: {
         type: {
             type: String,

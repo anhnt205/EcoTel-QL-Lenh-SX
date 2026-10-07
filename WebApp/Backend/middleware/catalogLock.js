@@ -22,37 +22,63 @@ function lockCatalogWrites(req, res, next) {
   return res.status(403).send({ status: "error", message: LOCKED_MESSAGE });
 }
 
-// Thiết bị: Điều phối vẫn tự ghi phần VẬN HÀNH (trạng thái, file đính kèm,
-// toạ độ) nên chỉ khoá các thao tác sửa danh mục gốc: tạo, xoá, nhập file và
-// đồng bộ trực tiếp từ Tài sản (nguồn gốc đã chuyển qua Thống kê).
-const DEVICE_LOCKED = [
+
+// Các danh mục MỘT PHẦN do Thống kê quản lý (thiết bị, vật liệu, điểm đổ tải): Điều
+// phối vẫn tự ghi phần VẬN HÀNH nên không chặn hẳn mà:
+//   - khoá các thao tác tạo/xoá/nhập file (và sync trực tiếp từ Tài sản với thiết bị);
+//   - PUT /:id (form sửa dùng chung cả phần gốc lẫn vận hành) chỉ GIỮ LẠI field vận
+//     hành, field danh mục gốc (tên, mã, loại...) bị bỏ.
+const PUT_ID = /^\/[^/]+\/?$/;
+
+function partialLock({ locked, putKeep, nonId }) {
+  return function partialCatalogLock(req, res, next) {
+    if (!isCatalogMasterThongKe() || READ_METHODS.has(req.method)) return next();
+    if (locked.some((r) => r.method === req.method && r.path.test(req.path))) {
+      return res.status(403).send({ status: "error", message: LOCKED_MESSAGE });
+    }
+    if (req.method === "PUT" && PUT_ID.test(req.path) && !nonId.test(req.path)) {
+      const body = req.body || {};
+      req.body = Object.fromEntries(putKeep.filter((k) => body[k] !== undefined).map((k) => [k, body[k]]));
+    }
+    return next();
+  };
+}
+
+const COMMON_LOCKED = [
   { method: "POST", path: /^\/?$/ },
   { method: "DELETE", path: /^\/?$/ },
   { method: "POST", path: /^\/importFile\/?$/ },
-  { method: "POST", path: /^\/sync-from-taisan\/?$/ },
 ];
+// Đường có tên cố định không được hiểu nhầm là ":id"
+const COMMON_NON_ID = "update_status|importFile|exportFile|sync-from-taisan|save-timeslot|timeslots";
+const nonIdRegex = new RegExp(`^/(${COMMON_NON_ID})/?$`);
 
-// PUT /api/devices/:id là form sửa dùng chung cho cả danh mục lẫn vận hành
-// (toạ độ, ghi chú, trạng thái). Khi khoá không chặn hẳn mà chỉ GIỮ LẠI field
-// vận hành — field danh mục gốc (tên, mã, loại, đơn vị...) bị bỏ.
-const DEVICE_OPERATIONAL_FIELDS = ["coordinates", "note", "status"];
-const DEVICE_PUT = /^\/[^/]+\/?$/;
-// Các đường PUT/POST con khác có tên cố định không được hiểu nhầm là ":id"
-const DEVICE_NON_ID = /^\/(update_status|importFile|exportFile|sync-from-taisan)\/?$/;
+/** Thiết bị: giữ vận hành = toạ độ, ghi chú, trạng thái. Chặn thêm sync trực tiếp từ Tài sản. */
+const lockDeviceCatalogWrites = partialLock({
+  locked: [...COMMON_LOCKED, { method: "POST", path: /^\/sync-from-taisan\/?$/ }],
+  putKeep: ["coordinates", "note", "status"],
+  nonId: nonIdRegex,
+});
 
-/** Khoá thao tác sửa danh mục gốc của thiết bị, giữ nguyên phần vận hành. */
-function lockDeviceCatalogWrites(req, res, next) {
-  if (!isCatalogMasterThongKe() || READ_METHODS.has(req.method)) return next();
-  if (DEVICE_LOCKED.some((r) => r.method === req.method && r.path.test(req.path))) {
-    return res.status(403).send({ status: "error", message: LOCKED_MESSAGE });
-  }
-  if (req.method === "PUT" && DEVICE_PUT.test(req.path) && !DEVICE_NON_ID.test(req.path)) {
-    const body = req.body || {};
-    req.body = Object.fromEntries(
-      DEVICE_OPERATIONAL_FIELDS.filter((k) => body[k] !== undefined).map((k) => [k, body[k]]),
-    );
-  }
-  return next();
-}
+/** Vật liệu: tên + sản phẩm nghiệm thu do Thống kê quản lý; tỷ trọng (valueHistory) là của Điều phối. */
+const lockMaterialCatalogWrites = partialLock({
+  locked: COMMON_LOCKED,
+  putKeep: ["valueHistory"],
+  nonId: nonIdRegex,
+});
 
-module.exports = { lockCatalogWrites, lockDeviceCatalogWrites, isCatalogMasterThongKe, LOCKED_MESSAGE };
+/** Điểm đổ tải: tên do Thống kê quản lý; khoảng cách + toạ độ là của Điều phối. */
+const lockLocationCatalogWrites = partialLock({
+  locked: COMMON_LOCKED,
+  putKeep: ["distance", "coordinates"],
+  nonId: nonIdRegex,
+});
+
+module.exports = {
+  lockCatalogWrites,
+  lockDeviceCatalogWrites,
+  lockMaterialCatalogWrites,
+  lockLocationCatalogWrites,
+  isCatalogMasterThongKe,
+  LOCKED_MESSAGE,
+};

@@ -27,6 +27,13 @@ const MAX_PAGES = 200; // chặn vòng lặp vô hạn nếu server trả totalP
 
 const GROUP_TK_TO_DPMM = { XE: "Xe", MAY: "Máy" };
 
+// Giá trị hợp lệ của Material.acceptedProduct bên Điều phối (config.ACCEPTED_PRODUCT).
+const ACCEPTED_PRODUCTS = ["Đất", "Than"];
+const acceptedProductOf = (name) => {
+  const key = norm(name);
+  return ACCEPTED_PRODUCTS.find((p) => norm(p) === key);
+};
+
 const norm = (v) =>
   v === undefined || v === null ? "" : String(v).trim().toLowerCase();
 const str = (v) => (v === undefined || v === null ? undefined : String(v).trim());
@@ -114,7 +121,15 @@ function diffFields(doc, fields) {
 // Chuẩn hoá dữ liệu Thống kê -> dòng đồng bộ (thuần)
 // ---------------------------------------------------------------------------
 
-function normalizeTk({ departments, positions, shifts, devices }) {
+function normalizeTk({
+  departments,
+  positions,
+  shifts,
+  devices,
+  cargoTypes = [],
+  unloadingPoints = [],
+  receivingPoints = [],
+}) {
   const deptRows = departments.map((d) => ({
     tkId: idStr(d.id),
     code: str(d.code),
@@ -160,6 +175,41 @@ function normalizeTk({ departments, positions, shifts, devices }) {
     }
   }
 
+  // Vật liệu (Điều phối) <- Chủng loại hàng (Thống kê). Trùng tên gộp 1, ghi nhận để báo cáo.
+  const materialByName = new Map();
+  const duplicateMaterialNames = [];
+  for (const c of cargoTypes) {
+    const key = norm(c.name);
+    if (!key) continue;
+    if (materialByName.has(key)) {
+      duplicateMaterialNames.push(str(c.name));
+      continue;
+    }
+    materialByName.set(key, {
+      tkId: idStr(c.id),
+      name: str(c.name),
+      acceptedProduct: acceptedProductOf(c.acceptanceProductName),
+    });
+  }
+
+  // Điểm đổ tải (Điều phối) <- Nơi dỡ tải + Nơi nhận tải (Thống kê). Hai bảng nguồn
+  // có thể trùng tên: gộp 1, id gắn kèm tiền tố nguồn để không nhầm id giữa 2 bảng.
+  const locationByName = new Map();
+  const duplicateLocationNames = [];
+  const addLocations = (list, prefix) => {
+    for (const p of list) {
+      const key = norm(p.name);
+      if (!key) continue;
+      if (locationByName.has(key)) {
+        duplicateLocationNames.push(str(p.name));
+        continue;
+      }
+      locationByName.set(key, { tkId: `${prefix}:${idStr(p.id)}`, name: str(p.name) });
+    }
+  };
+  addLocations(unloadingPoints, "unloading");
+  addLocations(receivingPoints, "receiving");
+
   const deviceRows = devices.map((d) => ({
     tkId: idStr(d.id),
     code: str(d.code),
@@ -179,8 +229,10 @@ function normalizeTk({ departments, positions, shifts, devices }) {
     shift: shiftRows,
     deviceType: [...typeRows.values()],
     deviceModel: [...modelRows.values()],
+    material: [...materialByName.values()],
+    location: [...locationByName.values()],
     device: deviceRows,
-    notes: { duplicatePositionNames },
+    notes: { duplicatePositionNames, duplicateMaterialNames, duplicateLocationNames },
   };
 }
 
@@ -215,6 +267,19 @@ const SPECS = {
     unique: [],
     pick: (r) => ({ name: r.name }),
   },
+  material: {
+    naturalKeys: ["name"],
+    unique: [],
+    // acceptedProduct chỉ có giá trị khi tên sản phẩm nghiệm thu của Thống kê khớp enum
+    // Điều phối (Đất/Than); không khớp thì để undefined -> giữ nguyên giá trị cũ.
+    pick: (r) => ({ name: r.name, acceptedProduct: r.acceptedProduct }),
+  },
+  location: {
+    naturalKeys: ["name"],
+    unique: [],
+    // distance + coordinates là dữ liệu vận hành riêng của Điều phối: Thống kê không có.
+    pick: (r) => ({ name: r.name }),
+  },
   device: {
     naturalKeys: ["code"],
     unique: [],
@@ -230,7 +295,16 @@ const SPECS = {
 };
 
 // Thứ tự xử lý: danh mục tham chiếu trước, thiết bị sau cùng.
-const ORDER = ["department", "position", "shift", "deviceType", "deviceModel", "device"];
+const ORDER = [
+  "department",
+  "position",
+  "shift",
+  "material",
+  "location",
+  "deviceType",
+  "deviceModel",
+  "device",
+];
 
 /**
  * @param tk     kết quả normalizeTk
@@ -394,13 +468,17 @@ async function fetchAll(baseUrl, token, path) {
 async function fetchTkCatalogs() {
   const cfg = config();
   const token = await loginTk(cfg);
-  const [departments, positions, shifts, devices] = await Promise.all([
+  const [departments, positions, shifts, devices, cargoTypes, unloadingPoints, receivingPoints] =
+    await Promise.all([
     fetchAll(cfg.baseUrl, token, "/api/departments"),
     fetchAll(cfg.baseUrl, token, "/api/positions"),
     fetchAll(cfg.baseUrl, token, "/api/shifts"),
     fetchAll(cfg.baseUrl, token, "/api/devices"),
+    fetchAll(cfg.baseUrl, token, "/api/cargo-types"),
+    fetchAll(cfg.baseUrl, token, "/api/unloading-points"),
+    fetchAll(cfg.baseUrl, token, "/api/receiving-points"),
   ]);
-  return { departments, positions, shifts, devices };
+  return { departments, positions, shifts, devices, cargoTypes, unloadingPoints, receivingPoints };
 }
 
 // ---------------------------------------------------------------------------
@@ -411,6 +489,8 @@ const MODELS = () => ({
   department: require("../models/Department"),
   position: require("../models/Position"),
   shift: require("../models/Shift"),
+  material: require("../models/material"),
+  location: require("../models/Location"),
   deviceType: require("../models/DeviceType"),
   deviceModel: require("../models/DeviceModel"),
   device: require("../models/Device"),
