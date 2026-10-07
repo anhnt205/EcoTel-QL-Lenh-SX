@@ -3391,3 +3391,13 @@ dùng thật (vừa nạp dữ liệu thật/tạm lên server ở Lượt 28/30
   thay vì cập nhật đúng thiết bị cũ — cần đối chiếu mã trước khi chạy thật
   trên dữ liệu sản xuất).
 - Chưa thêm nút "Đồng bộ từ Tài sản" ở Frontend.
+
+## Chạy nhúng dưới Điều phối (DIEU-PHOI-MM) — 2026-10-07, nhánh `claude-dev` (commit 66f46b4, CHƯA push)
+
+Theo yêu cầu gộp Thống kê vào Điều phối (xem `DIEU-PHOI-MM/.factory/context.md` mục "Gộp Thống kê vào Điều phối" để biết toàn cảnh + kết quả verify). Phía Thống kê chỉ thay frontend, **backend không đổi**:
+- `vite.config.ts`: `base` = `VITE_BASE_PATH` (mặc định `/` → bản độc lập/Portal giữ nguyên). Router `basename` lấy từ `import.meta.env.BASE_URL` (`lib/embed.ts#routerBasename`). Dockerfile thêm `ARG VITE_BASE_PATH`.
+- Chế độ nhúng (`lib/embed.ts`): bật khi `window.name === "tk-embed"` (Điều phối đặt `name` cho iframe) hoặc `?embed=1`. **Cố ý không dùng "đang trong iframe"** — Portal cũng nhúng app này bằng iframe và cần giữ header. Khi nhúng: `main-layout.tsx` ẩn `Header` + `TabBar`; `layouts/embed-bridge.tsx` nhận `postMessage {type:"tk:navigate", path}` (chỉ cùng origin, chỉ đường dẫn nội bộ bắt đầu `/` không `//`) và báo `{type:"tk:location", path}` lên cha.
+- `useLiveQueryInvalidation.ts`: URL WebSocket lấy theo `VITE_API_KONG_URL` (`/api` → `/api/ws` như cũ; `/tk-api/api` → `/tk-api/api/ws`). Trước đây hardcode `/api/ws` nên cùng domain với Điều phối sẽ rơi nhầm vào backend Node. **Chưa thấy kết nối WS thực trong lần thử** (không ghi nhận request `/ws` nào) — chưa kết luận là hoạt động, cần kiểm thêm.
+- Build nhúng: `VITE_BASE_PATH=/thong-ke/ VITE_API_KONG_URL=/tk-api/api` (reverse proxy Điều phối cắt tiền tố `/thong-ke/` và `/tk-api/`). Đã build + chạy thật trong stack thử: trang Phòng ban và Nhập liệu Vận tải hiển thị đúng trong khung.
+- Danh mục Điều phối đọc về qua `GET /api/{departments,positions,shifts,devices}` bằng 1 tài khoản **không gán chức vụ** (= chỉ đọc mọi resource theo `LocalAuthService.permissionsFor` tầng 3) — không cần thêm endpoint/cơ chế xác thực nào ở backend Thống kê. Chỉ đúng khi `AUTH_MODE=standalone`.
+- Lỗi có sẵn, chưa sửa: `not-found.tsx` gọi ảnh bằng đường dẫn tuyệt đối `/not-found.png` (file không có trong `public/`).
