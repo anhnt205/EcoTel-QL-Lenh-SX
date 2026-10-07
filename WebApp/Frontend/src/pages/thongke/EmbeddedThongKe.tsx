@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Box } from "@mui/material";
 import {
@@ -43,6 +43,19 @@ const EmbeddedThongKe = () => {
   );
   const lastReported = useRef(fullTkPath);
 
+  // Chiều cao khung = phần còn lại của màn hình tính từ vị trí THỰC của khung: thanh menu
+  // có thể xuống 2 dòng nên không dùng hằng số.
+  const [height, setHeight] = useState(560);
+  useLayoutEffect(() => {
+    const fit = () => {
+      const top = frameRef.current?.getBoundingClientRect().top ?? 0;
+      setHeight(Math.max(480, Math.floor(window.innerHeight - top)));
+    };
+    fit();
+    window.addEventListener("resize", fit);
+    return () => window.removeEventListener("resize", fit);
+  }, []);
+
   useEffect(() => {
     if (fullTkPath === lastReported.current) return;
     lastReported.current = fullTkPath;
@@ -77,8 +90,7 @@ const EmbeddedThongKe = () => {
         style={{
           display: "block",
           width: "100%",
-          height: "calc(100vh - 106px)",
-          minHeight: 480,
+          height,
           border: 0,
         }}
       />

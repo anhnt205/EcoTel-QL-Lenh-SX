@@ -21,10 +21,10 @@ export interface TkMenuGroup {
 export const TK_TOP_ITEMS: TkMenuItem[] = [
   { text: "Nhập liệu Khai thác", to: "/nhap-lieu/khai-thac" },
   { text: "Nhập liệu Vận tải", to: "/nhap-lieu/van-tai" },
-  { text: "Đối chiếu", to: "/nhap-lieu/doi-chieu" },
-  { text: "Báo chuyến", to: "/nhap-lieu/bao-chuyen" },
   { text: "Định mức nhiên liệu", to: "/danh-muc/dinh-muc-nhien-lieu" },
   { text: "Áp Trắc Địa", to: "/danh-muc/ap-tracdia" },
+  { text: "Đối chiếu", to: "/nhap-lieu/doi-chieu" },
+  { text: "Báo chuyến", to: "/nhap-lieu/bao-chuyen" },
   { text: "Báo cáo thống kê", to: "/bao-cao/thong-ke" },
 ];
 
@@ -108,3 +108,107 @@ export const CATALOG_PATHS_MOVED_TO_TK = [
   "/deviceTypes",
   "/deviceModels",
 ];
+
+// ---------------------------------------------------------------------------
+// Bố cục menu khi nhúng (giống PM Thống kê): các mục Thống kê nằm NGOÀI thanh
+// menu; "Danh mục" của Thống kê GỘP CHUNG với "Danh mục" của Điều phối thành
+// MỘT menu "Danh mục" duy nhất.
+//
+// Thanh menu: Tổng quan | Lệnh sản xuất | [Công việc của tôi] |
+//   Nhập liệu Khai thác | Nhập liệu Vận tải | DANH MỤC (gộp) | Định mức nhiên liệu |
+//   Áp Trắc Địa | Đối chiếu | Báo chuyến | Báo cáo thống kê | Báo cáo | Hệ thống
+// ---------------------------------------------------------------------------
+
+/** Mục Thống kê đứng TRƯỚC menu Danh mục (theo thứ tự thanh menu của PM Thống kê). */
+export const TK_NAV_BEFORE_CATALOG: TkMenuItem[] = TK_TOP_ITEMS.filter((i) =>
+  ["/nhap-lieu/khai-thac", "/nhap-lieu/van-tai"].includes(i.to),
+);
+/** Mục Thống kê đứng SAU menu Danh mục. */
+export const TK_NAV_AFTER_CATALOG: TkMenuItem[] = TK_TOP_ITEMS.filter(
+  (i) => !TK_NAV_BEFORE_CATALOG.includes(i),
+);
+
+export interface MergedCatalogItem {
+  text: string;
+  /** đường dẫn đích trong ứng dụng Điều phối (đã gồm tiền tố /tk với trang Thống kê) */
+  path: string;
+  source: "thongke" | "dieuphoi";
+}
+
+export interface MergedCatalogGroup {
+  label: string;
+  items: MergedCatalogItem[];
+}
+
+interface DpmmCatalogItem {
+  text: string;
+  path: string;
+  /** vai trò Điều phối được thấy mục này (giữ đúng phân quyền cũ của menu Danh mục) */
+  roles: string[];
+}
+
+const ADM = ["admin", "manager"];
+const ADM_DISP = ["admin", "manager", "dispatcher"];
+const TK_ROLES = ADM_DISP; // quyền chi tiết trong Thống kê do chính Thống kê kiểm tra
+
+/**
+ * Các mục danh mục CHỈ Điều phối có (hoặc phần vận hành của danh mục dùng chung),
+ * xếp vào nhóm tương ứng của Thống kê. Nhãn ghi rõ "(Điều phối)" ở mục vận hành
+ * để không nhầm với mục cùng tên của Thống kê.
+ */
+const DPMM_EXTRAS: Record<string, DpmmCatalogItem[]> = {
+  "Vật liệu, hàng hoá": [
+    { text: "Vật liệu — tỷ trọng (Điều phối)", path: "/materials", roles: ADM },
+  ],
+  "Vị trí": [
+    { text: "Điểm đổ tải — khoảng cách, toạ độ (Điều phối)", path: "/locations", roles: ADM },
+  ],
+  "Thiết bị": [
+    { text: "Xe — trạng thái, vị trí (Điều phối)", path: "/vehicles", roles: ADM_DISP },
+    { text: "Máy — trạng thái, vị trí (Điều phối)", path: "/machines", roles: ADM_DISP },
+  ],
+  "Danh mục Hệ thống": [
+    { text: "Cán bộ nhân viên", path: "/users", roles: ADM_DISP },
+  ],
+};
+
+/** Nhóm chỉ có ở Điều phối (giao ca, cung độ, mô hình). */
+const DPMM_ONLY_GROUP: { label: string; items: DpmmCatalogItem[] } = {
+  label: "Giao ca & vận hành (Điều phối)",
+  items: [
+    { text: "Công việc", path: "/jobs", roles: ADM },
+    { text: "Biện pháp an toàn", path: "/safetyMeasures", roles: ADM },
+    { text: "Cung độ", path: "/travelLog", roles: ADM },
+    { text: "Mô hình xe", path: "/models", roles: ADM_DISP },
+  ],
+};
+
+/**
+ * Menu "Danh mục" gộp, đã lọc theo vai trò. Nhóm rỗng bị bỏ. Thứ tự nhóm theo
+ * Thống kê, nhóm chỉ-Điều-phối đặt cuối.
+ */
+export function buildMergedCatalog(role: string | undefined): MergedCatalogGroup[] {
+  const r = role || "";
+  const isAdmin = r === "admin";
+  const groups: MergedCatalogGroup[] = TK_CATALOG_GROUPS.map((g) => {
+    const tk: MergedCatalogItem[] = TK_ROLES.includes(r)
+      ? g.items
+          .filter((i) => !i.adminOnly || isAdmin)
+          .map((i) => ({ text: i.text, path: tkPageRoute(i.to), source: "thongke" as const }))
+      : [];
+    const dp: MergedCatalogItem[] = (DPMM_EXTRAS[g.label] || [])
+      .filter((i) => i.roles.includes(r))
+      .map((i) => ({ text: i.text, path: i.path, source: "dieuphoi" as const }));
+    return { label: g.label, items: [...tk, ...dp] };
+  });
+  groups.push({
+    label: DPMM_ONLY_GROUP.label,
+    items: DPMM_ONLY_GROUP.items
+      .filter((i) => i.roles.includes(r))
+      .map((i) => ({ text: i.text, path: i.path, source: "dieuphoi" as const })),
+  });
+  return groups.filter((g) => g.items.length > 0);
+}
+
+/** Vai trò được thấy các mục menu của Thống kê (nhập liệu, đối chiếu, báo cáo...). */
+export const canSeeThongKe = (role: string | undefined) => TK_ROLES.includes(role || "");

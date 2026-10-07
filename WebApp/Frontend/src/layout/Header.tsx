@@ -205,11 +205,11 @@ export default function Header() {
   const displayName = user?.fullName || user?.username || "";
   const navBtnSx = (active: boolean) => ({
     height: 46,
-    px: 2,
+    px: TK_EMBED ? 1.25 : 2,
     gap: 0.5,
     borderRadius: 0,
     textTransform: "none",
-    fontSize: 15,
+    fontSize: TK_EMBED ? 14 : 15,
     fontWeight: 600,
     whiteSpace: "nowrap",
     color: active ? HDR_BLUE : "#334155",
@@ -290,7 +290,7 @@ export default function Header() {
                       <ListItemText primary="Công việc của tôi" />
                     </ListItem>
                   )}
-                  {menuItems.map((item: any) => {
+                  {!TK_EMBED && menuItems.map((item: any) => {
                     if (!item) return null;
                     if (item.submenu) {
                       return (
@@ -468,6 +468,7 @@ export default function Header() {
               display: "flex",
               alignItems: "stretch",
               gap: 0.5,
+              flexWrap: TK_EMBED ? "wrap" : "nowrap",
             }}
           >
             <Button
@@ -496,7 +497,7 @@ export default function Header() {
                 Công việc của tôi
               </Button>
             )}
-            {menuItems.length > 0 && (
+            {!TK_EMBED && menuItems.length > 0 && (
               <>
                 <Button
                   color="inherit"
