@@ -60,7 +60,6 @@ import { TK_EMBED } from "../config/features";
 import { CATALOG_PATHS_MOVED_TO_TK } from "./thongkeMenu";
 import ThongKeNav from "./ThongKeNav";
 import HeaderBanner from "./HeaderBanner";
-import { canSeeThongKe } from "./thongkeMenu";
 
 export default function Header() {
   const navigate = useNavigate();
@@ -223,9 +222,6 @@ export default function Header() {
     "& .MuiButton-startIcon": { mr: 0.75, color: HDR_BLUE },
   });
 
-  // Menu Báo cáo dạng dropdown khi nhúng Thống kê: "Tổng hợp báo cáo" + "Báo cáo thống kê"
-  const canTkReports = TK_EMBED && canSeeThongKe(user?.role);
-  const [reportAnchor, setReportAnchor] = useState<null | HTMLElement>(null);
 
   return (
     <ThemeProvider theme={uiSansTheme}>
@@ -370,21 +366,7 @@ export default function Header() {
                       <ListItemIcon sx={{ color: "primary.main" }}>
                         <ChartNoAxesCombined color="currentColor" />
                       </ListItemIcon>
-                      <ListItemText primary={canTkReports ? "Tổng hợp báo cáo" : "Báo cáo"} />
-                    </ListItem>
-                  )}
-                  {canTkReports && (
-                    <ListItem
-                      button
-                      onClick={() => {
-                        navigate("/reports?tab=thong-ke");
-                        setDrawerOpen(false);
-                      }}
-                    >
-                      <ListItemIcon sx={{ color: "primary.main" }}>
-                        <ChartNoAxesCombined color="currentColor" />
-                      </ListItemIcon>
-                      <ListItemText primary="Báo cáo thống kê" />
+                      <ListItemText primary="Báo cáo" />
                     </ListItem>
                   )}
                   {[RoleEnum.ADMIN].includes(user?.role) && (
@@ -607,44 +589,7 @@ export default function Header() {
             {TK_EMBED && (
               <ThongKeNav role={user?.role} variant="bar" navBtnSx={navBtnSx} />
             )}
-            {canTkReports && (
-              <>
-                <Button
-                  color="inherit"
-                  startIcon={<ChartNoAxesCombined size={20} style={{ color: "inherit" }} />}
-                  endIcon={<ExpandMore />}
-                  sx={{ ...navBtnSx(isActive("/reports")), px: 1.25, fontSize: 14 }}
-                  onClick={(e) => setReportAnchor(e.currentTarget)}
-                >
-                  Báo cáo
-                </Button>
-                <Menu
-                  anchorEl={reportAnchor}
-                  open={Boolean(reportAnchor)}
-                  onClose={() => setReportAnchor(null)}
-                >
-                  <MenuItem
-                    selected={isActive("/reports") && !location.search.includes("tab=thong-ke")}
-                    onClick={() => {
-                      navigate("/reports");
-                      setReportAnchor(null);
-                    }}
-                  >
-                    Tổng hợp báo cáo
-                  </MenuItem>
-                  <MenuItem
-                    selected={isActive("/reports") && location.search.includes("tab=thong-ke")}
-                    onClick={() => {
-                      navigate("/reports?tab=thong-ke");
-                      setReportAnchor(null);
-                    }}
-                  >
-                    Báo cáo thống kê
-                  </MenuItem>
-                </Menu>
-              </>
-            )}
-            {!canTkReports && [RoleEnum.ADMIN, RoleEnum.MANAGER, RoleEnum.DISPATCHER].includes(
+            {[RoleEnum.ADMIN, RoleEnum.MANAGER, RoleEnum.DISPATCHER].includes(
               user?.role,
             ) && (
               <Button

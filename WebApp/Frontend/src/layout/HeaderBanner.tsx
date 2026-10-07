@@ -44,7 +44,7 @@ const HeaderBanner = ({
       sx={{
         position: "relative",
         overflow: "hidden",
-        height: "clamp(140px, 16.5vw, 240px)",
+        height: "clamp(112px, 12.5vw, 180px)",
         color: textColor,
         background,
         borderBottom: `3px solid ${GOLD}`,
@@ -84,7 +84,7 @@ const HeaderBanner = ({
           src={logoUrl}
           alt="logo"
           sx={{
-            height: "68%",
+            height: "70%",
             aspectRatio: "1 / 1",
             objectFit: "contain",
             flexShrink: 0,
@@ -95,7 +95,7 @@ const HeaderBanner = ({
         <Box sx={{ minWidth: 0 }}>
           <Typography
             sx={{
-              fontSize: "clamp(11px, 1.35vw, 21px)",
+              fontSize: "clamp(10px, 1.2vw, 18px)",
               fontWeight: 500,
               letterSpacing: "0.12em",
               textTransform: "uppercase",
@@ -107,11 +107,11 @@ const HeaderBanner = ({
           <Typography
             component="h1"
             sx={{
-              fontSize: "clamp(16px, 2.75vw, 44px)",
+              fontSize: "clamp(15px, 2.4vw, 38px)",
               fontWeight: 800,
               lineHeight: 1.16,
               textTransform: "uppercase",
-              mt: "0.5vw",
+              mt: "0.4vw",
               maxWidth: "46vw",
               textShadow: "0 1px 6px rgba(0,0,0,.25)",
             }}
@@ -120,8 +120,8 @@ const HeaderBanner = ({
           </Typography>
           <Typography
             sx={{
-              fontSize: "clamp(10px, 1.15vw, 18px)",
-              mt: "0.9vw",
+              fontSize: "clamp(10px, 1vw, 16px)",
+              mt: "0.7vw",
               opacity: 0.95,
               whiteSpace: "pre",
             }}
