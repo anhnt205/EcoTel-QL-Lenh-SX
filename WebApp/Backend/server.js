@@ -39,6 +39,11 @@ const DeviceModelRoutes = require("./routes/deviceModel.routes");
 const ModelRoutes = require("./routes/model.routes");
 const AnalysicRoutes = require("./routes/analysic.routes");
 const SettingRoutes = require("./routes/setting.routes");
+const CatalogSyncRoutes = require("./routes/catalogSync.routes");
+const {
+  lockCatalogWrites,
+  lockDeviceCatalogWrites,
+} = require("./middleware/catalogLock");
 
 require("./utils/cron");
 
@@ -125,6 +130,14 @@ app.use((req, res, next) => {
   });
   next();
 });
+// Danh mục do Thống kê quản lý: chỉ có tác dụng khi CATALOG_MASTER=thongke
+// (xem middleware/catalogLock.js). Phải đứng TRƯỚC các router bên dưới.
+app.use(
+  ["/api/departments", "/api/positions", "/api/devicetypes", "/api/devicemodels", "/api/shifts"],
+  lockCatalogWrites,
+);
+app.use("/api/devices", lockDeviceCatalogWrites);
+
 // Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
@@ -151,6 +164,7 @@ app.use("/api/devicemodels", DeviceModelRoutes);
 app.use("/api/models", ModelRoutes);
 app.use("/api/analysics", AnalysicRoutes);
 app.use("/api/settings", SettingRoutes);
+app.use("/api/catalog-sync", CatalogSyncRoutes);
 
 let lastCpuInfo = os.cpus();
 

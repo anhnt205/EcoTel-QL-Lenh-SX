@@ -17,6 +17,12 @@ const DeviceType = new mongoose.Schema({
         index: true,
         sparse: true,
     },
+    // Gắn với phân loại thiết bị gốc bên Thống kê — xem services/tkCatalogSync.js.
+    externalTkId: {
+        type: String,
+        index: true,
+        sparse: true,
+    },
 },
     {
         timestamps: true

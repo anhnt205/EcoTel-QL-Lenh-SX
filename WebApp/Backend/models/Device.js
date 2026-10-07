@@ -19,6 +19,13 @@ const deviceSchema = new mongoose.Schema({
         index: true,
         sparse: true,
     },
+    // Gắn với thiết bị gốc bên Thống kê (id số) khi đồng bộ danh mục từ Thống
+    // kê — xem services/tkCatalogSync.js. Để trống nếu chỉ có ở Điều phối.
+    externalTkId: {
+        type: String,
+        index: true,
+        sparse: true,
+    },
     department: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Department',

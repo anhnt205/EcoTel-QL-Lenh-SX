@@ -15,6 +15,12 @@ const departmentSchema = new mongoose.Schema({
     },
     description: {
         type: String,
+    },
+    // Gắn với đơn vị gốc bên Thống kê — xem services/tkCatalogSync.js.
+    externalTkId: {
+        type: String,
+        index: true,
+        sparse: true,
     }
 }, {
     timestamps: true

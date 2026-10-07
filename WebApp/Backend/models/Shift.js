@@ -12,6 +12,12 @@ const Shift = new mongoose.Schema({
     endTime: {
         type: String,
     },
+    // Gắn với ca gốc bên Thống kê — xem services/tkCatalogSync.js.
+    externalTkId: {
+        type: String,
+        index: true,
+        sparse: true,
+    },
 },
     {
         timestamps: true

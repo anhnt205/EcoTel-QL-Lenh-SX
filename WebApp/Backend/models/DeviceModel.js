@@ -6,7 +6,12 @@ const DeviceModel = new mongoose.Schema({
         required: [true, 'Model name is required'],
         trim: true
     },
-
+    // Gắn với chủng loại gốc bên Thống kê — xem services/tkCatalogSync.js.
+    externalTkId: {
+        type: String,
+        index: true,
+        sparse: true,
+    },
 },
     {
         timestamps: true
