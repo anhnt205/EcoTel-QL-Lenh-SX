@@ -1,4 +1,6 @@
 const jwt = require("jsonwebtoken");
+const { TK_RESOURCES } = require("../config/modules");
+const { effectivePermissions, toTkPermissions, canAccessThongKeCustom } = require("./permissions");
 
 // Đăng nhập MỘT LẦN ở Điều phối: sau khi người dùng đã đăng nhập Điều phối, backend
 // Điều phối cấp cho khung Thống kê một token mà Thống kê chấp nhận, nên khung nhúng
@@ -15,18 +17,6 @@ const jwt = require("jsonwebtoken");
 //
 // Quyền Thống kê suy từ VAI TRÒ Điều phối (bảng dưới) — đây là CHÍNH SÁCH, cần chủ dự
 // án xác nhận; sửa ở đây là đổi được cho cả hệ thống.
-
-// Danh sách resource khớp PermissionResources.ALL bên Thống kê.
-const TK_RESOURCES = [
-  "users", "departments", "positions", "shifts", "locations", "devices", "device-types",
-  "materials", "cargo-groups", "cargo-types", "excavation-reports", "transport-reports",
-  "reconciliation", "acceptance-products", "classifications", "coefficients",
-  "density-parameters", "device-production-attributes", "excavation-areas", "matrix-catalogs",
-  "model-periods", "pickup-points", "production", "receiving-points", "report-periods",
-  "seam-groups", "survey-standards", "ttl-clh-items", "unloading-points",
-  "vehicle-category-classes", "vehicle-fuel-classes", "vehicle-rank-groups", "vehicle-ranks",
-  "vehicle-types",
-];
 
 // Các resource NHẬP LIỆU hằng ngày (người vận hành thao tác), khác danh mục gốc.
 const ENTRY_RESOURCES = ["excavation-reports", "transport-reports", "reconciliation"];
@@ -45,7 +35,17 @@ const ROLE_RULES = {
   dispatcher: (res) => (ENTRY_RESOURCES.includes(res) ? { c: true, r: true, u: true, d: false, a: false } : READ),
 };
 
-const canAccessThongKe = (role) => Object.prototype.hasOwnProperty.call(ROLE_RULES, role);
+const legacyCanAccess = (role) => Object.prototype.hasOwnProperty.call(ROLE_RULES, role);
+
+/**
+ * Có được vào Thống kê không. Nhận người dùng (đã populate position/department) hoặc chuỗi vai trò (cũ).
+ * Người đã được cấu hình quyền mới: có quyền xem ít nhất 1 màn Thống kê; chưa cấu hình: theo vai trò cũ.
+ */
+const canAccessThongKe = (userOrRole) => {
+  if (typeof userOrRole === "string" || !userOrRole) return legacyCanAccess(userOrRole);
+  const eff = effectivePermissions(userOrRole);
+  return eff.mode === "legacy" ? legacyCanAccess(userOrRole.role) : canAccessThongKeCustom(eff);
+};
 
 function permissionsFor(role) {
   const rule = ROLE_RULES[role];
@@ -81,7 +81,10 @@ function buildTkClaims(user, nowSec = Math.floor(Date.now() / 1000), appCode = "
     companyId: null,
     app: appCode,
     typ: "access",
-    permissions: permissionsFor(user.role),
+    permissions: (() => {
+      const eff = effectivePermissions(user);
+      return eff.mode === "legacy" ? permissionsFor(user.role) : toTkPermissions(eff);
+    })(),
     departmentId: Number.isFinite(tkDept) ? tkDept : null,
     fullDataScope: user.role === "admin" || user.role === "dispatcher",
     iat: nowSec,

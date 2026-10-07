@@ -14,6 +14,12 @@ const userSchema = new mongoose.Schema({
     department: { type: mongoose.Schema.Types.ObjectId, ref: 'Department' },
     position: { type: mongoose.Schema.Types.ObjectId, ref: 'Position' },
     role: { type: String, default: ROLE.EMPLOYEE },
+    // Quyền riêng của cán bộ: chỉ có tác dụng khi customPermissions = true (nếu không thì ăn theo chức vụ).
+    customPermissions: { type: Boolean, default: false },
+    permissions: {
+        type: [{ _id: false, module: String, c: Boolean, r: Boolean, u: Boolean, d: Boolean }],
+        default: undefined,
+    },
     active: {
         type: Boolean,
         default: true

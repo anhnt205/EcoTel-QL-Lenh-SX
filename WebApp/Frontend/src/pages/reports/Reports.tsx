@@ -61,7 +61,7 @@ import { printElement } from "../../utils/printElement";
 import { useSearchParams } from "react-router-dom";
 import { Tab, Tabs } from "@mui/material";
 import { TK_EMBED } from "../../config/features";
-import { canSeeThongKe } from "../../layout/thongkeMenu";
+import { canSeeTkModule, TK_REPORT_MODULE } from "../../layout/thongkeMenu";
 import ThongKeFrame from "../../components/thongke/ThongKeFrame";
 
 const LINE = "#e5e9f0";
@@ -855,7 +855,7 @@ function DispatchReports() {
 function Reports() {
   const [user] = useAtom(userAtom);
   const [params, setParams] = useSearchParams();
-  const showTk = TK_EMBED && canSeeThongKe(user?.role);
+  const showTk = TK_EMBED && canSeeTkModule(user, TK_REPORT_MODULE);
   const tab = showTk && params.get("tab") === "thong-ke" ? "thong-ke" : "bao-cao";
   // Giữ khung Thống kê sống sau lần mở đầu để chuyển qua lại không mất việc đang xem.
   const [tkOpened, setTkOpened] = useState(tab === "thong-ke");

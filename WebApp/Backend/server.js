@@ -40,6 +40,8 @@ const ModelRoutes = require("./routes/model.routes");
 const AnalysicRoutes = require("./routes/analysic.routes");
 const SettingRoutes = require("./routes/setting.routes");
 const CatalogSyncRoutes = require("./routes/catalogSync.routes");
+const PermissionRoutes = require("./routes/permission.routes");
+const { enforceWrites, enforceRead, permissionFieldsGuard } = require("./middleware/permission");
 const {
   lockCatalogWrites,
   lockDeviceCatalogWrites,
@@ -132,15 +134,43 @@ app.use((req, res, next) => {
   });
   next();
 });
-// Danh mục do Thống kê quản lý: chỉ có tác dụng khi CATALOG_MASTER=thongke
+// Danh mục do Thống kê quản lý (loại thiết bị, ca; Phòng ban/Chức vụ do Điều phối quản lý hẳn): chỉ có tác dụng khi CATALOG_MASTER=thongke
 // (xem middleware/catalogLock.js). Phải đứng TRƯỚC các router bên dưới.
 app.use(
-  ["/api/departments", "/api/positions", "/api/devicetypes", "/api/devicemodels", "/api/shifts"],
+  ["/api/devicetypes", "/api/devicemodels", "/api/shifts"],
   lockCatalogWrites,
 );
 app.use("/api/devices", lockDeviceCatalogWrites);
 app.use("/api/materials", lockMaterialCatalogWrites);
 app.use("/api/locations", lockLocationCatalogWrites);
+
+// Phân quyền MỚI (Phòng ban -> Chức vụ -> Cán bộ): chỉ áp dụng cho người đã được cấu hình quyền; admin và người chưa
+// cấu hình đi qua như cũ (xem middleware/permission.js). Chỉ chặn thao tác quản lý danh mục/hệ thống và xem Báo cáo;
+// KHÔNG đụng Lệnh sản xuất / báo chuyến / check-in / trạng thái thiết bị (các API app Mobile dùng).
+const skipExport = (req) => /\/exportFile\/?$/.test(req.path);
+const usersManagementOnly = (req) =>
+  !(
+    (req.method === "POST" && /^\/importFile\/?$/.test(req.path)) ||
+    (req.method === "PUT" && /^\/update\//.test(req.path)) ||
+    (req.method === "DELETE" && /^\/?$/.test(req.path))
+  );
+app.use("/api/departments", enforceWrites("departments", "Phòng ban", { skip: skipExport }), permissionFieldsGuard("department"));
+app.use("/api/positions", enforceWrites("positions", "Chức vụ", { skip: skipExport }), permissionFieldsGuard("position"));
+app.use("/api/users", enforceWrites("users", "Cán bộ nhân viên", { skip: usersManagementOnly }), permissionFieldsGuard("user"));
+app.use(
+  "/api/auth",
+  enforceWrites("users", "Cán bộ nhân viên", { skip: (req) => !(req.method === "POST" && req.path === "/register") }),
+  permissionFieldsGuard("user"),
+);
+app.use("/api/jobs", enforceWrites("jobs", "Công việc", { skip: skipExport }));
+app.use("/api/materials", enforceWrites("materials", "Vật liệu", { skip: skipExport }));
+app.use("/api/locations", enforceWrites("locations", "Điểm đổ tải", { skip: skipExport }));
+app.use("/api/safetyMeasures", enforceWrites("safety-measures", "Biện pháp an toàn", { skip: skipExport }));
+app.use("/api/travellogs", enforceWrites("travel-logs", "Cung độ", { skip: skipExport }));
+app.use("/api/models", enforceWrites("models", "Mô hình xe", { skip: skipExport }));
+app.use("/api/settings", enforceWrites("system", "Hệ thống"));
+app.use("/api/exports", enforceRead("reports", "Báo cáo"));
+
 
 // Routes
 app.use("/api/auth", authRoutes);
@@ -169,6 +199,7 @@ app.use("/api/models", ModelRoutes);
 app.use("/api/analysics", AnalysicRoutes);
 app.use("/api/settings", SettingRoutes);
 app.use("/api/catalog-sync", CatalogSyncRoutes);
+app.use("/api/permissions", PermissionRoutes);
 
 let lastCpuInfo = os.cpus();
 

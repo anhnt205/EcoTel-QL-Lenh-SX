@@ -95,9 +95,10 @@ describe('normalizeTk', () => {
 describe('buildPlan', () => {
     const emptyDpmm = () => ({ department: [], position: [], shift: [], deviceType: [], deviceModel: [], device: [] });
 
-    test('DB Điều phối trống -> tất cả là tạo mới', () => {
+    test('DB Điều phối trống -> thiết bị/loại là tạo mới; phòng ban KHÔNG tạo (Điều phối quản lý hẳn)', () => {
         const { summary } = buildPlan(normalizeTk(tkData()), emptyDpmm());
-        expect(summary.department.create).toBe(1);
+        expect(summary.department).toMatchObject({ create: 0, update: 0, onlyInTk: 1 });
+        expect(summary.position).toBeUndefined(); // chức vụ không đồng bộ nữa
         expect(summary.device.create).toBe(1);
         expect(summary.deviceType.create).toBe(1);
     });
@@ -123,7 +124,7 @@ describe('buildPlan', () => {
             department: 'd1', category: 't1', material: 'm1',
         }];
         const { summary } = buildPlan(normalizeTk(tkData()), dpmm);
-        for (const e of ['department', 'position', 'shift', 'deviceType', 'deviceModel', 'device']) {
+        for (const e of ['department', 'shift', 'deviceType', 'deviceModel', 'device']) {
             expect(summary[e]).toMatchObject({ create: 0, update: 0, unchanged: 1, conflicts: 0 });
         }
     });
@@ -138,16 +139,18 @@ describe('buildPlan', () => {
         expect(set).not.toHaveProperty('coordinates');
     });
 
-    test('xung đột unique: đổi tên đơn vị trùng đơn vị khác -> báo xung đột, không ghi', () => {
+    test('phòng ban chỉ GẮN externalTkId: không đổi tên/mã/mô tả, không tạo mới, không xung đột', () => {
         const dpmm = emptyDpmm();
         dpmm.department = [
-            { _id: 'd1', externalTkId: '1', code: 'DV1', name: 'Tên cũ' },
+            { _id: 'd1', code: 'DV1', name: 'Tên do Điều phối đặt', description: 'mô tả riêng' },
             { _id: 'd2', code: 'DV2', name: 'Đơn vị 1' },
         ];
         const { plan } = buildPlan(normalizeTk(tkData()), dpmm);
-        expect(plan.department.conflicts).toHaveLength(1);
-        expect(plan.department.conflicts[0].field).toBe('name');
-        expect(plan.department.update).toHaveLength(0);
+        expect(plan.department.create).toHaveLength(0);
+        expect(plan.department.conflicts).toHaveLength(0);
+        expect(plan.department.update).toHaveLength(1);
+        expect(plan.department.update[0]).toMatchObject({ id: 'd1', by: 'code', set: { externalTkId: '1' } });
+        expect(Object.keys(plan.department.update[0].set)).toEqual(['externalTkId']);
     });
 
     test('tham chiếu thiết bị chưa giải được không bị ghi null (chờ giải khi ghi thật)', () => {

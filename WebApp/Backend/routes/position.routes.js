@@ -11,7 +11,7 @@ const { ROLE } = require('../config/config');
 
 router.post('/', verifyToken, restrictTo(ROLE.MANAGER, ROLE.ADMIN), async (req, res, next) => {
     try {
-        const { name, note } = req.body;
+        const { name, note, department, permissions } = req.body;
 
         const existingPosition = await Position.findOne({ name });
         if (existingPosition) {
@@ -21,7 +21,9 @@ router.post('/', verifyToken, restrictTo(ROLE.MANAGER, ROLE.ADMIN), async (req, 
 
         const newPosition = new Position({
             name,
-            note
+            note,
+            department,
+            permissions
         });
         await newPosition.save();
         req.logger.info(`✅ Tạo chức vụ thành công: ${newPosition.name}`);

@@ -242,7 +242,10 @@ function normalizeTk({
 
 // Field Điều phối ghi từ Thống kê, theo từng danh mục (không có field vận hành).
 const SPECS = {
+  // Phòng ban do ĐIỀU PHỐI quản lý hẳn (kèm phân quyền). Đồng bộ chỉ GẮN `externalTkId` vào phòng ban đã có (ghép theo
+  // mã rồi tên) để tham chiếu thiết bị / phạm vi dữ liệu Thống kê; KHÔNG tạo mới, KHÔNG sửa tên/mã.
   department: {
+    linkOnly: true,
     naturalKeys: ["code", "name"],
     unique: ["code", "name"],
     pick: (r) => ({ code: r.code, name: r.name, description: r.description }),
@@ -295,9 +298,9 @@ const SPECS = {
 };
 
 // Thứ tự xử lý: danh mục tham chiếu trước, thiết bị sau cùng.
+// Chức vụ KHÔNG đồng bộ nữa: Điều phối quản lý hẳn (Chức vụ gắn phòng ban + phân quyền).
 const ORDER = [
   "department",
-  "position",
   "shift",
   "material",
   "location",
@@ -329,9 +332,22 @@ function buildPlan(tk, dpmm) {
       for (const d of docs) if (norm(d[u])) takenUnique[u].set(norm(d[u]), String(d._id));
     }
 
-    const out = { create: [], update: [], unchanged: 0, conflicts: [], onlyInDpmm: onlyInDpmm.map(brief) };
+    const out = { create: [], update: [], unchanged: 0, conflicts: [], onlyInDpmm: onlyInDpmm.map(brief), onlyInTk: [] };
 
     for (const { tk: row, doc, by } of matches) {
+      if (spec.linkOnly) {
+        if (!doc) {
+          out.onlyInTk.push({ tkId: row.tkId, code: row.code, name: row.name });
+          continue;
+        }
+        if (refMaps[entity]) refMaps[entity].set(row.tkId, doc._id);
+        if (String(doc.externalTkId || "") !== String(row.tkId)) {
+          out.update.push({ id: String(doc._id), tkId: row.tkId, by, set: { externalTkId: row.tkId }, refPending: false });
+        } else {
+          out.unchanged++;
+        }
+        continue;
+      }
       const fields = spec.pick(row);
       if (entity === "device") {
         // Tham chiếu: null nghĩa là sẽ được tạo ở bước trước nên chưa có _id.
@@ -394,6 +410,7 @@ function buildPlan(tk, dpmm) {
       unchanged: p.unchanged,
       conflicts: p.conflicts.length,
       onlyInDpmm: p.onlyInDpmm.length,
+      onlyInTk: p.onlyInTk.length,
     };
   }
   summary.notes = tk.notes;

@@ -32,6 +32,7 @@ import Models from "./pages/model/Model";
 import { RoleEnum } from "./enums";
 import SystemDashboard from "./pages/dashboard/System";
 import EmbeddedThongKe from "./pages/thongke/EmbeddedThongKe";
+import RequireModule from "./permissions/RequireModule";
 
 interface PrivateRouteProps {
   children: React.ReactNode;
@@ -87,125 +88,125 @@ const App = () => {
         <Route
           path="/"
           element={
-            <PrivateRoute>
+            <PrivateRoute><RequireModule module="dashboard">
               <DashBoard />
-            </PrivateRoute>
+            </RequireModule></PrivateRoute>
           }
         />
         <Route
           path="/orders"
           element={
-            <PrivateRoute>
+            <PrivateRoute><RequireModule module="orders">
               {user?.role === RoleEnum.DISPATCHER ? (
                 <DispatcherOrders />
               ) : (
                 <Orders />
               )}
-            </PrivateRoute>
+            </RequireModule></PrivateRoute>
           }
         />
         <Route
           path="/orderByUsers"
           element={
-            <PrivateRoute>
+            <PrivateRoute><RequireModule module="my-tasks">
               <OrderByUsers />
-            </PrivateRoute>
+            </RequireModule></PrivateRoute>
           }
         />
         <Route
           path="/safetyMeasures"
           element={
-            <PrivateRoute>
+            <PrivateRoute><RequireModule module="safety-measures">
               <SafetyMeasures />
-            </PrivateRoute>
+            </RequireModule></PrivateRoute>
           }
         />
         <Route
           path="/deviceTypes"
           element={
-            <PrivateRoute>
+            <PrivateRoute><RequireModule module="device-vehicles">
               <DeviceTypes />
-            </PrivateRoute>
+            </RequireModule></PrivateRoute>
           }
         />
         <Route
           path="/vehicles"
           element={
-            <PrivateRoute>
+            <PrivateRoute><RequireModule module="device-vehicles">
               <Devices />
-            </PrivateRoute>
+            </RequireModule></PrivateRoute>
           }
         />
         <Route
           path="/shifts"
           element={
-            <PrivateRoute>
+            <PrivateRoute><RequireModule module="tk-shifts">
               <Shifts />
-            </PrivateRoute>
+            </RequireModule></PrivateRoute>
           }
         />
         <Route
           path="/machines"
           element={
-            <PrivateRoute>
+            <PrivateRoute><RequireModule module="device-machines">
               <Machines />
-            </PrivateRoute>
+            </RequireModule></PrivateRoute>
           }
         />
         <Route
           path="/models"
           element={
-            <PrivateRoute>
+            <PrivateRoute><RequireModule module="models">
               <Models />
-            </PrivateRoute>
+            </RequireModule></PrivateRoute>
           }
         />
         <Route
           path="/materials"
           element={
-            <PrivateRoute>
+            <PrivateRoute><RequireModule module="materials">
               <Materials />
-            </PrivateRoute>
+            </RequireModule></PrivateRoute>
           }
         />
         <Route
           path="/jobs"
           element={
-            <PrivateRoute>
+            <PrivateRoute><RequireModule module="jobs">
               <Jobs />
-            </PrivateRoute>
+            </RequireModule></PrivateRoute>
           }
         />
         <Route
           path="/positions"
           element={
-            <PrivateRoute>
+            <PrivateRoute><RequireModule module="positions">
               <Positions />
-            </PrivateRoute>
+            </RequireModule></PrivateRoute>
           }
         />
         <Route
           path="/locations"
           element={
-            <PrivateRoute>
+            <PrivateRoute><RequireModule module="locations">
               <Locations />
-            </PrivateRoute>
+            </RequireModule></PrivateRoute>
           }
         />
         <Route
           path="/departments"
           element={
-            <PrivateRoute>
+            <PrivateRoute><RequireModule module="departments">
               <Departments />
-            </PrivateRoute>
+            </RequireModule></PrivateRoute>
           }
         />
         <Route
           path="/reports"
           element={
-            <PrivateRoute>
+            <PrivateRoute><RequireModule module="reports">
               <Reports />
-            </PrivateRoute>
+            </RequireModule></PrivateRoute>
           }
         />
         <Route
@@ -219,33 +220,33 @@ const App = () => {
         <Route
           path="/users"
           element={
-            <PrivateRoute>
+            <PrivateRoute><RequireModule module="users">
               <Users />
-            </PrivateRoute>
+            </RequireModule></PrivateRoute>
           }
         />
         <Route
           path="/travelLog"
           element={
-            <PrivateRoute>
+            <PrivateRoute><RequireModule module="travel-logs">
               <TravelLogs />
-            </PrivateRoute>
+            </RequireModule></PrivateRoute>
           }
         />
         <Route
           path="/deviceModels"
           element={
-            <PrivateRoute>
+            <PrivateRoute><RequireModule module="device-vehicles">
               <DeviceModels />
-            </PrivateRoute>
+            </RequireModule></PrivateRoute>
           }
         />
         <Route
           path="/system"
           element={
-            <PrivateRoute>
+            <PrivateRoute><RequireModule module="system">
               <SystemDashboard />
-            </PrivateRoute>
+            </RequireModule></PrivateRoute>
           }
         />
         {/* Phần mềm Thống kê nhúng cùng domain (xem pages/thongke/EmbeddedThongKe).
@@ -253,9 +254,9 @@ const App = () => {
         <Route
           path="/tk/*"
           element={
-            <PrivateRoute>
+            <PrivateRoute><RequireModule module="tk">
               <EmbeddedThongKe />
-            </PrivateRoute>
+            </RequireModule></PrivateRoute>
           }
         />
       </Routes>

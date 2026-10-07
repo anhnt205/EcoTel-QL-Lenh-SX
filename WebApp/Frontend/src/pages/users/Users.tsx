@@ -52,6 +52,7 @@ import { StyledPopper } from "../../ui/poppers";
 import { userValidationSchema } from "../../utils/validation";
 import UserService from "../../services/userService";
 import PositionService from "../../services/positionService";
+import UserPermissionSection from "../../components/permissions/UserPermissionSection";
 import DepartmentService from "../../services/departmentService";
 import { RoleEnum } from "../../enums";
 import { ROLE_TYPE_OPTIONS } from "../../utils/const";
@@ -211,6 +212,9 @@ const Users: React.FC = () => {
       department: user?.role === RoleEnum.ADMIN ? user?.department?._id : "",
       position: undefined,
       role: "",
+      // phân quyền chức năng: ăn theo chức vụ, hoặc quyền riêng khi bật customPermissions
+      customPermissions: false,
+      permissions: undefined as any,
       ...selectedUser,
     },
     validationSchema: userValidationSchema,
@@ -511,13 +515,13 @@ const Users: React.FC = () => {
     <Box>
       <Breadcrumbs aria-label="breadcrumb">
         <Typography>Danh mục</Typography>
-        <Typography>Người dùng</Typography>
+        <Typography>Cán bộ nhân viên</Typography>
       </Breadcrumbs>
       <Box
         sx={{ display: "flex", justifyContent: "space-between", mb: 3, mt: 3 }}
       >
         <Typography variant="h3" color="brand.title">
-          Người dùng
+          Cán bộ nhân viên
         </Typography>
       </Box>
       <Accordion expanded={expanded} ref={formRef}>
@@ -853,7 +857,7 @@ const Users: React.FC = () => {
                   select
                   id="role"
                   name="role"
-                  label="Phân quyền"
+                  label="Vai trò (quyền cơ bản)"
                   SelectProps={{
                     displayEmpty: true,
                     MenuProps: {
@@ -878,6 +882,24 @@ const Users: React.FC = () => {
                     </MenuItem>
                   ))}
                 </TextField>
+
+                {user?.role === RoleEnum.ADMIN && (
+                  <UserPermissionSection
+                    position={positions.find((p: Position) => p._id === formik.values.position)}
+                    positionDepartment={departments.find(
+                      (d: Department) =>
+                        d._id ===
+                        (positions.find((p: Position) => p._id === formik.values.position) as any)?.department,
+                    )}
+                    userDepartment={departments.find((d: Department) => d._id === formik.values.department)}
+                    customPermissions={Boolean(formik.values.customPermissions)}
+                    rows={Array.isArray(formik.values.permissions) ? formik.values.permissions : []}
+                    onChange={({ customPermissions, permissions }) => {
+                      formik.setFieldValue("customPermissions", customPermissions);
+                      formik.setFieldValue("permissions", permissions);
+                    }}
+                  />
+                )}
 
                 <Grid container spacing={2}>
                   <Grid item>

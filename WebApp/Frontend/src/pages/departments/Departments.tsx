@@ -42,6 +42,7 @@ import DepartmentService from "../../services/departmentService";
 import { RoleEnum } from "../../enums";
 import CustomDataGrid from "../../components/Table/CustomDataGrid";
 import { parseAxiosError } from "../../utils/handleApiError";
+import ModuleChecklist from "../../components/permissions/ModuleChecklist";
 
 const Departments = () => {
     const [open, setOpen] = useState(false);
@@ -189,13 +190,17 @@ const Departments = () => {
             name: "",
             code: "",
             description: "",
+            // chức năng (module) phòng ban được xem; null = chưa giới hạn (theo quyền vai trò cũ)
+            allowedModules: null as string[] | null,
         },
         validationSchema: departmentValidationSchema,
         onSubmit: (values) => {
             if (selectedDepartment) {
                 updateMutation.mutate({ ...values, _id: selectedDepartment?._id });
             } else {
-                createMutation.mutate(values);
+                // chưa giới hạn thì không gửi trường này khi tạo mới
+                const { allowedModules, ...rest } = values;
+                createMutation.mutate(allowedModules ? values : rest);
             }
         },
     });
@@ -207,6 +212,7 @@ const Departments = () => {
                 name: department.name,
                 code: department.code,
                 description: department.description || "",
+                allowedModules: Array.isArray(department.allowedModules) ? department.allowedModules : null,
             });
         } else {
             setSelectedDepartment(null);
@@ -249,13 +255,13 @@ const Departments = () => {
         <Box>
             <Breadcrumbs aria-label="breadcrumb">
                 <Typography>Danh mục</Typography>
-                <Typography>Đơn vị</Typography>
+                <Typography>Phòng ban</Typography>
             </Breadcrumbs>
             <Box
                 sx={{ display: "flex", justifyContent: "space-between", mb: 3, mt: 3 }}
             >
                 <Typography variant="h3" color="brand.title">
-                    Đơn vị
+                    Phòng ban
                 </Typography>
             </Box>
             <Accordion expanded={expanded} ref={formRef}>
@@ -441,6 +447,12 @@ const Departments = () => {
                                     formik.touched.description && formik.errors.description
                                 }
                             />
+                            {user?.role === RoleEnum.ADMIN && (
+                                <ModuleChecklist
+                                    value={formik.values.allowedModules}
+                                    onChange={(v) => formik.setFieldValue("allowedModules", v)}
+                                />
+                            )}
                         </Box>
                     </DialogContent>
                     <DialogActions>

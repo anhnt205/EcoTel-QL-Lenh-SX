@@ -75,7 +75,7 @@ router.get('/', verifyToken, async (req, res, next) => {
  */
 router.post('/', verifyToken, restrictTo(ROLE.MANAGER, ROLE.ADMIN), async (req, res, next) => {
     try {
-        const { name, code, description } = req.body;
+        const { name, code, description, allowedModules } = req.body;
 
         // Check if department with same code exists
         const existingCodeDepartment = await Department.findOne({ code });
@@ -92,6 +92,7 @@ router.post('/', verifyToken, restrictTo(ROLE.MANAGER, ROLE.ADMIN), async (req, 
             name,
             code,
             description,
+            allowedModules,
         });
 
         req.logger.info(`🔥  Tạo mới đơn vị thành công`);

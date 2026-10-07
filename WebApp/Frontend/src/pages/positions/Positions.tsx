@@ -11,6 +11,7 @@ import {
     MenuItem,
     Menu,
     Switch,
+    FormControlLabel,
     ListItemText,
     Accordion,
     AccordionSummary,
@@ -42,6 +43,9 @@ import PositionService from "../../services/positionService";
 import { RoleEnum } from "../../enums";
 import CustomDataGrid from "../../components/Table/CustomDataGrid";
 import { parseAxiosError } from "../../utils/handleApiError";
+import DepartmentService from "../../services/departmentService";
+import PermissionMatrix from "../../components/permissions/PermissionMatrix";
+import { PermRow } from "../../permissions/access";
 
 const Positions: React.FC = () => {
     const [open, setOpen] = useState(false);
@@ -57,9 +61,31 @@ const Positions: React.FC = () => {
 
     const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
 
+    // Phòng ban (để chọn phòng ban cho chức vụ và hiện tên trong bảng)
+    const { data: departments = [] } = useQuery({
+        queryKey: ["departments", ""],
+        queryFn: () => DepartmentService.getAll({}),
+    });
+    const deptById = Object.fromEntries(departments.map((d: any) => [d._id, d]));
+
     const defaultColumns = [
         { id: "name", label: "Tên chức danh, nghề nghiệp", align: "left" as "left" },
         { id: "note", label: "Mô tả", align: "left" as "left" },
+        {
+            id: "department",
+            label: "Phòng ban",
+            align: "left" as "left",
+            renderCell: (params: { row: any }) => deptById[params.row.department]?.name || "—",
+        },
+        {
+            id: "permissions",
+            label: "Phân quyền",
+            align: "left" as "left",
+            renderCell: (params: { row: any }) =>
+                Array.isArray(params.row.permissions)
+                    ? `Đã phân quyền (${params.row.permissions.length} chức năng)`
+                    : "Chưa phân quyền (theo vai trò cũ)",
+        },
         {
             id: "edit",
             label: "Sửa",
@@ -188,13 +214,21 @@ const Positions: React.FC = () => {
         initialValues: {
             name: "",
             note: "",
+            // phòng ban của chức vụ; quyền chỉ chọn trong phạm vi chức năng phòng ban được xem
+            department: "",
+            // null = chưa phân quyền (cán bộ theo vai trò cũ); mảng = đã phân quyền C/R/U/D theo chức năng
+            permissions: null as PermRow[] | null,
         },
         validationSchema: positionValidationSchema,
         onSubmit: (values) => {
+            const payload: any = { ...values, department: values.department || null };
             if (selectedPosition) {
-                updateMutation.mutate({ ...values, _id: selectedPosition._id });
+                updateMutation.mutate({ ...payload, _id: selectedPosition._id });
             } else {
-                createMutation.mutate({ ...values });
+                // tạo mới: không gửi trường trống
+                if (!payload.department) delete payload.department;
+                if (!payload.permissions) delete payload.permissions;
+                createMutation.mutate(payload);
             }
         },
     });
@@ -205,6 +239,8 @@ const Positions: React.FC = () => {
             formik.setValues({
                 ...position,
                 note: position.note ?? "",
+                department: (position.department?._id || position.department || "") as string,
+                permissions: Array.isArray(position.permissions) ? (position.permissions as PermRow[]) : null,
             });
         } else {
             setSelectedPosition(null);
@@ -247,13 +283,13 @@ const Positions: React.FC = () => {
         <Box>
             <Breadcrumbs aria-label="breadcrumb">
                 <Typography>Danh mục</Typography>
-                <Typography>Chức danh, nghề nghiệp</Typography>
+                <Typography>Chức vụ</Typography>
             </Breadcrumbs>
             <Box
                 sx={{ display: "flex", justifyContent: "space-between", mb: 3, mt: 3 }}
             >
                 <Typography variant="h3" color="brand.title">
-                    Chức danh, nghề nghiệp
+                    Chức vụ
                 </Typography>
             </Box>
             <Accordion expanded={expanded} ref={formRef}>
@@ -419,6 +455,61 @@ const Positions: React.FC = () => {
                                     error={formik.touched.note && Boolean(formik.errors.note)}
                                     helperText={formik.touched.note && formik.errors.note}
                                 />
+                                {user?.role === RoleEnum.ADMIN && (
+                                    <>
+                                        <TextField
+                                            select
+                                            fullWidth
+                                            id="department"
+                                            name="department"
+                                            label="Phòng ban"
+                                            value={formik.values.department}
+                                            onChange={(e) => {
+                                                const dId = e.target.value as string;
+                                                formik.setFieldValue("department", dId);
+                                                // đổi phòng ban: bỏ các quyền nằm ngoài phạm vi chức năng của phòng ban mới
+                                                const allowed = deptById[dId]?.allowedModules;
+                                                if (formik.values.permissions && Array.isArray(allowed)) {
+                                                    formik.setFieldValue(
+                                                        "permissions",
+                                                        formik.values.permissions.filter((p) => allowed.includes(p.module)),
+                                                    );
+                                                }
+                                            }}
+                                            helperText="Chức vụ chỉ được cấp quyền cho các chức năng mà phòng ban này được xem"
+                                        >
+                                            <MenuItem value="">(Không chọn)</MenuItem>
+                                            {departments.map((d: any) => (
+                                                <MenuItem key={d._id} value={d._id}>
+                                                    {d.name}
+                                                </MenuItem>
+                                            ))}
+                                        </TextField>
+                                        <Box>
+                                            <FormControlLabel
+                                                control={
+                                                    <Switch
+                                                        checked={Array.isArray(formik.values.permissions)}
+                                                        onChange={(_, on) => formik.setFieldValue("permissions", on ? [] : null)}
+                                                    />
+                                                }
+                                                label="Phân quyền chức năng cho chức vụ này"
+                                            />
+                                            <Typography variant="caption" display="block" color="text.secondary">
+                                                {Array.isArray(formik.values.permissions)
+                                                    ? "Cán bộ thuộc chức vụ này ăn theo quyền được tick bên dưới."
+                                                    : "Chưa phân quyền: cán bộ thuộc chức vụ này vẫn theo vai trò cũ."}
+                                            </Typography>
+                                            {Array.isArray(formik.values.permissions) && (
+                                                <PermissionMatrix
+                                                    value={formik.values.permissions}
+                                                    onChange={(rows) => formik.setFieldValue("permissions", rows)}
+                                                    allowedKeys={deptById[formik.values.department]?.allowedModules}
+                                                />
+                                            )}
+                                        </Box>
+                                    </>
+                                )}
                             </Box>
                         </Box>
                     </DialogContent>

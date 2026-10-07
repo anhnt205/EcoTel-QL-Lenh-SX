@@ -6,6 +6,7 @@ const { AppError } = require('../utils/errorHandler');
 const { sendPasswordResetEmail } = require('../utils/email');
 const User = require('../models/User');
 const { verifyToken, restrictTo } = require('../middleware/auth.middleware');
+const { permissionsForClient } = require("../services/permissions");
 
 /**
  * @swagger
@@ -44,7 +45,7 @@ const { verifyToken, restrictTo } = require('../middleware/auth.middleware');
 router.post('/register', async (req, res) => {
     try {
         const { username, password, email, gender, fullName, phone, avatar, signature,
-            salaryCode, department, position, role, active } = req.body;
+            salaryCode, department, position, role, active, customPermissions, permissions } = req.body;
 
         // Check if user already exists
         let user = await User.findOne({ username });
@@ -101,7 +102,9 @@ router.post('/register', async (req, res) => {
             position,
             gender,
             role,
-            active
+            active,
+            customPermissions,
+            permissions
         });
 
         // Hash password
@@ -333,7 +336,7 @@ router.patch('/reset-password/:token', async (req, res, next) => {
 router.get("/tk-token", verifyToken, async (req, res) => {
     try {
         const { canAccessThongKe, signTkToken } = require("../services/tkToken");
-        if (!canAccessThongKe(req.user?.role)) {
+        if (!canAccessThongKe(req.user)) {
             return res.status(403).send({ status: "error", message: "Tài khoản không có quyền dùng phần mềm Thống kê" });
         }
         const secret = process.env.TK_AUTH_JWT_SECRET;
@@ -350,7 +353,7 @@ router.get("/tk-token", verifyToken, async (req, res) => {
 
 router.get('/me', verifyToken, async (req, res, next) => {
     try {
-        const user = await User.findById(req.userId).populate("position").populate("department")
+        const user = await User.findById(req.userId).populate("department").populate({ path: "position", populate: { path: "department", select: "name code allowedModules" } })
         req.logger.info(`🔥 Load dữ liệu  người dùng thành công ${user.username}`);
         res.status(200).json({
             status: 'success',
@@ -365,7 +368,10 @@ router.get('/me', verifyToken, async (req, res, next) => {
                     department: user.department,
                     role: user.role,
                     signature: user.signature,
-                    avatar: user.avatar
+                    avatar: user.avatar,
+                    // quyền mới theo Phòng ban -> Chức vụ -> Cán bộ (mode: full|custom|legacy), xem services/permissions.js
+                    ...permissionsForClient(user),
+                    customPermissions: user.customPermissions === true
                 }
             }
         });

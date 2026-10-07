@@ -20,6 +20,8 @@ export interface User {
   department?: string;
   position?: string;
   role?: string;
+  customPermissions?: boolean;
+  permissions?: { module: string; c: boolean; r: boolean; u: boolean; d: boolean }[];
   active: boolean;
   createdAt?: string;
   updatedAt?: string;
@@ -30,6 +32,8 @@ export interface Department {
   name: string;
   code: string;
   description?: string;
+  /** module phòng ban được xem; không có/null = chưa giới hạn */
+  allowedModules?: string[] | null;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -37,6 +41,10 @@ export interface Position {
   _id: string;
   name: string;
   note?: string;
+  /** phòng ban của chức vụ (id, hoặc object khi đã populate) */
+  department?: any;
+  /** quyền C/R/U/D theo module; không có/null = chưa phân quyền (theo vai trò cũ) */
+  permissions?: { module: string; c: boolean; r: boolean; u: boolean; d: boolean }[] | null;
   createdAt?: string;
   updatedAt?: string;
 }

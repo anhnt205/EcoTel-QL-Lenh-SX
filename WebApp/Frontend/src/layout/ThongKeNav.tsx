@@ -23,7 +23,7 @@ import {
 } from "lucide-react";
 import {
   buildMergedCatalog,
-  canSeeThongKe,
+  canSeeTkModule,
   MergedCatalogItem,
   TK_NAV_AFTER_CATALOG,
   TK_NAV_BEFORE_CATALOG,
@@ -43,7 +43,8 @@ const ICONS: Record<string, JSX.Element> = {
 };
 
 interface Props {
-  role?: string;
+  /** người dùng hiện tại (kết quả /auth/me: role, permissionMode, permissions) */
+  user?: any;
   /** "bar": các nút trên thanh menu rộng; "drawer": danh sách thu gọn trong ngăn kéo di động */
   variant: "bar" | "drawer";
   navBtnSx?: (active: boolean) => object;
@@ -54,15 +55,17 @@ interface Props {
 // Thanh menu Thống kê khi nhúng: các mục Thống kê đứng NGOÀI (nhập liệu, định mức, áp
 // trắc địa, đối chiếu, báo chuyến, báo cáo), còn "Danh mục" là MỘT menu duy nhất gộp
 // danh mục Thống kê với danh mục Điều phối. Mục Thống kê dẫn tới trang nhúng `/tk/...`.
-const ThongKeNav = ({ role, variant, navBtnSx, onNavigate }: Props) => {
+const ThongKeNav = ({ user, variant, navBtnSx, onNavigate }: Props) => {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const [anchor, setAnchor] = useState<null | HTMLElement>(null);
   const [open, setOpen] = useState(false);
 
-  const showTk = canSeeThongKe(role);
-  const groups = buildMergedCatalog(role);
-  if (!showTk && groups.length === 0) return null;
+  // chỉ hiện các mục người dùng có quyền Xem (đã cấu hình quyền mới) hoặc theo vai trò cũ (chưa cấu hình)
+  const before = TK_NAV_BEFORE_CATALOG.filter((i) => canSeeTkModule(user, i.module));
+  const after = TK_NAV_AFTER_CATALOG.filter((i) => canSeeTkModule(user, i.module));
+  const groups = buildMergedCatalog(user);
+  if (before.length === 0 && after.length === 0 && groups.length === 0) return null;
 
   const go = (path: string) => {
     navigate(path);
@@ -108,7 +111,7 @@ const ThongKeNav = ({ role, variant, navBtnSx, onNavigate }: Props) => {
     );
     return (
       <>
-        {showTk && TK_NAV_BEFORE_CATALOG.map(drawerTop)}
+        {before.map(drawerTop)}
         {groups.length > 0 && (
           <>
             <ListItem button onClick={() => setOpen((v) => !v)}>
@@ -132,14 +135,14 @@ const ThongKeNav = ({ role, variant, navBtnSx, onNavigate }: Props) => {
             </Collapse>
           </>
         )}
-        {showTk && TK_NAV_AFTER_CATALOG.map(drawerTop)}
+        {after.map(drawerTop)}
       </>
     );
   }
 
   return (
     <>
-      {showTk && TK_NAV_BEFORE_CATALOG.map(topButton)}
+      {before.map(topButton)}
       {groups.length > 0 && (
         <>
           <Button
@@ -167,7 +170,7 @@ const ThongKeNav = ({ role, variant, navBtnSx, onNavigate }: Props) => {
           </Menu>
         </>
       )}
-      {showTk && TK_NAV_AFTER_CATALOG.map(topButton)}
+      {after.map(topButton)}
     </>
   );
 };

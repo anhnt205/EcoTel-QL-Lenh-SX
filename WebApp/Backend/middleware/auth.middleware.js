@@ -18,7 +18,7 @@ const verifyToken = async (req, res, next) => {
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
         // 3) Check if user still exists
-        const currentUser = await User.findById(decoded.userId).populate('department').populate('position')
+        const currentUser = await User.findById(decoded.userId).populate("department").populate({ path: "position", populate: { path: "department", select: "name code allowedModules" } })
         if (!currentUser) {
             req.logger.warn(`⚠️ Không tìm thấy user`);
             return res.status(401).send({ status: 'error', message: 'The user belonging to this token no longer exists.' });

@@ -57,6 +57,7 @@ import { ThemeProvider, alpha } from "@mui/material/styles";
 import { appFontTheme, uiSansTheme, UI_FONT } from "../theme/uiTheme";
 import { brandAccent, brandHeaderBg, brandNavy, brandOnColor, useBranding } from "../branding/BrandingProvider";
 import { TK_EMBED } from "../config/features";
+import { allowModule, showModule } from "../permissions/access";
 import { CATALOG_PATHS_MOVED_TO_TK } from "./thongkeMenu";
 import ThongKeNav from "./ThongKeNav";
 import HeaderBanner from "./HeaderBanner";
@@ -108,15 +109,13 @@ export default function Header() {
     navigate("/login");
   };
   const menuItems = [
-    [RoleEnum.ADMIN, RoleEnum.MANAGER].includes(user?.role) && {
-      text: "Bi·ªán ph√°p an to√†n",
+    allowModule(user, "safety-measures", [RoleEnum.ADMIN, RoleEnum.MANAGER]) && {
+      text: "Bi\·\ª\án\ ph\√\°p\ an\ to\√\†n",
       icon: <Security fontSize="small" />,
       path: "/safetyMeasures",
     },
-    [RoleEnum.ADMIN, RoleEnum.MANAGER, RoleEnum.DISPATCHER].includes(
-      user?.role,
-    ) && {
-      text: "Thi·∫øt b·ªã",
+    allowModule(user, "device-vehicles", [RoleEnum.ADMIN, RoleEnum.MANAGER, RoleEnum.DISPATCHER]) && {
+      text: "Thi\·\∫\øt\ b\·\ª\ã",
       icon: <Construction fontSize="small" />,
       path: "#",
       submenu: [
@@ -126,54 +125,48 @@ export default function Header() {
         { text: "Th√¥ng tin m√°y", path: "/machines" },
       ],
     },
-    [RoleEnum.ADMIN, RoleEnum.MANAGER].includes(user?.role) && {
-      text: "Cung ƒë·ªô",
+    allowModule(user, "travel-logs", [RoleEnum.ADMIN, RoleEnum.MANAGER]) && {
+      text: "Cung\ \ƒ\ë\·\ª\ô",
       icon: <Route fontSize="small" />,
       path: "/travelLog",
     },
-    [RoleEnum.ADMIN, RoleEnum.MANAGER, RoleEnum.DISPATCHER].includes(
-      user?.role,
-    ) && {
-      text: "M√¥ h√¨nh xe",
+    allowModule(user, "models", [RoleEnum.ADMIN, RoleEnum.MANAGER, RoleEnum.DISPATCHER]) && {
+      text: "M\√\¥\ h\√\¨nh\ xe",
       icon: <DirectionsCar fontSize="small" />,
       path: "/models",
     },
-    [RoleEnum.ADMIN, RoleEnum.MANAGER].includes(user?.role) && {
-      text: "V·∫≠t li·ªáu",
+    allowModule(user, "materials", [RoleEnum.ADMIN, RoleEnum.MANAGER]) && {
+      text: "V\·\∫\≠t\ li\·\ª\áu",
       icon: <Terrain fontSize="small" />,
       path: "/materials",
     },
-    [RoleEnum.ADMIN, RoleEnum.MANAGER].includes(user?.role) && {
-      text: "ƒêi·ªÉm ƒë·ªï t·∫£i",
+    allowModule(user, "locations", [RoleEnum.ADMIN, RoleEnum.MANAGER]) && {
+      text: "\ƒ\êi\·\ª\Ém\ \ƒ\ë\·\ª\ï\ t\·\∫\£i",
       icon: <LocationOn fontSize="small" />,
       path: "/locations",
     },
-    [RoleEnum.ADMIN, RoleEnum.MANAGER, RoleEnum.DISPATCHER].includes(
-      user?.role,
-    ) && {
-      text: "C√°n b·ªô nh√¢n vi√™n",
+    allowModule(user, "users", [RoleEnum.ADMIN, RoleEnum.MANAGER, RoleEnum.DISPATCHER]) && {
+      text: "C\√\°n\ b\·\ª\ô\ nh\√\¢n\ vi\√\™n",
       icon: <People fontSize="small" />,
       path: "/users",
     },
-    [RoleEnum.ADMIN, RoleEnum.MANAGER].includes(user?.role) && {
-      text: "C√¥ng vi·ªác",
+    allowModule(user, "jobs", [RoleEnum.ADMIN, RoleEnum.MANAGER]) && {
+      text: "C\√\¥ng\ vi\·\ª\ác",
       icon: <Work fontSize="small" />,
       path: "/jobs",
     },
-    [RoleEnum.ADMIN, RoleEnum.MANAGER].includes(user?.role) && {
-      text: "Ch·ª©c danh ngh·ªÅ nghi·ªáp",
+    allowModule(user, "positions", [RoleEnum.ADMIN, RoleEnum.MANAGER]) && {
+      text: "Ch\·\ª\©c\ danh\ ngh\·\ª\Å\ nghi\·\ª\áp",
       icon: <BadgeIcon fontSize="small" />,
       path: "/positions",
     },
-    [RoleEnum.ADMIN, RoleEnum.MANAGER, RoleEnum.DISPATCHER].includes(
-      user?.role,
-    ) && {
-      text: "ƒê∆°n v·ªã",
+    allowModule(user, "departments", [RoleEnum.ADMIN, RoleEnum.MANAGER, RoleEnum.DISPATCHER]) && {
+      text: "\ƒ\ê\∆\°n\ v\·\ª\ã",
       icon: <Business fontSize="small" />,
       path: "/departments",
     },
-    [RoleEnum.ADMIN, RoleEnum.MANAGER].includes(user?.role) && {
-      text: "Ca l√†m vi·ªác",
+    allowModule(user, "tk-shifts", [RoleEnum.ADMIN, RoleEnum.MANAGER]) && {
+      text: "Ca\ l\√\†m\ vi\·\ª\ác",
       icon: <AccessTime fontSize="small" />,
       path: "/shifts",
     },
@@ -270,6 +263,7 @@ export default function Header() {
                 onClose={() => setDrawerOpen(false)}
               >
                 <List sx={{ width: 280 }}>
+                  {showModule(user, "dashboard") && (
                   <ListItem
                     button
                     onClick={() => {
@@ -282,6 +276,8 @@ export default function Header() {
                     </ListItemIcon>
                     <ListItemText primary="T·ªïng quan" />
                   </ListItem>
+                  )}
+                  {showModule(user, "orders") && (
                   <ListItem
                     button
                     onClick={() => {
@@ -294,7 +290,8 @@ export default function Header() {
                     </ListItemIcon>
                     <ListItemText primary="L·ªánh s·∫£n xu·∫•t" />
                   </ListItem>
-                  {[RoleEnum.MANAGER].includes(user?.role) && (
+                  )}
+                  {allowModule(user, "my-tasks", [RoleEnum.MANAGER]) && (
                     <ListItem
                       button
                       onClick={() => {
@@ -346,16 +343,12 @@ export default function Header() {
                   })}
                   {TK_EMBED && (
                     <ThongKeNav
-                      role={user?.role}
+                      user={user}
                       variant="drawer"
                       onNavigate={() => setDrawerOpen(false)}
                     />
                   )}
-                  {[
-                    RoleEnum.ADMIN,
-                    RoleEnum.MANAGER,
-                    RoleEnum.DISPATCHER,
-                  ].includes(user?.role) && (
+                  {allowModule(user, "reports", [RoleEnum.ADMIN, RoleEnum.MANAGER, RoleEnum.DISPATCHER]) && (
                     <ListItem
                       button
                       onClick={() => {
@@ -369,7 +362,7 @@ export default function Header() {
                       <ListItemText primary="B√°o c√°o" />
                     </ListItem>
                   )}
-                  {[RoleEnum.ADMIN].includes(user?.role) && (
+                  {allowModule(user, "system", [RoleEnum.ADMIN]) && (
                     <ListItem
                       button
                       onClick={() => {
@@ -491,6 +484,7 @@ export default function Header() {
           >
             {/* C√°c m·ª•c menu: t·ª± xu·ªëng d√≤ng khi nhi·ªÅu; chu√¥ng + t√†i kho·∫£n lu√¥n ·ªü g√≥c ph·∫£i h√†ng ƒë·∫ßu */}
             <Box sx={{ display: "flex", alignItems: "stretch", gap: 0.5, flexWrap: TK_EMBED ? "wrap" : "nowrap", flex: 1, minWidth: 0 }}>
+            {showModule(user, "dashboard") && (
             <Button
               color="inherit"
               startIcon={<Dashboard />}
@@ -499,6 +493,8 @@ export default function Header() {
             >
               T·ªïng quan
             </Button>
+            )}
+            {showModule(user, "orders") && (
             <Button
               color="inherit"
               startIcon={<ClipboardPaste size={20} style={{ color: "inherit" }} />}
@@ -507,7 +503,8 @@ export default function Header() {
             >
               L·ªánh s·∫£n xu·∫•t
             </Button>
-            {[RoleEnum.MANAGER].includes(user?.role) && (
+            )}
+            {allowModule(user, "my-tasks", [RoleEnum.MANAGER]) && (
               <Button
                 color="inherit"
                 startIcon={<WorkOutline />}
@@ -587,11 +584,9 @@ export default function Header() {
               </>
             )}
             {TK_EMBED && (
-              <ThongKeNav role={user?.role} variant="bar" navBtnSx={navBtnSx} />
+              <ThongKeNav user={user} variant="bar" navBtnSx={navBtnSx} />
             )}
-            {[RoleEnum.ADMIN, RoleEnum.MANAGER, RoleEnum.DISPATCHER].includes(
-              user?.role,
-            ) && (
+            {allowModule(user, "reports", [RoleEnum.ADMIN, RoleEnum.MANAGER, RoleEnum.DISPATCHER]) && (
               <Button
                 color="inherit"
                 startIcon={<ChartNoAxesCombined size={20} style={{ color: "inherit" }} />}
@@ -601,7 +596,7 @@ export default function Header() {
                 B√°o c√°o
               </Button>
             )}
-            {[RoleEnum.ADMIN].includes(user?.role) && (
+            {allowModule(user, "system", [RoleEnum.ADMIN]) && (
               <Button
                 color="inherit"
                 startIcon={<MonitorCog size={20} style={{ color: "inherit" }} />}
