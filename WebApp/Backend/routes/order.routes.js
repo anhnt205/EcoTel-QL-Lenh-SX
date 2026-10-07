@@ -619,12 +619,10 @@ router.put("/:id", verifyToken, async (req, res, next) => {
     req.logger.info(`    - Trạng thái lệnh: ${status}`);
     switch (status) {
       case STATUS_ORDER.INPROGRESS:
-        if (order.status !== STATUS_ORDER.INPROGRESS) {
+        if (!order.startTime) {
           updateObject.startTime = new Date();
-          updateObject.resumeTime = new Date();
-        } else {
-          updateObject.resumeTime = new Date();
         }
+        updateObject.resumeTime = new Date();
         if (order.device && order.device.length > 0) {
           const lastDeviceId = order.device[order.device.length - 1];
           req.logger.info(`- Tìm thấy phương tiện: ${lastDeviceId}`);
