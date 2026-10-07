@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const axios = require("axios");
+const { getSignedDownloadUrl } = require("../utils/uploadImage");
 const ExcelJS = require("exceljs");
 const OrderModel = require("../models/Order");
 const { applyFrozenAll } = require("../services/orderSnapshot");
@@ -711,11 +712,8 @@ async function buildVehicle(order, workbook, sheetName) {
   };
   if (order.createdBy?.signature?.trim()) {
     try {
-      const key = encodeURIComponent(order.createdBy.signature);
-
-      const res = await axios.get(
-        `${process.env.API_URL}/uploads/get?key=${key}`,
-      );
+      // Ký URL ảnh chữ ký trực tiếp (route /uploads/get yêu cầu đăng nhập nên không gọi HTTP vòng qua đó)
+      const res = { data: { data: await getSignedDownloadUrl(order.createdBy.signature) } };
 
       const url = res.data?.data;
 
@@ -1331,11 +1329,8 @@ async function buildVehicleService(order, workbook, sheetName) {
   };
   if (order.createdBy?.signature?.trim()) {
     try {
-      const key = encodeURIComponent(order.createdBy.signature);
-
-      const res = await axios.get(
-        `${process.env.API_URL}/uploads/get?key=${key}`,
-      );
+      // Ký URL ảnh chữ ký trực tiếp (route /uploads/get yêu cầu đăng nhập nên không gọi HTTP vòng qua đó)
+      const res = { data: { data: await getSignedDownloadUrl(order.createdBy.signature) } };
 
       const url = res.data?.data;
 
@@ -1934,11 +1929,8 @@ async function buildExcavator(order, workbook, sheetName) {
   };
   if (order.createdBy?.signature?.trim()) {
     try {
-      const key = encodeURIComponent(order.createdBy.signature);
-
-      const res = await axios.get(
-        `${process.env.API_URL}/uploads/get?key=${key}`,
-      );
+      // Ký URL ảnh chữ ký trực tiếp (route /uploads/get yêu cầu đăng nhập nên không gọi HTTP vòng qua đó)
+      const res = { data: { data: await getSignedDownloadUrl(order.createdBy.signature) } };
 
       const url = res.data?.data;
 
@@ -2480,11 +2472,8 @@ async function buildOther(order, workbook, sheetName) {
   };
   if (order.createdBy?.signature?.trim()) {
     try {
-      const key = encodeURIComponent(order.createdBy.signature);
-
-      const res = await axios.get(
-        `${process.env.API_URL}/uploads/get?key=${key}`,
-      );
+      // Ký URL ảnh chữ ký trực tiếp (route /uploads/get yêu cầu đăng nhập nên không gọi HTTP vòng qua đó)
+      const res = { data: { data: await getSignedDownloadUrl(order.createdBy.signature) } };
 
       const url = res.data?.data;
 
@@ -2987,11 +2976,8 @@ async function buildMaintence(order, workbook, sheetName) {
   };
   if (order.createdBy?.signature?.trim()) {
     try {
-      const key = encodeURIComponent(order.createdBy.signature);
-
-      const res = await axios.get(
-        `${process.env.API_URL}/uploads/get?key=${key}`,
-      );
+      // Ký URL ảnh chữ ký trực tiếp (route /uploads/get yêu cầu đăng nhập nên không gọi HTTP vòng qua đó)
+      const res = { data: { data: await getSignedDownloadUrl(order.createdBy.signature) } };
 
       const url = res.data?.data;
 
@@ -3573,11 +3559,8 @@ async function buildDrill(order, workbook, sheetName) {
   };
   if (order.createdBy?.signature?.trim()) {
     try {
-      const key = encodeURIComponent(order.createdBy.signature);
-
-      const res = await axios.get(
-        `${process.env.API_URL}/uploads/get?key=${key}`,
-      );
+      // Ký URL ảnh chữ ký trực tiếp (route /uploads/get yêu cầu đăng nhập nên không gọi HTTP vòng qua đó)
+      const res = { data: { data: await getSignedDownloadUrl(order.createdBy.signature) } };
 
       const url = res.data?.data;
 
@@ -4167,11 +4150,8 @@ async function buildDozer(order, workbook, sheetName) {
   };
   if (order.createdBy?.signature?.trim()) {
     try {
-      const key = encodeURIComponent(order.createdBy.signature);
-
-      const res = await axios.get(
-        `${process.env.API_URL}/uploads/get?key=${key}`,
-      );
+      // Ký URL ảnh chữ ký trực tiếp (route /uploads/get yêu cầu đăng nhập nên không gọi HTTP vòng qua đó)
+      const res = { data: { data: await getSignedDownloadUrl(order.createdBy.signature) } };
 
       const url = res.data?.data;
 
@@ -4475,11 +4455,8 @@ async function buildDispatcher(order, workbook, sheetName) {
   };
   if (order.createdBy?.signature?.trim()) {
     try {
-      const key = encodeURIComponent(order.createdBy.signature);
-
-      const res = await axios.get(
-        `${process.env.API_URL}/uploads/get?key=${key}`,
-      );
+      // Ký URL ảnh chữ ký trực tiếp (route /uploads/get yêu cầu đăng nhập nên không gọi HTTP vòng qua đó)
+      const res = { data: { data: await getSignedDownloadUrl(order.createdBy.signature) } };
 
       const url = res.data?.data;
 

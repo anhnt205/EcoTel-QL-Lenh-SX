@@ -90,6 +90,15 @@ exports.getPresignedUrl = async (req, res) => {
   }
 };
 
+// Ký URL tải file từ S3 (dùng chung cho API /uploads/get và cho nơi xuất Excel trong backend, để
+// xuất Excel không phải gọi HTTP vòng qua route đã yêu cầu đăng nhập).
+exports.getSignedDownloadUrl = (key) =>
+  s3.getSignedUrlPromise("getObject", {
+    Bucket: process.env.S3_BUCKET_NAME,
+    Key: key,
+    Expires: 60 * 30,
+  });
+
 exports.getDownloadUrl = async (req, res) => {
   try {
     const { key } = req.query; // FE gửi key = "checkin/abc.webp"
