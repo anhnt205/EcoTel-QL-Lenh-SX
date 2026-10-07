@@ -346,12 +346,26 @@ function config() {
   return { baseUrl: baseUrl.replace(/\/+$/, ""), username, password };
 }
 
+// Lỗi axios mặc định chỉ có "Request failed with status code 400" — thêm bước nào
+// và mã lỗi để người chạy biết sai ở đâu (đăng nhập sai, thiếu quyền, sai URL...).
+const wrapTkError = (step, err) => {
+  if (err?.response) {
+    return new Error(`Thống kê trả HTTP ${err.response.status} khi ${step}`);
+  }
+  return new Error(`Không gọi được Thống kê khi ${step}: ${err?.code || err?.message}`);
+};
+
 async function loginTk({ baseUrl, username, password }) {
-  const { data } = await axios.post(
-    `${baseUrl}/api/auth/login`,
-    { username, password },
-    { timeout: 15000 },
-  );
+  let data;
+  try {
+    ({ data } = await axios.post(
+      `${baseUrl}/api/auth/login`,
+      { username, password },
+      { timeout: 15000 },
+    ));
+  } catch (err) {
+    throw wrapTkError("đăng nhập tài khoản đồng bộ", err);
+  }
   if (!data?.appToken) throw new Error("Thống kê không trả token đăng nhập");
   return data.appToken;
 }
@@ -359,11 +373,16 @@ async function loginTk({ baseUrl, username, password }) {
 async function fetchAll(baseUrl, token, path) {
   const rows = [];
   for (let page = 0; page < MAX_PAGES; page++) {
-    const { data } = await axios.get(`${baseUrl}${path}`, {
-      params: { page, size: PAGE_SIZE, sort: "id,asc" },
-      headers: { Authorization: `Bearer ${token}` },
-      timeout: 30000,
-    });
+    let data;
+    try {
+      ({ data } = await axios.get(`${baseUrl}${path}`, {
+        params: { page, size: PAGE_SIZE, sort: "id,asc" },
+        headers: { Authorization: `Bearer ${token}` },
+        timeout: 30000,
+      }));
+    } catch (err) {
+      throw wrapTkError(`đọc ${path}`, err);
+    }
     if (!data?.success) throw new Error(data?.message || `Thống kê trả lỗi ở ${path}`);
     const body = data.data || {};
     rows.push(...(body.content || []));

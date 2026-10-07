@@ -1,0 +1,136 @@
+# Bản thử "Điều phối + Thống kê cùng domain" — CHỈ để chạy/kiểm chứng cục bộ,
+# KHÔNG phải compose release/staging và không được workflow CI/CD nào dùng.
+#
+# Ghép: Điều phối (Node + Mongo) và Thống kê (Java + Postgres) sau 1 reverse
+# proxy duy nhất (reverse_proxy/nginx_thongke.conf). Dữ liệu nằm trong volume
+# riêng của stack này, không liên quan production.
+#
+# Frontend KHÔNG build bằng Dockerfile (webpack CRA >3GB RAM từng làm sập Docker
+# dùng chung) — build vào volume trước bằng container giới hạn RAM rồi nginx chỉ
+# phục vụ thư mục dist; xem .factory/context.md mục "Điều phối + Thống kê".
+#
+#   volume dpmm_tkembed_fe_dist  <- DPMM frontend (REACT_APP_TK_EMBED=true, REACT_APP_BASE_API=/api)
+#   volume tk_tkembed_fe_dist    <- TK frontend (VITE_BASE_PATH=/thong-ke/, VITE_API_KONG_URL=/tk-api/api)
+#
+# Biến cần có (đặt trong file .env.thongke-embed cạnh file này, KHÔNG commit):
+#   DPMM_JWT_SECRET, TK_AUTH_JWT_SECRET, TK_POSTGRES_PASSWORD,
+#   TK_SERVICE_USERNAME, TK_SERVICE_PASSWORD   (tài khoản chỉ-đọc Thống kê cho đồng bộ danh mục)
+#
+# Chạy:  docker compose -f docker-compose.thongke-embed.yaml --env-file .env.thongke-embed up -d
+# Dừng:  docker compose -f docker-compose.thongke-embed.yaml --env-file .env.thongke-embed down -v
+
+name: dpmm-tkembed
+
+services:
+  mongo:
+    image: mongo:latest
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: example
+    volumes:
+      - tkembed_mongo:/data/db
+    networks: [embed]
+
+  ktv_Backend_service:
+    image: ${DPMM_BACKEND_IMAGE:-dieuphoimm_backend_tkembed}
+    environment:
+      TZ: Asia/Ho_Chi_Minh
+      PORT: "8080"
+      NODE_ENV: development
+      MONGODB_URI: mongodb://root:example@mongo:27017/dieuphoimm?authSource=admin
+      JWT_SECRET: ${DPMM_JWT_SECRET:?đặt DPMM_JWT_SECRET}
+      JWT_EXPIRES_IN: 7d
+      # Thống kê là gốc danh mục -> khoá ghi danh mục ở Điều phối.
+      CATALOG_MASTER: thongke
+      # Hostname KHÔNG được có dấu gạch dưới: Tomcat của Thống kê từ chối header Host
+      # "tk_backend_service" bằng 400 -> dùng alias "tk-backend" khai báo ở service dưới.
+      TK_API_BASE_URL: http://tk-backend:8088
+      TK_SERVICE_USERNAME: ${TK_SERVICE_USERNAME:?đặt TK_SERVICE_USERNAME}
+      TK_SERVICE_PASSWORD: ${TK_SERVICE_PASSWORD:?đặt TK_SERVICE_PASSWORD}
+      # config/firebase.js require() file này ngay lúc nạp module nên phải có
+      # (placeholder dev-only, gitignored, không phải key Firebase thật — xem
+      # .factory/context.md). Trỏ FIREBASE_KEY_FILE tới file đó trên máy bạn.
+      FIREBASE_KEY_PATH: /usr/src/app/serviceAccountKey.json
+    volumes:
+      - ${FIREBASE_KEY_FILE:?đặt FIREBASE_KEY_FILE}:/usr/src/app/serviceAccountKey.json:ro
+    depends_on: [mongo]
+    networks: [embed]
+
+  ktv_Frontend_service:
+    image: nginx:alpine
+    volumes:
+      - dpmm_tkembed_fe_dist:/usr/share/nginx/html:ro
+      - ./Frontend/.nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    networks: [embed]
+
+  tk_postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${TK_POSTGRES_PASSWORD:?đặt TK_POSTGRES_PASSWORD}
+      POSTGRES_DB: thong_ke
+      TZ: Asia/Ho_Chi_Minh
+    volumes:
+      - tkembed_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [embed]
+
+  tk_redis:
+    image: redis:7-alpine
+    networks: [embed]
+
+  tk_backend_service:
+    image: ${TK_BACKEND_IMAGE:-thongke-caoson-preview-backend-service}
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      SPRING_DATASOURCE_URL: jdbc:postgresql://tk_postgres:5432/thong_ke?reWriteBatchedInserts=true
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: ${TK_POSTGRES_PASSWORD}
+      AUTH_MODE: standalone
+      AUTH_JWT_SECRET: ${TK_AUTH_JWT_SECRET:?đặt TK_AUTH_JWT_SECRET}
+      REDIS_HOST: tk_redis
+      REDIS_PORT: "6379"
+    depends_on:
+      tk_postgres:
+        condition: service_healthy
+      tk_redis:
+        condition: service_started
+    networks:
+      embed:
+        aliases: [tk-backend]
+
+  tk_frontend_service:
+    image: nginx:alpine
+    volumes:
+      - tk_tkembed_fe_dist:/usr/share/nginx/html:ro
+      - ./reverse_proxy/tk_frontend_spa.conf:/etc/nginx/conf.d/default.conf:ro
+    networks: [embed]
+
+  ktv_reverse_proxy_service:
+    image: nginx:alpine
+    ports:
+      - "${TKEMBED_PORT:-6870}:8888"
+    volumes:
+      - ./reverse_proxy/nginx_thongke.conf:/etc/nginx/nginx.conf:ro
+    depends_on: [ktv_Frontend_service, ktv_Backend_service, tk_frontend_service, tk_backend_service]
+    networks: [embed]
+
+networks:
+  embed:
+    # Địa chỉ cố định vì Docker dùng chung đã hết dải mạng mặc định
+    # ("all predefined address pools have been fully subnetted").
+    ipam:
+      config:
+        - subnet: 10.251.20.0/24
+
+volumes:
+  tkembed_mongo:
+  tkembed_pg:
+  dpmm_tkembed_fe_dist:
+    external: true
+  tk_tkembed_fe_dist:
+    external: true
