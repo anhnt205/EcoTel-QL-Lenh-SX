@@ -18,11 +18,15 @@ Cần xử lý/ xác nhận các điểm dưới trước khi nâng cấp.
   Location/Material: thêm tuỳ chọn, dữ liệu cũ không làm lỗi khởi động. Quay lại bản cũ an toàn (Mongoose strict bỏ qua field lạ).
 
 ## 3. Thay đổi HÀNH VI có chủ đích (từ các lượt trước) — phải báo khách + thử với Mobile
-1. **Lệnh đã hoàn thành bị chốt** (`PUT /api/orders/:id`, order.routes.js ~585): đổi các trường bảo vệ
-   (người nhận, trợ lý/phụ máy, thiết bị, xe, công việc, ca, ngày, giờ, nội dung, lô) hoặc mở lại/huỷ → **HTTP 409**
-   `{status:"error", message, fields:[...]}`. Gửi lại đúng giá trị cũ vẫn 200. Chỉ admin + `forceEditFrozen:true` được sửa.
-   Mobile: kết thúc lệnh (`{status:'completed'}`) và chuyển ca (POST lệnh mới) KHÔNG dính. **Dính**: thêm/bớt "phụ máy"
-   (`assistants`) trên lệnh đã hoàn thành. → thử tay trước; nếu cần cho phép sửa `assistants` thì chỉnh `PROTECTED_REF_KEYS`.
+1. **Lệnh đã hoàn thành: sửa được trong 48 giờ, sau đó khoá** (`PUT /api/orders/:id`, `services/orderSnapshot.js#frozenEditDecision`,
+   chỉnh được bằng env `ORDER_EDIT_WINDOW_HOURS`, mặc định 48). Mốc tính = `endTime` của lệnh.
+   - **Trong 48 giờ**: sửa bình thường (kể cả thêm/bớt "phụ máy" `assistants`, thiết bị, ca, công việc...). Bản chụp đã chốt được
+     chụp lại đúng các trường vừa sửa và có ghi lịch sử (`editedInWindow`), nên GET/báo cáo khớp dữ liệu mới.
+   - **Quá 48 giờ**: đổi các trường bảo vệ (người nhận, trợ lý/phụ máy, thiết bị, xe, công việc, ca, ngày, giờ, nội dung, lô) → **HTTP 409**
+     `{status:"error", message, reason:"expired", fields:[...]}`. Gửi lại đúng giá trị cũ vẫn 200. Chỉ admin + `forceEditFrozen:true` sửa được.
+   - **Luôn khoá** (kể cả trong hạn): giờ kết thúc `endTime` (là mốc tính hạn, tránh kéo dài) và mở lại / đổi trạng thái lệnh (`reason:"reopen"|"endTime"`).
+   - Lệnh thiếu `endTime` coi như đã quá hạn (khoá). Chưa thử với app Mobile thật.
+
 2. **Response lệnh đã chốt**: có thêm `frozenAt`, `frozenSource`, tham chiếu lấy từ bản chụp (cùng bộ trường). Dart bỏ qua field lạ.
 3. **Cron mới `*/10 * * * *`**: chốt (ghi `frozen`) tối đa 200 lệnh hoàn thành trong 48 giờ gần nhất + báo chuyến của chúng.
    Chỉ THÊM field, idempotent, không xoá. Lệnh/báo chuyến cũ hơn 48 giờ KHÔNG tự có bản chốt → chạy thủ công

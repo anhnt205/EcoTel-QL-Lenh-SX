@@ -220,3 +220,89 @@ describe('departmentAt', () => {
         expect(departmentAt(h, deptY._id, new Date('2026-11-01T00:00:00Z'))).toBe(String(deptY._id));
     });
 });
+
+describe('thời hạn sửa lệnh đã hoàn thành (48 giờ)', () => {
+    const { frozenEditDecision, isEditWindowOpen, editWindowHours } = require('../services/orderSnapshot');
+    const HOUR = 3600 * 1000;
+    const now = new Date('2026-10-10T12:00:00Z').getTime();
+    const asst = oid();
+    const mk = (hoursAgo, extra = {}) => ({
+        status: 'completed',
+        endTime: new Date(now - hoursAgo * HOUR),
+        assistants: [asst],
+        device: [oid()],
+        shift: oid(),
+        ...extra,
+    });
+
+    afterEach(() => { delete process.env.ORDER_EDIT_WINDOW_HOURS; });
+
+    test('mặc định 48 giờ; đổi được bằng ORDER_EDIT_WINDOW_HOURS; giá trị rác quay về 48', () => {
+        expect(editWindowHours()).toBe(48);
+        process.env.ORDER_EDIT_WINDOW_HOURS = '24';
+        expect(editWindowHours()).toBe(24);
+        process.env.ORDER_EDIT_WINDOW_HOURS = 'abc';
+        expect(editWindowHours()).toBe(48);
+        process.env.ORDER_EDIT_WINDOW_HOURS = '-5';
+        expect(editWindowHours()).toBe(48);
+    });
+
+    test('trong 48 giờ: thêm/sửa phụ máy được phép, ghi nhận trường bị đổi để chụp lại bản chốt', () => {
+        const d = frozenEditDecision(mk(10), { assistants: [asst, oid()] }, { now });
+        expect(d.blocked).toBe(false);
+        expect(d.inWindow).toBe(true);
+        expect(d.editKeys).toEqual(['assistants']);
+    });
+
+    test('đúng mốc 48 giờ vẫn còn hạn; quá 48 giờ thì khoá và nêu lý do expired', () => {
+        expect(frozenEditDecision(mk(48), { assistants: [] }, { now }).blocked).toBe(false);
+        const d = frozenEditDecision(mk(48.01), { assistants: [asst, oid()] }, { now });
+        expect(d.blocked).toBe(true);
+        expect(d.reason).toBe('expired');
+        expect(d.fields).toEqual(['assistants']);
+    });
+
+    test('quá hạn nhưng gửi lại đúng giá trị cũ (app gửi nguyên lệnh) thì KHÔNG bị chặn', () => {
+        const o = mk(100);
+        const d = frozenEditDecision(o, { assistants: [asst], device: o.device, shift: o.shift, endTime: o.endTime }, { now });
+        expect(d.blocked).toBe(false);
+        expect(d.editKeys).toEqual([]);
+    });
+
+    test('giờ kết thúc luôn khoá kể cả trong hạn (tránh kéo dài hạn sửa)', () => {
+        const d = frozenEditDecision(mk(1), { endTime: new Date(now) }, { now });
+        expect(d.blocked).toBe(true);
+        expect(d.reason).toBe('endTime');
+        expect(d.fields).toEqual(['endTime']);
+    });
+
+    test('mở lại / đổi trạng thái lệnh đã hoàn thành luôn bị chặn, kể cả trong hạn', () => {
+        const d = frozenEditDecision(mk(1), {}, { status: 'in_progress', now });
+        expect(d.blocked).toBe(true);
+        expect(d.reason).toBe('reopen');
+        expect(d.fields).toEqual(['status']);
+        expect(frozenEditDecision(mk(1), {}, { status: 'completed', now }).blocked).toBe(false);
+    });
+
+    test('lệnh thiếu endTime coi như đã quá hạn (khoá) — an toàn với dữ liệu cũ', () => {
+        const o = mk(1);
+        delete o.endTime;
+        expect(isEditWindowOpen(o, now)).toBe(false);
+        const d = frozenEditDecision(o, { assistants: [] }, { now });
+        expect(d.blocked).toBe(true);
+        expect(d.reason).toBe('expired');
+    });
+
+    test('admin gửi forceEditFrozen vẫn sửa được lệnh đã khoá, và vẫn ghi nhận trường để chụp lại', () => {
+        const d = frozenEditDecision(mk(500), { assistants: [] }, { adminForce: true, now });
+        expect(d.blocked).toBe(false);
+        expect(d.reason).toBe('expired');
+        expect(d.editKeys).toEqual(['assistants']);
+    });
+
+    test('đổi giờ làm việc (workingDate) trong hạn được phép; ngoài hạn bị chặn', () => {
+        const body = { workingDate: '2026-10-11' };
+        expect(frozenEditDecision(mk(5, { workingDate: '2026-10-10' }), body, { now }).blocked).toBe(false);
+        expect(frozenEditDecision(mk(60, { workingDate: '2026-10-10' }), body, { now }).blocked).toBe(true);
+    });
+});

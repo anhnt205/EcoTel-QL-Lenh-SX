@@ -34,7 +34,7 @@ const sendPushNotification = require("../utils/sendNotification");
 const {
   applyFrozen,
   applyFrozenAll,
-  changedProtectedFields,
+  frozenEditDecision,
 } = require("../services/orderSnapshot");
 const { freezeOrder } = require("../services/orderFreeze");
 
@@ -582,28 +582,34 @@ router.put("/:id", verifyToken, async (req, res, next) => {
         .send({ status: "error", message: "Không tìm thấy lệnh với ID này." });
     }
 
-    // Lệnh đã hoàn thành = đã chốt: không được đổi thông tin lệnh (đơn vị, nhân viên, thiết bị, công việc,
-    // ca, ngày làm việc, giờ bắt đầu/kết thúc...) và không được mở lại. Gửi lại đúng giá trị cũ thì vẫn
-    // được (vd app gửi nguyên lệnh). Chỉ admin được sửa khi gửi kèm forceEditFrozen: true; trường bị sửa
-    // được chụp lại, phần còn lại giữ nguyên.
+    // Lệnh đã hoàn thành = đã chốt thông tin. Trong 48 giờ kể từ giờ kết thúc (ORDER_EDIT_WINDOW_HOURS) vẫn được sửa
+    // (kể cả thêm/sửa phụ máy) và bản chụp được chụp lại đúng phần vừa sửa; quá hạn thì khoá (409), không mở lại
+    // được, giờ kết thúc luôn khoá. Gửi lại đúng giá trị cũ thì không tính là sửa (vd app gửi nguyên lệnh). Chỉ
+    // admin gửi forceEditFrozen: true mới sửa được lệnh đã khoá. Xem services/orderSnapshot.js#frozenEditDecision.
     const wasFrozen = order.status === STATUS_ORDER.COMPLETED;
     const adminForce =
       wasFrozen && user?.role === ROLE.ADMIN && forceEditFrozen === true;
     let frozenEditKeys = [];
+    let editedInWindow = false;
     if (wasFrozen) {
-      frozenEditKeys = changedProtectedFields(order, body);
-      const reopen = status !== undefined && status !== STATUS_ORDER.COMPLETED;
-      if ((frozenEditKeys.length > 0 || reopen) && !adminForce) {
+      const decision = frozenEditDecision(order, body, { status, adminForce });
+      frozenEditKeys = decision.editKeys;
+      editedInWindow = decision.inWindow;
+      if (decision.blocked) {
         req.logger.warn(
-          `⚠️ ${user?.username} sửa lệnh đã chốt ${id} bị từ chối (${
-            reopen ? `đổi trạng thái sang ${status}` : frozenEditKeys.join(", ")
-          })`,
+          `⚠️ ${user?.username} sửa lệnh đã hoàn thành ${id} bị từ chối (${decision.reason}: ${decision.fields.join(", ")})`,
         );
+        const message = {
+          reopen: "Lệnh đã hoàn thành nên không thể mở lại hoặc đổi trạng thái.",
+          expired:
+            "Lệnh đã hoàn thành quá 48 giờ nên đã bị khoá, không thể thêm hoặc sửa thông tin.",
+          endTime: "Không được sửa giờ kết thúc của lệnh đã hoàn thành.",
+        }[decision.reason];
         return res.status(409).send({
           status: "error",
-          message:
-            "Lệnh đã hoàn thành và đã được chốt thông tin nên không thể thay đổi.",
-          fields: reopen ? ["status"] : frozenEditKeys,
+          message,
+          reason: decision.reason,
+          fields: decision.fields,
         });
       }
     }
@@ -813,7 +819,7 @@ router.put("/:id", verifyToken, async (req, res, next) => {
     // làm hỏng việc hoàn thành lệnh: bộ quét định kỳ (utils/cron.js) sẽ chốt bù.
     if (updatedOrder.status === STATUS_ORDER.COMPLETED) {
       try {
-        const refreeze = adminForce && frozenEditKeys.length > 0;
+        const refreeze = (adminForce || editedInWindow) && frozenEditKeys.length > 0;
         await freezeOrder(id, {
           source: "completion",
           refreeze,
@@ -826,7 +832,8 @@ router.put("/:id", verifyToken, async (req, res, next) => {
             changedBy: req.userId,
             snapshot: {
               ...updatedOrder.toObject(),
-              forceEditedFrozen: true,
+              forceEditedFrozen: adminForce,
+              editedInWindow: !adminForce,
               forceEditedFields: frozenEditKeys,
             },
           }).save();

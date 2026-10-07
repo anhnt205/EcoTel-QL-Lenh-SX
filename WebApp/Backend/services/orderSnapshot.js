@@ -334,6 +334,56 @@ const applyCreationDepartment = (data) => {
   return data;
 };
 
+// --- Thời hạn sửa lệnh đã hoàn thành ---------------------------------------------------------------
+// Lệnh hoàn thành được SỬA trong EDIT_WINDOW_HOURS giờ (mặc định 48) kể từ giờ kết thúc (kể cả thêm/sửa phụ
+// máy); quá hạn thì khoá (409) — chỉ admin gửi forceEditFrozen mới sửa được. Trong hạn, bản chụp đã chốt được
+// chụp lại đúng các trường vừa sửa để màn hình/báo cáo khớp dữ liệu. Giờ kết thúc (endTime) là mốc tính hạn
+// nên LUÔN khoá, không cho sửa để khỏi kéo dài hạn; lệnh không có endTime coi như đã quá hạn (khoá).
+const DEFAULT_EDIT_WINDOW_HOURS = 48;
+const editWindowHours = () => {
+  const raw = process.env.ORDER_EDIT_WINDOW_HOURS;
+  if (raw === undefined || raw === "") return DEFAULT_EDIT_WINDOW_HOURS;
+  const n = Number(raw);
+  return Number.isFinite(n) && n >= 0 ? n : DEFAULT_EDIT_WINDOW_HOURS;
+};
+/** Giờ hoàn thành của lệnh (ms) = endTime; null nếu thiếu/không hợp lệ. */
+const completedAtMs = (order) => {
+  const t = order && order.endTime ? new Date(order.endTime).getTime() : NaN;
+  return Number.isFinite(t) ? t : null;
+};
+const isEditWindowOpen = (order, now = Date.now(), hours = editWindowHours()) => {
+  const t = completedAtMs(order);
+  return t !== null && now - t <= hours * 3600 * 1000;
+};
+/** Trường LUÔN khoá kể cả trong hạn. */
+const ALWAYS_LOCKED_KEYS = ["endTime"];
+
+/**
+ * Quyết định cho một request sửa lệnh ĐÃ HOÀN THÀNH (hàm thuần, có test).
+ * @returns {{ blocked: boolean, reason: null|"reopen"|"expired"|"endTime", inWindow: boolean,
+ *             editKeys: string[], fields: string[] }}
+ *  - editKeys: các trường bảo vệ bị đổi (dùng để chụp lại bản chốt)
+ *  - fields: trường nêu trong lỗi 409
+ */
+const frozenEditDecision = (order, body, { status, adminForce = false, now = Date.now(), hours } = {}) => {
+  const inWindow = isEditWindowOpen(order, now, hours);
+  const editKeys = changedProtectedFields(order, body || {});
+  const reopen = status !== undefined && status !== STATUS_COMPLETED;
+  let reason = null;
+  let fields = [];
+  if (reopen) {
+    reason = "reopen";
+    fields = ["status"];
+  } else if (editKeys.length > 0 && !inWindow) {
+    reason = "expired";
+    fields = editKeys;
+  } else if (editKeys.some((k) => ALWAYS_LOCKED_KEYS.includes(k))) {
+    reason = "endTime";
+    fields = editKeys.filter((k) => ALWAYS_LOCKED_KEYS.includes(k));
+  }
+  return { blocked: reason !== null && !adminForce, reason, inWindow, editKeys, fields };
+};
+
 module.exports = {
   STATUS_COMPLETED,
   FROZEN_REF_KEYS,
@@ -342,6 +392,10 @@ module.exports = {
   collectIds,
   sameIdSet,
   changedProtectedFields,
+  frozenEditDecision,
+  isEditWindowOpen,
+  editWindowHours,
+  ALWAYS_LOCKED_KEYS,
   pick,
   isPlainObject,
   isPopulatedValue,
