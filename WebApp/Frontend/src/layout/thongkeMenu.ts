@@ -116,7 +116,7 @@ export const CATALOG_PATHS_MOVED_TO_TK = [
 //
 // Thanh menu: Tổng quan | Lệnh sản xuất | [Công việc của tôi] |
 //   Nhập liệu Khai thác | Nhập liệu Vận tải | DANH MỤC (gộp) | Định mức nhiên liệu |
-//   Áp Trắc Địa | Đối chiếu | Báo chuyến | Báo cáo thống kê | Báo cáo | Hệ thống
+//   Áp Trắc Địa | Đối chiếu | Báo chuyến | Báo cáo (có tab "Báo cáo thống kê") | Hệ thống
 // ---------------------------------------------------------------------------
 
 /** Mục Thống kê đứng TRƯỚC menu Danh mục (theo thứ tự thanh menu của PM Thống kê). */
@@ -124,8 +124,11 @@ export const TK_NAV_BEFORE_CATALOG: TkMenuItem[] = TK_TOP_ITEMS.filter((i) =>
   ["/nhap-lieu/khai-thac", "/nhap-lieu/van-tai"].includes(i.to),
 );
 /** Mục Thống kê đứng SAU menu Danh mục. */
+// "Báo cáo thống kê" KHÔNG đứng ngoài thanh menu: nằm trong menu "Báo cáo" dưới dạng tab
+// (xem pages/reports/Reports.tsx).
+export const TK_REPORT_ITEM_PATH = "/bao-cao/thong-ke";
 export const TK_NAV_AFTER_CATALOG: TkMenuItem[] = TK_TOP_ITEMS.filter(
-  (i) => !TK_NAV_BEFORE_CATALOG.includes(i),
+  (i) => !TK_NAV_BEFORE_CATALOG.includes(i) && i.to !== TK_REPORT_ITEM_PATH,
 );
 
 export interface MergedCatalogItem {

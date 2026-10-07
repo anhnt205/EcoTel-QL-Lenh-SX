@@ -326,6 +326,28 @@ router.patch('/reset-password/:token', async (req, res, next) => {
  *     security:
  *       - bearerAuth: []
  */
+/**
+ * Cấp token cho khung Thống kê nhúng (đăng nhập một lần) — xem services/tkToken.js.
+ * Chỉ admin/manager/dispatcher; employee không được vào Thống kê.
+ */
+router.get("/tk-token", verifyToken, async (req, res) => {
+    try {
+        const { canAccessThongKe, signTkToken } = require("../services/tkToken");
+        if (!canAccessThongKe(req.user?.role)) {
+            return res.status(403).send({ status: "error", message: "Tài khoản không có quyền dùng phần mềm Thống kê" });
+        }
+        const secret = process.env.TK_AUTH_JWT_SECRET;
+        if (!secret) {
+            return res.status(503).send({ status: "error", message: "Chưa cấu hình liên thông Thống kê (TK_AUTH_JWT_SECRET)" });
+        }
+        const { token, expiresIn } = signTkToken(req.user, secret);
+        res.status(200).json({ status: "success", data: { appToken: token, expiresIn } });
+    } catch (err) {
+        req.logger.error("❌ Lỗi cấp token Thống kê", err);
+        res.status(500).send({ status: "error", message: err.message });
+    }
+});
+
 router.get('/me', verifyToken, async (req, res, next) => {
     try {
         const user = await User.findById(req.userId).populate("position").populate("department")

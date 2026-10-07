@@ -42,6 +42,9 @@ services:
       JWT_EXPIRES_IN: 7d
       # Thống kê là gốc danh mục -> khoá ghi danh mục ở Điều phối.
       CATALOG_MASTER: thongke
+      # Đăng nhập một lần: Điều phối cấp token cho khung Thống kê, ký bằng CÙNG khoá với
+      # AUTH_JWT_SECRET của Thống kê (xem Backend/services/tkToken.js).
+      TK_AUTH_JWT_SECRET: ${TK_AUTH_JWT_SECRET:?đặt TK_AUTH_JWT_SECRET}
       # Hostname KHÔNG được có dấu gạch dưới: Tomcat của Thống kê từ chối header Host
       # "tk_backend_service" bằng 400 -> dùng alias "tk-backend" khai báo ở service dưới.
       TK_API_BASE_URL: http://tk-backend:8088

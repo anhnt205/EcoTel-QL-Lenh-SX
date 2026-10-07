@@ -50,7 +50,6 @@ describe("menu Danh mục gộp (Thống kê + Điều phối)", () => {
       "Áp Trắc Địa",
       "Đối chiếu",
       "Báo chuyến",
-      "Báo cáo thống kê",
     ]);
   });
 

@@ -101,6 +101,8 @@ export default function Header() {
 
   const handleLogout = () => {
     localStorage.removeItem("token");
+    // phiên Thống kê nhúng (nếu có) cũng phải bỏ, tránh người sau dùng nhầm token cũ
+    try { sessionStorage.removeItem("token_portal"); } catch { /* bỏ qua */ }
     setUser(null);
     navigate("/login");
   };
