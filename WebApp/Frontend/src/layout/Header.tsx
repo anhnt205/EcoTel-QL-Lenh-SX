@@ -56,6 +56,9 @@ import { RoleEnum } from "../enums";
 import { ThemeProvider, alpha } from "@mui/material/styles";
 import { appFontTheme, uiSansTheme, UI_FONT } from "../theme/uiTheme";
 import { brandAccent, brandHeaderBg, brandNavy, brandOnColor, useBranding } from "../branding/BrandingProvider";
+import { TK_EMBED } from "../config/features";
+import { CATALOG_PATHS_MOVED_TO_TK } from "./thongkeMenu";
+import ThongKeNav from "./ThongKeNav";
 
 export default function Header() {
   const navigate = useNavigate();
@@ -171,7 +174,24 @@ export default function Header() {
       icon: <AccessTime fontSize="small" />,
       path: "/shifts",
     },
-  ].filter(Boolean);
+  ]
+    .filter(Boolean)
+    // Khi Thống kê là gốc danh mục (REACT_APP_TK_EMBED): ẩn các mục danh mục đã
+    // chuyển sang Thống kê — đơn vị, chức danh, ca (cả mục "Phân loại/Chủng loại
+    // thiết bị" trong submenu Thiết bị). Màn vận hành xe/máy vẫn giữ.
+    .map((it: any) =>
+      TK_EMBED && it?.submenu
+        ? {
+            ...it,
+            submenu: it.submenu.filter(
+              (s: any) => !CATALOG_PATHS_MOVED_TO_TK.includes(s.path),
+            ),
+          }
+        : it,
+    )
+    .filter(
+      (it: any) => !(TK_EMBED && CATALOG_PATHS_MOVED_TO_TK.includes(it?.path)),
+    );
 
 
   // ---- Lớp trình bày theo ảnh mẫu: thanh trên xanh đậm + hàng tab trắng ----
@@ -306,6 +326,13 @@ export default function Header() {
                       </ListItem>
                     );
                   })}
+                  {TK_EMBED && (
+                    <ThongKeNav
+                      role={user?.role}
+                      variant="drawer"
+                      onNavigate={() => setDrawerOpen(false)}
+                    />
+                  )}
                   {[
                     RoleEnum.ADMIN,
                     RoleEnum.MANAGER,
@@ -537,6 +564,9 @@ export default function Header() {
                     })}
                 </Menu>
               </>
+            )}
+            {TK_EMBED && (
+              <ThongKeNav role={user?.role} variant="bar" navBtnSx={navBtnSx} />
             )}
             {[RoleEnum.ADMIN, RoleEnum.MANAGER, RoleEnum.DISPATCHER].includes(
               user?.role,

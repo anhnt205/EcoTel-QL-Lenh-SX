@@ -31,6 +31,7 @@ import DeviceModels from "./pages/deviceModels/DeviceModels";
 import Models from "./pages/model/Model";
 import { RoleEnum } from "./enums";
 import SystemDashboard from "./pages/dashboard/System";
+import EmbeddedThongKe from "./pages/thongke/EmbeddedThongKe";
 
 interface PrivateRouteProps {
   children: React.ReactNode;
@@ -244,6 +245,16 @@ const App = () => {
           element={
             <PrivateRoute>
               <SystemDashboard />
+            </PrivateRoute>
+          }
+        />
+        {/* Phần mềm Thống kê nhúng cùng domain (xem pages/thongke/EmbeddedThongKe).
+            Route luôn có mặt nhưng chỉ được dẫn tới khi bật REACT_APP_TK_EMBED. */}
+        <Route
+          path="/tk/*"
+          element={
+            <PrivateRoute>
+              <EmbeddedThongKe />
             </PrivateRoute>
           }
         />
