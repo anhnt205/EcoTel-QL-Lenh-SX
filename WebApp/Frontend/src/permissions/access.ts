@@ -38,12 +38,13 @@ export const hasPermission = (user: any, key: string, action: PermAction): boole
 /**
  * Module có hiện trên menu / mở được không.
  *  - chưa cấu hình quyền mới: theo vai trò cũ (`legacyRoles`);
- *  - đã cấu hình: theo quyền Xem (R) của module.
+ *  - đã cấu hình (custom): theo quyền Xem (R) của module;
+ *  - admin (full): giữ đúng menu cũ theo vai trò (không tự hiện thêm mục mà admin trước đây không thấy).
  */
 export const allowModule = (user: any, key: string, legacyRoles: readonly string[]): boolean =>
-  permissionMode(user) === "legacy"
-    ? legacyRoles.includes(user?.role)
-    : hasPermission(user, key, "r");
+  permissionMode(user) === "custom"
+    ? hasPermission(user, key, "r")
+    : legacyRoles.includes(user?.role); // legacy và admin (full): giữ đúng menu cũ theo vai trò
 
 /**
  * Có được thêm/sửa/xoá không: chưa cấu hình thì giữ quyết định cũ của trang (`legacyAllowed`), đã cấu hình thì theo C/U/D.
@@ -78,4 +79,4 @@ export const hasAny = (r?: PermRow) => Boolean(r && (r.c || r.r || r.u || r.d));
  * cấu hình quyền mới thì theo quyền Xem.
  */
 export const showModule = (user: any, key: string): boolean =>
-  permissionMode(user) === "legacy" ? true : hasPermission(user, key, "r");
+  permissionMode(user) === "custom" ? hasPermission(user, key, "r") : true;

@@ -60,7 +60,12 @@ const enforceWrites = (moduleKey, label, { skip } = {}) => async (req, res, next
     const actor = await loadActor(req);
     if (!actor) return next();
     const eff = effectivePermissions(actor);
-    if (eff.mode === "legacy" || hasModulePermission(eff, moduleKey, action)) return next();
+    if (eff.mode === "legacy") return next();
+    if (hasModulePermission(eff, moduleKey, action)) {
+      // đã cấu hình quyền mới và CÓ quyền -> các `restrictTo(vai trò cũ)` trong route không được chặn nữa (xem auth.middleware)
+      req.permissionGranted = true;
+      return next();
+    }
     req.logger?.warn(`⚠️ ${actor.username} bị chặn ${action} ở module ${moduleKey}`);
     return forbid(res, label, action);
   } catch (err) {
@@ -74,7 +79,11 @@ const enforceRead = (moduleKey, label) => async (req, res, next) => {
     const actor = await loadActor(req);
     if (!actor) return next();
     const eff = effectivePermissions(actor);
-    if (eff.mode === "legacy" || hasModulePermission(eff, moduleKey, "r")) return next();
+    if (eff.mode === "legacy") return next();
+    if (hasModulePermission(eff, moduleKey, "r")) {
+      req.permissionGranted = true;
+      return next();
+    }
     return forbid(res, label, "r");
   } catch (err) {
     return next(err);

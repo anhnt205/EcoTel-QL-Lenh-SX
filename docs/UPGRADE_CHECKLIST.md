@@ -64,3 +64,12 @@ Cần xử lý/ xác nhận các điểm dưới trước khi nâng cấp.
 5. Ngay sau deploy: `node scripts/freeze-completed-orders.js --dry-run` → đọc → chạy thật. Theo dõi log cron `*/10` và thời gian build index.
 6. Quay lại nếu có sự cố: chạy lại image/tag cũ (dữ liệu mới thêm `frozen`/`externalTkId` không làm hỏng bản cũ). Đừng restore Mongo
    trừ khi dữ liệu thật sự hỏng.
+
+## 7. Bổ sung (2026-10-08): phân quyền Phòng ban → Chức vụ → Cán bộ nhân viên
+- **Không đổi hành vi bản đang chạy** cho tới khi admin cấu hình: người chưa có quyền mới chạy `legacy` (4 vai trò cũ). Field mới đều tuỳ chọn
+  (`Department.allowedModules`, `Position.department/permissions`, `User.customPermissions/permissions`), không migration, không index mới.
+- `verifyToken` (mọi route) giờ populate lồng `position.department` — thêm 1 truy vấn nhỏ mỗi request; rollback an toàn (field lạ bị bỏ qua).
+- Chỉ áp cho menu/danh mục/hệ thống/Thống kê/Báo cáo; **không** kiểm Lệnh sản xuất và API Mobile → Mobile không bị ảnh hưởng ngay cả khi cấu hình.
+  Nhưng nếu cấu hình quyền cho cán bộ dùng Mobile thì các thao tác ghi danh mục/hệ thống của họ mới bị kiểm (Mobile bình thường không gọi).
+- Khi bật `CATALOG_MASTER=thongke`: Phòng ban/Chức vụ KHÔNG còn bị khoá/đồng bộ; chỉ thiết bị, loại/chủng loại thiết bị, ca, vật liệu, điểm đổ tải.
+- Thêm biến/route: `GET /api/permissions/modules`; không biến môi trường mới.

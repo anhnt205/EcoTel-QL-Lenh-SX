@@ -42,6 +42,9 @@ const verifyToken = async (req, res, next) => {
 
 const restrictTo = (...roles) => {
     return (req, res, next) => {
+        // Quyền mới (Phòng ban -> Chức vụ -> Cán bộ): middleware/permission.js đã xác nhận người này được phép thao tác
+        // này trên module tương ứng (chỉ đặt ở các nhóm API quản lý danh mục/hệ thống) -> không áp lại giới hạn vai trò cũ.
+        if (req.permissionGranted === true) return next();
         if (!roles.includes(req.user?.role)) {
             return res.status(403).send({ status: 'error', message: 'You do not have permission to perform this action' });
         }

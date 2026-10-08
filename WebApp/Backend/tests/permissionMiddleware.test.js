@@ -145,3 +145,41 @@ describe('permissionFieldsGuard', () => {
         expect(req.body.allowedModules).toBeNull();
     });
 });
+
+describe('quyền mới thay lớp kiểm tra vai trò cũ (restrictTo)', () => {
+    const { restrictTo } = require('../middleware/auth.middleware');
+    const restrictOldRoles = restrictTo('manager', 'admin');
+
+    test('người đã cấu hình và CÓ quyền: enforceWrites đặt cờ, restrictTo(vai trò cũ) không chặn nữa', async () => {
+        actorIs(actorWith('employee', [row('jobs', true, true, false, false)]));
+        const req = mkReq('POST', '/', {});
+        req.user = { role: 'employee' };
+        expect((await run(enforceWrites('jobs', 'Công việc'), req)).nexted).toBe(true);
+        expect(req.permissionGranted).toBe(true);
+        expect((await run(restrictOldRoles, req)).nexted).toBe(true);
+    });
+    test('người chưa cấu hình (legacy): KHÔNG đặt cờ nên restrictTo cũ vẫn chặn như trước', async () => {
+        actorIs({ _id: 'u1', username: 'u', role: 'employee', active: true });
+        const req = mkReq('POST', '/', {});
+        req.user = { role: 'employee' };
+        await run(enforceWrites('jobs', 'Công việc'), req);
+        expect(req.permissionGranted).toBeUndefined();
+        const r = await run(restrictOldRoles, req);
+        expect(r.nexted).toBe(false);
+        expect(r.res.statusCode).toBe(403);
+    });
+    test('đã cấu hình nhưng THIẾU quyền: bị chặn ngay ở enforceWrites, không có cờ', async () => {
+        actorIs(actorWith('manager', [row('jobs', false, true, false, false)]));
+        const req = mkReq('DELETE', '/', {});
+        req.user = { role: 'manager' };
+        const r = await run(enforceWrites('jobs', 'Công việc'), req);
+        expect(r.res.statusCode).toBe(403);
+        expect(req.permissionGranted).toBeUndefined();
+    });
+    test('enforceRead cũng đặt cờ khi có quyền xem', async () => {
+        actorIs(actorWith('employee', [row('reports', false, true, false, false)]));
+        const req = mkReq('POST', '/exportFile', {});
+        await run(enforceRead('reports', 'Báo cáo'), req);
+        expect(req.permissionGranted).toBe(true);
+    });
+});

@@ -155,3 +155,12 @@ describe("permissions/access", () => {
     });
   });
 });
+
+describe("admin giữ đúng menu cũ", () => {
+  test("allowModule với admin (mode full) theo vai trò cũ: không thấy 'Công việc của tôi' (chỉ quản lý)", () => {
+    const admin = { role: "admin", permissionMode: "full", permissions: {} };
+    expect(allowModule(admin, "my-tasks", ["manager"])).toBe(false);
+    expect(allowModule(admin, "system", ["admin"])).toBe(true);
+    expect(showModule(admin, "dashboard")).toBe(true);
+  });
+});
