@@ -15,6 +15,10 @@ export interface TkMenuItem {
   to: string;
   /** khoá module phân quyền */
   module: string;
+  /** trang riêng của Điều phối (không phải trang nhúng /tk/...); mặc định tkPageRoute(to) */
+  route?: string;
+  /** hiện khi có quyền Xem ở BẤT KỲ module nào trong danh sách (mặc định chỉ `module`) */
+  anyModule?: string[];
 }
 
 export interface TkMenuGroup {
@@ -31,7 +35,14 @@ export const TK_TOP_ITEMS: TkMenuItem[] = [
   { text: "Định mức nhiên liệu", to: "/danh-muc/dinh-muc-nhien-lieu", module: "tk-fuel-norm" },
   { text: "Áp Trắc Địa", to: "/danh-muc/ap-tracdia", module: "tk-survey" },
   { text: "Đối chiếu", to: "/nhap-lieu/doi-chieu", module: "tk-reconciliation" },
-  { text: "Thống kê sản lượng", to: "/bao-cao/thong-ke", module: "tk-stat-report" },
+  // Trang 2 tab (Sản lượng thống kê | Báo chuyến) — xem pages/thongke/OutputStats.tsx
+  {
+    text: "Thống kê sản lượng",
+    to: "/bao-cao/thong-ke",
+    module: "tk-stat-report",
+    route: "/thong-ke-san-luong",
+    anyModule: ["tk-stat-report", "tk-trip-report"],
+  },
 ];
 
 // Nhóm "Danh mục" của Thống kê — danh mục gốc dùng chung, Điều phối chỉ giữ bản sao chỉ-đọc.
@@ -117,7 +128,13 @@ export const CATALOG_PATHS_MOVED_TO_TK = ["/shifts", "/deviceTypes", "/deviceMod
 export const TK_NAV_BEFORE_CATALOG: TkMenuItem[] = TK_TOP_ITEMS.filter((i) =>
   ["/nhap-lieu/khai-thac", "/nhap-lieu/van-tai"].includes(i.to),
 );
-// "Thống kê sản lượng" (trang báo cáo thống kê của Thống kê) đứng ngoài thanh menu, thay mục "Báo chuyến" cũ.
+// "Thống kê sản lượng" đứng ngoài thanh menu, mở trang có 2 tab: "Sản lượng thống kê" (báo cáo thống kê) và
+// "Báo chuyến" (xem pages/thongke/OutputStats.tsx).
+export const TK_OUTPUT_ROUTE = "/thong-ke-san-luong";
+export const TK_OUTPUT_TABS = [
+  { key: "san-luong", label: "Sản lượng thống kê", to: "/bao-cao/thong-ke", module: "tk-stat-report" },
+  { key: "bao-chuyen", label: "Báo chuyến", to: "/nhap-lieu/bao-chuyen", module: "tk-trip-report" },
+] as const;
 export const TK_REPORT_MODULE = "tk-stat-report";
 /** Mục Thống kê đứng SAU menu Danh mục. */
 export const TK_NAV_AFTER_CATALOG: TkMenuItem[] = TK_TOP_ITEMS.filter((i) => !TK_NAV_BEFORE_CATALOG.includes(i));
@@ -217,6 +234,10 @@ export function buildMergedCatalog(user: any): MergedCatalogGroup[] {
 /** Có thấy mục Thống kê `module` không (menu ngoài thanh menu và tab Báo cáo thống kê). */
 export const canSeeTkModule = (user: any, module: string) => allowModule(user, module, TK_LEGACY_ROLES);
 
+/** Có thấy mục menu `item` không (theo `anyModule` nếu có, không thì theo `module`). */
+export const canSeeTkItem = (user: any, item: TkMenuItem) =>
+  (item.anyModule || [item.module]).some((m) => canSeeTkModule(user, m));
+
 /** Có thấy ít nhất một màn Thống kê không (dùng để quyết định hiện khung nhúng). */
 export const canSeeThongKe = (user: any) =>
-  [...TK_TOP_ITEMS, ...TK_CATALOG_GROUPS.flatMap((g) => g.items)].some((i) => canSeeTkModule(user, i.module));
+  [...TK_TOP_ITEMS, ...TK_CATALOG_GROUPS.flatMap((g) => g.items)].some((i) => canSeeTkItem(user, i));

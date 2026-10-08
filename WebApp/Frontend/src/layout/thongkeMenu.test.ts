@@ -1,8 +1,11 @@
 import {
   buildMergedCatalog,
   canSeeThongKe,
+  canSeeTkItem,
   canSeeTkModule,
   CATALOG_PATHS_MOVED_TO_TK,
+  TK_OUTPUT_ROUTE,
+  TK_OUTPUT_TABS,
   TK_CATALOG_GROUPS,
   TK_NAV_AFTER_CATALOG,
   TK_NAV_BEFORE_CATALOG,
@@ -162,5 +165,34 @@ describe("admin giữ đúng menu cũ", () => {
     expect(allowModule(admin, "my-tasks", ["manager"])).toBe(false);
     expect(allowModule(admin, "system", ["admin"])).toBe(true);
     expect(showModule(admin, "dashboard")).toBe(true);
+  });
+});
+
+describe("Thống kê sản lượng: trang 2 tab", () => {
+  const item = TK_TOP_ITEMS.find((i) => i.text === "Thống kê sản lượng")!;
+
+  test("mục menu trỏ tới trang riêng của Điều phối, không phải trang nhúng /tk/...", () => {
+    expect(TK_OUTPUT_ROUTE).toBe("/thong-ke-san-luong");
+    expect(item.route).toBe(TK_OUTPUT_ROUTE);
+    expect(TK_NAV_AFTER_CATALOG.map((i) => i.text)).toContain("Thống kê sản lượng");
+  });
+
+  test("2 tab theo đúng thứ tự: Sản lượng thống kê (báo cáo thống kê) rồi Báo chuyến", () => {
+    expect(TK_OUTPUT_TABS.map((t) => t.label)).toEqual(["Sản lượng thống kê", "Báo chuyến"]);
+    expect(TK_OUTPUT_TABS.map((t) => t.to)).toEqual(["/bao-cao/thong-ke", "/nhap-lieu/bao-chuyen"]);
+    expect(TK_OUTPUT_TABS.map((t) => t.module)).toEqual(["tk-stat-report", "tk-trip-report"]);
+  });
+
+  test("mục menu hiện khi có quyền Xem ở BẤT KỲ tab nào; không có tab nào thì ẩn", () => {
+    expect(canSeeTkItem(custom("employee", { "tk-trip-report": { r: true } }), item)).toBe(true);
+    expect(canSeeTkItem(custom("employee", { "tk-stat-report": { r: true } }), item)).toBe(true);
+    expect(canSeeTkItem(custom("employee", { jobs: { r: true } }), item)).toBe(false);
+    expect(canSeeTkItem(legacy("dispatcher"), item)).toBe(true);
+    expect(canSeeTkItem(legacy("employee"), item)).toBe(false);
+  });
+
+  test("tab theo quyền riêng từng module", () => {
+    const onlyTrips = custom("manager", { "tk-trip-report": { r: true } });
+    expect(TK_OUTPUT_TABS.filter((t) => canSeeTkModule(onlyTrips, t.module)).map((t) => t.key)).toEqual(["bao-chuyen"]);
   });
 });

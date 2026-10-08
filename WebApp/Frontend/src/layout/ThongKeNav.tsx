@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 import {
   buildMergedCatalog,
-  canSeeTkModule,
+  canSeeTkItem,
   MergedCatalogItem,
   TK_NAV_AFTER_CATALOG,
   TK_NAV_BEFORE_CATALOG,
@@ -60,8 +60,8 @@ const ThongKeNav = ({ user, variant, navBtnSx, onNavigate }: Props) => {
   const [open, setOpen] = useState(false);
 
   // chỉ hiện các mục người dùng có quyền Xem (đã cấu hình quyền mới) hoặc theo vai trò cũ (chưa cấu hình)
-  const before = TK_NAV_BEFORE_CATALOG.filter((i) => canSeeTkModule(user, i.module));
-  const after = TK_NAV_AFTER_CATALOG.filter((i) => canSeeTkModule(user, i.module));
+  const before = TK_NAV_BEFORE_CATALOG.filter((i) => canSeeTkItem(user, i));
+  const after = TK_NAV_AFTER_CATALOG.filter((i) => canSeeTkItem(user, i));
   const groups = buildMergedCatalog(user);
   if (before.length === 0 && after.length === 0 && groups.length === 0) return null;
 
@@ -80,7 +80,7 @@ const ThongKeNav = ({ user, variant, navBtnSx, onNavigate }: Props) => {
   });
 
   const topButton = (i: TkMenuItem) => {
-    const path = tkPageRoute(i.to);
+    const path = i.route ?? tkPageRoute(i.to);
     return (
       <Button
         key={i.to}
@@ -102,7 +102,7 @@ const ThongKeNav = ({ user, variant, navBtnSx, onNavigate }: Props) => {
 
   if (variant === "drawer") {
     const drawerTop = (i: TkMenuItem) => (
-      <ListItem button key={i.to} selected={onPath(tkPageRoute(i.to))} onClick={() => go(tkPageRoute(i.to))}>
+      <ListItem button key={i.to} selected={onPath(i.route ?? tkPageRoute(i.to))} onClick={() => go(i.route ?? tkPageRoute(i.to))}>
         <ListItemIcon sx={{ color: "primary.main" }}>{ICONS[i.to]}</ListItemIcon>
         <ListItemText primary={i.text} />
       </ListItem>

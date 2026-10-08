@@ -32,6 +32,7 @@ import Models from "./pages/model/Model";
 import { RoleEnum } from "./enums";
 import SystemDashboard from "./pages/dashboard/System";
 import EmbeddedThongKe from "./pages/thongke/EmbeddedThongKe";
+import OutputStats from "./pages/thongke/OutputStats";
 import RequireModule from "./permissions/RequireModule";
 
 interface PrivateRouteProps {
@@ -251,6 +252,17 @@ const App = () => {
         />
         {/* Phần mềm Thống kê nhúng cùng domain (xem pages/thongke/EmbeddedThongKe).
             Route luôn có mặt nhưng chỉ được dẫn tới khi bật REACT_APP_TK_EMBED. */}
+        {/* Thống kê sản lượng: 2 tab (Sản lượng thống kê | Báo chuyến) nhúng từ Thống kê */}
+        <Route
+          path="/thong-ke-san-luong"
+          element={
+            <PrivateRoute>
+              <RequireModule module="tk">
+                <OutputStats />
+              </RequireModule>
+            </PrivateRoute>
+          }
+        />
         <Route
           path="/tk/*"
           element={

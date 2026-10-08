@@ -46,6 +46,7 @@ import {
   Category,
   WorkOutline,
   Dashboard,
+  Settings,
 } from "@mui/icons-material";
 import { ChartNoAxesCombined, ClipboardPaste, MonitorCog } from "lucide-react";
 import { userAtom } from "../atoms/userAtoms";
@@ -596,21 +597,24 @@ export default function Header() {
                 Báo cáo
               </Button>
             )}
-            {allowModule(user, "system", [RoleEnum.ADMIN]) && (
-              <Button
-                color="inherit"
-                startIcon={<MonitorCog size={20} style={{ color: "inherit" }} />}
-                sx={navBtnSx(isActive("/system"))}
-                onClick={() => navigate("/system")}
-              >
-                Hệ thống
-              </Button>
-            )}
-
             </Box>
 
             {/* Thông báo + tài khoản nằm bên phải hàng menu (theo ảnh mẫu) */}
             <Box sx={{ display: "flex", alignItems: "center", gap: 1, pl: 1, alignSelf: "flex-start", height: 54, flexShrink: 0 }}>
+              {allowModule(user, "system", [RoleEnum.ADMIN]) && (
+                <Tooltip title="Hệ thống">
+                  <IconButton
+                    onClick={() => navigate("/system")}
+                    aria-label="Hệ thống"
+                    sx={{
+                      color: HDR_BLUE,
+                      bgcolor: isActive("/system") ? alpha(HDR_BLUE, 0.12) : "transparent",
+                    }}
+                  >
+                    <Settings />
+                  </IconButton>
+                </Tooltip>
+              )}
               <Tooltip
                 title={`Thông báo${notificationCount ? ` (${notificationCount} chưa đọc)` : ""}`}
               >
