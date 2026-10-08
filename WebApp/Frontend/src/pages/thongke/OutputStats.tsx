@@ -7,8 +7,8 @@ import ThongKeFrame from "../../components/thongke/ThongKeFrame";
 import { canSeeTkModule, TK_OUTPUT_TABS } from "../../layout/thongkeMenu";
 
 // "Thống kê sản lượng": trang 2 tab nhúng 2 màn của phần mềm Thống kê —
-//   Tab 01: Sản lượng thống kê (báo cáo thống kê: bảng tính sản lượng theo kỳ)
-//   Tab 02: Báo chuyến
+//   Tab "Sản lượng thống kê" (báo cáo thống kê: bảng tính sản lượng theo kỳ)
+//   Tab "Báo chuyến"
 // Mỗi tab là 1 khung nhúng riêng, chỉ tạo khi mở lần đầu và GIỮ SỐNG sau đó để chuyển qua lại không mất việc đang
 // xem. Tab hiện theo quyền Xem của module tương ứng (tk-stat-report, tk-trip-report). Tab mở sẵn lấy từ `?tab=`.
 const OutputStats = () => {
@@ -34,11 +34,11 @@ const OutputStats = () => {
         onChange={(_, key) => setParams(key === visible[0].key ? {} : { tab: key }, { replace: true })}
         sx={{ borderBottom: "1px solid #e5e9f0" }}
       >
-        {visible.map((t, i) => (
+        {visible.map((t) => (
           <Tab
             key={t.key}
             value={t.key}
-            label={`Tab ${String(i + 1).padStart(2, "0")}: ${t.label}`}
+            label={t.label}
             sx={{ textTransform: "none", fontWeight: 600 }}
           />
         ))}
