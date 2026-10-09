@@ -10,6 +10,7 @@ const upload = multer({ storage: multer.memoryStorage() });
 const ExcelJS = require('exceljs');
 const xlsx = require('xlsx');
 const { ROLE } = require('../config/config');
+const { safeRegex } = require('../utils/escapeRegex');
 
 /**
  * @swagger
@@ -25,8 +26,7 @@ router.get('/', verifyToken, async (req, res, next) => {
         const query = {}
 
         if (req.query.code) {
-            const regex = new RegExp(req.query.code, 'i'); // không phân biệt hoa thường
-            query.code = regex;
+            query.code = safeRegex(req.query.code); // không phân biệt hoa thường
         }
         const departments = await Department.find(query)
             .collation({ locale: "vi", strength: 1 })

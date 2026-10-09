@@ -111,12 +111,12 @@ export default function Header() {
   };
   const menuItems = [
     allowModule(user, "safety-measures", [RoleEnum.ADMIN, RoleEnum.MANAGER]) && {
-      text: "Bi\·\ª\án\ ph\√\°p\ an\ to\√\†n",
+      text: "Bi·ªán ph√°p an to√†n",
       icon: <Security fontSize="small" />,
       path: "/safetyMeasures",
     },
     allowModule(user, "device-vehicles", [RoleEnum.ADMIN, RoleEnum.MANAGER, RoleEnum.DISPATCHER]) && {
-      text: "Thi\·\∫\øt\ b\·\ª\ã",
+      text: "Thi·∫øt b·ªã",
       icon: <Construction fontSize="small" />,
       path: "#",
       submenu: [
@@ -127,47 +127,47 @@ export default function Header() {
       ],
     },
     allowModule(user, "travel-logs", [RoleEnum.ADMIN, RoleEnum.MANAGER]) && {
-      text: "Cung\ \ƒ\ë\·\ª\ô",
+      text: "Cung ƒë·ªô",
       icon: <Route fontSize="small" />,
       path: "/travelLog",
     },
     allowModule(user, "models", [RoleEnum.ADMIN, RoleEnum.MANAGER, RoleEnum.DISPATCHER]) && {
-      text: "M\√\¥\ h\√\¨nh\ xe",
+      text: "M√¥ h√¨nh xe",
       icon: <DirectionsCar fontSize="small" />,
       path: "/models",
     },
     allowModule(user, "materials", [RoleEnum.ADMIN, RoleEnum.MANAGER]) && {
-      text: "V\·\∫\≠t\ li\·\ª\áu",
+      text: "V·∫≠t li·ªáu",
       icon: <Terrain fontSize="small" />,
       path: "/materials",
     },
     allowModule(user, "locations", [RoleEnum.ADMIN, RoleEnum.MANAGER]) && {
-      text: "\ƒ\êi\·\ª\Ém\ \ƒ\ë\·\ª\ï\ t\·\∫\£i",
+      text: "ƒêi·ªÉm ƒë·ªï t·∫£i",
       icon: <LocationOn fontSize="small" />,
       path: "/locations",
     },
     allowModule(user, "users", [RoleEnum.ADMIN, RoleEnum.MANAGER, RoleEnum.DISPATCHER]) && {
-      text: "C\√\°n\ b\·\ª\ô\ nh\√\¢n\ vi\√\™n",
+      text: "C√°n b·ªô nh√¢n vi√™n",
       icon: <People fontSize="small" />,
       path: "/users",
     },
     allowModule(user, "jobs", [RoleEnum.ADMIN, RoleEnum.MANAGER]) && {
-      text: "C\√\¥ng\ vi\·\ª\ác",
+      text: "C√¥ng vi·ªác",
       icon: <Work fontSize="small" />,
       path: "/jobs",
     },
     allowModule(user, "positions", [RoleEnum.ADMIN, RoleEnum.MANAGER]) && {
-      text: "Ch\·\ª\©c\ danh\ ngh\·\ª\Å\ nghi\·\ª\áp",
+      text: "Ch·ª©c danh ngh·ªÅ nghi·ªáp",
       icon: <BadgeIcon fontSize="small" />,
       path: "/positions",
     },
     allowModule(user, "departments", [RoleEnum.ADMIN, RoleEnum.MANAGER, RoleEnum.DISPATCHER]) && {
-      text: "\ƒ\ê\∆\°n\ v\·\ª\ã",
+      text: "ƒê∆°n v·ªã",
       icon: <Business fontSize="small" />,
       path: "/departments",
     },
     allowModule(user, "tk-shifts", [RoleEnum.ADMIN, RoleEnum.MANAGER]) && {
-      text: "Ca\ l\√\†m\ vi\·\ª\ác",
+      text: "Ca l√†m vi·ªác",
       icon: <AccessTime fontSize="small" />,
       path: "/shifts",
     },

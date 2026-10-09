@@ -4,6 +4,7 @@ const { AppError } = require('../utils/errorHandler');
 const DeviceType = require('../models/DeviceType');
 const { verifyToken, restrictTo } = require('../middleware/auth.middleware');
 const { ROLE } = require('../config/config');
+const { safeRegex } = require('../utils/escapeRegex');
 
 
 router.post('/', verifyToken, restrictTo(ROLE.MANAGER, ROLE.ADMIN), async (req, res, next) => {
@@ -73,8 +74,7 @@ router.get('/', verifyToken, async (req, res) => {
     try {
         const query = {};
         if (req.query.q) {
-            const regex = new RegExp(req.query.q, 'i');
-            query.name = regex
+            query.name = safeRegex(req.query.q);
         }
         const DeviceTypes = await DeviceType.find(query)
             .collation({ locale: "vi", strength: 1 })

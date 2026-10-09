@@ -9,6 +9,7 @@ const upload = multer({ storage: multer.memoryStorage() });
 const ExcelJS = require('exceljs');
 const xlsx = require('xlsx');
 const { ROLE } = require('../config/config');
+const { safeRegex } = require('../utils/escapeRegex');
 
 const columnMapping = {
     'Tên biện pháp an toàn chung': 'name',
@@ -85,8 +86,7 @@ router.get('/', verifyToken, async (req, res) => {
     try {
         const query = {};
         if (req.query.q) {
-            const regex = new RegExp(req.query.q, 'i');
-            query.name = regex
+            query.name = safeRegex(req.query.q);
         }
         const SafetyMeasures = await SafetyMeasure.find(query).populate('job', 'name').populate('position', 'name').collation({ locale: "vi", strength: 1 })
             .sort({ content: 1 });

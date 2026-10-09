@@ -68,6 +68,7 @@ import OrderHistories from '../../components/Modal/OrderHistories';
 import { parseAxiosError } from '../../utils/handleApiError';
 import { appFontTheme, uiSansTheme, UI_FONT } from '../../theme/uiTheme';
 import { brandAccent } from '../../branding/BrandingProvider';
+import SearchInput from '../../components/SearchInput';
 import OrderDetailPanel from '../orders/OrderDetailPanel';
 import DateRangeFilter from '../orders/DateRangeFilter';
 import { ORDER_STATUS_META, StatusPill } from '../orders/orderStatus';
@@ -624,22 +625,16 @@ const DispatcherOrders: React.FC = () => {
                         })}
                     </Box>
                     <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center', mt: 1.25 }}>
-                        <TextField
+                        <SearchInput
                             size='small'
                             value={search}
                             placeholder='Tìm người nhận, số thẻ, công việc, mã lô...'
-                            onChange={(e) => {
-                                setSearch(e.target.value);
+                            iconPosition='start'
+                            onChange={(val) => {
+                                setSearch(val);
                                 setPage(0);
                             }}
                             sx={{ flex: '2 1 280px', minWidth: 230, ...inputSx }}
-                            InputProps={{
-                                startAdornment: (
-                                    <InputAdornment position='start'>
-                                        <Search sx={{ fontSize: 20, color: '#94a3b8' }} />
-                                    </InputAdornment>
-                                ),
-                            }}
                         />
                         <Autocomplete
                             size='small'

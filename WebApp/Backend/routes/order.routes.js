@@ -37,6 +37,7 @@ const {
   frozenEditDecision,
 } = require("../services/orderSnapshot");
 const { freezeOrder } = require("../services/orderFreeze");
+const { safeRegex } = require("../utils/escapeRegex");
 
 router.get("/", verifyToken, async (req, res, next) => {
   try {
@@ -45,7 +46,7 @@ router.get("/", verifyToken, async (req, res, next) => {
 
     // ---- Bộ lọc chung ----
     if (req.query.q) {
-      const regex = new RegExp(req.query.q, "i");
+      const regex = safeRegex(req.query.q);
 
       // tìm user theo salaryCode
       const matchedUsers = await User.find(
@@ -70,7 +71,7 @@ router.get("/", verifyToken, async (req, res, next) => {
       }
     }
     if (req.query.assignedTo) {
-      const regex = new RegExp(req.query.assignedTo, "i");
+      const regex = safeRegex(req.query.assignedTo);
 
       // tìm user theo salaryCode
       const matchedUsers = await User.find(
@@ -83,7 +84,7 @@ router.get("/", verifyToken, async (req, res, next) => {
       };
     }
     if (req.query.createdBy) {
-      const regex = new RegExp(req.query.createdBy, "i");
+      const regex = safeRegex(req.query.createdBy);
 
       // tìm user theo salaryCode
       const matchedUsers = await User.find(
@@ -107,15 +108,15 @@ router.get("/", verifyToken, async (req, res, next) => {
       };
     }
     if (req.query.job) {
-      const regex = new RegExp(req.query.job, "i");
+      const regex = safeRegex(req.query.job);
 
       // tìm user theo salaryCode
       const matchedJobs = await Job.find({ name: regex }, { _id: 1 }).lean();
-      const jobIds = matchedJobs.map((u) => u._id);
+      const jobIds = matchedJobs.map((j) => j._id);
       query.job = { $in: jobIds.map((id) => new mongoose.Types.ObjectId(id)) };
     }
     if (req.query.device) {
-      const regex = new RegExp(req.query.device, "i");
+      const regex = safeRegex(req.query.device);
 
       // tìm user theo salaryCode
       const matchedDevices = await Device.find(
@@ -128,7 +129,7 @@ router.get("/", verifyToken, async (req, res, next) => {
       };
     }
     if (req.query.material) {
-      const regex = new RegExp(req.query.material, "i");
+      const regex = safeRegex(req.query.material);
 
       const matchedMaterials = await Material.find(
         { name: regex },

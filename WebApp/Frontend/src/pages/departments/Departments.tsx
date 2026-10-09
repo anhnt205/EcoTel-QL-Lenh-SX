@@ -43,6 +43,7 @@ import { RoleEnum } from "../../enums";
 import CustomDataGrid from "../../components/Table/CustomDataGrid";
 import { parseAxiosError } from "../../utils/handleApiError";
 import ModuleChecklist from "../../components/permissions/ModuleChecklist";
+import SearchInput from "../../components/SearchInput";
 
 const Departments = () => {
     const [open, setOpen] = useState(false);
@@ -333,20 +334,11 @@ const Departments = () => {
                                 },
                             }}
                         >
-                            <TextField
-                                fullWidth
-                                size="small"
-                                value={value}
+                            <SearchInput
                                 placeholder="Tìm kiếm theo mã đơn vị"
-                                onChange={(e) => setValue(e.target.value)}
-                                InputProps={{
-                                    endAdornment: (
-                                        <InputAdornment position="end">
-                                            <Search sx={{ fontSize: 24 }} />
-                                        </InputAdornment>
-                                    ),
-                                }}
-                            ></TextField>
+                                value={value}
+                                onChange={setValue}
+                            />
                         </Box>
                         {user?.role === RoleEnum.ADMIN && (
                             <Box

@@ -48,6 +48,7 @@ import { RoleEnum } from "../../../enums";
 import { ACCEPTED_PRODUCT_OPTIONS } from "../../../utils/const";
 import CustomDataGrid from "../../../components/Table/CustomDataGrid";
 import { parseAxiosError } from '../../../utils/handleApiError';
+import SearchInput from "../../../components/SearchInput";
 import dayjs from "dayjs";
 import { DatePicker, LocalizationProvider } from "@mui/x-date-pickers";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
@@ -457,20 +458,11 @@ export default function MaterialType() {
                                 },
                             }}
                         >
-                            <TextField
-                                fullWidth
-                                size="small"
-                                value={value}
+                            <SearchInput
                                 placeholder="Tìm kiếm theo tên vật liệu"
-                                onChange={(e) => setValue(e.target.value)}
-                                InputProps={{
-                                    endAdornment: (
-                                        <InputAdornment position="end">
-                                            <Search sx={{ fontSize: 24 }} />
-                                        </InputAdornment>
-                                    ),
-                                }}
-                            ></TextField>
+                                value={value}
+                                onChange={setValue}
+                            />
                             <TextField
                                 fullWidth
                                 select

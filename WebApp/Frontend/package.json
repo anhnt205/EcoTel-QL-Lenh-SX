@@ -2,6 +2,7 @@
   "name": "ecotel-ql-lenh-sx",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "dependencies": {
     "@emotion/react": "^11.11.3",
     "@emotion/styled": "^11.11.0",
@@ -34,6 +35,7 @@
     "formik": "^2.4.5",
     "install": "^0.13.0",
     "jotai": "^2.12.5",
+    "leaflet": "^1.9.4",
     "leaflet.markercluster": "^1.5.3",
     "localforage": "^1.10.0",
     "lodash": "^4.17.21",
@@ -46,7 +48,6 @@
     "react-leaflet": "^4.2.1",
     "react-resizable": "^3.0.5",
     "react-router-dom": "^6.22.0",
-    "react-scripts": "5.0.1",
     "recharts": "^3.7.0",
     "socket.io": "^4.8.1",
     "socket.io-client": "^4.7.4",
@@ -57,10 +58,10 @@
     "yup": "^1.3.3"
   },
   "scripts": {
-    "start": "react-scripts start",
-    "build": "react-scripts build",
-    "test": "react-scripts test",
-    "eject": "react-scripts eject",
+    "dev": "vite",
+    "start": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
     "lint": "eslint src --ext .ts,.tsx",
     "lint:fix": "eslint src --ext .ts,.tsx --fix",
     "format": "prettier --write \"src/**/*.{ts,tsx}\""
@@ -90,11 +91,14 @@
     "@types/react-resizable": "^3.0.8",
     "@typescript-eslint/eslint-plugin": "^6.21.0",
     "@typescript-eslint/parser": "^6.21.0",
+    "@vitejs/plugin-react": "^4.7.0",
     "eslint": "^8.56.0",
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-prettier": "^5.1.3",
     "eslint-plugin-react": "^7.33.2",
     "eslint-plugin-react-hooks": "^4.6.0",
-    "prettier": "^3.2.5"
+    "prettier": "^3.2.5",
+    "vite": "^5.4.21",
+    "vite-tsconfig-paths": "^6.1.1"
   }
 }

@@ -46,6 +46,7 @@ import { parseAxiosError } from "../../utils/handleApiError";
 import DepartmentService from "../../services/departmentService";
 import PermissionMatrix from "../../components/permissions/PermissionMatrix";
 import { PermRow } from "../../permissions/access";
+import SearchInput from "../../components/SearchInput";
 
 const Positions: React.FC = () => {
     const [open, setOpen] = useState(false);
@@ -361,20 +362,11 @@ const Positions: React.FC = () => {
                                 },
                             }}
                         >
-                            <TextField
-                                fullWidth
-                                size="small"
-                                value={value}
+                            <SearchInput
                                 placeholder="Tìm kiếm theo tên chức danh, nghề nghiệp"
-                                onChange={(e) => setValue(e.target.value)}
-                                InputProps={{
-                                    endAdornment: (
-                                        <InputAdornment position="end">
-                                            <Search sx={{ fontSize: 24 }} />
-                                        </InputAdornment>
-                                    ),
-                                }}
-                            ></TextField>
+                                value={value}
+                                onChange={setValue}
+                            />
                         </Box>
                         {user?.role === RoleEnum.ADMIN && (
                             <Box

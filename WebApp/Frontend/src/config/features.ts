@@ -6,4 +6,4 @@
 // khỏi menu Điều phối. Mặc định TẮT → giao diện và hành vi y như cũ, nên gộp
 // code vào nhánh không làm đổi bản đang chạy thật cho tới khi bật cờ khi build.
 // Phải bật cùng lúc với CATALOG_MASTER=thongke ở backend (xem catalogLock.js).
-export const TK_EMBED = process.env.REACT_APP_TK_EMBED === "true";
+export const TK_EMBED = ((import.meta as any).env?.VITE_TK_EMBED ?? (import.meta as any).env?.REACT_APP_TK_EMBED) === "true";

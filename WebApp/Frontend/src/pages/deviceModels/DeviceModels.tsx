@@ -43,6 +43,7 @@ import { deviceModelValidationSchema } from "../../utils/validation";
 import { RoleEnum } from "../../enums";
 import CustomDataGrid from "../../components/Table/CustomDataGrid";
 import { parseAxiosError } from "../../utils/handleApiError";
+import SearchInput from "../../components/SearchInput";
 
 const DeviceModels: React.FC = () => {
     const [open, setOpen] = useState(false);
@@ -349,20 +350,11 @@ const DeviceModels: React.FC = () => {
                             </Box>
                         )}
                         <Box sx={{ display: "flex", flex: 1, width: "100%" }}>
-                            <TextField
-                                fullWidth
-                                size="small"
-                                value={value}
+                            <SearchInput
                                 placeholder="Tìm kiếm theo tên chủng loại"
-                                onChange={(e) => setValue(e.target.value)}
-                                InputProps={{
-                                    endAdornment: (
-                                        <InputAdornment position="end">
-                                            <Search sx={{ fontSize: 24 }} />
-                                        </InputAdornment>
-                                    ),
-                                }}
-                            ></TextField>
+                                value={value}
+                                onChange={setValue}
+                            />
                         </Box>
                         {user?.role === RoleEnum.ADMIN && (
                             <Box

@@ -58,6 +58,7 @@ import { RoleEnum } from "../../enums";
 import { ROLE_TYPE_OPTIONS } from "../../utils/const";
 import { parseAxiosError } from "../../utils/handleApiError";
 import ImageUploadBox from "../../components/ImageUploadBox";
+import SearchInput from "../../components/SearchInput";
 
 const Users: React.FC = () => {
   const [open, setOpen] = useState(false);
@@ -594,20 +595,11 @@ const Users: React.FC = () => {
               }}
             >
               <Box sx={{ display: "flex", gap: 4 }}>
-                <TextField
-                  fullWidth
-                  size="small"
-                  value={value}
+                <SearchInput
                   placeholder="Tìm kiếm theo tên, mã thẻ lương cán bộ, nhân viên"
-                  onChange={(e) => setValue(e.target.value)}
-                  InputProps={{
-                    endAdornment: (
-                      <InputAdornment position="end">
-                        <Search sx={{ fontSize: 24 }} />
-                      </InputAdornment>
-                    ),
-                  }}
-                ></TextField>
+                  value={value}
+                  onChange={setValue}
+                />
                 {user?.role === RoleEnum.ADMIN && (
                   <Autocomplete
                     fullWidth

@@ -11,6 +11,7 @@ const Position = require("../models/Position");
 const Department = require("../models/Department");
 const mongoose = require("mongoose");
 const { ROLE } = require("../config/config");
+const { safeRegex } = require("../utils/escapeRegex");
 // Get all users
 function parseBool(v) {
   if (v === undefined || v === null) return undefined; // không lọc
@@ -50,7 +51,7 @@ router.get("/", verifyToken, async (req, res) => {
     }
 
     if (req.query.q) {
-      const regex = new RegExp(req.query.q, "i");
+      const regex = safeRegex(req.query.q);
       query.$or = [
         { salaryCode: regex },
         { fullName: regex },

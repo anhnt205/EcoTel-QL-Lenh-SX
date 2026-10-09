@@ -67,6 +67,7 @@ import DepartmentService from "../../services/departmentService";
 import OrderService from "../../services/orderService";
 import { parseAxiosError } from "../../utils/handleApiError";
 import { Route } from "lucide-react";
+import SearchInput from "../../components/SearchInput";
 
 const Orders: React.FC = () => {
   const [open, setOpen] = useState(false);
@@ -826,20 +827,11 @@ const Orders: React.FC = () => {
                 },
               }}
             >
-              <TextField
-                fullWidth
-                size="small"
-                value={value}
+              <SearchInput
                 placeholder="Thẻ lương, công việc ..."
-                onChange={(e) => setValue(e.target.value)}
-                InputProps={{
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <Search sx={{ fontSize: 24 }} />
-                    </InputAdornment>
-                  ),
-                }}
-              ></TextField>
+                value={value}
+                onChange={setValue}
+              />
               {user?.role === RoleEnum.ADMIN && (
                 <Autocomplete
                   fullWidth

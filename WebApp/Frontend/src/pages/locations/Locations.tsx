@@ -45,6 +45,7 @@ import LocationService from "../../services/locationService";
 import { RoleEnum } from "../../enums";
 import CustomDataGrid from "../../components/Table/CustomDataGrid";
 import { parseAxiosError } from "../../utils/handleApiError";
+import SearchInput from "../../components/SearchInput";
 
 const containerStyle = {
     width: "100%",
@@ -380,20 +381,11 @@ const Locations: React.FC = () => {
                                 },
                             }}
                         >
-                            <TextField
-                                fullWidth
-                                size="small"
-                                value={value}
+                            <SearchInput
                                 placeholder="Tìm kiếm theo tên điểm đổ tải"
-                                onChange={(e) => setValue(e.target.value)}
-                                InputProps={{
-                                    endAdornment: (
-                                        <InputAdornment position="end">
-                                            <Search sx={{ fontSize: 24 }} />
-                                        </InputAdornment>
-                                    ),
-                                }}
-                            ></TextField>
+                                value={value}
+                                onChange={setValue}
+                            />
                         </Box>
                         {user?.role === RoleEnum.ADMIN && (
                             <Box

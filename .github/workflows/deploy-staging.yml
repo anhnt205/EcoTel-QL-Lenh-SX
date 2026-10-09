@@ -5,12 +5,12 @@ name: Deploy for staging version
 on:
   push:
     branches:
-      - develop  # Deploy when code is pushed to 'develop'
+      - develop # Deploy when code is pushed to 'develop'
 
 env:
-  WEBAPP_NAME: ECOTEL_QL_LENH_SX    # set this to your application's name
-  WEBAPP_PACKAGE_PATH: '.'      # set this to the path to your web app project, defaults to the repository root
-  NODE_VERSION: '20.x'                # set this to the node version to use
+  WEBAPP_NAME: ECOTEL_QL_LENH_SX # set this to your application's name
+  WEBAPP_PACKAGE_PATH: "." # set this to the path to your web app project, defaults to the repository root
+  NODE_VERSION: "20.x" # set this to the node version to use
 
 # permissions:
 #   contents: read
@@ -28,10 +28,10 @@ jobs:
 
       - name: Create an .env file in frontend for building image
         run: |
-          echo "REACT_APP_BASE_API=${{ secrets.REACT_APP_BASE_API }}" > ./WebApp/Frontend/.env
-          echo "REACT_APP_SOCKET_API=${{ secrets.REACT_APP_SOCKET_API }}" >> ./WebApp/Frontend/.env
-          echo "REACT_APP_MAP_API_KEY=${{ secrets.REACT_APP_MAP_API_KEY }}" >> ./WebApp/Frontend/.env
-      
+          echo "VITE_BASE_API=${{ secrets.VITE_BASE_API }}" > ./WebApp/Frontend/.env
+          echo "VITE_SOCKET_API=${{ secrets.VITE_SOCKET_API_RELEASE }}" >> ./WebApp/Frontend/.env
+          echo "VITE_MAP_API_KEY=${{ secrets.VITE_MAP_API_KEY }}" >> ./WebApp/Frontend/.env
+
       - name: List Files
         run: ls -laR
 
@@ -56,7 +56,7 @@ jobs:
           port: ${{ secrets.STAGING_PORT }}
           script: |
             mkdir -p /home/${{ secrets.STAGING_USER }}/ecotel_ktv/deployment/staging
-      
+
       - name: Transfer docker-compose file to VPS for deployment
         uses: appleboy/scp-action@v0.1.4
         with:
@@ -66,9 +66,8 @@ jobs:
           port: ${{ secrets.STAGING_PORT }}
           source: deployment/staging/*
           target: "/home/${{ secrets.STAGING_USER }}/ecotel_ktv/deployment/staging"
-          strip_components: 2   # Removes "deployment/staging/" folder path!
+          strip_components: 2 # Removes "deployment/staging/" folder path!
 
-      
       - name: Clean up containers and stuff via SSH
         uses: appleboy/ssh-action@v0.1.7
         with:
@@ -85,7 +84,7 @@ jobs:
             docker image prune -f
             docker compose -f staging-docker-compose.yaml down # always down first
             docker ps
-            
+
       - name: Deploy to Staging via SSH
         uses: appleboy/ssh-action@v0.1.7
         with:
