@@ -39,6 +39,7 @@ import { useFormik } from "formik";
 import api from "../../config/api.config";
 import { Department, Position, User } from "../../types";
 import { DataGrid, GridColDef, GridToolbar } from "@mui/x-data-grid";
+import { indexColumn } from "../../components/Table/CustomDataGrid";
 import { useAtom } from "jotai";
 import { userAtom } from "../../atoms/userAtoms";
 import imageCompression from "browser-image-compression";
@@ -993,7 +994,7 @@ const Users: React.FC = () => {
         </Box>
         <DataGrid
           rows={filteredOrders}
-          columns={visibleColumns}
+          columns={[indexColumn, ...visibleColumns]}
           getRowId={(row) => row._id}
           pageSizeOptions={[10, 20, 50]}
           autoHeight

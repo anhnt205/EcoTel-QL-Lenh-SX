@@ -35,6 +35,24 @@ interface CustomDataGridProps {
     showIndex?: boolean;
 }
 
+// Cột STT dùng chung cho các bảng danh mục (số thứ tự theo vị trí đang hiển thị, cộng dồn qua các trang)
+export const indexColumn: GridColDef = {
+    field: "__stt",
+    headerName: "STT",
+    width: 64,
+    minWidth: 64,
+    sortable: false,
+    filterable: false,
+    disableColumnMenu: true,
+    headerAlign: "center",
+    align: "center",
+    renderCell: (params) => {
+        // số thứ tự theo vị trí đang hiển thị, cộng dồn qua các trang
+        const model = params.api.state.pagination.paginationModel;
+        return params.api.getRowIndexRelativeToVisibleRows(params.id) + model.page * model.pageSize + 1;
+    },
+};
+
 const CustomDataGrid: React.FC<CustomDataGridProps> = ({
     rows,
     defaultColumns,
@@ -45,22 +63,6 @@ const CustomDataGrid: React.FC<CustomDataGridProps> = ({
     sx,
     showIndex = true,
 }) => {
-    const indexColumn: GridColDef = {
-        field: "__stt",
-        headerName: "STT",
-        width: 64,
-        minWidth: 64,
-        sortable: false,
-        filterable: false,
-        disableColumnMenu: true,
-        headerAlign: "center",
-        align: "center",
-        renderCell: (params) => {
-            // số thứ tự theo vị trí đang hiển thị, cộng dồn qua các trang
-            const model = params.api.state.pagination.paginationModel;
-            return params.api.getRowIndexRelativeToVisibleRows(params.id) + model.page * model.pageSize + 1;
-        },
-    };
     const columns: GridColDef[] = [
         ...(showIndex ? [indexColumn] : []),
         ...defaultColumns.map((col) => ({
