@@ -598,7 +598,7 @@ const SafetyMeasures: React.FC = () => {
                     ))}
                 </Menu>
             </Box>
-            <CustomDataGrid
+            <CustomDataGrid showIndex={false}
                 rows={safetyMeasures.map((sm, index) => ({
                     ...sm,
                     stt: index + 1,

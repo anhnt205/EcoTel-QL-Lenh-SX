@@ -34,6 +34,7 @@ import SystemDashboard from "./pages/dashboard/System";
 import EmbeddedThongKe from "./pages/thongke/EmbeddedThongKe";
 import OutputStats from "./pages/thongke/OutputStats";
 import RequireModule from "./permissions/RequireModule";
+import CatalogThemeBoundary from "./theme/catalogTheme";
 
 interface PrivateRouteProps {
   children: React.ReactNode;
@@ -117,89 +118,89 @@ const App = () => {
         <Route
           path="/safetyMeasures"
           element={
-            <PrivateRoute><RequireModule module="safety-measures">
+            <PrivateRoute><RequireModule module="safety-measures"><CatalogThemeBoundary>
               <SafetyMeasures />
-            </RequireModule></PrivateRoute>
+            </CatalogThemeBoundary></RequireModule></PrivateRoute>
           }
         />
         <Route
           path="/deviceTypes"
           element={
-            <PrivateRoute><RequireModule module="device-vehicles">
+            <PrivateRoute><RequireModule module="device-vehicles"><CatalogThemeBoundary>
               <DeviceTypes />
-            </RequireModule></PrivateRoute>
+            </CatalogThemeBoundary></RequireModule></PrivateRoute>
           }
         />
         <Route
           path="/vehicles"
           element={
-            <PrivateRoute><RequireModule module="device-vehicles">
+            <PrivateRoute><RequireModule module="device-vehicles"><CatalogThemeBoundary>
               <Devices />
-            </RequireModule></PrivateRoute>
+            </CatalogThemeBoundary></RequireModule></PrivateRoute>
           }
         />
         <Route
           path="/shifts"
           element={
-            <PrivateRoute><RequireModule module="tk-shifts">
+            <PrivateRoute><RequireModule module="tk-shifts"><CatalogThemeBoundary>
               <Shifts />
-            </RequireModule></PrivateRoute>
+            </CatalogThemeBoundary></RequireModule></PrivateRoute>
           }
         />
         <Route
           path="/machines"
           element={
-            <PrivateRoute><RequireModule module="device-machines">
+            <PrivateRoute><RequireModule module="device-machines"><CatalogThemeBoundary>
               <Machines />
-            </RequireModule></PrivateRoute>
+            </CatalogThemeBoundary></RequireModule></PrivateRoute>
           }
         />
         <Route
           path="/models"
           element={
-            <PrivateRoute><RequireModule module="models">
+            <PrivateRoute><RequireModule module="models"><CatalogThemeBoundary>
               <Models />
-            </RequireModule></PrivateRoute>
+            </CatalogThemeBoundary></RequireModule></PrivateRoute>
           }
         />
         <Route
           path="/materials"
           element={
-            <PrivateRoute><RequireModule module="materials">
+            <PrivateRoute><RequireModule module="materials"><CatalogThemeBoundary>
               <Materials />
-            </RequireModule></PrivateRoute>
+            </CatalogThemeBoundary></RequireModule></PrivateRoute>
           }
         />
         <Route
           path="/jobs"
           element={
-            <PrivateRoute><RequireModule module="jobs">
+            <PrivateRoute><RequireModule module="jobs"><CatalogThemeBoundary>
               <Jobs />
-            </RequireModule></PrivateRoute>
+            </CatalogThemeBoundary></RequireModule></PrivateRoute>
           }
         />
         <Route
           path="/positions"
           element={
-            <PrivateRoute><RequireModule module="positions">
+            <PrivateRoute><RequireModule module="positions"><CatalogThemeBoundary>
               <Positions />
-            </RequireModule></PrivateRoute>
+            </CatalogThemeBoundary></RequireModule></PrivateRoute>
           }
         />
         <Route
           path="/locations"
           element={
-            <PrivateRoute><RequireModule module="locations">
+            <PrivateRoute><RequireModule module="locations"><CatalogThemeBoundary>
               <Locations />
-            </RequireModule></PrivateRoute>
+            </CatalogThemeBoundary></RequireModule></PrivateRoute>
           }
         />
         <Route
           path="/departments"
           element={
-            <PrivateRoute><RequireModule module="departments">
+            <PrivateRoute><RequireModule module="departments"><CatalogThemeBoundary>
               <Departments />
-            </RequireModule></PrivateRoute>
+            </CatalogThemeBoundary></RequireModule></PrivateRoute>
           }
         />
         <Route
@@ -221,25 +222,25 @@ const App = () => {
         <Route
           path="/users"
           element={
-            <PrivateRoute><RequireModule module="users">
+            <PrivateRoute><RequireModule module="users"><CatalogThemeBoundary>
               <Users />
-            </RequireModule></PrivateRoute>
+            </CatalogThemeBoundary></RequireModule></PrivateRoute>
           }
         />
         <Route
           path="/travelLog"
           element={
-            <PrivateRoute><RequireModule module="travel-logs">
+            <PrivateRoute><RequireModule module="travel-logs"><CatalogThemeBoundary>
               <TravelLogs />
-            </RequireModule></PrivateRoute>
+            </CatalogThemeBoundary></RequireModule></PrivateRoute>
           }
         />
         <Route
           path="/deviceModels"
           element={
-            <PrivateRoute><RequireModule module="device-vehicles">
+            <PrivateRoute><RequireModule module="device-vehicles"><CatalogThemeBoundary>
               <DeviceModels />
-            </RequireModule></PrivateRoute>
+            </CatalogThemeBoundary></RequireModule></PrivateRoute>
           }
         />
         <Route

@@ -31,6 +31,8 @@ interface CustomDataGridProps {
     isLoading?: boolean;
     getRowId?: (row: any) => string;
     sx?: any;
+    /** Cột STT đứng đầu (như trang danh mục chuẩn); tắt nếu trang tự có cột số thứ tự */
+    showIndex?: boolean;
 }
 
 const CustomDataGrid: React.FC<CustomDataGridProps> = ({
@@ -41,8 +43,26 @@ const CustomDataGrid: React.FC<CustomDataGridProps> = ({
     isLoading = false,
     getRowId,
     sx,
+    showIndex = true,
 }) => {
+    const indexColumn: GridColDef = {
+        field: "__stt",
+        headerName: "STT",
+        width: 64,
+        minWidth: 64,
+        sortable: false,
+        filterable: false,
+        disableColumnMenu: true,
+        headerAlign: "center",
+        align: "center",
+        renderCell: (params) => {
+            // số thứ tự theo vị trí đang hiển thị, cộng dồn qua các trang
+            const model = params.api.state.pagination.paginationModel;
+            return params.api.getRowIndexRelativeToVisibleRows(params.id) + model.page * model.pageSize + 1;
+        },
+    };
     const columns: GridColDef[] = [
+        ...(showIndex ? [indexColumn] : []),
         ...defaultColumns.map((col) => ({
             field: col.id,
             headerName: col.label,
@@ -84,6 +104,14 @@ const CustomDataGrid: React.FC<CustomDataGridProps> = ({
                     toolbarColumns: "Cột",
                     toolbarFilters: "Bộ lọc",
                     toolbarDensity: "Mật độ",
+                    noRowsLabel: "Không có dữ liệu",
+                    footerRowSelected: (count) => `Đã chọn ${count} dòng`,
+                    // chân trang giống trang danh mục chuẩn: "Số dòng: 10 ... Hiển thị 1–3 trong tổng 3 bản ghi"
+                    MuiTablePagination: {
+                        labelRowsPerPage: "Số dòng:",
+                        labelDisplayedRows: ({ from, to, count }) =>
+                            `Hiển thị ${from}–${to} trong tổng ${count === -1 ? `hơn ${to}` : count} bản ghi`,
+                    },
                 }}
                 slotProps={{
                     filterPanel: { disableAddFilterButton: false },
@@ -94,16 +122,9 @@ const CustomDataGrid: React.FC<CustomDataGridProps> = ({
                 }}
                 sx={[
                     {
+                        // cỡ chữ, màu đầu cột, nền dòng... do theme/catalogTheme.tsx quyết định (chuẩn "Chủng loại hàng")
                         "& .MuiDataGrid-columnHeaderTitle": {
                             textAlign: "center",
-                            fontWeight: "bold",
-                            fontSize: 16,
-                        },
-                        "& .MuiDataGrid-row:nth-of-type(odd)": {
-                            backgroundColor: "brand.zebra",
-                        },
-                        "& .MuiDataGrid-row:nth-of-type(even)": {
-                            backgroundColor: "white",
                         },
                     },
                     sx,

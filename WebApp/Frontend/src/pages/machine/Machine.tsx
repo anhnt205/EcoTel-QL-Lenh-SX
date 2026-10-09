@@ -976,7 +976,7 @@ const Machines: React.FC = () => {
           width={viewingDevice ? "50%" : "100%"}
           sx={{ overflow: "hidden" }}
         >
-          <CustomDataGrid
+          <CustomDataGrid showIndex={false}
             rows={machines.map((sm, index) => ({
               ...sm,
               stt: index + 1,
