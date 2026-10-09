@@ -1009,6 +1009,14 @@ const Users: React.FC = () => {
             toolbarColumns: "Cột",
             toolbarFilters: "Bộ lọc",
             toolbarDensity: "Mật độ",
+            noRowsLabel: "Không có dữ liệu",
+            footerRowSelected: (count) => `Đã chọn ${count} dòng`,
+            // chân trang giống các bảng danh mục khác (xem CustomDataGrid)
+            MuiTablePagination: {
+              labelRowsPerPage: "Số dòng:",
+              labelDisplayedRows: ({ from, to, count }) =>
+                `Hiển thị ${from}–${to} trong tổng ${count === -1 ? `hơn ${to}` : count} bản ghi`,
+            },
           }}
           slotProps={{
             filterPanel: { disableAddFilterButton: false },
