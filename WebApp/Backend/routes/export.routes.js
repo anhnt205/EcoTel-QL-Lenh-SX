@@ -34,6 +34,26 @@ const {
   JOB_TYPE,
   ACCEPTED_PRODUCT,
 } = require("../config/config");
+
+// Excel giới hạn tên sheet 31 ký tự, không phân biệt hoa thường.
+// Cắt phần gốc để vừa hậu tố + số đếm, trùng thì thêm " (1)", " (2)"...
+function uniqueSheetName(workbook, base, suffix = "") {
+  const stem = String(base)
+    .replace(/[\\\/:*?\[\]]/g, "-")
+    .replace(/\s\(\d+\)$/, "");
+  const existing = new Set(
+    workbook.worksheets.map((ws) => ws.name.toLowerCase()),
+  );
+  for (let n = 0; ; n++) {
+    const counter = n ? ` (${n})` : "";
+    const name =
+      stem.substring(0, 31 - suffix.length - counter.length).trimEnd() +
+      suffix +
+      counter;
+    if (!existing.has(name.toLowerCase())) return name;
+  }
+}
+
 // lệnh sx
 router.post(
   "/order/bulk",
@@ -100,13 +120,13 @@ router.post(
           ],
         });
       const workbook = new ExcelJS.Workbook();
-      for (const [index, order] of orders.entries()) {
+      for (const order of orders) {
         console.log(order);
         const jobType = order.job?.type;
-        const sheetName =
-          `${order.assignedTo?.username}_${formatDate(order.workingDate)}_${order.shift?.name}_${index}`
-            .replace(/[\\\/:*?\[\]]/g, "-")
-            .substring(0, 31);
+        const sheetName = uniqueSheetName(
+          workbook,
+          `${order.assignedTo?.username}_${formatDate(order.workingDate)}_${order.shift?.name}`,
+        );
         if (jobType === JOB_TYPE.VAN_HANH_XE) {
           await buildVehicle(order, workbook, sheetName);
         } else if (jobType === JOB_TYPE.VAN_HANH_XUC) {
@@ -150,7 +170,7 @@ async function buildVehicle(order, workbook, sheetName) {
     .populate({
       path: "device",
       select: "code material",
-      populate: { path: "material", selcct: "name value" },
+      populate: { path: "material", select: "name value" },
     })
     .populate("material", "name acceptedProduct")
     .populate("excavator", "code")
@@ -808,7 +828,7 @@ async function buildTimeLogSheet(order, workbook, groupedData, sheetName) {
 
   // === 1️⃣ Tạo sheet mới với tên an toàn === (Giữ nguyên)
 
-  const ws = workbook.addWorksheet(`${sheetName}_Chi tiết`);
+  const ws = workbook.addWorksheet(uniqueSheetName(workbook, sheetName, "_CT"));
 
   const borderStyle = {
     top: { style: "thin" },
@@ -2053,7 +2073,9 @@ async function buildTimeLogSheetExcavator(
   };
 
   // 1. Chuẩn bị Tên Sheet
-  const worksheet = workbook.addWorksheet(`${sheetName}_Chi tiết`);
+  const worksheet = workbook.addWorksheet(
+    uniqueSheetName(workbook, sheetName, "_CT"),
+  );
 
   const borderStyle = {
     top: { style: "thin" },
@@ -2679,7 +2701,6 @@ async function buildMaintence(order, workbook, sheetName) {
   };
 
   headerCursor += 2;
-
 
   // Dự báo nguy cơ
   worksheet.getCell(`B${headerCursor}`).value = "Dự báo nguy cơ";
@@ -3573,7 +3594,9 @@ async function buildDrill(order, workbook, sheetName) {
         signature: order.createdBy.signature,
         error: err.message,
       });
-      worksheet.mergeCells(`K${totalRow + 8 + deviceRow}:L${totalRow + 8 + deviceRow}`);
+      worksheet.mergeCells(
+        `K${totalRow + 8 + deviceRow}:L${totalRow + 8 + deviceRow}`,
+      );
       worksheet.getCell(`K${totalRow + 8 + deviceRow}`).value = "✔";
       worksheet.getCell(`K${totalRow + 8 + deviceRow}`).alignment = {
         horizontal: "center",
@@ -3585,7 +3608,9 @@ async function buildDrill(order, workbook, sheetName) {
       };
     }
   } else {
-    worksheet.mergeCells(`K${totalRow + 8 + deviceRow}:L${totalRow + 8 + deviceRow}`);
+    worksheet.mergeCells(
+      `K${totalRow + 8 + deviceRow}:L${totalRow + 8 + deviceRow}`,
+    );
     worksheet.getCell(`K${totalRow + 8 + deviceRow}`).value = "✔";
     worksheet.getCell(`K${totalRow + 8 + deviceRow}`).alignment = {
       horizontal: "center",
@@ -4168,7 +4193,9 @@ async function buildDozer(order, workbook, sheetName) {
         signature: order.createdBy.signature,
         error: err.message,
       });
-      worksheet.mergeCells(`K${totalRow + 8 + deviceRow}:L${totalRow + 8 + deviceRow}`);
+      worksheet.mergeCells(
+        `K${totalRow + 8 + deviceRow}:L${totalRow + 8 + deviceRow}`,
+      );
       worksheet.getCell(`K${totalRow + 8 + deviceRow}`).value = "✔";
       worksheet.getCell(`K${totalRow + 8 + deviceRow}`).alignment = {
         horizontal: "center",
@@ -4180,7 +4207,9 @@ async function buildDozer(order, workbook, sheetName) {
       };
     }
   } else {
-    worksheet.mergeCells(`K${totalRow + 8 + deviceRow}:L${totalRow + 8 + deviceRow}`);
+    worksheet.mergeCells(
+      `K${totalRow + 8 + deviceRow}:L${totalRow + 8 + deviceRow}`,
+    );
     worksheet.getCell(`K${totalRow + 8 + deviceRow}`).value = "✔";
     worksheet.getCell(`K${totalRow + 8 + deviceRow}`).alignment = {
       horizontal: "center",
@@ -8597,7 +8626,7 @@ async function getProductReport(query) {
     })
     .populate("assignedTo", "fullName salaryCode")
     .populate("device", "code")
-    .populate("job", "type")
+    .populate("job", "type");
 
   const result = [];
 
@@ -10758,7 +10787,7 @@ router.post(
       }
 
       if (shift && shift.length > 0) {
-        const shiftIds = shift.map(s => typeof s === 'object' ? s._id : s);
+        const shiftIds = shift.map((s) => (typeof s === "object" ? s._id : s));
         query.shift = { $in: shiftIds };
       }
 
@@ -10773,9 +10802,9 @@ router.post(
       // 2. Khởi tạo cấu trúc dữ liệu tổng hợp
       let aggregatedData = {};
       if (shift && shift.length > 0) {
-        const shiftIds = shift.map(s => typeof s === 'object' ? s._id : s);
+        const shiftIds = shift.map((s) => (typeof s === "object" ? s._id : s));
         const selectedShifts = await Shift.find({ _id: { $in: shiftIds } });
-        selectedShifts.forEach(s => {
+        selectedShifts.forEach((s) => {
           if (s.name) aggregatedData[s.name] = {};
         });
       } else {
@@ -10942,7 +10971,7 @@ router.post(
       }
 
       if (shift && shift.length > 0) {
-        const shiftIds = shift.map(s => typeof s === 'object' ? s._id : s);
+        const shiftIds = shift.map((s) => (typeof s === "object" ? s._id : s));
         query.shift = { $in: shiftIds };
       }
 
@@ -10957,9 +10986,9 @@ router.post(
       // 2. Khởi tạo cấu trúc dữ liệu tổng hợp
       let aggregatedData = {};
       if (shift && shift.length > 0) {
-        const shiftIds = shift.map(s => typeof s === 'object' ? s._id : s);
+        const shiftIds = shift.map((s) => (typeof s === "object" ? s._id : s));
         const selectedShifts = await Shift.find({ _id: { $in: shiftIds } });
-        selectedShifts.forEach(s => {
+        selectedShifts.forEach((s) => {
           if (s.name) aggregatedData[s.name] = {};
         });
       } else {
@@ -11289,10 +11318,13 @@ router.post(
 
       // --- TỔNG CẢ NGÀY ---
       sheet.mergeCells(currentRow, 1, currentRow, 2);
-      const shiftNamesList = shift && shift.length > 0 
-        ? shift.map(s => typeof s === 'object' ? s.name : s).join('+')
-        : "";
-      sheet.getCell(currentRow, 1).value = shiftNamesList ? `TỔNG CA ${shiftNamesList}` : "TỔNG CẢ NGÀY";
+      const shiftNamesList =
+        shift && shift.length > 0
+          ? shift.map((s) => (typeof s === "object" ? s.name : s)).join("+")
+          : "";
+      sheet.getCell(currentRow, 1).value = shiftNamesList
+        ? `TỔNG CA ${shiftNamesList}`
+        : "TỔNG CẢ NGÀY";
       sheet.getCell(currentRow, totalDatCol).value =
         finalResult.grandTotal.grandTotalDat;
       sheet.getCell(currentRow, totalThanCol).value =
