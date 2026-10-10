@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const axios = require("axios");
 const { getSignedDownloadUrl } = require("../utils/uploadImage");
+const { uniqueSheetName } = require("../utils/sheetName");
 const ExcelJS = require("exceljs");
 const OrderModel = require("../models/Order");
 const { applyFrozenAll } = require("../services/orderSnapshot");
@@ -144,10 +145,11 @@ router.post(
       for (const [index, order] of orders.entries()) {
         console.log(order);
         const jobType = order.job?.type;
-        const sheetName =
-          `${order.assignedTo?.username}_${formatDate(order.workingDate)}_${order.shift?.name}_${index}`
-            .replace(/[\\\/:*?\[\]]/g, "-")
-            .substring(0, 31);
+        // Tên sheet <= 31 ký tự và không trùng (2 lệnh cùng người/ngày/ca không còn đụng tên) — xem utils/sheetName.js
+        const sheetName = uniqueSheetName(
+          workbook,
+          `${order.assignedTo?.username}_${formatDate(order.workingDate)}_${order.shift?.name}`,
+        );
         if (jobType === JOB_TYPE.VAN_HANH_XE) {
           await buildVehicle(order, workbook, sheetName);
         } else if (jobType === JOB_TYPE.VAN_HANH_XUC) {
@@ -846,7 +848,7 @@ async function buildTimeLogSheet(order, workbook, groupedData, sheetName) {
 
   // === 1️⃣ Tạo sheet mới với tên an toàn === (Giữ nguyên)
 
-  const ws = workbook.addWorksheet(`${sheetName}_Chi tiết`);
+  const ws = workbook.addWorksheet(uniqueSheetName(workbook, sheetName, "_Chi tiết"));
 
   const borderStyle = {
     top: { style: "thin" },
@@ -2085,7 +2087,7 @@ async function buildTimeLogSheetExcavator(
   };
 
   // 1. Chuẩn bị Tên Sheet
-  const worksheet = workbook.addWorksheet(`${sheetName}_Chi tiết`);
+  const worksheet = workbook.addWorksheet(uniqueSheetName(workbook, sheetName, "_Chi tiết"));
 
   const borderStyle = {
     top: { style: "thin" },
