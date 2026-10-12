@@ -1,12 +1,11 @@
 # THONGKE-CAOSON — Phần mềm thống kê Cao Sơn
 
-Dự án brownfield: source + lịch sử Git có sẵn, được clone về qua
-`https://github.com/anhnt205/THONG_KE_CAO_SON.git`. File này bổ sung cho
+Dự án brownfield (nguồn gốc: `PM_TK-CAOSON`). **Từ 2026-10-12 mã nguồn nằm trong repo Điều phối, thư mục `ThongKe/`** (một repo, một nơi deploy) — lịch sử Git của Thống kê được giữ nguyên. File này bổ sung cho
 CLAUDE.md gốc ở root repo factory — đọc cả hai trước khi làm việc.
 
 ## Đọc trước khi làm bất cứ việc gì
 
-1. `.factory/context.md` — trạng thái, quyết định, việc còn dang dở (nguồn
+1. `docs/FACTORY_CONTEXT.md` — trạng thái, quyết định, việc còn dang dở (nguồn
    sự thật, tin hơn lịch sử chat). Phần "BÀN GIAO" ở cuối chỉ rõ đọc tiếp
    gì tuỳ loại việc.
 2. **`docs/DECISIONS.md`** — quyết định nghiệp vụ chủ dự án đã chốt

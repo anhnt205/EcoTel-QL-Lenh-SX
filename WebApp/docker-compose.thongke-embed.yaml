@@ -87,6 +87,9 @@ services:
     networks: [embed]
 
   tk_backend_service:
+    # Mã nguồn Thống kê nằm cùng repo (ThongKe/backend) — `compose build tk_backend_service` dựng từ đây.
+    build:
+      context: ../ThongKe/backend
     image: ${TK_BACKEND_IMAGE:-thongke-caoson-preview-backend-service}
     environment:
       SPRING_PROFILES_ACTIVE: dev
