@@ -4,6 +4,7 @@ const { AppError } = require('../utils/errorHandler');
 const Shift = require('../models/Shift');
 const { verifyToken, restrictTo } = require('../middleware/auth.middleware');
 const { ROLE } = require('../config/config');
+const { safeRegex } = require('../utils/escapeRegex');
 
 router.post('/', verifyToken, restrictTo(ROLE.MANAGER,ROLE.ADMIN), async (req, res, next) => {
     try {
@@ -79,8 +80,7 @@ router.get('/', verifyToken, async (req, res) => {
         const query = {};
 
         if (req.query.name) {
-            const regex = new RegExp(req.query.name, 'i'); // không phân biệt hoa thường
-            query.name = regex;
+            query.name = safeRegex(req.query.name); // không phân biệt hoa thường
         }
         const shifts = await Shift.find(query);
         res.status(200).send({ status: 'success', data: shifts });

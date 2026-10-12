@@ -53,6 +53,7 @@ import DepartmentService from "../../services/departmentService";
 import { DeviceTypeEnum, RoleEnum, StatusDeviceEnum } from "../../enums";
 import CustomDataGrid from "../../components/Table/CustomDataGrid";
 import { GridRenderCellParams } from "@mui/x-data-grid";
+import SearchInput from "../../components/SearchInput";
 import { STATUS_DEVICE_OPTIONS } from "../../utils/const";
 
 const containerStyle = {
@@ -551,20 +552,11 @@ const Machines: React.FC = () => {
               }}
             >
               <Box sx={{ display: "flex", gap: 4 }}>
-                <TextField
-                  fullWidth
-                  size="small"
-                  value={q}
+                <SearchInput
                   placeholder="Tìm kiếm theo tên, biển số, số máy, chủng loại"
-                  onChange={(e) => setQ(e.target.value)}
-                  InputProps={{
-                    endAdornment: (
-                      <InputAdornment position="end">
-                        <Search sx={{ fontSize: 24 }} />
-                      </InputAdornment>
-                    ),
-                  }}
-                ></TextField>
+                  value={q}
+                  onChange={setQ}
+                />
                 {user?.role !== RoleEnum.MANAGER && (
                   <Autocomplete
                     fullWidth

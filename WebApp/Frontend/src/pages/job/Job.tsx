@@ -44,6 +44,7 @@ import { RoleEnum } from "../../enums";
 import CustomDataGrid from "../../components/Table/CustomDataGrid";
 import { parseAxiosError } from '../../utils/handleApiError';
 import JobService from '../../services/jobService'
+import SearchInput from '../../components/SearchInput';
 
 
 const Jobs: React.FC = () => {
@@ -328,20 +329,11 @@ const Jobs: React.FC = () => {
                                 },
                             }}
                         >
-                            <TextField
-                                fullWidth
-                                size="small"
-                                value={value}
+                            <SearchInput
                                 placeholder="Tìm kiếm theo tên công việc"
-                                onChange={(e) => setValue(e.target.value)}
-                                InputProps={{
-                                    endAdornment: (
-                                        <InputAdornment position="end">
-                                            <Search sx={{ fontSize: 24 }} />
-                                        </InputAdornment>
-                                    ),
-                                }}
-                            ></TextField>
+                                value={value}
+                                onChange={setValue}
+                            />
                         </Box>
                         {user?.role === RoleEnum.ADMIN && (
                             <Box

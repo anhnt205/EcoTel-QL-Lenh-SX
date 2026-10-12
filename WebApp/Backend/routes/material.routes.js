@@ -9,6 +9,7 @@ const upload = multer({ storage: multer.memoryStorage() });
 const ExcelJS = require('exceljs');
 const xlsx = require('xlsx');
 const { ROLE } = require('../config/config');
+const { safeRegex } = require('../utils/escapeRegex');
 
 // them vat lieu
 router.post('/', verifyToken, restrictTo(ROLE.MANAGER, ROLE.ADMIN), async (req, res, next) => {
@@ -202,8 +203,7 @@ router.get('/', verifyToken, async (req, res) => {
         const { startTime, endTime } = req.query;
         const query = {}
         if (req.query.name) {
-            const regex = new RegExp(req.query.name, 'i');
-            query.name = regex;
+            query.name = safeRegex(req.query.name);
         }
         let materials;
 

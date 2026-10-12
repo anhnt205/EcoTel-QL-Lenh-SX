@@ -22,6 +22,7 @@ const dayjs = require("dayjs");
 
 const { verifyToken, restrictTo } = require("../middleware/auth.middleware");
 const Order = require("../models/Order");
+const { safeRegex } = require("../utils/escapeRegex");
 
 router.get("/", verifyToken, async (req, res, next) => {
   try {
@@ -29,7 +30,7 @@ router.get("/", verifyToken, async (req, res, next) => {
     const query = {};
 
     if (req.query.q) {
-      const regex = new RegExp(req.query.q, "i");
+      const regex = safeRegex(req.query.q);
 
       const matchedModels = await DeviceModel.find(
         { name: regex },

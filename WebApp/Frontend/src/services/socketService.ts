@@ -19,7 +19,8 @@ class SocketService {
 
     public connect(userId: string): void {
         if (!this.socket) {
-            this.socket = io(process.env.REACT_APP_SOCKET_API || 'ws://localhost:8080', {
+            const socketUrl = (import.meta as any).env?.VITE_SOCKET_API || (import.meta as any).env?.REACT_APP_SOCKET_API || 'ws://localhost:8080';
+            this.socket = io(socketUrl, {
                 transports: ['websocket'],
                 autoConnect: false,
             });

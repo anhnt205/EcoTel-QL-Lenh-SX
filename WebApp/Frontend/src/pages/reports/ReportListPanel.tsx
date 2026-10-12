@@ -9,6 +9,7 @@ import {
   Typography,
 } from "@mui/material";
 import { ChevronRight, MenuOpen, Search } from "@mui/icons-material";
+import SearchInput from "../../components/SearchInput";
 
 export interface ReportListItem {
   name: string;
@@ -92,18 +93,14 @@ export default function ReportListPanel({
       </Box>
 
       <Box sx={{ p: 1.25, borderBottom: `1px solid ${LINE}` }}>
-        <TextField
+        <SearchInput
           size="small"
           fullWidth
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={setQuery}
           placeholder="Tìm tên, mẫu báo cáo..."
+          iconPosition="start"
           InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <Search sx={{ fontSize: 18, color: "#94a3b8" }} />
-              </InputAdornment>
-            ),
             sx: { fontSize: 13, bgcolor: "#f8fafc" },
           }}
         />
