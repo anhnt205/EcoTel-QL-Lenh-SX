@@ -1,0 +1,211 @@
+# Điều phối + Thống kê trong MỘT stack — dựng từ mã nguồn trong repo này (WebApp/ + ../ThongKe/).
+# Đây là compose "gộp" dùng để deploy một nơi (server chung / VPS). Không thay compose release/staging
+# do CI/CD của Điều phối đang dùng (deployment/release, deployment/staging) — các file đó không đổi.
+#
+#   /            -> frontend Điều phối          /api/, /socket.io/ -> backend Điều phối (Node + Mongo)
+#   /thong-ke/   -> frontend Thống kê (Vite)    /tk-api/           -> backend Thống kê (Java + Postgres, cắt tiền tố)
+#
+# Một cổng ra ngoài (UNIFIED_PORT, mặc định 6868 -> container 8888, HTTP). Muốn HTTPS/tên miền: dùng
+# reverse_proxy/nginx_release_thongke.conf (xem docs/UNIFIED_DEPLOY.md).
+#
+# Biến (đặt trong WebApp/.env, mẫu: unified.env.example — KHÔNG commit giá trị thật):
+#   bắt buộc:  MONGO_PASSWORD, TK_POSTGRES_PASSWORD, TK_AUTH_JWT_SECRET (>= 32 ký tự)
+#   tuỳ chọn:  UNIFIED_PORT, PUBLIC_URL, VITE_MAP_API_KEY, TK_SERVICE_USERNAME/TK_SERVICE_PASSWORD, CATALOG_MASTER
+# Backend Điều phối vẫn đọc Backend/.env (JWT_SECRET, MONGODB_URI, ...) như compose cũ; các biến TK_* /
+# CATALOG_MASTER dưới đây đè lên file đó.
+#
+# Dựng:  docker compose -f docker-compose.unified.yaml build   (giữ khoá Docker dùng chung nếu máy có nhiều phiên)
+# Chạy:  docker compose -f docker-compose.unified.yaml up -d
+#
+# Cố ý KHÔNG có: grafana/loki/promtail (giám sát) và ktv_backup (sao lưu Mongo -> S3) — thêm lại từ
+# docker-compose.yaml nếu server cần.
+
+name: dieu-phoi-mm
+
+services:
+
+  ktv_reverse_proxy_service:
+    image: dieuphoimm_reverse_proxy_img
+    build:
+      context: ./reverse_proxy
+      args:
+        # HTTP :8888 (nginx_thongke.conf) hoặc HTTPS + tên miền (nginx_release_thongke.conf) — đặt NGINX_CONF trong .env
+        NGINX_CONF: ${NGINX_CONF:-nginx_thongke.conf}
+    ports:
+      - "${UNIFIED_PORT:-6868}:8888"
+    environment:
+      - TZ=Asia/Ho_Chi_Minh
+    restart: unless-stopped
+    depends_on:
+      - ktv_Frontend_service
+      - ktv_Backend_service
+      - tk_frontend_service
+      - tk_backend_service
+    networks:
+      - frontnet
+      - backnet
+    logging:
+      driver: json-file
+      options:
+        max-size: "100m"
+        max-file: "30"
+
+  # ---------------------------------------------------------------- Điều phối
+  ktv_Frontend_service:
+    image: dieuphoimm_frontend_img
+    build:
+      context: ./Frontend
+      args:
+        # Rỗng thì Dockerfile giữ giá trị trong Frontend/.env (nếu có), không ghi đè.
+        VITE_BASE_API: ${VITE_BASE_API:-/api}
+        VITE_SOCKET_API: ${PUBLIC_URL:-}
+        VITE_MAP_API_KEY: ${VITE_MAP_API_KEY:-}
+    environment:
+      - TZ=Asia/Ho_Chi_Minh
+    restart: unless-stopped
+    networks:
+      - frontnet
+    logging:
+      driver: json-file
+      options:
+        max-size: "100m"
+        max-file: "30"
+
+  ktv_Backend_service:
+    image: dieuphoimm_backend_img
+    build:
+      context: ./Backend
+    env_file:
+      - ./Backend/.env
+    environment:
+      TZ: Asia/Ho_Chi_Minh
+      # --- Thống kê: đăng nhập một lần + đồng bộ danh mục (xem Backend/services/tkToken.js, tkCatalogSync.js)
+      # Cùng khoá với AUTH_JWT_SECRET của backend Thống kê bên dưới.
+      TK_AUTH_JWT_SECRET: ${TK_AUTH_JWT_SECRET:?đặt TK_AUTH_JWT_SECRET (>= 32 ký tự)}
+      # Hostname KHÔNG có dấu gạch dưới (Tomcat trả 400) -> dùng alias tk-backend khai báo ở service Thống kê.
+      TK_API_BASE_URL: http://tk-backend:8088
+      TK_SERVICE_USERNAME: ${TK_SERVICE_USERNAME:-}
+      TK_SERVICE_PASSWORD: ${TK_SERVICE_PASSWORD:-}
+      # Để TRỐNG cho tới khi đã chạy thử đồng bộ (POST /api/catalog-sync/tk, mặc định dry-run) và kiểm kết quả;
+      # đặt `thongke` thì danh mục Điều phối chuyển sang chỉ-đọc, do Thống kê quản lý.
+      CATALOG_MASTER: ${CATALOG_MASTER:-}
+    depends_on:
+      ktv_db:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - backnet
+      - tknet
+    logging:
+      driver: json-file
+      options:
+        max-size: "100m"
+        max-file: "30"
+
+  ktv_db:
+    image: mongo
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      # Chỉ có tác dụng khi khởi tạo DB lần đầu; DB đã có dữ liệu giữ mật khẩu cũ.
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:?đặt MONGO_PASSWORD}
+      TZ: Asia/Ho_Chi_Minh
+    volumes:
+      - .ktv-mongodb-data:/data/db
+    # Lần đầu image mongo chạy mongod tạm chỉ nghe 127.0.0.1 để khởi tạo rồi khởi động lại — kiểm tra qua địa chỉ container
+    # (hostname) để chỉ báo "healthy" khi mongod thật đã nghe; backend Điều phối chỉ thử kết nối 5 lần rồi bỏ cuộc.
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --quiet --host $$(hostname) --eval 'db.adminCommand({ping:1}).ok' | grep -q 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - backnet
+    logging:
+      driver: json-file
+      options:
+        max-size: "100m"
+        max-file: "30"
+
+  # ----------------------------------------------------------------- Thống kê
+  tk_postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${TK_POSTGRES_PASSWORD:?đặt TK_POSTGRES_PASSWORD}
+      POSTGRES_DB: thong_ke
+      TZ: Asia/Ho_Chi_Minh
+    volumes:
+      - tk_pgdata:/var/lib/postgresql/data
+      - ../ThongKe/backend/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+    networks:
+      - tknet
+
+  tk_redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+    networks:
+      - tknet
+
+  tk_backend_service:
+    image: dieuphoimm_tk_backend_img
+    build:
+      context: ../ThongKe/backend
+    environment:
+      TZ: Asia/Ho_Chi_Minh
+      SPRING_PROFILES_ACTIVE: dev
+      SPRING_DATASOURCE_URL: jdbc:postgresql://tk_postgres:5432/thong_ke?reWriteBatchedInserts=true
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: ${TK_POSTGRES_PASSWORD:?đặt TK_POSTGRES_PASSWORD}
+      # Đăng nhập chỉ ở Điều phối: Điều phối ký token HS256 bằng đúng khoá này, Thống kê chỉ xác thực.
+      AUTH_MODE: standalone
+      AUTH_JWT_SECRET: ${TK_AUTH_JWT_SECRET:?đặt TK_AUTH_JWT_SECRET (>= 32 ký tự)}
+      REDIS_HOST: tk_redis
+      REDIS_PORT: "6379"
+    depends_on:
+      tk_postgres:
+        condition: service_healthy
+      tk_redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      backnet:
+      tknet:
+        aliases: [tk-backend]
+    logging:
+      driver: json-file
+      options:
+        max-size: "100m"
+        max-file: "30"
+
+  tk_frontend_service:
+    image: dieuphoimm_tk_frontend_img
+    build:
+      context: ../ThongKe/frontend
+      args:
+        # Bundle chạy dưới /thong-ke/ (proxy cắt tiền tố); API đi qua /tk-api/ cùng domain.
+        VITE_BASE_PATH: /thong-ke/
+        VITE_API_KONG_URL: /tk-api/api
+    restart: unless-stopped
+    networks:
+      - frontnet
+
+networks:
+  frontnet:
+  backnet:
+  tknet:
+
+volumes:
+  tk_pgdata:

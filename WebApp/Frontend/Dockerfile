@@ -11,14 +11,22 @@ WORKDIR /usr/src/app
 ## A wildcard is used to ensure both package.json AND package-lock.json are copied
 COPY package*.json ./
 ## Clean & install app dependencies
-RUN npm i
+## --legacy-peer-deps: vite@5 đòi @types/node >= 18 (peerOptional) trong khi package.json ghim ^16 -> `npm i` thường báo ERESOLVE.
+RUN npm i --legacy-peer-deps
 
 ## Bundle app source
 ## Get all the code needed to run the app
 COPY . .
 
-## React buid for production environment (smaller size)
-RUN npm run build
+## Vite bake VITE_* vào bundle lúc build. CI vẫn ghi Frontend/.env như cũ; bản gộp (docker-compose.unified.yaml) truyền qua build-arg.
+## `env` chỉ đặt biến nào CÓ giá trị — ARG rỗng không được đè lên file .env.
+ARG VITE_BASE_API
+ARG VITE_SOCKET_API
+ARG VITE_MAP_API_KEY
+RUN env ${VITE_BASE_API:+VITE_BASE_API="$VITE_BASE_API"} \
+        ${VITE_SOCKET_API:+VITE_SOCKET_API="$VITE_SOCKET_API"} \
+        ${VITE_MAP_API_KEY:+VITE_MAP_API_KEY="$VITE_MAP_API_KEY"} \
+    npm run build
 
 ## Create an HTTP web server based on nginx image;
 ## default nginx server's port is 80
