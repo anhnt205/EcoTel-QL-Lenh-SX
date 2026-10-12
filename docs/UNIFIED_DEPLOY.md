@@ -28,6 +28,7 @@ Từ 2026-10-12 mã nguồn Thống kê nằm trong repo này (`ThongKe/`). Hai 
 
 - Bắt buộc: `MONGO_PASSWORD`, `TK_POSTGRES_PASSWORD`, `TK_AUTH_JWT_SECRET` (>= 32 ký tự).
 - Backend Điều phối vẫn đọc `WebApp/Backend/.env` (`JWT_SECRET`, `MONGODB_URI`, `FIREBASE_KEY_PATH`, ...) như trước; `MONGODB_URI` phải dùng đúng `MONGO_PASSWORD`. File Firebase `WebApp/Backend/serviceAccountKey.json` phải có trước khi build (backend `require()` lúc khởi động).
+- `VITE_TK_EMBED=true` (mặc định trong compose gộp) bật menu Thống kê ở frontend Điều phối — **bake lúc build**; thiếu biến này frontend vẫn chạy nhưng KHÔNG có menu Thống kê.
 - `CATALOG_MASTER` để **trống** cho tới khi đã đồng bộ danh mục xong (xem dưới).
 
 ## Lần đầu bật Thống kê trên hệ thống Điều phối đang chạy thật

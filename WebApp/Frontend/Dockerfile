@@ -23,7 +23,10 @@ COPY . .
 ARG VITE_BASE_API
 ARG VITE_SOCKET_API
 ARG VITE_MAP_API_KEY
+# "true" = hiện menu/khung Thống kê (config/features.ts); bỏ trống = giao diện Điều phối như cũ
+ARG VITE_TK_EMBED
 RUN env ${VITE_BASE_API:+VITE_BASE_API="$VITE_BASE_API"} \
+        ${VITE_TK_EMBED:+VITE_TK_EMBED="$VITE_TK_EMBED"} \
         ${VITE_SOCKET_API:+VITE_SOCKET_API="$VITE_SOCKET_API"} \
         ${VITE_MAP_API_KEY:+VITE_MAP_API_KEY="$VITE_MAP_API_KEY"} \
     npm run build
