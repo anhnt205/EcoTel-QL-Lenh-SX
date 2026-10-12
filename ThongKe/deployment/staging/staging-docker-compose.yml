@@ -1,0 +1,105 @@
+name: thong-ke-cs
+services:
+  reverse-proxy-service:
+    image: ${DOCKER_REGISTRY}/thong-ke-cs-reverse-proxy-img:${IMAGE_TAG:-latest}
+    ports:
+      - "1400:8888"
+    stdin_open: true
+    environment:
+      - TZ=Asia/Ho_Chi_Minh
+    networks:
+      - staging_frontnet
+      - staging_backnet
+    depends_on:
+      - frontend-service
+      - backend-service
+    restart: "no"
+
+  frontend-service:
+    image: ${DOCKER_REGISTRY}/thong-ke-cs-frontend-img:${IMAGE_TAG:-latest}
+    ports:
+      - "1401:80"
+    stdin_open: true
+    environment:
+      - TZ=Asia/Ho_Chi_Minh
+    networks:
+      - staging_frontnet
+    restart: "no"
+
+  backend-service:
+    env_file:
+      - .env_backend
+    image: ${DOCKER_REGISTRY}/thong-ke-cs-backend-img:${IMAGE_TAG:-latest}
+    environment:
+      - TZ=Asia/Ho_Chi_Minh
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "1402:8088"
+    networks:
+      - staging_backnet
+    restart: on-failure:5
+
+  postgres:
+    image: postgres:16-alpine
+    env_file:
+      - .env_backend
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+      POSTGRES_DB: ${POSTGRES_DB:-thong_ke}
+      TZ: Asia/Ho_Chi_Minh
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "PGPASSWORD=$$POSTGRES_PASSWORD psql -h localhost -U $$POSTGRES_USER -d $$POSTGRES_DB -c 'SELECT 1' || exit 1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    restart: "no"
+    networks:
+      - staging_backnet
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    env_file:
+      - .env_backend
+    environment:
+      - TZ=Asia/Ho_Chi_Minh
+    ports:
+      - "1403:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - staging_backnet
+
+volumes:
+  postgres_data:
+    driver: local
+    driver_opts:
+      type: none
+      device: /mnt/hdd/thong_ke_cs_postgres_data
+      o: bind
+  pgadmin_data:
+    driver: local
+    driver_opts:
+      type: none
+      device: /mnt/hdd/thong_ke_cs_pgadmin_data
+      o: bind
+
+networks:
+  staging_frontnet:
+    external: true
+  staging_backnet:
+    external: true

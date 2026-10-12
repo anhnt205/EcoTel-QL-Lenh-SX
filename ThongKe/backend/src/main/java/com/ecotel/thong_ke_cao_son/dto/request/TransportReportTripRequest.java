@@ -1,0 +1,58 @@
+package com.ecotel.thong_ke_cao_son.dto.request;
+
+import com.ecotel.thong_ke_cao_son.enums.LoadLevelType;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
+import lombok.Getter;
+import lombok.Setter;
+
+@Getter
+@Setter
+public class TransportReportTripRequest {
+
+    private Boolean rainyDay = false;
+    private Boolean supplementaryVehicle = false;
+
+    @NotNull(message = "Khu vực xúc là bắt buộc")
+    private Long excavationAreaId;
+
+    @NotNull(message = "Máy xúc là bắt buộc")
+    private Long excavatorDeviceId;
+
+    @NotNull(message = "Nơi nhận tải là bắt buộc")
+    private Long loadingPointId;
+
+    private Integer receivingFloor;
+    private String unloadingFloor;
+
+    private Double totalRouteDistanceKm;
+    private Double totalRouteLiftM;
+    private Double localSlopeDistanceKm;
+    private Double localSlopeM;
+
+    @NotNull(message = "Nơi dỡ tải là bắt buộc")
+    private Long unloadingPointId;
+
+    @NotNull(message = "Loại hàng là bắt buộc")
+    private Long cargoTypeId;
+
+    @NotNull(message = "Số chuyến là bắt buộc")
+    @Min(value = 1, message = "Số chuyến phải >= 1")
+    private Integer tripCount;
+
+    // Sáu trường "(Báo chuyến)" phục vụ tính sản lượng (B5). Để trống được;
+    // trống KHÁC 0 — xem ghi chú ở TransportReportTrip.
+    private java.math.BigDecimal weighedWeightTon;
+    private java.math.BigDecimal provisionalModel;
+    private java.math.BigDecimal provisionalDensity;
+    private java.math.BigDecimal ctnbDeviationCoefficient;
+    private java.math.BigDecimal deductionAmount;
+    private java.math.BigDecimal wasteRockTon;
+
+    @NotNull(message = "Mức tải là bắt buộc")
+    private LoadLevelType loadLevelType;
+
+    @Pattern(regexp = "^\\d+/[1-9]\\d*$", message = "Giá trị mức tải phải dạng x/y (y >= 1), ví dụ 1/2")
+    private String loadLevelCustomValue;
+}

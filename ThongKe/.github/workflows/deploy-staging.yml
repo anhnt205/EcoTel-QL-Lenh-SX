@@ -1,0 +1,78 @@
+name: Deploy Staging — Thong Ke CS System
+
+on:
+  pull_request:
+    branches:
+      - main
+
+concurrency:
+  group: thong-ke-cs-deploy-staging
+  cancel-in-progress: true
+
+jobs:
+  deploy-staging:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Copy init-db.sql into staging
+        run: cp backend/init-db.sql deployment/staging/init-db.sql
+
+      # ============ FRONTEND ENV ============
+      - name: Create .env for frontend
+        run: |
+          cat > ./frontend/.env << EOF
+          VITE_API_KONG_URL=${{ secrets.VITE_API_KONG_URL }}
+          EOF
+
+      # ============ BUILD & PUSH IMAGES ============
+      - name: Build and push Docker images
+        env:
+          DOCKER_HUB_USERNAME: ${{ secrets.DOCKER_HUB_USERNAME }}
+          DOCKER_HUB_ACCESS_TOKEN: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: make staging
+
+      # READ DOCKER_REGISTRY from .env by Makefile
+      - name: Copy .env into deployment folder
+        run: cp .env deployment/staging/
+
+      # ============ TRANSFER FILES ============
+      - name: Ensure target directory exists on VPS
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: ${{ secrets.STAGING_HOST }}
+          username: ${{ secrets.STAGING_USER }}
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          port: ${{ secrets.STAGING_PORT }}
+          script: |
+            mkdir -p /home/${{ secrets.STAGING_USER }}/thong-ke-cs/deployment/staging
+
+      - name: Transfer deployment files to VPS
+        uses: appleboy/scp-action@v0.1.4
+        with:
+          host: ${{ secrets.STAGING_HOST }}
+          username: ${{ secrets.STAGING_USER }}
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          port: ${{ secrets.STAGING_PORT }}
+          source: "deployment/staging/*"
+          target: "/home/${{ secrets.STAGING_USER }}/thong-ke-cs/deployment/staging"
+          strip_components: 2
+
+      # ============ DEPLOY ============
+      - name: Deploy to Staging
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: ${{ secrets.STAGING_HOST }}
+          username: ${{ secrets.STAGING_USER }}
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          port: ${{ secrets.STAGING_PORT }}
+          script: |
+            cd /home/${{ secrets.STAGING_USER }}/thong-ke-cs/deployment/staging
+            pwd && ls -al
+            docker image prune -f
+            docker compose -f staging-docker-compose.yml down --remove-orphans
+            chmod +x start-app.sh
+            ./start-app.sh

@@ -1,0 +1,15 @@
+name: thong-ke-cs
+services:
+  reverse-proxy-service:
+    build:
+      context: ./reverse_proxy
+    image: ${DOCKER_REGISTRY}/thong-ke-cs-reverse-proxy-img:${IMAGE_TAG}
+  frontend-service:
+    build:
+      context: ./frontend
+    image: ${DOCKER_REGISTRY}/thong-ke-cs-frontend-img:${IMAGE_TAG}
+
+  backend_service:
+    build:
+      context: ./backend
+    image: ${DOCKER_REGISTRY}/thong-ke-cs-backend-img:${IMAGE_TAG}

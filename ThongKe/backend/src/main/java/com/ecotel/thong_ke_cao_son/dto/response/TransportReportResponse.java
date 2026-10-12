@@ -1,0 +1,38 @@
+package com.ecotel.thong_ke_cao_son.dto.response;
+
+import lombok.Builder;
+import lombok.Getter;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.List;
+
+@Getter
+@Builder
+public class TransportReportResponse {
+    private Long id;
+    private LocalDate reportDate;
+
+    private Long shiftId;
+    private Integer shiftName;
+
+    private Long employeeId;
+    private String employeeSalaryCode;
+    private String employeeFullName;
+
+    private Long vehicleId;
+    private String vehicleCode;
+    private String vehicleName;
+    private String vehicleDepartmentName;
+    private String vehicleCategoryName;
+
+    private Double fuelBeginning;
+    private Double fuelEnding;
+    private Double fuelReceived;
+    private Double fuelUsed;
+
+    private List<TransportReportTripResponse> trips;
+
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
+}

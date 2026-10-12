@@ -1,0 +1,40 @@
+spring:
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+  flyway:
+    # Quality Gate lượt 7 của Codex (2026-09-16) — xem V1__baseline.sql để
+    # biết lý do. LƯU Ý: KHÔNG được đọc bởi Spring Boot auto-configuration
+    # (bản 4.0.7 dùng ở đây không có package
+    # org.springframework.boot.autoconfigure.flyway — đã xác minh) — các
+    # key dưới đây được đọc THỦ CÔNG bởi
+    # com.ecotel.thong_ke_cao_son.config.FlywayContextInitializer (đăng ký
+    # trong ThongKeCaoSonApplication#main), chạy TRƯỚC schema.sql/Hibernate
+    # ddl-auto.
+    enabled: true
+    locations: classpath:db/migration
+    # CSDL HIỆN HỮU (dev/staging/preview/prod đã chạy từ trước, CHƯA có bảng
+    # flyway_schema_history) -> tự đánh dấu "đã ở version 1" mà KHÔNG chạy
+    # lại V1__baseline.sql (schema ở đó đã đúng y hệt — V1 chính là dump từ
+    # 1 trong các CSDL đó). CSDL HOÀN TOÀN MỚI (chưa có bảng nào) -> cờ này
+    # KHÔNG có tác dụng, Flyway chạy V1 thật để dựng schema từ đầu.
+    baseline-on-migrate: true
+    baseline-version: 1
+    baseline-description: "Baseline dua Flyway vao du an - schema tai thoi diem 2026-09-16 (Quality Gate luot 7)"
+  sql:
+    init:
+      # Bắt buộc "always" vì Postgres không phải CSDL nhúng — Spring mặc định
+      # chỉ tự chạy schema.sql cho CSDL nhúng (H2...), "embedded" sẽ ÂM THẦM
+      # bỏ qua file này trên Postgres. Chạy TRƯỚC Hibernate ddl-auto=update
+      # (spring.jpa.defer-datasource-initialization mặc định false) — xem
+      # schema.sql để biết lý do bắt buộc thứ tự này.
+      mode: always
+      # Bắt buộc (Quality Gate lượt 3 của Codex, 2026-09-11 — lỗi thật tự
+      # phát hiện khi soát lại chính lượt sửa trước): bộ tách câu lệnh mặc
+      # định của Spring (`ScriptUtils`) cắt file theo DẤU ";" ĐƠN GIẢN, không
+      # hiểu cú pháp `DO $$ ... $$;` của PostgreSQL — sẽ cắt NGAY tại dấu ";"
+      # đầu tiên bên TRONG khối DO (vd sau "DEFAULT false"), làm vỡ khối
+      # thành nhiều câu lệnh rời rạc không hợp lệ cú pháp riêng lẻ, khiến
+      # schema.sql lỗi ngay khi khởi động — schema.sql giờ dùng "@@" để đánh
+      # dấu hết MỖI khối lệnh top-level (xem cuối mỗi khối DO trong
+      # schema.sql), dấu ";" bên trong khối được giữ nguyên vẹn.
+      separator: "@@"

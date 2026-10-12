@@ -1,0 +1,177 @@
+# DONG 5 sheet 'tinh toan' - DONG CHUAN (day du cong thuc nhat: 137 cong thuc + 34 gia tri)
+# '=' = o co cong thuc ; ':' = o chi co gia tri
+# Trich bang parser DA SUA LOI (ReadOuterXml). Da doi chieu voi ban cu: cac cong thuc then chot trung khop.
+# Nguon: Thang 5 doi ten xe.xlsx / xl/worksheets/sheet78.xml. KHONG SUA FILE NAY.
+
+### DONG 5 cua xl/worksheets/sheet78.xml - 171 o
+A5 = +'Cap nhat Slg ThanV+Dat B1'!A3
+B5 = +'Cap nhat Slg ThanV+Dat B1'!B3
+C5 = +'Cap nhat Slg ThanV+Dat B1'!C3
+D5 = +'Cap nhat Slg ThanV+Dat B1'!D3
+E5 = +'Cap nhat Slg ThanV+Dat B1'!E3
+F5 = +'Cap nhat Slg ThanV+Dat B1'!G3
+G5 = +'Cap nhat Slg ThanV+Dat B1'!F3
+H5 = +'Cap nhat Slg ThanV+Dat B1'!H3
+I5 = +'Cap nhat Slg ThanV+Dat B1'!M3
+J5 = IF(K5=0,"",INDEX('Mohinh_TheTrong( ko dk xoa)'!$C$4:$AX$144,MATCH(K5,'Mohinh_TheTrong( ko dk xoa)'!$B$4:$B$144,0),MATCH("Nhom_CLH",'Mohinh_TheTrong( ko dk xoa)'!$C$3:$AX$3,0)))
+K5 = +'Cap nhat Slg ThanV+Dat B1'!N3
+L5 = +'Cap nhat Slg ThanV+Dat B1'!I3
+M5 = +'Cap nhat Slg ThanV+Dat B1'!J3
+N5 = 'Cap nhat Slg ThanV+Dat B1'!K3
+O5 = 'Cap nhat Slg ThanV+Dat B1'!L3
+P5 = IF(L5=0,0,IF(O5<M5,M5,ROUND(IF(N5<>0,IF(M5<0,0,M5)+(O5-IF(M5<0,0,M5))*N5/L5,IF(M5<0,0,M5)),0)))
+Q5 = +'Cap nhat Slg ThanV+Dat B1'!O3
+R5 = +'Cap nhat Slg ThanV+Dat B1'!P3
+S5 = IF('Cap nhat Slg ThanV+Dat B1'!$A$1="TKE",1,INDEX('AP Tdia(m3-tan-tkm)'!$S$7:$AJ$1000,MATCH(CR5,'AP Tdia(m3-tan-tkm)'!$R$7:$R$1000,0),MATCH("HS_"&$AG5&"_m3",'AP Tdia(m3-tan-tkm)'!$S$6:$AJ$6,0)))
+T5 = IF('Cap nhat Slg ThanV+Dat B1'!$A$1="TKE",1,INDEX('AP Tdia(m3-tan-tkm)'!$S$7:$AJ$1000,MATCH(CR5,'AP Tdia(m3-tan-tkm)'!$R$7:$R$1000,0),MATCH("HS_"&$AG5&"_tan",'AP Tdia(m3-tan-tkm)'!$S$6:$AJ$6,0)))
+U5 = IF('Cap nhat Slg ThanV+Dat B1'!$A$1="TKE",1,INDEX('AP Tdia(m3-tan-tkm)'!$S$7:$AJ$1000,MATCH(CR5,'AP Tdia(m3-tan-tkm)'!$R$7:$R$1000,0),MATCH("HS_"&$AG5&"_tkm",'AP Tdia(m3-tan-tkm)'!$S$6:$AJ$6,0)))
+W5 = 'Cap nhat Slg ThanV+Dat B1'!W3
+X5 = +'Cap nhat Slg ThanV+Dat B1'!AC3
+Y5 = 'Cap nhat Slg ThanV+Dat B1'!Q3
+Z5 = 'Cap nhat Slg ThanV+Dat B1'!R3
+AA5 = 'Cap nhat Slg ThanV+Dat B1'!S3
+AB5 = 'Cap nhat Slg ThanV+Dat B1'!T3
+AC5 = IF(OR(AG5="dat_TCN",AG5="than_CN"),AI5,IF(AND(AG5<>"Dat_SX",AG5<>"than_sx"),0,INDEX('STD(Dat+thanSX)'!$B$6:$P$1000,MATCH($CR5,'STD(Dat+thanSX)'!$A$6:$A$1000,0),MATCH(IF(AG5="Dat_SX","TheTrong_Dat_TĐ","TheTrong_Than_TĐ"),'STD(Dat+thanSX)'!$B$5:$P$5,0)))+IF(AG5<>"Dat_CN",0,INDEX('STD(DatCN)'!$B$5:$H$301,MATCH($CR5,'STD(DatCN)'!$A$5:$A$301,0),MATCH("DatCN_TT",'STD(DatCN)'!$B$4:$H$4,0))))
+AD5 = IF(OR(LEFT(AG5,1)="S",LEFT(AG5,1)="D"),"DAT","Than")
+AE5 = 'Cap nhat Slg ThanV+Dat B1'!V3
+AF5 = IF('Cap nhat Slg ThanV+Dat B1'!AM3=0,1,'Cap nhat Slg ThanV+Dat B1'!AM3)
+AG5 = IF(AND(D5="CS",N5="DaXit.NK"),"Dat_SX",IF(K5=0,"",INDEX('Mohinh_TheTrong( ko dk xoa)'!$C$4:$AX$144,MATCH(K5,'Mohinh_TheTrong( ko dk xoa)'!$B$4:$B$144,0),MATCH("SP_NghiemThu",'Mohinh_TheTrong( ko dk xoa)'!$C$3:$AX$3,0))))
+AH5 = 'Cap nhat Slg ThanV+Dat B1'!U3
+AI5 = IF(AB5<>0,AB5,INDEX('Mohinh_TheTrong( ko dk xoa)'!$C$4:$AX$144,MATCH(K5,'Mohinh_TheTrong( ko dk xoa)'!$B$4:$B$144,0),MATCH(IF(D5="CS","CS.","KC.")&"TyTrong",'Mohinh_TheTrong( ko dk xoa)'!$C$3:$AX$3,0)))
+AJ5 = ROUND(IF(R5=0,0,IF(AA5<>0,AA5,INDEX('Mohinh_TheTrong( ko dk xoa)'!$C$4:$AX$149,MATCH($K5,'Mohinh_TheTrong( ko dk xoa)'!$B$4:$B$149,0),MATCH($DA5,'Mohinh_TheTrong( ko dk xoa)'!$C$3:$AX$3,0))*IF(Z5="roda",2/3,IF(Z5=0,1,Z5)))),3)
+AK5 = IF(D5="KC",(IF(F5<-195,-200,IF(F5<0,-1+TRUNC((F5+1)/15,0),TRUNC(F5/15,0))*15)),(IF(F5<0,-1+TRUNC((F5+1)/15,0),TRUNC(F5/15,0))*15))
+AL5 = IF(Y5>0,Y5/AI5,ROUND(IF(LEFT(J5,1)="D",ROUND(AJ5,1),ROUND(AJ5,3))*R5-IF(AD5="DAT",AH5,0),3))
+AM5 = (AL5*AI5-FK5-IF(AD5="THAN",AH5,0))*IF(AG5="than_sx",$AM$3,1)
+AN5 = IF(Y5<>0,Y5*L5,ROUND(AM5*L5,4))
+AO5 = R5*L5
+AP5 = INDEX('DMNL T2-2025'!$A$7:$A$73,MATCH($L5,'DMNL T2-2025'!$A$7:$A$73,1))
+AQ5 = SMALL('DMNL T2-2025'!$A$7:$A$73,COUNTIF('DMNL T2-2025'!$A$7:$A$73,"<"&$L5)+1)
+AR5 = INDEX('DMNL T2-2025'!$B$7:$B$73,MATCH($P5,'DMNL T2-2025'!$B$7:$B$73,1))
+AS5 = SMALL('DMNL T2-2025'!$B$7:$B$73,COUNTIF('DMNL T2-2025'!$B$7:$B$73,"<"&$P5)+1)
+AT5 = INDEX('DMNL T2-2025'!$C$7:$AJR$73,MATCH($AR5,'DMNL T2-2025'!$B$7:$B$73,0),MATCH(DE5&"_"&$AP5,'DMNL T2-2025'!$C$6:$AJR$6,0))
+AU5 = INDEX('DMNL T2-2025'!$C$7:$AJR$73,MATCH($AS5,'DMNL T2-2025'!$B$7:$B$73,0),MATCH(DE5&"_"&$AP5,'DMNL T2-2025'!$C$6:$AJR$6,0))
+AV5 = +IF(AR5=AS5,AT5,AT5+(AU5-AT5)*(P5-AR5)/(AS5-AR5))
+AW5 = INDEX('DMNL T2-2025'!$C$7:$AJR$73,MATCH($AR5,'DMNL T2-2025'!$B$7:$B$73,0),MATCH(DE5&"_"&$AQ5,'DMNL T2-2025'!$C$6:$AJR$6,0))
+AX5 = INDEX('DMNL T2-2025'!$C$7:$AJR$73,MATCH($AS5,'DMNL T2-2025'!$B$7:$B$73,0),MATCH(DE5&"_"&$AQ5,'DMNL T2-2025'!$C$6:$AJR$6,0))
+AY5 = +IF(AR5=AS5,AW5,AW5+(P5-AR5)*(AX5-AW5)/(AS5-AR5))
+AZ5 = IF(L5=0,0,IF(AQ5=AP5,AV5,AY5-(AY5-AV5)/(AP5-AQ5)*(L5-AQ5)))
+BA5 = IF(OR(A5=6,A5=7,A5=8,A5=9),1.03,1)*AZ5
+BB5 = +BA5
+BC5 = IF(DB5="A",0.97,IF(DB5="B",1,IF(DB5="C1",1.04,1.06)))*BB5
+BD5 = IF(CX5="CaiToa",1.03,1)*BC5
+BE5 = +IF(AG5="Than_CN",IF(OR(DQ5="VolvoA40F",DQ5="VolvoA40G"),1.02,IF(AND(D5="CS",K5="SPNT.Baichua",LEFT(DQ5,5)="HD465"),0.9,IF(AND(L5<1.5,LEFT(DQ5,8)="HD465-7R"),1.15,1))),1)
+BF5 = BD5*BE5
+BG5 = AN5*BF5/1000
+BH5 = IF(Z5="Roda",0.5,0)*BG5
+BI5 = IF(X5=1,5%,0)*BG5
+BJ5 = IF(AE5=0,0,4%)*BG5
+BK5 = IF(OR(DF5="HD465-7",DF5="HD465-7R",DF5="CAT773E"),1%,IF(OR(DF5="CAT777",DF5="CAT777D",DF5="CAT777E",DF5="HD785-7"),0.5%,1.5%))*BG5
+BL5 = IF(LEFT(Q5,3)="965",0.05,0)*BG5
+BM5 = IF(OR(K5="spnt_uot.via",K5="spnt.via"),IF(OR(DQ5="HM400-2R",DQ5="VolvoA40F",DQ5="VolvoA40G"),0.1,0.15),0)*BG5
+BN5 = IF(DQ5="HM400-2R",0,IF(OR(LEFT(K5,6)="B.Duot",LEFT(K5,7)="B.Loang",LEFT(K5,6)="DBChan",LEFT(K5,6)="B.Chan"),$BN$2,0))*BG5+IF(DQ5="HM400-2R",0,IF(OR(LEFT(K5,6)="B.Tron",LEFT(K5,6)="DBTron"),$BN$2,0))*BG5
+BP5 = +BO5+BN5+BM5+BL5+BK5+BJ5+BI5+BH5+BG5
+BQ5 = BP5*EC5
+BR5 = IF(OR(R5=0,L5=0),0,INDEX(NS.XE,MATCH(IF(L5>8,8,ROUND(L5,1)),NS.CDXE,0),MATCH(LEFT($DA5,LEN($DA5)-3)&"."&AD5,NS.CLXE,0)))
+BS5 = P5*AL5
+BT5 = IF(K5=0,"",INDEX('Mohinh_TheTrong( ko dk xoa)'!$C$4:$BB$144,MATCH(K5,'Mohinh_TheTrong( ko dk xoa)'!$B$4:$B$144,0),MATCH("TTL_CLH",'Mohinh_TheTrong( ko dk xoa)'!$C$3:$BB$3,0)))
+BU5 = _xlfn.SWITCH(BT5, "xitNK", IF(OR(G5={"Sàng 3.CS";"Sàng 1.CS";"Sàng 2B.CS"}), "daloaiNK", "xitCTNB"), "DAT_thai", IF(CQ5="PA.PCMB.S+90", "thai.PCMB", BT5), BT5)
+BV5 = IF(RIGHT(CQ5,4)="KPMB","KPMB","")
+BW5 = IF(OR(LEFT(K5,6)="B.Loan",LEFT(K5,6)="B.Duot",LEFT(K5,6)="B.Tron",LEFT(K5,8)="Btr.Tron",LEFT(K5,6)="B.chan"),"_Bun",IF(LEFT(K5,6)="BunDac","_BĐ",IF(LEFT(K5,5)="D.uot","_D.uot",IF(LEFT(K5,6)="DBchan","_Dbun",IF(LEFT(K5,6)="DBtron","_Dbun","")))))&IF(RIGHT(K5,2)="cũ","_cũ","")
+CC5 = +INDEX('Mohinh_TheTrong( ko dk xoa)'!$C$4:$AX$144,MATCH($K5,'Mohinh_TheTrong( ko dk xoa)'!$B$4:$B$144,0),MATCH(IF($D5="CS","CS.","KC.")&"TyTrongKoQA",'Mohinh_TheTrong( ko dk xoa)'!$C$3:$AX$3,0))
+CD5 = ROUND(CC5*CG5,5)
+CE5 = ROUND(CD5*L5,3)
+CF5 = +INDEX('Mohinh_TheTrong( ko dk xoa)'!$C$4:$AX$144,MATCH($K5,'Mohinh_TheTrong( ko dk xoa)'!$B$4:$B$144,0),MATCH(IF($D5="CS","CS.","KC.")&"TyTrong",'Mohinh_TheTrong( ko dk xoa)'!$C$3:$AX$3,0))
+CG5 = ROUND(ROUND($AJ5,3)*$R5-IF($AD5="DAT",$AH5,AH5/CF5),3)
+CH5 = ROUND(CG5*CF5,5)
+CI5 = ROUND(CH5*L5,3)
+CK5 = ROUND(CF5*AJ5*R5-IF(AD5="than",AH5,AH5*CF5),5)
+CL5 = 'Cap nhat Slg ThanV+Dat B1'!W3
+CN5 = INDEX('AP BBNT xe-SP'!$B$12:$E$1000,MATCH(CO5,'AP BBNT xe-SP'!$A$12:$A$1000,0),4)
+CO5 = AG5&"_"&K5&"_"&G5&"_"&I5
+CP5 = AK5&"_"&E5
+CQ5 = VLOOKUP(G5,'KBTC Xe&May Xuc(ko dk xoa)'!$AD$4:$AE$150,2,0)
+CR5 = CQ5&"_"&AK5&"_"&E5&BW5&"_"&D5&IF(I5="Băng tải.","_BK",IF(J5="SPNT.via","_ SPNT",""))&IF(J5="SPNT.via","",IF(AI5=2.25,"_2,25",IF(LEFT(K5,5)="dthai","_dthai","")))
+CS5 = CQ5&"_"&AK5
+CT5 = CS5&"_"&I5
+CU5 = G5&"_"&I5
+CV5 = G5&"_"&AK5
+CW5 = CV5&"_"&I5
+CX5 = +IF($Q5<>0,INDEX(DSXE,MATCH($Q5,SoXe,0),MATCH("CaiTaoToa",SoXeDong,0)),"")
+CY5 = IF($Q5<>0,INDEX(DSXE,MATCH($Q5,SoXe,0),MATCH(CY$4,SoXeDong,0)),0)
+CZ5 = IF(AND(AG5="Than_CN",DA5="HD325-7RCoi.KC"),"HD325-7RCoi.KC.ThanCtai",IF(AND($DC5="HM400-2R_C",OR(K5="B.Duot",K5="DBuot",K5="B.Duot.CN",K5="Dbuot.CN",)),LEFT(DA5,LEN(DA5)-3)&"."&D5&".BU",IF(AND(OR(DQ5="VolvoA40",DQ5="HM400-2R",DQ5="ScanniaP340"),OR(LEFT(K5,6)="bundac",I5="Cạp đường.",I5="Cạp công nghệ.",AG5="Dat_CN")),DA5&".Dat",IF(OR(I5="Băng tải.",LEFT(I5,3)="Cạp",K5="SPNT.via",K5="SPNT_uot.via",AG5="Dat_CN"),DA5&".BK",DA5&"."&AD5))))
+DA5 = IF($Q5<>0,INDEX(DSXE,MATCH($Q5,SoXe,0),MATCH(DA$4,SoXeDong,0)),0)&IF(D5="CS",".CS",".KC")
+DB5 = IF($Q5<>0,INDEX(DSXE,MATCH($Q5,SoXe,0),MATCH(DB$4,SoXeDong,0)),0)
+DC5 = LEFT(DA5,LEN(DA5)-3)&"_"&LEFT(DB5,1)
+DD5 = IF($Q5<>0,INDEX(DSXE,MATCH($Q5,SoXe,0),MATCH(DD$4,SoXeDong,0)),0)
+DE5 = IF(AND($DC5="HM400-2R_C",OR(LEFT(K5,7)="B.Loang",K5="B.Duot",K5="DBuot",K5="B.Duot.CN",K5="Dbuot.CN",)),LEFT(DQ5,LEN(DQ5)-0)&".Bun",IF(AND(OR(DC5="VolvoA40-GCoi_A",DC5="VolvoA40-F_C",DC5="HM400-2R_C"),OR(LEFT(K5,6)="bundac",I5="Cạp đường.",I5="Cạp công nghệ.",AG5="Dat_CN",LEFT(I5,3)="Cạp")),DQ5&".Dat",IF(OR(I5="Băng tải.",K5="SPNT.via",K5="SPNT_uot.via"),DQ5&".BK",DQ5&"."&AD5)))
+DF5 = LEFT(DA5,7)
+DG5 = IF($E5<>0,INDEX(DSMAY,MATCH($E5,SoMay,0),MATCH(DG$4,SoMayDong,0)),0)
+DH5 : 8U
+DI5 : C
+DJ5 = DH5&" _"&DI5
+DK5 = INDEX($FT$5:$FT$15,MATCH(DH5,$FS$5:$FS$15,0)*1)
+DL5 = IF(B5<8,"Kỳ 01, 1/5 den 7/5",IF(B5<15,"Kỳ 02, 8/5 den 14/5",IF(B5<22,"Kỳ 03, 15/5 den 21/5",IF(B5<29,"Kỳ 04, 22/5 den 28/5",IF(B5<32,"Kỳ 05, 29/5 den 31/5",0)))))
+DM5 = INDEX($FR$5:$FR$13,MATCH(DQ5,$FQ$5:$FQ$13,0),1)
+DN5 = IF($E5<>0,INDEX(DSMAY,MATCH($E5,SoMay,0),MATCH(DN$4,SoMayDong,0)),0)
+DO5 = IF(C5=3,"ca 3","Ca 1+2")
+DP5 = DQ5&"_"&LEFT(DB5,1)
+DQ5 = IF($Q5<>0,INDEX(DSXE,MATCH($Q5,SoXe,0),MATCH(DQ$4,SoXeDong,0)),0)
+DR5 = DC5&IF(Z5="Roda","_Roda","")
+DS5 = IF(LEFT(J5,3)="TCN",AF5*AL5,AL5*S5)
+DT5 = _xlfn.IFNA(DW5*DY5,0)
+DU5 = DX5*DZ5
+DW5 = IF(LEFT($J5,3)="TCN",AM5*$AF5,DS5*AC5)
+DX5 = DW5*L5
+DY5 = IF(OR('Cap nhat Slg ThanV+Dat B1'!$A$1="TKE",LEFT(J5,3)="TCN"),1,INDEX('Ap Tkm'!$Y$7:$AP$1000,MATCH(CR5,'Ap Tkm'!$X$7:$X$1000,0),MATCH("HS_"&$AG5&"_tan",'Ap Tkm'!$Y$6:$AP$6,0)))
+DZ5 = IF(OR('Cap nhat Slg ThanV+Dat B1'!$A$1="TKE",LEFT(J5,3)="TCN"),1,INDEX('Ap Tkm'!$Y$7:$AP$1000,MATCH(CR5,'Ap Tkm'!$X$7:$X$1000,0),MATCH("HS_"&$AG5&"_tkm",'Ap Tkm'!$Y$6:$AP$6,0)))
+EA5 = DP5&"_"&AD5
+EB5 = +ED5*BP5
+EC5 = INDEX($FX$5:$FY$50,MATCH(EA5,$FW$5:$FW$50,0),MATCH(D5,$FX$4:$FY$4,0))
+ED5 = IF(AN5=0,1,DU5/AN5)
+EE5 = +EG5*EF5
+EF5 = INDEX($EP$5:$EQ$32,MATCH(EA5,$EO$5:$EO$32,0),MATCH(D5,$EP$4:$EQ$4,0))
+EG5 = +ED5*BQ5
+EH5 = +EE5-EG5
+EI5 = +BP5*IF(AD5="Dat",0.98,1)*EF5
+EO5 : 3524
+EP5 : 1
+EQ5 = 'DuKien HS theo -2%'!M6
+FH5 = IF(AD5="dat",0,AM5/2.03)
+FI5 = IF(FH5<>0,FH5,AL5)
+FJ5 = FK5/IF(D5="KC",2.625,2.617)
+FK5 = IF(J5="THANV",IF(D5="CS",$D$3,IF(AND(D5="KC",RIGHT(I5,2)="CS"),$F$3,$B$3))*$CK5,0)
+FL5 = -FJ5
+FQ5 : 8
+FR5 : 6531
+FS5 : 2126
+FT5 : 6532
+FU5 : 0.97
+FW5 : 3524
+FX5 = +FZ5*GB5*GD5*GF5*GH5*GJ5*GL5*GN5*GP5*GR5*GT5*GV5
+FY5 = +GA5*GC5*GE5*GG5*GI5*GK5*GM5*GO5*GQ5*GS5*GU5*GW5
+FZ5 : 1
+GA5 : 1
+GB5 : 1
+GC5 : 1
+GD5 : 1
+GE5 : 1
+GF5 : 1
+GG5 : 0.95
+GH5 : 1
+GI5 : 1
+GJ5 : 1
+GK5 : 1
+GL5 : 1
+GM5 : 1
+GN5 : 1
+GO5 : 1
+GP5 : 1
+GQ5 : 1
+GR5 : 1
+GS5 : 1
+GT5 : 1
+GU5 : 1
+GV5 : 1
+GW5 : 1
+GX5 = +GV5*GT5*GR5*GP5*GN5*GL5*GJ5*GH5*GF5*GD5*GB5*FZ5
+GY5 = +GW5*GU5*GS5*GQ5*GO5*GM5*GK5*GI5*GG5*GE5*GC5*GA5

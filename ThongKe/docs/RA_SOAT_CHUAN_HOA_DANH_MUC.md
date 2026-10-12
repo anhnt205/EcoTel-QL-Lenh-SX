@@ -1,0 +1,468 @@
+# Rà soát & chuẩn hoá danh mục trước khi dựng Báo cáo thống kê
+
+Rà soát 2026-08-30 theo yêu cầu chủ dự án: đọc lại `Module Thống kê sản
+lượng.docx` và workbook `Tháng 5 đổi tên xe.xlsx`, đối chiếu với những gì
+ĐÃ dựng, trước khi code phần Báo cáo thống kê.
+
+**Trạng thái: ĐÃ CHỐT.** Chủ dự án đã trả lời 2 câu chặn (mục 7); 3 câu
+còn lại tự tra được trong docx. Không còn gì chặn — đủ điều kiện code.
+
+**Nguồn quyết định** khi docx và Excel mâu thuẫn: **Excel** (đã thống nhất,
+xem `CLAUDE.md`). Riêng những chỗ chủ dự án đã chốt trong `DECISIONS.md`
+thì theo quyết định đó.
+
+---
+
+## 1. Nguồn tra cứu THẬT mà công thức dùng
+
+Đếm trực tiếp trên 140 công thức của dòng master (dòng 5) sheet `tinh toan`:
+
+| Lần dùng | Bảng tra | Bản chất | Đã dựng? |
+|---|---|---|---|
+| 32 | `Cap nhat Slg ThanV+Dat B1` | dữ liệu báo chuyến đã chốt | ⚠ là **đầu vào**, không phải danh mục |
+| **21** | `Mohinh_TheTrong( ko dk xoa)` | danh mục | ❌ chưa |
+| **20** | `DMNL T2-2025` | danh mục | ❌ chưa |
+| 9 | `AP Tdia(m3-tan-tkm)` | **hệ TỰ SINH** | ❌ chưa |
+| 6 | `Ap Tkm` | **hệ TỰ SINH** | ❌ chưa |
+| 3 | `STD(DatCN)` | danh mục | ❌ chưa |
+| 3 | `STD(Dat+thanSX)` | danh mục | ❌ chưa |
+| 2 | `AP BBNT xe-SP` | **hệ TỰ SINH** | ❌ chưa |
+| 1 | `KBTC Xe&May Xuc(ko dk xoa)` | danh mục | ⚠ một phần (`ReceivingPoint.seamGroup`) |
+| 1 | `DuKien HS theo -2%` | **hệ TỰ SINH** | ❌ chưa |
+| — | named range `DSXE` / `DSMAY` | danh mục xe/máy | ⚠ một phần (`Device`) |
+| — | 5 bảng tra **nằm ngay trong sheet** (vùng `EO..GY`) | danh mục | ❌ chưa |
+
+**4 bảng "hệ tự sinh"** (chủ dự án xác nhận) — người dùng KHÔNG nhập, hệ
+tính ra. Chúng là *kết quả trung gian*, không phải danh mục. Đây là thay
+đổi kiến trúc quan trọng, xem mục 4.
+
+---
+
+## 2. Bốn phát hiện phải xử lý trước khi code
+
+### 2.1. ⚠ Bản docx TỰ MÂU THUẪN về nguồn Tỷ trọng
+
+Ba chỗ trong cùng một tài liệu nói ba kiểu:
+
+| Dòng | Nội dung |
+|---|---|
+| 132 | định nghĩa **"Tỷ trọng (danh mục)"** riêng, có `Thời gian` + `Khu vực xúc` |
+| 285 | *"Tỷ trọng (cập nhật) = 0 → Đối chiếu **danh mục Tỷ trọng** (quy ẩm)"* |
+| 470, 476 | *"Đối chiếu theo **danh mục Mô hình** theo Chủng loại hàng – Tỷ trọng"* |
+
+Excel làm theo cách thứ ba: **cả 3 bước lấy tỷ trọng đều tra sheet
+`Mohinh_TheTrong`**, khoá `Chủng loại hàng`, cột `CS.TyTrong`/`KC.TyTrong`
+và `CS.TyTrongKoQA`/`KC.TyTrongKoQA` — **không có chiều thời gian**.
+
+**Xử lý:** giữ **QĐ-04** (chủ dự án đã chốt: danh mục Tỷ trọng có khoảng
+thời gian). Nhưng **tách làm HAI danh mục**, không gộp như Excel:
+
+| | Khoá | Giá trị |
+|---|---|---|
+| **Tỷ trọng** | Chủng loại hàng × Khu vực xúc × **khoảng thời gian** | quy ẩm, không quy ẩm |
+| **Mô hình** | Chủng loại hàng × **Chủng loại xe** | m3/chuyến |
+
+Excel gộp vào một sheet vì Excel khó làm hai bảng. Trong CSDL hai bảng mới
+đúng — **khoá của chúng khác hẳn nhau** (một bên theo khu vực, một bên theo
+chủng loại xe).
+
+### 2.2. ⚠ Mô hình là bảng HAI CHIỀU, không phải danh sách phẳng
+
+```excel
+INDEX('Mohinh_TheTrong…'!$C$4:$AX$149,
+      MATCH($K5,  …$B$4:$B$149, 0),     ← dòng  = Chủng loại hàng
+      MATCH($DA5, …$C$3:$AX$3,  0))     ← cột   = Chủng loại xe + DMNL
+```
+
+Thiết kế cũ ghi *"`ModelParameter`: chủng loại hàng × chủng loại xe"* —
+đúng, nhưng **giao diện phải là lưới hai chiều** (dòng = CLH, cột = chủng
+loại xe). Nhập ~145 CLH × ~48 chủng loại xe bằng bảng phẳng là không dùng
+được.
+
+### 2.3. ⚠ Ba bảng tra không có trong đặc tả — đã xác định là hệ tự sinh
+
+Chúng chỉ lộ ra khi đọc công thức thật. Chủ dự án xác nhận **cả ba là bảng
+trung gian hệ tự sinh**, không phải danh mục người dùng nhập:
+
+| Bảng | Dùng ở | Vai trò |
+|---|---|---|
+| `Ap Tkm` | 6 lần (`DY`, `DZ`) | hệ số trắc địa cho **tấn** và **tkm**, áp ở bước sau `AP Tdia` |
+| `AP BBNT xe-SP` | 2 lần (`CN`) | Tên nghiệm thu, khoá ghép `SPNT_CLH_NơiNhận_NơiDỡ` |
+| `DuKien HS theo -2%` | 1 lần (`EQ`) | hệ số dự kiến |
+
+Ngoài ra **5 bảng tra nhỏ nằm ngay trong sheet `tinh toan`** (vùng `EO..GY`)
+— những cái này **là danh mục thật**, chỉ bị nhét vào sheet cho tiện:
+Năng suất xe (`NS.XE`), Gầu xúc theo chủng loại máy, Tải trọng xe theo
+chủng loại, HS điều chỉnh NLĐM, HSDML. Thiếu chúng thì không tính được
+`BQ` (NLĐM hiện hành), `BR` (định mức năng suất), `EF`, `EQ`.
+
+### 2.4. ⚠ `Device` còn thiếu 4–6 thuộc tính mà công thức cần
+
+Lấy từ named range `DSXE`/`DSMAY`:
+
+| Cột Excel | Nội dung | Có trong `Device`? |
+|---|---|---|
+| `CX` | `CaiTaoToa` | ❌ |
+| `DB` | Hạng xe (A/B/C1/khác) | ❌ |
+| `DA`/`DQ` | Chủng loại xe + DMNL | ❌ |
+| — | Chất lượng (tra HS điều chỉnh) | ❌ |
+| `DG`,`DN` | Gầu xúc, QLTB (từ `DSMAY`) | ❌ |
+
+Đã ghi trong `DESIGN_SANLUONG.md` mục 2.2 nhưng **chưa thực thi**.
+
+---
+
+## 3. Bảng đối chiếu: đã dựng vs còn thiếu
+
+### 3.1. Đã dựng và ĐÚNG (8 danh mục)
+
+`excavation_areas`, `receiving_points` (có `seamGroup`), `unloading_points`,
+`pickup_points`, `cargo_types`, `cargo_groups`, `acceptance_products`,
+`ttl_clh_items`.
+
+### 3.2. Cần sửa trên cái đã dựng (3 việc)
+
+| # | Việc | Vì sao |
+|---|---|---|
+| ~~S1~~ | ✅ **XONG** — `CargoType` SPNT + TTL CLH sang khoá ngoại, đã di trú |
+| ~~S2~~ | ✅ **XONG** — `ReceivingPoint.seamGroup` sang khoá ngoại; khoá ghép nay dùng MÃ |
+| ~~S3~~ | ✅ **XONG** — `Device` + 6 thuộc tính, kèm màn khai báo riêng | — |
+
+**Ghi chú thực thi S3 (2026-08-31).** Khi làm mới lộ ra: `Device` trong hệ
+này **chỉ có endpoint đọc**, không hề có tạo/sửa — dữ liệu thiết bị đến từ
+seed. Thêm 6 cột mà không có đường nhập thì chúng sẽ nằm trống mãi và công
+thức vẫn không chạy được. Nên S3 gồm cả:
+
+- 6 thuộc tính: `carRenovation`, `vehicleClass`, `qualityLevel`,
+  `fuelClass` (FK), `categoryClass` (FK), `bucketCapacity`.
+- **Không** thêm QLTB: nó chính là `department` đã có. Thêm nữa sẽ thành hai
+  chỗ cho một khái niệm — đúng cái bẫy đã gặp với `Material`/`CargoType`.
+- Endpoint riêng `/api/device-production-attributes` (danh sách + sửa + ghi
+  hàng loạt theo mã). Tách khỏi `/api/devices` để màn này **không** âm thầm
+  trở thành màn sửa thiết bị: chỉ ghi được đúng phần sản lượng.
+- Hai màn "Thuộc tính SL — Xe" và "— Máy xúc", `canCreate: false` và
+  `canDelete: false` (thiết bị đến từ nơi khác; xoá ở đây sẽ có nghĩa là xoá
+  cả thiết bị).
+- Ghi hàng loạt có ngữ nghĩa **THAY THẾ**, không phải bổ sung — file tự chế
+  thiếu cột sẽ xoá trắng các cột còn lại. Cảnh báo này được ghi thẳng vào
+  sheet "HuongDan" của file mẫu.
+
+**Ghi chú thực thi S1 + S2 (2026-08-31).**
+
+Ba trường này là **đầu vào của công thức**, không phải nhãn hiển thị:
+`acceptance_product` được so với các hằng `Dat_SX` / `Than_SX` / `Dat_CN` để
+chọn nhánh tính; `seam_group` là thành phần ĐẦU của khoá ghép tra STD. Ở
+dạng chuỗi tự do, sai một ký tự là công thức đi nhầm nhánh hoặc dòng STD
+không khớp — mà triệu chứng chỉ là "thiếu dữ liệu".
+
+Quyết định quan trọng nhất của lượt di trú: **`code` của nhóm vỉa tạo mới =
+đúng chuỗi cũ**, không sinh mã mới. Khoá ghép nay dựng từ MÃ, nên giữ nguyên
+chuỗi cũ làm mã thì mọi khoá đã sinh và mọi dòng STD đã khai theo khoá đó
+vẫn khớp nguyên vẹn. Đã kiểm chứng: chạy lại engine sau di trú cho khoá
+giống hệt từng ký tự và mọi con số không đổi.
+
+Kết quả di trú: 12 + 11 + 10 bản ghi được nối, **5 nhóm vỉa tự tạo**, truy
+vấn kiểm tra trả về **0 dòng sót**. Ba cột chuỗi cũ vẫn nằm trong CSDL vì
+Hibernate `ddl-auto: update` không bao giờ xoá cột — lệnh `DROP COLUMN` để
+sẵn (đã chú thích) ở cuối
+`backend/migration-2026-08-31-s1-s2-khoa-ngoai.sql`, **chạy tay sau khi
+kiểm tra**.
+
+### 3.3. Còn thiếu — 12 danh mục người dùng nhập
+
+Xếp theo **thứ tự phụ thuộc**, đúng yêu cầu "tuần tự từ danh mục".
+
+| Lớp | Danh mục | Khoá | Kiểu giao diện |
+|---|---|---|---|
+| **1** | Nhóm vỉa | mã, tên | bảng phẳng ✅ dùng lại `CatalogPage` |
+| **1** | Chủng loại xe + DMNL | mã, tên | bảng phẳng |
+| **1** | Chủng loại xe + Phân loại | mã, tên | bảng phẳng |
+| **1** | Hệ số (Than tke trừ đá / Than kcs…) | mã hệ số | bảng phẳng |
+| **1** | Kỳ báo cáo (QĐ-05) | năm, tháng, số kỳ | bảng phẳng |
+| **2** | **Tỷ trọng** | CLH × Khu vực × thời gian | phiếu-đầu + dòng |
+| **2** | **Mô hình (m3/ch)** | CLH × Chủng loại xe | **lưới 2 chiều** |
+| **2** | **Định mức nhiên liệu** | (CLxe+DMNL, cung độ) × độ dốc | **lưới 2 chiều** |
+| **2** | Năng suất xe (996) | (CLxe+Phân loại) × cung độ | **lưới 2 chiều** |
+| **2** | HS điều chỉnh NLĐM | CLxe_Hạng_Phân loại × khu vực | **lưới 2 chiều** |
+| **3** | STD (Đất SX/Than SX), STD (Đất CN) | Nhóm vỉa+Máy xúc × thời gian | phiếu-đầu + dòng |
+
+**Hai thứ đã LOẠI khỏi danh sách sau khi tra lại docx** (2026-08-31):
+
+| Bị loại | Lý do |
+|---|---|
+| Nhóm tầng | **Không phải danh mục** — là cột TÍNH: `TRUNC(tầng/15)*15` (docx dòng 293–300). Dựng thành danh mục là sai bản chất. |
+| Số thẻ lương | Docx dòng 62 có ghi `(danh mục)`, nhưng **đã tồn tại** trong hệ dưới dạng `User.salaryCode` (`userRepository.findBySalaryCode`). Dựng thêm sẽ tạo bảng trùng. |
+
+Đây là kết quả của việc đối chiếu 21 dòng có chữ `(danh mục)` trong docx với
+code hiện có, thay vì tin danh sách tự liệt kê ở lượt rà soát trước.
+
+**Nhận xét quan trọng:** 4 danh mục ở lớp 2 đều là **lưới hai chiều**. Đây
+là kiểu giao diện thứ ba (sau bảng phẳng và phiếu-đầu+dòng) — cần một
+thành phần `MatrixCatalogPage` dùng chung, nếu không phải viết 4 lần.
+
+### 3.4. KHÔNG phải danh mục — hệ tự sinh (4 bảng)
+
+`AP Tdia(m3-tan-tkm)`, `Ap Tkm`, `AP BBNT xe-SP`, `DuKien HS theo -2%`.
+Người dùng chỉ **xem** (đúng với ghi chú *(only view)* trong đặc tả) và tải
+Excel. Xem mục 4.
+
+---
+
+## 4. ⚠ Phát hiện kiến trúc: phép tính có BA LƯỢT, không phải một
+
+> **Đính chính (2026-08-31, khi thực thi B5):** mục này ban đầu ghi "hai
+> lượt". Đọc kỹ chuỗi công thức cuối (`DS → DW → DX → DT → DU`) cho thấy
+> thực ra có **ba lượt trên chuyến, xen giữa là hai rào chắn tổng hợp**:
+>
+> ```
+> Lượt 1   AL, AM, AN                          (từng chuyến)
+>   ├─ gộp theo (khoá, SPNT) → sinh AP Tdia;  S = STD_m3 ÷ ΣAL
+> Lượt 2   DS = AL × S ; DW = DS × Thể trọng (TĐ) ; DX = DW × Cung độ
+>   ├─ gộp LẦN HAI        → sinh Ap Tkm;  DY = STD_tấn ÷ ΣDW, DZ = STD_tkm ÷ ΣDX
+> Lượt 3   DT = DW × DY ; DU = DX × DZ         (từng chuyến)
+> ```
+>
+> Điểm mấu chốt bị bỏ sót lúc đầu: `Ap Tkm` **không** gộp từ `AM` của lượt 1,
+> mà gộp từ `DW` — tức từ kết quả đã áp hệ số của lượt 2. Vì thế nó là một
+> rào chắn riêng, không gộp chung với `AP Tdia` được.
+>
+> Đã kiểm chứng sống: hệ số kéo tổng của các chuyến về đúng khít số trắc địa
+> (70 m3 → 100 tấn → 350 tkm), đúng mục đích của phép áp hệ số.
+
+Đây là hệ quả trực tiếp của việc `AP Tdia` là bảng tự sinh. Docx dòng
+253–261:
+
+```
+Nếu Tổng m3 ≠ 0 → đối chiếu Nhóm vỉa + Máy xúc trong danh mục STD
+                  để lấy Đất CN (m3/tấn/tkm)
+HSTĐ(m3)  = m3  / Tổng m3
+HSTĐ(tấn) = tấn / Tổng tấn
+HSTĐ(tkm) = tkm / Tổng tkm
+```
+
+`Tổng m3` là **tổng cộng dồn của TẤT CẢ các chuyến** trong kỳ, gộp theo
+`Nhóm vỉa + Máy xúc`. Còn `m3` (tử số) là số trắc địa lấy từ danh mục STD.
+Rồi hệ số đó lại được áp ngược trở lại vào **từng chuyến**:
+
+```excel
+DS5 = IF(LEFT(J5,3)="TCN", AF5*AL5, AL5*S5)   ← Tổng m3 (từng chuyến) × HS
+DW5 = IF(LEFT($J5,3)="TCN", AM5*$AF5, DS5*AC5)
+DT5 = IFNA(DW5*DY5, 0)                        ← lại nhân HS của Ap Tkm
+```
+
+**Không thể tính một chuyến một cách độc lập.** Trình tự bắt buộc:
+
+| Lượt | Việc | Phạm vi |
+|---|---|---|
+| **1** | Tính `AL`/`AM`/`AN` (Tổng m3, tấn, tkm) — chưa có hệ số | từng chuyến |
+| **2** | Cộng dồn theo `Nhóm vỉa + Máy xúc` × kỳ → **sinh `AP Tdia`** | toàn kỳ |
+| **3** | `HSTĐ = Số trắc địa (STD) ÷ Tổng` | toàn kỳ |
+| **4** | Sinh `Ap Tkm` (cùng cách, cho tấn/tkm) | toàn kỳ |
+| **5** | Áp hệ số ngược vào từng chuyến → `DS`, `DW`, `DX`, `DT`, `DU` | từng chuyến |
+
+`DESIGN_SANLUONG.md` mô tả 25 bước như một chuỗi tuyến tính trên từng
+dòng — **phải sửa**: lớp 5 (áp hệ số trắc địa) là một **rào chắn tổng hợp**,
+không phải một bước trên dòng.
+
+Hệ quả thực thi: engine tính phải chạy theo **kỳ**, không theo chuyến; kết
+quả của một chuyến thay đổi khi có chuyến khác trong cùng kỳ được sửa. Nên
+kết quả phải được tính lại cả kỳ và lưu kèm dấu "kỳ đã chốt" (khớp QĐ-03).
+
+Ghi chú: khi bật chế độ TKE (QĐ-02) thì `S=T=U=1` và `DY=DZ=1` — tức
+**bỏ qua toàn bộ lượt 2–4**. Chế độ TKE chỉ cần một lượt.
+
+---
+
+## 5. Menu "Báo cáo thống kê" — đầu ra cuối cùng
+
+Chính là sheet `tinh toan`: **mỗi dòng = một chuyến đã đối soát**, 206 cột.
+
+**Nguồn vào:** cặp đã đối soát (Khai thác × Vận tải) ở trạng thái đã chốt —
+tương ứng sheet `Cap nhat Slg ThanV+Dat B1` (32/140 công thức trỏ vào đây).
+
+**Không lưu 206 cột.** Chỉ lưu:
+- các chỉ tiêu đầu ra thật sự cần (`ProductionResult`, `DESIGN_SANLUONG.md` 3.7);
+- các cột trung gian (`AP`…`AY` nội suy, `CO`…`CW` khoá ghép) **tính lại khi
+  cần**, không lưu — chúng chỉ là bước đệm của Excel.
+
+**Giao diện:** chọn kỳ → bảng cột lồng nhiều tầng, cuộn ngang, đóng băng
+cột trái, xuất Excel. Cùng loại với AP Tdia.
+
+---
+
+## 6. Chốt lại thứ tự làm
+
+| Bước | Nội dung | Điều kiện |
+|---|---|---|
+| **B1** | S1+S2+S3 (sửa 3 chỗ đã dựng) + 6 danh mục phẳng lớp 1 | không chặn |
+| ~~B2~~ | ✅ **XONG** — `MatrixCatalogPage` + 3 bảng lưới + 4 lưới đã khai báo | — |
+| ~~B3~~ | ✅ **XONG** — Tỷ trọng (QĐ-04); 4 lưới đã dùng được từ B2 | — |
+| ~~B4~~ | ✅ **XONG** — STD ×2 + bộ dựng khoá Nhóm vỉa + Máy xúc | — |
+| ~~B5~~ | ✅ **XONG** — engine **3 lượt** + sinh AP Tdia / Ap Tkm | — |
+| ~~B6~~ | ✅ **XONG** — màn Báo cáo thống kê, cột lồng 6 nhóm, xuất Excel | — |
+
+### Còn lại sau B6
+
+| Việc | Ghi chú |
+|---|---|
+| ~~S1, S2~~ | ✅ **XONG** (2026-08-31) — xem ghi chú dưới. |
+| ~~Nhánh nhiên liệu & năng suất~~ | ✅ **XONG** — `AZ`…`BR`, trừ cột `BO` (xem dưới). |
+| ~~Mã hoá hàng~~ | ✅ **XONG** — `BT` (Mã hoá hàng), `BU` (Mã hàng TTL), `BV` (Vỉa KPMB). |
+| Đối soát → chốt kỳ | Engine hiện lấy **mọi** chuyến trong khoảng ngày. Khi có quy trình chốt kỳ thì lọc theo trạng thái đã chốt. |
+
+### ⛔ Ba chỗ CHẶN vì không có luật ở bất kỳ nguồn nào
+
+Đã tra cả docx lẫn công thức thật của dòng master. Không đoán, không tự chế.
+
+| Cột | Tình trạng |
+|---|---|
+| `BO` — *BSNL_Spnt__CN (xe)* | Có tiêu đề trong cả docx lẫn Excel, **không có công thức**, ô bảng tính để trống. Là khoản bù thứ tám và **nằm trong tổng `BP`**, nên hiện `BP` thiếu đúng khoản đó. Đang để 0. |
+| `BX` — *Thể trọng bùn* | Như trên: chỉ có tiêu đề. |
+| `BY`, `BZ`, `CA`, `CB` — nhóm *Tổng … (trừ bùn)* + *Tổng bùn (tấn)* | Như trên: bốn tiêu đề, không công thức, docx cũng chỉ liệt kê tên. |
+
+### Hai bảng tự sinh còn lại — đã tra rõ bản chất
+
+**`AP BBNT xe-SP`** — cấu trúc rõ hoàn toàn:
+
+```excel
+CO5 = AG5 & "_" & K5 & "_" & G5 & "_" & I5   ← SPNT_CLH_NơiNhậnTải_NơiDỡTải
+CN5 = INDEX('AP BBNT xe-SP'!B12:E1000, MATCH(CO5, A12:A1000, 0), 4)
+```
+
+Khoá suy được 100%, nhưng nó trả về **Tên Nghiệm thu** (cột `CN4`) — thứ
+**không suy được từ khoá**, và docx không nhắc một chữ nào. Nên "hệ tự sinh"
+chỉ đúng với **danh sách khoá**; **tên** phải do người dùng khai. Chờ chủ dự
+án xác nhận trước khi dựng.
+
+**`DuKien HS theo -2%`** — KHÔNG phải bảng riêng. `EQ5` là một ô của bảng
+HSDML nhúng ở vùng `EO:EQ`, và bảng đó có **đúng hình dạng** với lưới
+`HS_DIEU_CHINH_NLDM` đã dựng (khoá dòng `Xe_Hạng_Phânloại`, cột = khu vực).
+Dựng chỉ là thêm một khai báo lưới. Nhưng **chưa nên làm**: docx không nhắc
+HSDML hay "-2%", các cột tiêu thụ nó (`EE`, `EG`, `EI`) cũng không có trong
+docx, và sheet còn giữ nhiều kịch bản song song (`KC gốc`, `CS gốc`,
+`kc-tháng 2`) mà không rõ cơ chế chọn.
+
+### ✅ QĐ-02 áp cho cột `CG` — ĐÃ DỰNG (2026-08-31)
+
+Tra ra cột thật mà QĐ-02 nói tới:
+
+```excel
+CG5 = ROUND( ROUND($AJ5,3)*$R5 − IF($AD5="DAT", $AH5, AH5/CF5), 3)
+      Tổng KLVC TKE (m3)_BanDau
+```
+
+Đúng như QĐ-02 đã chốt — Trừ vơi chia cho Tỷ trọng ban đầu, **nhưng chỉ khi
+phân loại KHÁC `DAT`**. Kèm theo là `CC`/`CD`/`CE`/`CF` (Tỷ trọng không quy
+ẩm và các tổng TKE), đều có công thức đầy đủ.
+
+**Đã dựng cả nhóm `CC`…`CG`.** Hai điểm đáng ghi:
+
+- Chi tiết "chỉ chia khi phân loại KHÁC `DAT`" **không có trong QĐ-02**, chỉ
+  lộ ra ở công thức thật. Kiểm chứng sống: Trừ vơi = 10, tỷ trọng 1,45 →
+  `Than_SX` cho `CG = 73,5 − 10/1,45 = 66,603`; đổi sang `Dat_SX` thì
+  `CG = 73,5 − 10 = 63,500`.
+- `CF` (Tỷ trọng ban đầu) và `CC` (không quy ẩm) **luôn** lấy từ danh mục,
+  kể cả khi chuyến có tỷ trọng tạm tính — khác `AI` (tỷ trọng đang dùng).
+  Vì thế phải thêm `DensityParameterService.findEffective` không ném lỗi:
+  dùng `resolve` ở đây sẽ làm hỏng chuyến vốn chạy được nhờ giá trị tạm tính.
+
+### ⚠ Hai khoá dẫn xuất — đã sửa 2026-08-31, ghi lại để không sai lại
+
+Cả hai chỉ lộ ra khi đọc kỹ bảng tính lúc chuẩn bị làm nhánh nhiên liệu; cả
+hai đều là **lỗi trong phần đã chạy**, nay đã sửa và gom vào
+`ProductionKeys`.
+
+**1. Khoá cột lưới Mô hình / DMNL có HẬU TỐ KHU VỰC.**
+
+```excel
+DA5 = INDEX(DSXE, …) & IF(D5="CS", ".CS", ".KC")
+AJ5 = … MATCH($DA5, 'Mohinh_TheTrong'!$C$3:$AX$3, 0)
+```
+
+Cột lưới là `CAT777E.CS` / `CAT777E.KC`, **không phải** mã trần `CAT777E`.
+Hậu tố là nhị phân: đúng khu vực `CS` thì `.CS`, mọi khu vực khác đều `.KC`.
+Khoá dòng lưới Năng suất xe cũng dẫn xuất tương tự:
+`LEFT(DA5, len−3) & "." & phân loại` → `CAT777E.DAT`.
+
+Kèm theo đó: khoá dòng Năng suất xe **dẫn xuất** từ chủng loại xe + DMNL,
+không đọc từ thuộc tính `Device.categoryClass` mà mục S3 đã thêm. Danh mục
+"Chủng loại xe + Phân loại" vẫn cần — để làm nhãn dòng của lưới — nhưng
+trường trên thiết bị hiện chưa có chỗ dùng.
+
+**2. Phân loại Đất/Than — bảng tính đã có công thức sẵn.**
+
+```excel
+AD5 = IF(OR(LEFT(AG5,1)="S", LEFT(AG5,1)="D"), "DAT", "Than")
+```
+
+Xét **chữ cái đầu** của Sản phẩm nghiệm thu, không phải tiền tố
+`Dat_`/`Than_` như tôi từng suy. Khác biệt là thật: `SP than sạch` bắt đầu
+bằng `S` nên là **ĐẤT**, dù trong tên có chữ "than"; cách suy cũ không xếp
+nó vào đâu cả. **Không còn là giả định chờ chủ dự án xác nhận.**
+
+### Ghi chú thực thi B2 (2026-08-31)
+
+Hạ tầng lưới là **một** bộ dùng chung cho cả 4 danh mục: 3 bảng
+(`matrix_definitions` / `matrix_axis_entries` / `matrix_cells`), một
+controller `/api/matrix-catalogs/{code}`, một trang `MatrixCatalogPage`.
+Bốn lưới chỉ khác nhau ở nhãn và nguồn khoá nên được **seed** bằng
+`backend/seed-matrix-catalogs.sql`, không phải do người dùng tạo.
+
+Bốn quyết định đáng ghi lại, đều xuất phát từ đặc điểm thật của công thức:
+
+1. **Trục lưu tường minh, không suy ra từ ô.** Suy ra thì một dòng chưa nhập
+   giá trị nào sẽ biến mất khi tải lại — mà lúc nhập liệu, dòng trống là
+   trạng thái bình thường.
+2. **Trục số tách riêng `numericValue`.** `DMNL` dùng `MATCH(…,1)` +
+   `SMALL(…)` để lấy hai dải kề nhau rồi nội suy, nên thứ tự SỐ là một phần
+   của phép tính. Sắp theo chuỗi cho `"0.5" < "1" < "10" < "2" < "9"` và
+   chọn nhầm dải. Đã kiểm chứng sống: nhập lộn xộn `10, 9, 2, 0.5, 1` trả về
+   đúng `0.5, 1, 2, 9, 10`.
+3. **Ô trống ≠ ô bằng 0.** Trống là *chưa khai báo* (công thức phải báo thiếu
+   dữ liệu); 0 là *đã khai báo và bằng không*. Vì thế ô lưu THƯA, và
+   `value: null` nghĩa là xoá ô chứ không phải ghi 0.
+4. **Khoá ô là MÃ danh mục, không phải nhãn.** Đổi tên hiển thị không được
+   làm hỏng lưới. File Excel thì ngược lại — dùng nhãn, vì người nhập chỉ
+   biết tên.
+
+Chặn ô mồ côi: chỉ ghi được vào dòng/cột đã có trên trục. Không có chốt này
+thì gõ sai một mã sẽ lặng lẽ tạo ô mà lưới không hiện và công thức không bao
+giờ tra thấy.
+
+---
+
+## 7. Các câu hỏi — ĐÃ TRẢ LỜI HẾT
+
+**Chủ dự án trả lời (2026-08-30):**
+
+1. **AP Tdia / Ap Tkm lấy dữ liệu từ đâu?** → *"lấy dữ liệu từ các danh mục
+   khác, docx có mô tả công thức tính."* Đã tra ra: docx dòng 253–261. Là
+   bảng **tự sinh** = (số trắc địa từ danh mục STD) ÷ (tổng cộng dồn từ
+   chuyến). ✅ **Không còn chặn B5.**
+2. **`Ap Tkm`, `AP BBNT xe-SP`, `DuKien HS theo -2%`?** → *"bảng trung gian
+   hệ tự sinh."* ✅ Bỏ khỏi danh sách danh mục.
+
+**Tự tra được trong docx (không cần hỏi):**
+
+3. **Tỷ trọng: bản "Tất cả khu vực" vs khu vực cụ thể chồng thời gian** →
+   giữ thiết kế **bản cụ thể thắng**. Đây là quy tắc chuẩn của danh mục có
+   khoảng thời gian; docx không nói khác.
+4. **Hậu tố khoá `Nhóm vỉa + Máy xúc` — tự suy hay chọn tay?** → **TỰ SUY.**
+   Docx dòng 219 và 241 ghi rõ `Nhóm vỉa + Máy xúc (tự set)`; dòng 490–500
+   cho quy tắc đầy đủ, hoàn toàn tất định:
+   ```
+   Khoá = Nhóm vỉa _ Nhóm tầng _ Máy xúc _ Ký hiệu bùn _ Khu vực xúc _ hậu tố
+
+   Bước 1 (ưu tiên Băng tải trước):
+     Nơi dỡ tải = Băng tải          → thêm _BK
+     ngược lại, Nhóm CLH = SPNT.via → thêm _SPNT
+   Bước 2:
+     Nhóm CLH = SPNT.via            → giữ nguyên
+     Nhóm CLH ≠ SPNT.via và Tỷ trọng = 2,25 → thêm _2,25
+     Chủng loại hàng = Dthai        → thêm _dthai
+   ```
+   Ô chọn trong mockup là để **chọn khoá đã có sẵn** khi nhập dòng STD, chứ
+   không phải gõ hậu tố bằng tay.
+5. **Kỳ của màn Báo cáo thống kê** → theo **kỳ báo cáo (QĐ-05)**, không theo
+   tháng như Excel. Excel làm theo tháng vì mỗi tháng một file; hệ này đã có
+   danh mục Kỳ nên dùng kỳ, và cho gộp nhiều kỳ để xem cả tháng.

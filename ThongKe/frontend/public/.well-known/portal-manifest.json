@@ -1,0 +1,55 @@
+{
+  "modules": [
+    { "code": "excavation-reports", "name": "Nhập liệu Khai thác", "sortOrder": 1 },
+    { "code": "transport-reports", "name": "Nhập liệu Vận tải", "sortOrder": 2 },
+
+    { "code": "nhom-danh-muc", "name": "Danh mục", "sortOrder": 3 },
+
+    { "code": "nhom-danh-muc/vat-lieu", "name": "Vật liệu, hàng hoá", "parentCode": "nhom-danh-muc", "sortOrder": 1 },
+    { "code": "cargo-types", "name": "Chủng loại hàng", "parentCode": "nhom-danh-muc/vat-lieu", "sortOrder": 1 },
+    { "code": "cargo-groups", "name": "Nhóm chủng loại hàng", "parentCode": "nhom-danh-muc/vat-lieu", "sortOrder": 2 },
+    { "code": "acceptance-products", "name": "Sản phẩm nghiệm thu", "parentCode": "nhom-danh-muc/vat-lieu", "sortOrder": 3 },
+
+    { "code": "nhom-danh-muc/vi-tri", "name": "Vị trí", "parentCode": "nhom-danh-muc", "sortOrder": 2 },
+    { "code": "receiving-points", "name": "Nơi nhận tải", "parentCode": "nhom-danh-muc/vi-tri", "sortOrder": 1 },
+    { "code": "unloading-points", "name": "Nơi dỡ tải", "parentCode": "nhom-danh-muc/vi-tri", "sortOrder": 2 },
+    { "code": "pickup-points", "name": "Nơi chất tải", "parentCode": "nhom-danh-muc/vi-tri", "sortOrder": 3 },
+    { "code": "excavation-areas", "name": "Khu vực xúc", "parentCode": "nhom-danh-muc/vi-tri", "sortOrder": 4 },
+
+    { "code": "nhom-danh-muc/thiet-bi", "name": "Thiết bị", "parentCode": "nhom-danh-muc", "sortOrder": 3 },
+    { "code": "devices", "name": "Thông tin xe / máy", "parentCode": "nhom-danh-muc/thiet-bi", "sortOrder": 1 },
+    { "code": "vehicle-types", "name": "Chủng loại xe", "parentCode": "nhom-danh-muc/thiet-bi", "sortOrder": 2 },
+    { "code": "vehicle-rank-groups", "name": "Nhóm hạng xe", "parentCode": "nhom-danh-muc/thiet-bi", "sortOrder": 3 },
+    { "code": "vehicle-ranks", "name": "Hạng xe", "parentCode": "nhom-danh-muc/thiet-bi", "sortOrder": 4 },
+
+    { "code": "nhom-danh-muc/std", "name": "Số trắc địa (STD)", "parentCode": "nhom-danh-muc", "sortOrder": 4 },
+    { "code": "survey-standards", "name": "STD (Đất CN, Đất SX/Than SX)", "parentCode": "nhom-danh-muc/std", "sortOrder": 1 },
+
+    { "code": "nhom-danh-muc/khac", "name": "Danh mục khác", "parentCode": "nhom-danh-muc", "sortOrder": 5 },
+    { "code": "ttl-clh-items", "name": "TTL CLH", "parentCode": "nhom-danh-muc/khac", "sortOrder": 1 },
+    { "code": "seam-groups", "name": "Nhóm vỉa", "parentCode": "nhom-danh-muc/khac", "sortOrder": 2 },
+    { "code": "vehicle-fuel-classes", "name": "Chủng loại xe + DMNL", "parentCode": "nhom-danh-muc/khac", "sortOrder": 3 },
+    { "code": "coefficients", "name": "Hệ số", "parentCode": "nhom-danh-muc/khac", "sortOrder": 4 },
+    { "code": "report-periods", "name": "Kỳ báo cáo (gồm chốt / mở khoá kỳ)", "parentCode": "nhom-danh-muc/khac", "sortOrder": 5 },
+    { "code": "model-periods", "name": "Mô hình", "parentCode": "nhom-danh-muc/khac", "sortOrder": 6 },
+    { "code": "density-parameters", "name": "Tỷ trọng", "parentCode": "nhom-danh-muc/khac", "sortOrder": 7 },
+    { "code": "device-production-attributes", "name": "Thuộc tính sản lượng — Xe / Máy xúc", "parentCode": "nhom-danh-muc/khac", "sortOrder": 8 },
+    { "code": "shifts", "name": "Ca làm việc", "parentCode": "nhom-danh-muc/khac", "sortOrder": 9 },
+
+    { "code": "nhom-danh-muc/he-thong", "name": "Danh mục Hệ thống", "parentCode": "nhom-danh-muc", "sortOrder": 6 },
+    { "code": "departments", "name": "Phòng ban", "parentCode": "nhom-danh-muc/he-thong", "sortOrder": 1 },
+    { "code": "positions", "name": "Chức vụ", "parentCode": "nhom-danh-muc/he-thong", "sortOrder": 2 },
+    { "code": "users", "name": "Tài khoản", "parentCode": "nhom-danh-muc/he-thong", "sortOrder": 3 },
+
+    { "code": "nhom-danh-muc/khac-chua-co-menu", "name": "Khác (chưa có trên menu)", "parentCode": "nhom-danh-muc", "sortOrder": 7 },
+    { "code": "locations", "name": "Vị trí (dùng nội bộ cho nhập liệu)", "parentCode": "nhom-danh-muc/khac-chua-co-menu", "sortOrder": 1 },
+    { "code": "materials", "name": "Vật tư (dùng nội bộ cho nhập liệu)", "parentCode": "nhom-danh-muc/khac-chua-co-menu", "sortOrder": 2 },
+    { "code": "device-types", "name": "Loại thiết bị", "parentCode": "nhom-danh-muc/khac-chua-co-menu", "sortOrder": 3 },
+    { "code": "classifications", "name": "Phân loại", "parentCode": "nhom-danh-muc/khac-chua-co-menu", "sortOrder": 4 },
+    { "code": "vehicle-category-classes", "name": "Chủng loại xe + Phân loại", "parentCode": "nhom-danh-muc/khac-chua-co-menu", "sortOrder": 5 },
+
+    { "code": "matrix-catalogs", "name": "Định mức nhiên liệu (gồm Năng suất xe, HS điều chỉnh NLĐM)", "sortOrder": 4 },
+    { "code": "production", "name": "Áp Trắc Địa & Báo cáo thống kê (tính sản lượng)", "sortOrder": 5 },
+    { "code": "reconciliation", "name": "Đối chiếu & Báo chuyến (gồm duyệt)", "sortOrder": 6 }
+  ]
+}

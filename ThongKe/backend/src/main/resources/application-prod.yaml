@@ -1,0 +1,59 @@
+spring:
+  application:
+    name: thong-ke-cao-son
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+
+  datasource:
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        jdbc:
+          batch_size: 50
+        order_inserts: true
+        order_updates: true
+    show-sql: false
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: ${PORTAL_JWKS_URI}
+
+portal:
+  internal-url: http://portal-service:8080
+app:
+  code: tkcs
+  # Chế độ xác thực:
+  #   standalone = tự đăng nhập tại /api/auth/login (không cần Portal)
+  #   portal     = nhận token do Portal cấp qua /api/auth/exchange-code
+  # Đổi sang "portal" khi ghép lại vào Portal — không phải sửa code.
+  auth:
+    mode: ${AUTH_MODE:standalone}
+    # BẮT BUỘC >= 32 ký tự (HS256 cần khoá 256 bit). Đặt qua biến môi
+    # trường ở môi trường thật, KHÔNG commit giá trị thật vào repo.
+    jwt-secret: ${AUTH_JWT_SECRET:}
+    access-token-ttl-seconds: ${AUTH_ACCESS_TTL:28800}
+    refresh-token-ttl-seconds: ${AUTH_REFRESH_TTL:604800}
+
+server:
+  port: ${THONG_KE_PORT}
+
+springdoc:
+  swagger-ui:
+    enabled: true
+    path: /swagger-ui.html
+  api-docs:
+    enabled: true
+    version: OPENAPI_3_0
+    path: /v3/api-docs

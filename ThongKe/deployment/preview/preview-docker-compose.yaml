@@ -1,0 +1,140 @@
+# Thêm bởi AI Software Factory (2026-08-29) cho PREVIEW LOCAL trong factory
+# này — không phải 1 phần của pipeline release/staging thật của app (vẫn
+# dùng deployment/staging + Makefile như cũ).
+#   - build image từ source local (`build:`), không pull registry.
+#   - không publish host port cho reverse-proxy — join network `preview`
+#     dùng chung (external, tạo sẵn ở compose.yaml gốc factory), gateway
+#     (gateway/nginx.conf) proxy http://thongke-caoson.preview.localhost:8080/
+#     tới thẳng container bằng tên qua Docker DNS — cùng quy ước mọi preview
+#     khác trong factory đang dùng (xem HOP-DONG/QL-TAISAN...).
+#   - Postgres/Redis riêng, dữ liệu preview KHÔNG liên quan production thật.
+#   - Mongo sync ĐÃ GỠ KHỎI CODE (không phải chỉ tắt cấu hình) — xem
+#     docs/TECHNICAL_DEBT.md mục đã cập nhật. Dự án độc lập, sẽ tích hợp lại
+#     với DIEU-PHOI-MM sau này qua cơ chế riêng, không phải Change Streams
+#     thẳng vào Mongo như thiết kế cũ.
+#   - Portal JWKS/refresh: trỏ qua service `portal-gateway` — đây là ALIAS
+#     được gắn RUNTIME (docker network connect, không sửa compose PORTAL-PM)
+#     vào container reverse-proxy thật của PORTAL-PM đang chạy, xem
+#     README ngắn trong .factory/context.md mục "Chạy preview". Nếu
+#     PORTAL-PM preview chưa chạy, backend vẫn boot bình thường (JWKS chỉ
+#     fetch lazy lúc có request thật cần xác thực).
+#
+# Chạy: docker compose -f deployment/preview/preview-docker-compose.yaml up -d --build
+# Dừng: docker compose -f deployment/preview/preview-docker-compose.yaml down
+# URL:  http://thongke-caoson.preview.localhost:8080/
+
+name: thongke-caoson-preview
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-thongke_preview_local_only}
+      POSTGRES_DB: thong_ke
+      TZ: Asia/Ho_Chi_Minh
+    volumes:
+      - thongke_preview_postgres_data:/var/lib/postgresql/data
+      - ../../backend/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [backnet]
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks: [backnet]
+    restart: unless-stopped
+
+  backend-service:
+    build:
+      context: ../../backend
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/thong_ke?reWriteBatchedInserts=true
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-thongke_preview_local_only}
+      # Chế độ xác thực độc lập: tự đăng nhập tại /api/auth/login, không cần
+      # Portal. Đổi AUTH_MODE=portal khi ghép lại vào Portal.
+      AUTH_MODE: standalone
+      AUTH_JWT_SECRET: ${AUTH_JWT_SECRET:-thongke-caoson-preview-local-only-secret-32b+}
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      # Spring relaxed-binding: dấu "-" trong tên property bị BỎ HẲN (không
+      # thay bằng "_") khi map sang biến môi trường — "jwk-set-uri" ->
+      # "JWKSETURI", "internal-url" -> "INTERNALURL". Test nhầm quy tắc này
+      # 1 lần lúc build (đã sửa trước khi build thật) — ghi chú lại để không
+      # lặp lại sai lầm.
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWKSETURI: http://portal-gateway:8888/.well-known/jwks.json
+      PORTAL_INTERNALURL: http://portal-gateway:8888
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8088/actuator/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 40s
+    networks: [backnet, portal-link]
+    restart: unless-stopped
+
+  frontend-service:
+    build:
+      context: ../../frontend
+      args:
+        # RELATIVE (không phải origin tuyệt đối) — để CÙNG 1 bundle build
+        # ra dùng đúng dù truy cập qua subdomain gateway
+        # (thongke-caoson.preview.localhost:8080) HAY qua cổng host riêng
+        # (localhost:${PREVIEW_HOST_PORT:-8997}, xem ports: bên dưới) —
+        # trình duyệt tự resolve "/api" theo đúng origin đang mở. Trước đây
+        # hardcode origin tuyệt đối nên chỉ chạy đúng qua 1 cổng duy nhất.
+        VITE_API_KONG_URL: /api
+        VITE_PORTAL_URL: http://localhost:18090/
+    networks: [frontnet]
+    restart: unless-stopped
+
+  reverse-proxy:
+    build:
+      context: ../../reverse_proxy
+      args:
+        NGINX_CONF: nginx_preview.conf
+    ports:
+      # Truy cập trực tiếp localhost:<port>, không cần qua gateway subdomain
+      # (*.preview.localhost) — theo yêu cầu người dùng 2026-09-05. Cổng
+      # 8997 xác nhận rảnh lúc thêm (không trùng port nào khác đang publish
+      # trong toàn bộ factory, xem `docker ps` trước khi đổi số này).
+      - "${PREVIEW_HOST_PORT:-8997}:80"
+    depends_on:
+      - frontend-service
+      - backend-service
+    networks:
+      frontnet:
+      backnet:
+      preview:
+        aliases: ["thongke-caoson-frontend"]
+    restart: unless-stopped
+
+networks:
+  frontnet:
+  backnet:
+  # Bridge tạm để backend gọi được JWKS/refresh của PORTAL-PM đang chạy
+  # riêng (project khác trong factory) — attach runtime, không sửa compose
+  # của PORTAL-PM.
+  portal-link:
+  preview:
+    external: true
+    name: factory-preview
+
+volumes:
+  thongke_preview_postgres_data:

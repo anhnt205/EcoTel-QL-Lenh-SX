@@ -1,0 +1,48 @@
+package com.ecotel.thong_ke_cao_son.mapper;
+
+import com.ecotel.thong_ke_cao_son.dto.response.DeviceResponse;
+import com.ecotel.thong_ke_cao_son.model.Device;
+import com.ecotel.thong_ke_cao_son.model.DeviceFile;
+import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
+
+import java.util.List;
+import java.util.stream.Collectors;
+
+@Mapper(componentModel = "spring")
+public interface DeviceMapper {
+
+    @Mapping(target = "departmentId", source = "department.id")
+    @Mapping(target = "departmentName", source = "department.name")
+    @Mapping(target = "categoryId", source = "category.id")
+    @Mapping(target = "categoryName", source = "category.name")
+    @Mapping(target = "categoryGroup", source = "category.group")
+    @Mapping(target = "fuelClassId", source = "fuelClass.id")
+    @Mapping(target = "fuelClassName", source = "fuelClass.name")
+    @Mapping(target = "vehicleTypeId", source = "vehicleType.id")
+    @Mapping(target = "vehicleTypeName", source = "vehicleType.name")
+    // Danh mục Hạng xe không có trường `name` — hiển thị bằng chính mã hạng.
+    @Mapping(target = "vehicleRankId", source = "vehicleRank.id")
+    @Mapping(target = "vehicleRankName", source = "vehicleRank.code")
+    @Mapping(target = "categoryClassId", source = "categoryClass.id")
+    @Mapping(target = "categoryClassName", source = "categoryClass.name")
+    @Mapping(target = "materialId", source = "material.id")
+    @Mapping(target = "materialName", source = "material.name")
+    @Mapping(target = "createdById", source = "createdBy.id")
+    @Mapping(target = "createdByName", source = "createdBy.fullName")
+    @Mapping(target = "updatedById", source = "updatedBy.id")
+    @Mapping(target = "updatedByName", source = "updatedBy.fullName")
+    @Mapping(target = "longitude", source = "coordinates.longitude")
+    @Mapping(target = "latitude", source = "coordinates.latitude")
+    @Mapping(target = "files", expression = "java(mapFiles(device.getFiles()))")
+    DeviceResponse toResponse(Device device);
+
+    default List<String> mapFiles(List<DeviceFile> files) {
+        if (files == null) {
+            return null;
+        }
+        return files.stream()
+                .map(file -> file.getFileName() != null ? file.getFileName() : file.getKey())
+                .collect(Collectors.toList());
+    }
+}

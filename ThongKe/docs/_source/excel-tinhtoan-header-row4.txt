@@ -1,0 +1,211 @@
+# HANG TIEU DE sheet 'tinh toan' - DONG 4 (206 cot, ten tieng Viet do chinh nguoi dung dat)
+# Day la TEN COT CHINH THUC. Vung dong bang cua sheet la 5 dong dau (ySplit=5) => dong 1-5 la vung tieu de/mau,
+# du lieu that bat dau tu dong 6. Sheet co 55.161 dong, cot A..GY.
+# Nguon: Thang 5 doi ten xe.xlsx / xl/worksheets/sheet78.xml. KHONG SUA FILE NAY.
+
+A4 : THANG
+B4 : Ngày
+C4 : Ca
+D4 : Khu vực xúc
+E4 : Máy xúc
+F4 : Tầng nhận tải
+G4 : Nơi nhận tải (vỉa/kho)
+H4 : Tầng dỡ tải
+I4 : Tên gọi nơi dỡ tải
+J4 : Nhom hang
+K4 : Chủng loại hàng
+L4 : CĐ toàn tuyến (Km)
+M4 : Nâng tải toàn tuyến (m)
+N4 : CĐ dốc cục bộ
+O4 : Dốc cục bộ
+P4 : Chênh cao thanh toán nhiên liệu
+Q4 : Số xe
+R4 : Số chuyến 
+S4 : HSTĐ (m3)
+T4 : HSTĐ_Tan
+U4 : HSTĐ Dat+Than_Tkm
+V4 : Hệ số chất tải bùn (Trắc địa)
+W4 : báo cáo 
+X4 : Ngày mưa
+Y4 : Klg tan (Qua can)
+Z4 : Roda ; Khac
+AA4 : MoHinh (Tam tinh chua có QĐ)
+AB4 : Tỷ trọng (cập nhật)
+AC4 : TheTrong_TĐ
+AD4 : Phân loại (Dat/Than)
+AE4 : Lái xe bổ túc
+AF4 : HS ap cho than CTNB
+AG4 : SP N/thu; Cong Nghe
+AH4 : Trừ vơi (đất_m3; than_tấn)
+AI4 : Tỷ trọng (tấn/m3)
+AJ4 : Mô hình (m3/ch)
+AK4 : Nhóm tầng
+AL4 : Tổng m3
+AM4 : Tổng KLVC (tấn)
+AN4 : Tổng Tkm
+AO4 : Tổng Km vận chuyển 
+AP4 : Hb-CĐộ cận trên
+AQ4 : Ha-CĐộ cận dưới
+AR4 : h1-Dốc cận trước
+AS4 : h2-Dốc cận sau
+AT4 : Nb-h1
+AU4 : Nb-h2
+AV4 : Nb-NL tương ứng Hb
+AW4 : Na-h1
+AX4 : Na-h2
+AY4 : Na-NL tương ứng Ha
+AZ4 : Nt-NLĐM tiêu hao cần tìm
+BA4 : ĐMNL theo mùa
+BB4 : ĐMNL_ cty
+BC4 : DMNL_HangXe
+BD4 : NLĐM_CaiTaoBen
+BE4 : HS_Than(CN_NK)
+BF4 : ĐMNL_xe (Đ/C tháng)
+BG4 : NhienLieu_TieuHaoTheoĐM (lit)
+BH4 : BSNL_ Roda (xe) -x 1,5
+BI4 : BSNL_ngay_mua (5%)
+BJ4 : BSNL_bổ túc  (4%)
+BK4 : BSNL_SC,BD (Xe)
+BL4 : BSNL_ khac
+BM4 : BSNL_Spnt (xe)
+BN4 : BSNL_Bun (xe)
+BO4 : BSNL_Spnt__CN(xe)
+BP4 : ĐMNL_xe (QD 1828_25/02/2025)-SoTke
+BQ4 : NLDM HienHanh_SoTke
+BR4 : Định mức năng suất Xe tải (ch/ca)
+BS4 : ChenhCaoNLxM3
+BT4 : Mahoahang
+BU4 : mã hàng TTL
+BV4 : Vỉa KPMB
+BW4 : KyHieuBun
+BX4 : Thể trọng bùn
+BY4 : Tổng m3 (trừ bun)
+BZ4 : Tổng tan (trù bun)
+CA4 : Tổng Tkm (tru bun)
+CB4 : Tổng_Bùn (tấn)
+CC4 : TyTrongKoQA
+CD4 : Tổng KLVC TKE (tấn_koQA)
+CE4 : Tổng TKE (tkm_koQA)
+CF4 : Tỷ trọng _BanDau
+CG4 : Tổng KLVC TKE (m3)_BanDau
+CH4 : Tổng KLVC TKE (tấn)_QA
+CI4 : Tổng TKE (Tkm)_QA
+CJ4 : NLĐM (tke)_BanDau
+CK4 : Tổng KLVC TKE (tấn)_BanDau_chưa trừ đá
+CL4 : TenSP_NghiemThu
+CM4 : Lễ
+CN4 : Tên Nghiệm thu
+CO4 : BBNT-MaHoa
+CP4 : NhomTang+M.Xuc
+CQ4 : Nhóm vỉa
+CR4 : Nhóm vỉa+M.xuc
+CS4 : Nhom via+Nhóm tầng
+CT4 : NhomVia+NhomTang+Baithai
+CU4 : Via+BaiThai
+CV4 : Via+NhomTang
+CW4 : Via+Tang+BaiThai
+CX4 : CaiTaoToa
+CY4 : Số hiệu xe
+CZ4 : Xe + Hang van chuyen
+DA4 : Chủng loại xe
+DB4 : Hạng xe
+DC4 : Chung Loai xe + Hang xe
+DD4 : PXVT
+DE4 : LoaiXe_DMNL
+DF4 : Chung loai xe
+DG4 : Số hiệu máy
+DH4 : C/LOAI MAY
+DI4 : HẠNGMAY
+DJ4 : Chung loai may + Hang may
+DK4 : GauXuc
+DL4 : TachGiaiDoanGiaDau
+DM4 : TaiTrongxe
+DN4 : QLY THIET BI
+DO4 : Ca 1+2 ; 3
+DP4 : CLXe + Loai xe
+DQ4 : Chủng loại xe (NL)
+DR4 : CLXe + Loai xe (roda)
+DS4 : TĐ.Tổng m3
+DT4 : TĐ.Tổng KLVC (tấn)
+DU4 : TĐ.Tổng Tkm
+DV4 : TĐ.Tổng Km vận chuyển 
+DW4 : td.tanL1
+DX4 : td.tkmL1
+DY4 : HS TDia.Tan
+DZ4 : HS TDia.Tkm
+EA4 : Xe+Hang
+EB4 : TỔNG NLDM (QĐ 1298, ngày 27/2/2025)-SoNgthu
+EC4 : HSNL đ/c tháng (nam 2026)
+ED4 : TyLe_Tkm(tk/td)
+EE4 : NLĐM đã ĐCHS theo thang
+EF4 : HSDML
+EG4 : Tổng NLĐM hiện hành_Ngthu
+EH4 : (+/-)NL SauDC
+EI4 : Nhiên liệu ĐM( Áp 2%)
+EJ4 : C13
+EK4 : TĐ.Bùn (m3)
+EL4 : TĐ.Bùn (Tkm)
+EM4 : TĐ.Đất trộn P/Án bùn (m3)
+EN4 : TĐ.Đất trộn P/Án Bùn (Tkm)
+EO4 : Xe
+EP4 : KC
+EQ4 : CS
+ER4 : KC gốc
+ES4 : CS gốc
+ET4 : kc-tháng 2
+EU4 : cs-tháng 2
+EV4 : D3
+EW4 : D4
+EX4 : D5
+EY4 : D6
+EZ4 : D7
+FA4 : D8
+FB4 : D9
+FC4 : D10
+FD4 : D11
+FE4 : D12
+FF4 : D13
+FG4 : D14
+FH4 : M3 than qui đổi
+FI4 : m3 tính vượt
+FJ4 : M3 ĐÁ THẢI
+FK4 : TẤN ĐÁ THẢI
+FL4 : E1
+FM4 : E2
+FN4 : E3
+FO4 : E4
+FP4 : E5
+FQ4 : ChungLoaixe
+FR4 : Taitrongxe_tan
+FS4 : ChungLoaiMay
+FT4 : GauXuc
+FU4 : T4 2025
+FW4 : Xe
+FX4 : KC
+FY4 : CS
+FZ4 : KC
+GA4 : CS
+GB4 : KC
+GC4 : CS
+GD4 : KC
+GE4 : CS
+GF4 : KC
+GG4 : CS
+GH4 : KC
+GI4 : CS
+GJ4 : KC
+GK4 : CS
+GL4 : KC
+GM4 : CS
+GN4 : KC
+GO4 : CS
+GP4 : KC
+GQ4 : CS
+GR4 : KC
+GS4 : CS
+GT4 : KC
+GU4 : CS
+GV4 : KC
+GW4 : CS
+GX4 : KC
+GY4 : CS
