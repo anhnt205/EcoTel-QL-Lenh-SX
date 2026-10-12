@@ -92,6 +92,13 @@ services:
       # Để TRỐNG cho tới khi đã chạy thử đồng bộ (POST /api/catalog-sync/tk, mặc định dry-run) và kiểm kết quả;
       # đặt `thongke` thì danh mục Điều phối chuyển sang chỉ-đọc, do Thống kê quản lý.
       CATALOG_MASTER: ${CATALOG_MASTER:-}
+      # Đăng nhập một lần từ Portal (xem Backend/services/portalSso.js). Để trống = tắt, đăng nhập thường không đổi.
+      # Redis + JWKS là của PORTAL; PORTAL_APP_CODE = mã phần mềm đăng ký trên Portal (URL đăng ký phải là <điều phối>/login).
+      PORTAL_REDIS_HOST: ${PORTAL_REDIS_HOST:-}
+      PORTAL_REDIS_PORT: ${PORTAL_REDIS_PORT:-6379}
+      PORTAL_REDIS_PASSWORD: ${PORTAL_REDIS_PASSWORD:-}
+      PORTAL_JWKS_URI: ${PORTAL_JWKS_URI:-}
+      PORTAL_APP_CODE: ${PORTAL_APP_CODE:-dpmm}
     depends_on:
       ktv_db:
         condition: service_healthy

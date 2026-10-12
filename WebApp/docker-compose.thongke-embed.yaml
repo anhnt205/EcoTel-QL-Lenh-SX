@@ -42,6 +42,13 @@ services:
       JWT_EXPIRES_IN: 7d
       # Thống kê là gốc danh mục -> khoá ghi danh mục ở Điều phối.
       CATALOG_MASTER: thongke
+      # Đăng nhập một lần từ Portal (xem Backend/services/portalSso.js). Để trống = tắt, đăng nhập thường không đổi.
+      # Redis + JWKS là của PORTAL; PORTAL_APP_CODE = mã phần mềm đăng ký trên Portal (URL đăng ký phải là <điều phối>/login).
+      PORTAL_REDIS_HOST: ${PORTAL_REDIS_HOST:-}
+      PORTAL_REDIS_PORT: ${PORTAL_REDIS_PORT:-6379}
+      PORTAL_REDIS_PASSWORD: ${PORTAL_REDIS_PASSWORD:-}
+      PORTAL_JWKS_URI: ${PORTAL_JWKS_URI:-}
+      PORTAL_APP_CODE: ${PORTAL_APP_CODE:-dpmm}
       # Đăng nhập một lần: Điều phối cấp token cho khung Thống kê, ký bằng CÙNG khoá với
       # AUTH_JWT_SECRET của Thống kê (xem Backend/services/tkToken.js).
       TK_AUTH_JWT_SECRET: ${TK_AUTH_JWT_SECRET:?đặt TK_AUTH_JWT_SECRET}

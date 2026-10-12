@@ -84,3 +84,12 @@ Sau khi chuyển, `deploy/projects/THONGKE-CAOSON.yaml` thành dư (Thống kê 
 - Backend Thống kê chạy profile Spring `dev` (`ddl-auto update`) giống bản preview đã dùng; đổi sang profile khác cần kiểm schema trước.
 - Frontend Thống kê build bằng `pnpm` (Dockerfile của nó); `npm ci` ở thư mục đó báo lock lệch.
 - Server chung dùng khoá Docker (`docker_build_lock`) khi build; stack này dựng 5 image (2 Node, 1 Java, 1 Vite, 1 nginx) — chạy build ngoài giờ cao điểm.
+
+## Đăng nhập một lần từ Portal (PORTAL-PM)
+
+Điều phối là phần mềm con của Portal: bấm thẻ phần mềm trên Portal thì vào thẳng, không gõ lại mật khẩu.
+
+- Luồng: Portal sinh app-token (JWT RS256) + mã dùng một lần, lưu `otc:<code>` trong **Redis của Portal** (TTL 30 giây) rồi mở `<URL đăng ký>?code=<code>`. Trang `/login` của Điều phối gọi `POST /api/auth/portal/exchange-code`; backend `GETDEL` mã, xác thực token bằng JWKS của Portal (`iss`, `type=app`, `app=<PORTAL_APP_CODE>`) và cấp phiên Điều phối cho tài khoản **cùng `username`** (không tự tạo tài khoản; chưa có thì báo 403). Quyền trong Điều phối vẫn theo mô hình của Điều phối, không dùng `permissions` trong token Portal. Mã: `Backend/services/portalSso.js`.
+- Bật bằng biến (trống = tắt, đăng nhập thường không ảnh hưởng): `PORTAL_REDIS_HOST`, `PORTAL_REDIS_PORT`, `PORTAL_REDIS_PASSWORD`, `PORTAL_JWKS_URI`, `PORTAL_APP_CODE` (mặc định `dpmm`) — xem `unified.env.example`. Backend Điều phối phải **thấy được Redis và JWKS của Portal** (cùng mạng Docker hoặc địa chỉ nội bộ).
+- Trên Portal: đăng ký phần mềm với mã = `PORTAL_APP_CODE` và **URL = `<địa chỉ Điều phối>/login`** (đăng ký trang gốc thì mất `?code=` khi chuyển hướng).
+- Điều kiện: Điều phối được mở trong khung (iframe) của Portal nên proxy không được gửi `X-Frame-Options`/CSP chặn; bản `nginx_release_thongke.conf` chỉ cho `frame-ancestors` các origin Portal liệt kê sẵn — thêm origin Portal thật vào đó.

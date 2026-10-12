@@ -7,6 +7,8 @@ const { sendPasswordResetEmail } = require('../utils/email');
 const User = require('../models/User');
 const { verifyToken, restrictTo } = require('../middleware/auth.middleware');
 const { permissionsForClient } = require("../services/permissions");
+const portalSso = require("../services/portalSso");
+const { escapeRegex } = require("../utils/escapeRegex");
 
 /**
  * @swagger
@@ -218,6 +220,58 @@ router.post('/login', async (req, res) => {
         req.logger.error("❌ Đăng nhập thất bại", error);
         res.status(500).send({ status: 'error', message: error.message, stack: error.stack })
 
+    }
+});
+
+/**
+ * Đăng nhập một lần từ Portal: đổi mã dùng một lần (`?code=` Portal gắn vào URL khi mở phần mềm) lấy phiên Điều phối.
+ * Public (chưa có phiên). Chi tiết luồng và biến môi trường: services/portalSso.js.
+ * Chỉ đăng nhập được tài khoản Điều phối ĐÃ CÓ cùng `username` với tài khoản Portal — không tự tạo tài khoản.
+ */
+router.post('/portal/exchange-code', async (req, res) => {
+    try {
+        if (!portalSso.isEnabled()) {
+            return res.status(503).send({ status: 'error', message: 'Đăng nhập qua Portal chưa được bật trên hệ thống này' });
+        }
+        const claims = await portalSso.exchangeCode(req.body && req.body.code);
+        const user = await User.findOne({
+            username: { $regex: `^${escapeRegex(String(claims.username))}$`, $options: 'i' },
+        }).populate('position').populate('department');
+        if (!user) {
+            req.logger.error(`❌ SSO Portal: tài khoản Portal "${claims.username}" chưa có tài khoản Điều phối cùng tên đăng nhập`);
+            return res.status(403).send({
+                status: 'error',
+                message: `Tài khoản Portal "${claims.username}" chưa có tài khoản tương ứng trong Điều phối. Vui lòng liên hệ quản trị viên.`,
+            });
+        }
+        if (user.active === false) {
+            return res.status(403).send({ status: 'error', message: 'Tài khoản không hoạt động, vui lòng liên hệ quản trị viên.' });
+        }
+        const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
+        req.logger.info(`🔥 SSO Portal thành công user ${user.username}`);
+        res.json({
+            success: true,
+            data: {
+                token,
+                user: {
+                    _id: user._id,
+                    username: user.username,
+                    email: user.email,
+                    fullName: user.fullName,
+                    salaryCode: user.salaryCode,
+                    phone: user.phone,
+                    department: user.department,
+                    role: user.role,
+                },
+            },
+        });
+    } catch (error) {
+        if (error instanceof portalSso.PortalSsoError) {
+            req.logger.error(`❌ SSO Portal thất bại: ${error.message}`);
+            return res.status(error.status).send({ status: 'error', message: error.message });
+        }
+        req.logger.error('❌ SSO Portal lỗi', error);
+        res.status(500).send({ status: 'error', message: error.message });
     }
 });
 

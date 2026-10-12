@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
     Box,
@@ -56,6 +56,34 @@ const Login = () => {
             showErrorAlert(error.response.data.message || error.message || 'Đăng nhập thất bại')
         }
     });
+
+    // Đăng nhập một lần từ Portal: Portal mở phần mềm với `?code=<mã dùng 1 lần>`. Đổi mã lấy phiên Điều phối (backend: POST
+    // /auth/portal/exchange-code). Mã chỉ dùng được 1 lần nên phải chặn gọi lặp (React StrictMode chạy effect 2 lần ở dev).
+    const portalCodeHandled = useRef(false);
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const code = params.get('code');
+        if (!code || portalCodeHandled.current) return;
+        portalCodeHandled.current = true;
+        params.delete('code');
+        const rest = params.toString();
+        window.history.replaceState({}, '', window.location.pathname + (rest ? `?${rest}` : ''));
+        api.post('/auth/portal/exchange-code', { code })
+            .then(res => {
+                const data = res.data;
+                if (data.data.user?.role.toLowerCase() === RoleEnum.EMPLOYEE) {
+                    showErrorAlert('Bạn không có quyền truy cập hệ thống.');
+                    return;
+                }
+                localStorage.setItem('token', data.data.token);
+                setUser(data.data.user);
+                navigate('/');
+            })
+            .catch((error: any) => {
+                showErrorAlert(error?.response?.data?.message || error?.message || 'Đăng nhập qua Portal thất bại');
+            });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const loginFormik = useFormik({
         initialValues: {

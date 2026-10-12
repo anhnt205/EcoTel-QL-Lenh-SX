@@ -326,3 +326,10 @@ Chuẩn = trang "Chủng loại hàng" (Thống kê). Cách làm: **một lớp 
 - **Bẫy đã gặp:** (1) Docker máy này hết dải mạng mặc định → thử cục bộ phải ghi đè subnet; (2) thư mục bind `.ktv-mongodb-data` giữ mật khẩu Mongo của lần khởi tạo đầu — đổi `MONGO_PASSWORD` sau đó thì "Authentication failed"; (3) server chạy bằng `deployment/release` của CI dùng `.mongodb-data` (khác `.ktv-mongodb-data`).
 - **Chưa làm:** chưa deploy; chưa đồng bộ danh mục thật (cần tài khoản Thống kê chỉ-đọc + dữ liệu Thống kê); CI/CD (`main`/`develop`) chưa build/push image Thống kê; spec deployer ở repo factory chưa đổi (mẫu nằm trong `docs/UNIFIED_DEPLOY.md`).
 - **Bẫy menu Thống kê (2026-10-12):** menu/khung Thống kê chỉ hiện khi frontend Điều phối build với `VITE_TK_EMBED=true` (hoặc `REACT_APP_TK_EMBED`, đọc ở `Frontend/src/config/features.ts`). Script dựng preview Vite và compose gộp ban đầu thiếu biến này → giao diện không có menu Thống kê dù tất cả endpoint vẫn 200. Đã thêm `ARG VITE_TK_EMBED` vào `Frontend/Dockerfile`, `VITE_TK_EMBED: ${VITE_TK_EMBED:-true}` vào `docker-compose.unified.yaml`. Khi kiểm bản gộp phải nhìn menu trên giao diện, không chỉ gọi API. Sau khi đổi frontend, tải lại cứng trang (JS cũ có thể còn trong tab).
+
+## SSO Portal cho Điều phối (2026-10-12, nhánh `claude-dev` → `dev-update`)
+
+- Thêm `POST /api/auth/portal/exchange-code` (`Backend/services/portalSso.js`, route trong `auth.routes.js`), xử lý `?code=` ở `Frontend/src/pages/auth/Login.tsx`. Deps mới: `ioredis`, `jwks-rsa`. 13 test mới (`tests/portalSso.test.js`; tổng 166 test backend qua). Cùng cơ chế OTC/JWKS với QL-TAISAN.
+- Bẫy: (1) app trên Portal phải đăng ký URL `/login`; (2) backend Điều phối phải dùng/thấy REDIS CỦA PORTAL cho `otc:*` và thấy JWKS (`portal-gateway`); (3) `username` Portal phải trùng `username` Điều phối (admin↔admin ok), không tự tạo tài khoản.
+- Verify LIVE trên preview: Portal :18095 → thẻ "Phần mềm điều phối" → vào thẳng, log "SSO Portal thành công user admin"; mã dùng lại bị từ chối.
+- Chưa làm: ánh xạ `permissions` theo module Portal → quyền Điều phối; manifest module (`/.well-known/portal-manifest.json`) cho Điều phối gộp (cần thêm module Thống kê).
