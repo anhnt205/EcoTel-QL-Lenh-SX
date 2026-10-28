@@ -61,6 +61,36 @@ Xác nhận thật khi build baseline (2026-08-24): `npm ci` báo **65 vulnerabi
 
 **Bug mới phát hiện khi thao tác apply_code (không phải bug code, mà bug hạ tầng factory)**: gọi thẳng `POST /api/agent/requests` với `request_text` nhiều dòng (nhúng code mẫu) — dù không dùng cú pháp đính kèm cũ — vẫn bị `decompose_request` tách thành 13 task rác theo từng dòng (tái hiện đúng sự cố #16 đã ghi ở `docs/INCIDENTS.md` gốc factory, nhưng qua đường gọi API trực tiếp thay vì Chat UI). Khắc phục: luôn dùng field `attachments` cho nội dung nhiều dòng, giữ `request_text` là 1 dòng duy nhất.
 
+## 12. Đã thêm (2026-08-25): placeholder `portal-manifest.json` cho tích hợp PORTAL-PM
+
+Retrofit theo yêu cầu riêng (không phải phát hiện lỗi) — PORTAL-PM (portal
+SSO chung trong cùng factory) đăng ký module con qua cơ chế "pull manifest
+tĩnh", xem `PORTAL-PM/docs/APP_MANIFEST_CONTRACT.md`. Đã xác minh trước khi
+thêm: WebApp/Frontend là Create React App (`react-scripts`, KHÔNG phải
+Vite) — `npm run build` copy nguyên `public/` vào `build/`, rồi
+`WebApp/Frontend/Dockerfile` copy `build/` vào image nginx
+(`/usr/share/nginx/html`). Đã đọc cả `WebApp/Frontend/.nginx/nginx.conf`
+(`location / { try_files $uri /index.html =404; }`) và
+`WebApp/reverse_proxy/nginx_release.conf`/`nginx_staging.conf`
+(`location /` proxy nguyên trạng mọi path không phải `/api/`
+hay `/socket.io/` sang frontend) — không có location block nào chặn
+`/.well-known/*`, nên file đặt trong `public/.well-known/` sẽ lên đúng
+`GET {origin}/.well-known/portal-manifest.json`, public, không qua backend.
+
+Đã thêm 2 file, KHÔNG đổi gì khác:
+- `WebApp/Frontend/public/.well-known/portal-manifest.json` — nội dung
+  `{"modules": []}` (placeholder rỗng hợp lệ, Portal chấp nhận app 0
+  module ở Layer 1).
+- `WebApp/Frontend/public/.well-known/README.md` — hướng dẫn điền module
+  thật sau này, dịch/rút gọn từ tài liệu PORTAL-PM.
+
+MobileApp (Flutter) KHÔNG được xét làm target cho cơ chế này — app native
+Android/iOS không có origin HTTP để Portal iframe/gọi tới, và bản thân dự
+án đã ghi rõ MobileApp nằm ngoài phạm vi factory quản lý (xem mục "Chưa
+làm" bên dưới, dòng MobileApp). Chưa deploy/build lại — file mới chỉ nằm
+trên source, cần 1 lần build+deploy Frontend thật để endpoint sống trên
+domain thật.
+
 ## Chưa làm / chưa xác minh (báo cáo trước khi phát triển tiếp)
 
 - Chưa đọc chi tiết `utils/cron.js` (nội dung job định kỳ cụ thể).

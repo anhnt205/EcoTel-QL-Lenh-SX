@@ -1,0 +1,15 @@
+# Override CỤC BỘ (không commit) cho bản thử "Điều phối + Thống kê" dùng chung dữ liệu demo của preview Điều phối.
+# Dùng kèm docker-compose.thongke-embed.yaml:
+#   docker compose -p dpmm-preview -f docker-compose.thongke-embed.yaml -f docker-compose.thongke-preview.local.yaml --env-file .env.thongke-embed up -d
+services:
+  mongo:
+    # Dùng LẠI dữ liệu Mongo demo (thư mục bind) thay vì volume trống; chỉ được chạy MỘT mongod trên thư mục này
+    # (dừng preview Điều phối cũ dieuphoimm_mongo_db trước).
+    volumes: !override
+      - ./.ktv-mongodb-data:/data/db
+    # mongod bị SIGSEGV ở thread ftdc trên Docker Desktop (2026-10-27): tắt thu thập chẩn đoán
+    command: ["mongod", "--setParameter", "diagnosticDataCollectionEnabled=false"]
+  ktv_Backend_service:
+    environment:
+      # Danh mục Thống kê chưa được đồng bộ -> KHÔNG khoá ghi danh mục ở Điều phối (xem docs/UNIFIED_DEPLOY.md)
+      CATALOG_MASTER: ""

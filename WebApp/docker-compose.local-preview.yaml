@@ -1,0 +1,48 @@
+# Override CUC BO (khong commit) chi de doi host port - tranh dung do voi
+# TK-HATU dang chay song song tren cung may (ca 2 du an dung chung ten port
+# mac dinh 6868/27017 vi cung goc codebase). Khong dung "docker compose up"
+# tran - luon kem file nay: xem project.yaml commands.start.
+services:
+  # Ten image goc (ktv_ecotel_backend_img, ...) hardcode TRUNG HET voi TK-HATU
+  # (cung goc codebase) - build o day se ghi de tag :latest cua TK-HATU, lan sau
+  # TK-HATU recreate se am tham chay code cua DIEU-PHOI-MM. Doi tag rieng.
+  ktv_Backend_service:
+    image: dieuphoimm_backend_img
+  # Frontend KHONG build bang Dockerfile o day: "npm run build" (webpack) la buoc
+  # lam Docker Desktop sap 2 lan (2026-10-01, may dung chung chi 7.6GiB RAM). Build
+  # tach rieng trong 1 container bi gioi han RAM/CPU (xem .factory/context.md, muc
+  # "Build frontend preview"), ket qua nam trong volume dieuphoimm_fe_dist, nginx
+  # chi phuc vu thu muc do voi dung .nginx/nginx.conf cua repo.
+  ktv_Frontend_service:
+    image: nginx:alpine
+    build: !reset null
+    volumes: !override
+      - dieuphoimm_fe_dist:/usr/share/nginx/html:ro
+      - ./Frontend/.nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    # Docker het dai mang mac dinh ("address pools fully subnetted" - qua nhieu
+    # project tao network rieng) nen KHONG tao them webapp_frontnet duoc: dung
+    # chung webapp_backnet da co san.
+    networks: !override
+      - backnet
+  ktv_reverse_proxy_service:
+    image: dieuphoimm_reverse_proxy_img
+    # "!override" bat buoc de THAY THE han list ports goc, khong chi noi them
+    # (Compose mac dinh NOI list "ports" giua cac file thay vi ghi de).
+    ports: !override
+      - "6869:8888"
+    networks: !override
+      - backnet
+  ktv_db:
+    # container_name goc "ktv_mongo_db" bi hardcode trong docker-compose.yaml,
+    # bo qua project prefix cua compose - trung ten voi container Mongo cua
+    # TK-HATU (cung goc codebase, cung hardcode ten nay). Doi rieng.
+    container_name: dieuphoimm_mongo_db
+    ports: !override
+      - "27018:27017"
+    # mongod bi SIGSEGV (exit 139) sau ~5 phut o thread "ftdc" (FTDCController::doLoop fassert) tren Docker Desktop
+    # (2026-10-27); du lieu khong hong. Tat thu thap chan doan ftdc de preview khong sap (chi mat so lieu chan doan noi bo).
+    command: ["mongod", "--setParameter", "diagnosticDataCollectionEnabled=false"]
+
+volumes:
+  dieuphoimm_fe_dist:
+    external: true

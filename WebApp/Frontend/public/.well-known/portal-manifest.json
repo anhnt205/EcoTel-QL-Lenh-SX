@@ -1,0 +1,26 @@
+{
+  "modules": [
+    { "code": "dashboard", "name": "Tổng quan", "sortOrder": 1 },
+    { "code": "orders", "name": "Lệnh sản xuất", "sortOrder": 2 },
+    { "code": "order-by-users", "name": "Công việc của tôi", "sortOrder": 3 },
+    { "code": "danh-muc", "name": "Danh mục", "sortOrder": 4 },
+    { "code": "danh-muc/safety-measures", "name": "Biện pháp an toàn", "parentCode": "danh-muc", "sortOrder": 1 },
+    { "code": "danh-muc/thiet-bi", "name": "Thiết bị", "parentCode": "danh-muc", "sortOrder": 2 },
+    { "code": "danh-muc/thiet-bi/device-types", "name": "Phân loại thiết bị", "parentCode": "danh-muc/thiet-bi", "sortOrder": 1 },
+    { "code": "danh-muc/thiet-bi/device-models", "name": "Chủng loại thiết bị", "parentCode": "danh-muc/thiet-bi", "sortOrder": 2 },
+    { "code": "danh-muc/thiet-bi/vehicles", "name": "Thông tin xe", "parentCode": "danh-muc/thiet-bi", "sortOrder": 3 },
+    { "code": "danh-muc/thiet-bi/machines", "name": "Thông tin máy", "parentCode": "danh-muc/thiet-bi", "sortOrder": 4 },
+    { "code": "danh-muc/travel-log", "name": "Cung độ", "parentCode": "danh-muc", "sortOrder": 3 },
+    { "code": "danh-muc/models", "name": "Mô hình xe", "parentCode": "danh-muc", "sortOrder": 4 },
+    { "code": "danh-muc/materials", "name": "Vật liệu", "parentCode": "danh-muc", "sortOrder": 5 },
+    { "code": "danh-muc/locations", "name": "Điểm đổ tải", "parentCode": "danh-muc", "sortOrder": 6 },
+    { "code": "danh-muc/users", "name": "Cán bộ nhân viên", "parentCode": "danh-muc", "sortOrder": 7 },
+    { "code": "danh-muc/jobs", "name": "Công việc", "parentCode": "danh-muc", "sortOrder": 8 },
+    { "code": "danh-muc/positions", "name": "Chức danh nghề nghiệp", "parentCode": "danh-muc", "sortOrder": 9 },
+    { "code": "danh-muc/departments", "name": "Đơn vị", "parentCode": "danh-muc", "sortOrder": 10 },
+    { "code": "danh-muc/shifts", "name": "Ca làm việc", "parentCode": "danh-muc", "sortOrder": 11 },
+    { "code": "reports", "name": "Báo cáo", "sortOrder": 5 },
+    { "code": "system", "name": "Hệ thống", "sortOrder": 6 },
+    { "code": "notifications", "name": "Thông báo", "sortOrder": 7 }
+  ]
+}
