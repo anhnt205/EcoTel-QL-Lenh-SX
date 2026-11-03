@@ -971,6 +971,6 @@ Báo cáo, kỳ chưa tính → 0); các test cổng duyệt cũ không đổi.
 3. **Hiệu năng:** `calculatePeriod` chuyển `FlushMode.COMMIT` khi tính — trước đó mỗi truy vấn tra cứu
    kích hoạt dirty-check toàn bộ thực thể đã nạp (chậm bậc hai: ~10 nghìn chuyến > 15 phút, nginx cắt
    504 sau 300 s).
-4. **Còn lệch so với Excel (CHƯA sửa, chỉ ảnh hưởng nhiên liệu):** nội suy DMNL dùng
+4. **Cột P "Chênh cao thanh toán nhiên liệu" (đã sửa 2026-11-04):** nội suy DMNL trước đây dùng `totalRouteLiftM`; nay dùng `FuelCalculator.fuelPaymentLift` (công thức Excel, tái tạo đúng 24.368/24.368 dòng). CÒN lệch nhỏ: 3 dòng `Dthai.` ở ô Roda (Excel chỉ cộng phụ cấp Roda khi ô là chữ "Roda"; engine cộng) — chủ dự án quyết.
    `totalRouteLiftM`, Excel dùng cột P "Chênh cao thanh toán nhiên liệu" (gồm dốc cục bộ): 554/24.368 dòng
    nâng tải nằm ngoài [h1,h2] của Excel, 89 dòng lệch ĐMNL tới 4,1%.
