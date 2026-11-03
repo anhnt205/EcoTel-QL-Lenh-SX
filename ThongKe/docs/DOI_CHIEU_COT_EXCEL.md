@@ -10,6 +10,8 @@ Màn Báo cáo thống kê hiện hiển thị **40 cột / 8 nhóm**. File này
 
 ---
 
+> **Cập nhật 2026-11-04:** màn hình KHÔNG còn chia nhóm — 40 cột xếp đúng thứ tự cột của sheet `tinh toan` (B, C, D, E, G, I, J, K, L, Q, R, S, AC, AG … DZ), tiêu đề có chữ cái cột Excel. Các "Nhóm" dưới đây chỉ còn là cách giải thích nguồn gốc cột.
+
 ## 1. Bốn mươi cột đang hiển thị
 
 Thứ tự đúng như trên màn hình. Cột "Excel" là chữ cái cột trong sheet

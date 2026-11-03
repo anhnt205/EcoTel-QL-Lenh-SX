@@ -1,7 +1,8 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowUpDown,
+  Bell,
   Calculator,
   Columns3,
   Download,
@@ -18,6 +19,13 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Breadcrumb,
   BreadcrumbItem,
   BreadcrumbLink,
@@ -30,10 +38,9 @@ import { downloadProductionReport } from "./productionExcel";
 import {
   ALL_REPORT_COLUMNS,
   FROZEN_COLUMN_COUNT,
-  REPORT_COLUMN_GROUPS,
+  MAIN_COLUMN_KEYS,
   classifyEarthCoal,
   formatCell,
-  type ReportColumn,
 } from "./productionReportColumns";
 import { productionService, type ProductionReportRow } from "./productionService";
 
@@ -79,7 +86,10 @@ export function ProductionReportPage() {
   // bỏ chọn = nghiêm ngặt QĐ-16 (còn chuyến chưa duyệt thì từ chối cả kỳ).
   const [onlyApproved, setOnlyApproved] = useState(true);
   const [calculating, setCalculating] = useState(false);
-  const [warnings, setWarnings] = useState<string[]>([]);
+  // Thông báo của lần tính gần nhất (lỗi thiếu khai báo hoặc cảnh báo) — KHÔNG hiện khối đỏ chiếm
+  // màn hình; bấm nút chuông "Thông báo" để xem chi tiết (chủ dự án chốt 2026-11-04).
+  const [notice, setNotice] = useState<CalculationNotice | null>(null);
+  const [noticeOpen, setNoticeOpen] = useState(false);
   const [lockBusy, setLockBusy] = useState(false);
 
   // ── Lọc & tìm kiếm (chạy trên toàn bộ dòng của kỳ, không phải một trang) ──
@@ -139,6 +149,18 @@ export function ProductionReportPage() {
     queryFn: () => productionService.summary(effectivePeriodId!),
     enabled: !!effectivePeriodId,
   });
+
+  // Kỳ đã có kết quả thì lấy chế độ TKE/Trắc địa của lần tính đó làm mặc định cho ô "Chế độ TKE"
+  // (mỗi kỳ chỉ đồng bộ một lần để không đè lựa chọn của người dùng) — tránh bấm "Tính lại kỳ" ở
+  // chế độ Trắc địa khi kỳ đang tính theo TKE rồi báo thiếu số trắc địa.
+  const tkeSyncedFor = useRef<number | null>(null);
+  useEffect(() => {
+    if (summary && summary.rowCount > 0 && summary.tkeMode != null
+        && tkeSyncedFor.current !== summary.periodId) {
+      tkeSyncedFor.current = summary.periodId;
+      setTkeMode(summary.tkeMode);
+    }
+  }, [summary]);
 
   // Nạp TOÀN BỘ dòng của kỳ một lần (giống hệt nguồn dữ liệu xuất Excel) —
   // kỳ chỉ 3–8 ngày, số dòng đủ nhỏ để lọc/sắp xếp/phân trang ngay trên
@@ -214,21 +236,30 @@ export function ProductionReportPage() {
   const apiErrorMessage = (e: unknown, fallback: string) =>
     (e as { response?: { data?: { message?: string } } }).response?.data?.message ?? fallback;
 
+  const showNotice = () => setNoticeOpen(true);
+
   const handleCalculate = async () => {
     if (!effectivePeriodId) return;
     setCalculating(true);
-    setWarnings([]);
+    setNotice(null);
     try {
       const res = await productionService.calculate(effectivePeriodId, tkeMode, onlyApproved);
-      setWarnings(res.warnings ?? []);
+      const warnings = res.warnings ?? [];
+      if (warnings.length > 0) {
+        setNotice({ kind: "warning", title: `${warnings.length} cảnh báo khi tính`, lines: warnings, hint: null });
+      }
       refresh();
       const skipped = res.excludedTripCount ?? 0;
       toast.success(
         `Đã tính ${res.tripCount} chuyến, sinh ${res.coefficientRowCount} dòng hệ số.` +
           (skipped > 0 ? ` Bỏ qua ${skipped} chuyến chưa duyệt đối chiếu.` : ""),
+        warnings.length > 0 ? { action: { label: "Xem thông báo", onClick: showNotice } } : undefined,
       );
     } catch (e: unknown) {
-      toast.error(apiErrorMessage(e, "Tính sản lượng thất bại."));
+      // Không dùng toast.error (khối đỏ): lưu vào "Thông báo", chỉ hiện một dòng nhắc nhẹ.
+      const parsed = parseCalculationError(apiErrorMessage(e, "Tính sản lượng thất bại."), tkeMode);
+      setNotice(parsed);
+      toast("Chưa tính được kỳ này.", { action: { label: "Xem thông báo", onClick: showNotice } });
     } finally {
       setCalculating(false);
     }
@@ -305,16 +336,10 @@ export function ProductionReportPage() {
       else next.delete(key);
       return next;
     });
-  const toggleGroupColumns = (cols: ReportColumn[], on: boolean) =>
-    setVisibleKeys((prev) => {
-      const next = new Set(prev);
-      cols.forEach((c) => (on ? next.add(c.key as string) : next.delete(c.key as string)));
-      return next;
-    });
   const setPreset = (kind: "all" | "none" | "main") => {
     if (kind === "all") setVisibleKeys(new Set(ALL_REPORT_COLUMNS.map((c) => c.key as string)));
     else if (kind === "none") setVisibleKeys(new Set());
-    else setVisibleKeys(new Set(REPORT_COLUMN_GROUPS[0].columns.map((c) => c.key as string)));
+    else setVisibleKeys(new Set(MAIN_COLUMN_KEYS.map((k) => k as string)));
   };
 
   return (
@@ -457,6 +482,22 @@ export function ProductionReportPage() {
         <Button variant="outline" size="sm" className="h-9 w-9 p-0" title="Làm mới" onClick={refresh}>
           <RotateCcw className="h-4 w-4" />
         </Button>
+
+        {notice && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-9 gap-1.5 border-amber-400 text-amber-700 hover:bg-amber-50 dark:text-amber-400"
+            title="Xem thông báo của lần tính gần nhất"
+            onClick={showNotice}
+          >
+            <Bell className="h-4 w-4" />
+            Thông báo
+            <span className="rounded-full bg-amber-500 px-1.5 text-[10px] font-bold leading-4 text-white">
+              {notice.lines.length}
+            </span>
+          </Button>
+        )}
       </div>
 
       {effectivePeriod?.locked && (
@@ -481,19 +522,25 @@ export function ProductionReportPage() {
         </div>
       )}
 
-      {warnings.length > 0 && (
-        <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-200">
-          <p className="mb-1 flex items-center gap-1.5 font-semibold">
-            <TriangleAlert className="h-4 w-4" />
-            {warnings.length} cảnh báo khi tính
-          </p>
-          <ul className="list-disc space-y-0.5 pl-5">
-            {warnings.map((w) => (
-              <li key={w}>{w}</li>
+      {/* Chi tiết thông báo của lần tính gần nhất — mở từ nút chuông, không chiếm chỗ trên trang. */}
+      <Dialog open={noticeOpen} onOpenChange={setNoticeOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Bell className="h-4 w-4 text-amber-600" />
+              {notice?.title ?? "Thông báo"}
+            </DialogTitle>
+            <DialogDescription>
+              {notice?.hint ?? "Chi tiết của lần bấm “Tính lại kỳ” gần nhất."}
+            </DialogDescription>
+          </DialogHeader>
+          <ul className="max-h-[55vh] list-disc space-y-1 overflow-auto pl-5 text-sm">
+            {(notice?.lines ?? []).map((line, i) => (
+              <li key={`${i}-${line}`}>{line}</li>
             ))}
           </ul>
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
 
       {/* ── Thẻ số tổng quan ─────────────────────────────────────────────── */}
       {summary && (
@@ -604,61 +651,32 @@ export function ProductionReportPage() {
           </Button>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3 border-b px-3 py-1.5 text-[11px] text-muted-foreground">
-          {REPORT_COLUMN_GROUPS.map((g) => (
-            <span key={g.title} className="flex items-center gap-1.5 whitespace-nowrap">
-              <i className="inline-block h-2.5 w-2.5 rounded-sm" style={{ background: g.color }} />
-              {g.title}
-            </span>
-          ))}
-        </div>
-
         <div className="overflow-auto" style={{ maxHeight: "60vh" }}>
           <table className="border-collapse text-xs">
             <thead>
+              {/* Một dòng tiêu đề, cột theo ĐÚNG thứ tự sheet `tinh toan` của Excel (không chia nhóm). */}
               <tr>
                 <th
-                  rowSpan={2}
                   className="sticky left-0 top-0 z-30 border-b border-r bg-muted px-2 py-1.5 text-left font-bold"
-                  style={{ minWidth: 90 }}
+                  style={{ minWidth: MA_DONG_WIDTH }}
                 >
                   Mã dòng
                 </th>
-                {REPORT_COLUMN_GROUPS.map((g) => {
-                  const cols = g.columns.filter((c) => visibleKeys.has(c.key as string));
-                  if (cols.length === 0) return null;
-                  return (
-                    <th
-                      key={g.title}
-                      colSpan={cols.length}
-                      className="sticky top-0 z-20 border-b border-r px-2 py-1.5 text-center font-bold"
-                      style={{ background: `color-mix(in srgb, ${g.color} 16%, white)` }}
-                    >
-                      {g.title}
-                    </th>
-                  );
-                })}
-              </tr>
-              <tr>
                 {visibleColumns.map((c, i) => {
-                  const gIdx = REPORT_COLUMN_GROUPS.findIndex((g) => g.columns.includes(c));
-                  const g = REPORT_COLUMN_GROUPS[gIdx];
                   const frozen = i < FROZEN_COLUMN_COUNT;
                   return (
                     <th
                       key={c.key}
                       onClick={() => sortBy(c.key)}
                       className={cn(
-                        "sticky top-[29px] z-20 cursor-pointer select-none whitespace-nowrap border-b border-r px-2 py-1.5 text-left font-semibold",
+                        "sticky top-0 z-20 cursor-pointer select-none whitespace-nowrap border-b border-r bg-muted px-2 py-1.5 text-left font-semibold",
                         c.width,
                         frozen && "z-30",
                       )}
-                      style={{
-                        background: `color-mix(in srgb, ${g.color} 6%, white)`,
-                        left: frozen ? frozenOffset(i) : undefined,
-                      }}
-                      title={`${g.title} · ${c.label}`}
+                      style={{ left: frozen ? frozenOffset(i) : undefined }}
+                      title={`Cột ${c.excel} của sheet tinh toan · ${c.label}`}
                     >
+                      <span className="mr-1 text-[10px] font-normal text-muted-foreground">{c.excel}</span>
                       {c.label}
                       {sortKey === c.key && (
                         <ArrowUpDown className="ml-1 inline h-3 w-3 text-blue-600" />
@@ -771,7 +789,6 @@ export function ProductionReportPage() {
           onSearch={setColumnSearch}
           visibleKeys={visibleKeys}
           onToggleColumn={toggleColumn}
-          onToggleGroup={toggleGroupColumns}
           onPreset={setPreset}
           onClose={() => setColumnPanelOpen(false)}
         />
@@ -782,9 +799,39 @@ export function ProductionReportPage() {
   );
 }
 
-const FROZEN_WIDTHS = [90, 110, 80];
+// Cột "Mã dòng" dính trái (rộng MA_DONG_WIDTH); các cột đóng băng tiếp theo dính ngay sau nó.
+const MA_DONG_WIDTH = 90;
+const FROZEN_DATA_WIDTHS = [110, 80]; // Ngày, Ca — khớp min-w của hai cột đầu
 const frozenOffset = (index: number) =>
-  FROZEN_WIDTHS.slice(0, index).reduce((a, b) => a + b, 0);
+  MA_DONG_WIDTH + FROZEN_DATA_WIDTHS.slice(0, index).reduce((a, b) => a + b, 0);
+
+/** Thông báo của lần tính gần nhất, hiện trong hộp thoại mở từ nút chuông (không phải khối đỏ). */
+interface CalculationNotice {
+  kind: "error" | "warning";
+  title: string;
+  lines: string[];
+  hint: string | null;
+}
+
+/**
+ * Tách thông báo lỗi tổng hợp của backend ("Chưa tính được kỳ này vì còn N chỗ thiếu khai báo:\n- …\n- …\n…
+ * và M chỗ khác.") thành tiêu đề + từng dòng, kèm gợi ý khi lỗi là thiếu số trắc địa (STD) — chế độ
+ * Trắc địa cần STD, còn chế độ TKE thì không.
+ */
+function parseCalculationError(message: string, tkeMode: boolean): CalculationNotice {
+  const parts = message.split("\n").map((l) => l.trim()).filter(Boolean);
+  const title = parts[0] ?? "Chưa tính được kỳ này";
+  const lines = parts.slice(1).map((l) => l.replace(/^-\s*/, ""));
+  const missingStd = !tkeMode && /STD|trắc địa/i.test(message);
+  return {
+    kind: "error",
+    title,
+    lines: lines.length > 0 ? lines : [title],
+    hint: missingStd
+      ? "Chế độ Trắc địa cần số trắc địa (STD) cho từng khoá. Kỳ này chưa có STD — hãy bật “Chế độ TKE” để tính theo số thống kê."
+      : null,
+  };
+}
 
 const fmt = (v: number, scale = 3) =>
   v.toLocaleString("vi-VN", { minimumFractionDigits: scale, maximumFractionDigits: scale });
@@ -813,7 +860,6 @@ function ColumnPanel({
   onSearch,
   visibleKeys,
   onToggleColumn,
-  onToggleGroup,
   onPreset,
   onClose,
 }: {
@@ -821,7 +867,6 @@ function ColumnPanel({
   onSearch: (v: string) => void;
   visibleKeys: Set<string>;
   onToggleColumn: (key: string, on: boolean) => void;
-  onToggleGroup: (cols: ReportColumn[], on: boolean) => void;
   onPreset: (kind: "all" | "none" | "main") => void;
   onClose: () => void;
 }) {
@@ -855,41 +900,23 @@ function ColumnPanel({
         </Button>
       </div>
       <div className="flex-1 overflow-auto p-3">
-        {REPORT_COLUMN_GROUPS.map((g) => {
-          const cols = g.columns.filter((c) => (c.key + " " + c.label).toLowerCase().includes(q));
-          if (cols.length === 0) return null;
-          const allOn = cols.every((c) => visibleKeys.has(c.key as string));
-          return (
-            <div key={g.title} className="border-b py-2 last:border-b-0">
-              <label className="flex items-center gap-2 py-1 font-semibold">
-                <input
-                  type="checkbox"
-                  checked={allOn}
-                  onChange={(e) => onToggleGroup(cols, e.target.checked)}
-                  className="h-4 w-4"
-                  style={{ accentColor: g.color }}
-                />
-                <i className="inline-block h-2.5 w-2.5 rounded-sm" style={{ background: g.color }} />
-                {g.title} <span className="font-normal text-muted-foreground">({cols.length})</span>
-              </label>
-              {cols.map((c) => (
-                <label
-                  key={c.key}
-                  className="grid grid-cols-[20px_44px_1fr] items-center gap-2 rounded px-1 py-1 hover:bg-muted/50"
-                >
-                  <input
-                    type="checkbox"
-                    checked={visibleKeys.has(c.key as string)}
-                    onChange={(e) => onToggleColumn(c.key as string, e.target.checked)}
-                    className="h-4 w-4"
-                  />
-                  <code className="text-[11px]" style={{ color: g.color }}>{c.key}</code>
-                  <span className="truncate text-xs">{c.label}</span>
-                </label>
-              ))}
-            </div>
-          );
-        })}
+        {ALL_REPORT_COLUMNS.filter((c) =>
+          (c.key + " " + c.label + " " + c.excel).toLowerCase().includes(q),
+        ).map((c) => (
+          <label
+            key={c.key}
+            className="grid grid-cols-[20px_36px_1fr] items-center gap-2 rounded px-1 py-1 hover:bg-muted/50"
+          >
+            <input
+              type="checkbox"
+              checked={visibleKeys.has(c.key as string)}
+              onChange={(e) => onToggleColumn(c.key as string, e.target.checked)}
+              className="h-4 w-4"
+            />
+            <code className="text-[11px] text-muted-foreground">{c.excel}</code>
+            <span className="truncate text-xs">{c.label}</span>
+          </label>
+        ))}
       </div>
     </aside>
   );
@@ -907,26 +934,14 @@ function DetailDrawer({ row, onClose }: { row: ProductionReportRow; onClose: () 
           <X className="h-4 w-4" />
         </Button>
       </div>
-      <div className="p-4">
-        {REPORT_COLUMN_GROUPS.map((g) => (
-          <section key={g.title} className="mb-3 overflow-hidden rounded-lg border">
-            <h4
-              className="m-0 px-3 py-2 text-sm font-bold"
-              style={{ background: `color-mix(in srgb, ${g.color} 14%, white)` }}
-            >
-              {g.title}
-            </h4>
-            <div className="grid grid-cols-1 gap-x-3 p-3 sm:grid-cols-2">
-              {g.columns.map((c) => (
-                <div key={c.key} className="border-b py-1.5 last:border-b-0">
-                  <small className="block text-muted-foreground">
-                    <code style={{ color: g.color }}>{c.key}</code> · {c.label}
-                  </small>
-                  <b className="text-sm">{formatCell(row[c.key], c) || "—"}</b>
-                </div>
-              ))}
-            </div>
-          </section>
+      <div className="grid grid-cols-1 gap-x-3 p-4 sm:grid-cols-2">
+        {ALL_REPORT_COLUMNS.map((c) => (
+          <div key={c.key} className="border-b py-1.5">
+            <small className="block text-muted-foreground">
+              <code>{c.excel}</code> · {c.label}
+            </small>
+            <b className="text-sm">{formatCell(row[c.key], c) || "—"}</b>
+          </div>
         ))}
       </div>
     </aside>
