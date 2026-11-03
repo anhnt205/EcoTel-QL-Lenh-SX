@@ -36,12 +36,15 @@ public class ProductionCalculationController {
      * Tính lại toàn bộ một kỳ. Xoá kết quả cũ của kỳ trước khi tính.
      *
      * @param tkeMode chế độ Thống kê (QĐ-03) — bỏ qua hệ số trắc địa
+     * @param onlyApproved QĐ-25 — chỉ tính chuyến đã duyệt đối chiếu, bỏ qua (và báo lại) chuyến chưa
+     *     duyệt; mặc định {@code false} = nghiêm ngặt QĐ-16 (còn chuyến chưa duyệt thì từ chối)
      */
     @PostMapping("/calculate")
     public ApiResponse<ProductionCalculationService.CalculationSummary> calculate(
             @RequestParam Long periodId,
-            @RequestParam(defaultValue = "false") boolean tkeMode) {
-        return ApiResponse.success(calculationService.calculatePeriod(periodId, tkeMode));
+            @RequestParam(defaultValue = "false") boolean tkeMode,
+            @RequestParam(defaultValue = "false") boolean onlyApproved) {
+        return ApiResponse.success(calculationService.calculatePeriod(periodId, tkeMode, onlyApproved));
     }
 
     /** Phần đầu màn báo cáo: kỳ, thời điểm tính, và các tổng cộng của cả kỳ. */

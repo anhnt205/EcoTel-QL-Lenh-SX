@@ -40,6 +40,7 @@ import { productionService, type ProductionReportRow } from "./productionService
 const VISIBLE_COLUMNS_KEY = "production-report-visible-columns";
 const DENSITY_KEY = "production-report-density";
 const PAGE_SIZES = [20, 50, 100, 200];
+const MONTH_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 
 /**
  * Màn "Báo cáo thống kê" — đầu ra cuối cùng, tương ứng sheet `tinh toan`.
@@ -64,8 +65,19 @@ export function ProductionReportPage() {
 
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth() + 1);
+  const yearOptions = useMemo(() => {
+    const current = today.getFullYear();
+    const years: number[] = [];
+    for (let y = current - 4; y <= current + 1; y++) years.push(y);
+    if (!years.includes(year)) years.push(year);
+    return years.sort((a, b) => a - b);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `today` đổi mỗi lần render nhưng năm hiện tại không đổi trong phiên
+  }, [year]);
   const [periodId, setPeriodId] = useState<number | null>(null);
   const [tkeMode, setTkeMode] = useState(false);
+  // QĐ-25: mặc định chỉ tính phần ĐÃ duyệt đối chiếu (chủ dự án chốt 2026-11-04);
+  // bỏ chọn = nghiêm ngặt QĐ-16 (còn chuyến chưa duyệt thì từ chối cả kỳ).
+  const [onlyApproved, setOnlyApproved] = useState(true);
   const [calculating, setCalculating] = useState(false);
   const [warnings, setWarnings] = useState<string[]>([]);
   const [lockBusy, setLockBusy] = useState(false);
@@ -207,11 +219,13 @@ export function ProductionReportPage() {
     setCalculating(true);
     setWarnings([]);
     try {
-      const res = await productionService.calculate(effectivePeriodId, tkeMode);
+      const res = await productionService.calculate(effectivePeriodId, tkeMode, onlyApproved);
       setWarnings(res.warnings ?? []);
       refresh();
+      const skipped = res.excludedTripCount ?? 0;
       toast.success(
-        `Đã tính ${res.tripCount} chuyến, sinh ${res.coefficientRowCount} dòng hệ số.`,
+        `Đã tính ${res.tripCount} chuyến, sinh ${res.coefficientRowCount} dòng hệ số.` +
+          (skipped > 0 ? ` Bỏ qua ${skipped} chuyến chưa duyệt đối chiếu.` : ""),
       );
     } catch (e: unknown) {
       toast.error(apiErrorMessage(e, "Tính sản lượng thất bại."));
@@ -335,23 +349,34 @@ export function ProductionReportPage() {
 
       {/* ── Thanh kỳ báo cáo ────────────────────────────────────────────── */}
       <div className="flex flex-wrap items-end gap-2 rounded-xl border bg-card p-3">
+        {/* Chọn từ danh sách (không gõ tay): tránh nhập sai/ngoài khoảng, và đổi năm/tháng
+            là đổi ngay kỳ hiển thị. Khoảng năm: 4 năm trước → năm sau năm hiện tại, luôn có
+            cả năm đang chọn. */}
         <Field label="Năm">
-          <Input
-            type="number"
+          <select
             value={year}
             onChange={(e) => setYear(Number(e.target.value))}
-            className="h-9 w-[90px]"
-          />
+            className="h-9 w-[100px] rounded-md border bg-transparent px-2 text-sm"
+          >
+            {yearOptions.map((y) => (
+              <option key={y} value={y}>
+                {y}
+              </option>
+            ))}
+          </select>
         </Field>
         <Field label="Tháng">
-          <Input
-            type="number"
-            min={1}
-            max={12}
+          <select
             value={month}
             onChange={(e) => setMonth(Number(e.target.value))}
-            className="h-9 w-[80px]"
-          />
+            className="h-9 w-[110px] rounded-md border bg-transparent px-2 text-sm"
+          >
+            {MONTH_OPTIONS.map((m) => (
+              <option key={m} value={m}>
+                Tháng {m}
+              </option>
+            ))}
+          </select>
         </Field>
         <Field label="Kỳ">
           <select
@@ -376,6 +401,19 @@ export function ProductionReportPage() {
             onChange={(e) => setTkeMode(e.target.checked)}
           />
           Chế độ TKE
+        </label>
+
+        <label
+          className="flex h-9 items-center gap-1.5 text-sm"
+          title="Chỉ đưa vào sản lượng các chuyến Vận tải đã duyệt đối chiếu (cả hai bên khớp cặp); chuyến chưa duyệt bị bỏ qua và được báo số lượng. Bỏ chọn: còn chuyến chưa duyệt thì không tính."
+        >
+          <input
+            type="checkbox"
+            className="h-4 w-4 accent-blue-600"
+            checked={onlyApproved}
+            onChange={(e) => setOnlyApproved(e.target.checked)}
+          />
+          Chỉ tính chuyến đã duyệt
         </label>
 
         <Button
@@ -431,6 +469,15 @@ export function ProductionReportPage() {
         <div className="flex items-center gap-1.5 rounded-md border border-red-300 bg-red-50 px-3 py-1.5 text-xs text-red-900 dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-200">
           <TriangleAlert className="h-3.5 w-3.5" />
           Kỳ vừa được mở khoá — kết quả đang xem có thể LỖI THỜI so với báo cáo đã chốt trước đó. Tính lại rồi chốt lại để xoá cảnh báo này.
+        </div>
+      )}
+
+      {summary && summary.rowCount > 0 && (summary.unapprovedTripCount ?? 0) > 0 && (
+        <div className="flex items-center gap-1.5 rounded-md border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-200">
+          <TriangleAlert className="h-3.5 w-3.5 shrink-0" />
+          Số liệu mới tính trên phần ĐÃ DUYỆT đối chiếu ({summary.rowCount.toLocaleString("vi-VN")} chuyến). Còn{" "}
+          {(summary.unapprovedTripCount ?? 0).toLocaleString("vi-VN")} chuyến Vận tải chưa duyệt đối chiếu KHÔNG nằm trong
+          bảng này — duyệt thêm ở màn Đối chiếu rồi bấm “Tính lại kỳ”.
         </div>
       )}
 

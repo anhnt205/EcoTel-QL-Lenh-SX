@@ -76,13 +76,27 @@ public class ProductionCalculationService {
         private final int coefficientRowCount;
         private final boolean tkeMode;
         private final List<String> warnings;
+        /** Số chuyến Vận tải bị BỎ QUA vì chưa duyệt đối chiếu (QĐ-25); luôn 0 ở chế độ nghiêm ngặt. */
+        private final int excludedTripCount;
 
-        CalculationSummary(int tripCount, int coefficientRowCount, boolean tkeMode, List<String> warnings) {
+        CalculationSummary(int tripCount, int coefficientRowCount, boolean tkeMode, List<String> warnings,
+                           int excludedTripCount) {
             this.tripCount = tripCount;
             this.coefficientRowCount = coefficientRowCount;
             this.tkeMode = tkeMode;
             this.warnings = warnings;
+            this.excludedTripCount = excludedTripCount;
         }
+    }
+
+    /**
+     * Tính lại toàn bộ một kỳ — chế độ NGHIÊM NGẶT (QĐ-16): còn chuyến chưa
+     * duyệt thì từ chối. Đây là chế độ của tính lại TỰ ĐỘNG sau mỗi lần duyệt
+     * ({@link ProductionAutoRecalculateListener}).
+     */
+    @Transactional
+    public CalculationSummary calculatePeriod(Long periodId, boolean tkeMode) {
+        return calculatePeriod(periodId, tkeMode, false);
     }
 
     /**
@@ -90,9 +104,15 @@ public class ProductionCalculationService {
      *
      * <p>Luôn xoá kết quả cũ của kỳ trước khi tính: giữ lại sẽ sinh ra hai
      * thế hệ số liệu lẫn lộn trong cùng một kỳ.
+     *
+     * @param onlyApproved QĐ-25 (nới QĐ-16, chủ dự án chốt 2026-11-04): {@code true} =
+     *     chỉ tính các chuyến Vận tải ĐÃ DUYỆT đối chiếu (cả hai bên khớp cặp), BỎ QUA
+     *     chuyến chưa duyệt thay vì từ chối cả kỳ — số chuyến bị bỏ qua được báo lại
+     *     trong {@link CalculationSummary#getExcludedTripCount()} và cảnh báo, không
+     *     âm thầm. {@code false} = nghiêm ngặt như QĐ-16 gốc.
      */
     @Transactional
-    public CalculationSummary calculatePeriod(Long periodId, boolean tkeMode) {
+    public CalculationSummary calculatePeriod(Long periodId, boolean tkeMode, boolean onlyApproved) {
         ReportPeriod period = periodRepository.findById(periodId).orElseThrow(
                 () -> new ResourceNotFoundException("Không tìm thấy kỳ báo cáo id: " + periodId));
 
@@ -155,12 +175,28 @@ public class ProductionCalculationService {
                 .filter(Objects::nonNull)
                 .distinct()
                 .toList();
-        if (!notApprovedIssues.isEmpty()) {
+        if (!notApprovedIssues.isEmpty() && !onlyApproved) {
             throw new PeriodNotFullyApprovedException(buildAggregateError(
                     "Kỳ " + period.getDisplayName() + " chưa thể tính vì còn "
                             + notApprovedIssues.size() + " chuyến VẬN TẢI CHƯA ĐƯỢC DUYỆT ĐỐI CHIẾU"
                             + " (chỉ dữ liệu đã duyệt mới là \"chuẩn\" để tính sản lượng):",
                     notApprovedIssues));
+        }
+
+        // QĐ-25: chế độ "chỉ tính phần đã duyệt" — giữ lại ĐÚNG những chuyến vượt
+        // qua cùng bộ kiểm tra ở trên (APPROVED + có chuyến Khai thác ghép cặp
+        // cũng APPROVED), phần còn lại nằm ngoài kỳ và được đếm để báo lại.
+        List<TransportReportTrip> eligibleTrips = trips;
+        int excludedTripCount = 0;
+        if (!notApprovedIssues.isEmpty()) {
+            eligibleTrips = selectApprovedTrips(trips, decisionByTransportTripId);
+            excludedTripCount = trips.size() - eligibleTrips.size();
+            if (eligibleTrips.isEmpty()) {
+                throw new PeriodNotFullyApprovedException(buildAggregateError(
+                        "Kỳ " + period.getDisplayName() + " chưa có chuyến Vận tải nào đã duyệt đối chiếu"
+                                + " — không có gì để tính (còn " + excludedTripCount + " chuyến chưa duyệt):",
+                        notApprovedIssues));
+            }
         }
 
         resultRepository.deleteByPeriod(periodId);
@@ -178,7 +214,7 @@ public class ProductionCalculationService {
         List<String> warnings = new ArrayList<>();
 
         // ── LƯỢT 1 ──────────────────────────────────────────────────────────
-        List<TripBaseResult> base = trips.stream().map(baseCalculator::calculate).toList();
+        List<TripBaseResult> base = eligibleTrips.stream().map(baseCalculator::calculate).toList();
 
         // ── RÀO CHẮN 1: gộp theo (khoá, SPNT) → AP Tdia ─────────────────────
         Map<GroupKey, List<TripBaseResult>> groups = new LinkedHashMap<>();
@@ -260,10 +296,28 @@ public class ProductionCalculationService {
             periodRepository.save(period);
         }
 
-        log.info("Tính sản lượng kỳ {}: {} chuyến, {} dòng hệ số, TKE={}",
-                period.getDisplayName(), results.size(), apTdia.size() + apTkm.size(), tkeMode);
+        log.info("Tính sản lượng kỳ {}: {} chuyến, {} dòng hệ số, TKE={}, bỏ qua {} chuyến chưa duyệt",
+                period.getDisplayName(), results.size(), apTdia.size() + apTkm.size(), tkeMode, excludedTripCount);
 
-        return new CalculationSummary(results.size(), apTdia.size() + apTkm.size(), tkeMode, warnings);
+        List<String> notices = new ArrayList<>(warnings);
+        if (excludedTripCount > 0) {
+            notices.add("Kỳ mới được tính trên phần ĐÃ DUYỆT đối chiếu: " + results.size()
+                    + " chuyến Vận tải đã tính, " + excludedTripCount
+                    + " chuyến chưa duyệt đối chiếu KHÔNG nằm trong số liệu (duyệt thêm rồi tính lại kỳ để đưa vào).");
+        }
+        return new CalculationSummary(results.size(), apTdia.size() + apTkm.size(), tkeMode, notices,
+                excludedTripCount);
+    }
+
+    /**
+     * Các chuyến đủ điều kiện tính sản lượng (QĐ-16/QĐ-25): cùng tiêu chí với
+     * {@link #describeProductionApprovalIssue}, giữ nguyên thứ tự đầu vào.
+     */
+    private List<TransportReportTrip> selectApprovedTrips(
+            List<TransportReportTrip> trips, Map<Long, ReconciliationDecision> decisionByTransportTripId) {
+        return trips.stream()
+                .filter(t -> describeProductionApprovalIssue(t, decisionByTransportTripId.get(t.getId())) == null)
+                .toList();
     }
 
     /**

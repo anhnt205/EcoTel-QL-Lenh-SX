@@ -35,6 +35,7 @@ riêng — cần kiểm lại khi implement.
 | QĐ-22 | Đối chiếu tự cập nhật realtime qua WebSocket, không cần reload |
 | QĐ-20 | Gom nhóm Danh mục + bỏ 6 danh mục không dùng/trùng lặp |
 | QĐ-21 | "Báo chuyến" chỉ hiện dòng CẢ HAI bên đã duyệt xong |
+| QĐ-25 | Tính sản lượng được phép CHỈ trên phần đã duyệt (nới QĐ-16, lựa chọn mặc định ở màn Báo cáo) |
 | **TG-01** | **TẠM GÁC — ngoại lệ `+15` và biến thể công thức Nhóm tầng** |
 
 ---
@@ -919,3 +920,38 @@ Chưa test được đường tự động kích hoạt end-to-end (cần 1 kỳ
 đã khớp + duyệt hết, dữ liệu mẫu hiện tại không có kỳ nào đủ điều kiện) —
 sẽ tự xác nhận khi có dữ liệu thật đủ điều kiện, logic đã review kỹ theo
 đúng pattern QĐ-22 đã test.
+
+## QĐ-25 (2026-11-04) — Tính sản lượng được phép CHỈ trên phần đã duyệt — **nới QĐ-16**
+
+**Bối cảnh:** tháng 9/2026 nhập từ Excel chỉ duyệt được 9.840 cặp khớp (41,2% chuyến
+Vận tải); phần còn lại (Vận tải tách nhiều dòng/tuyến còn Khai thác gộp 1 dòng, máy
+xúc không có phiếu Khai thác, lệch thật) đúng quy tắc phải để nguyên ở Đối chiếu. QĐ-16
+bắt cả kỳ phải sạch mới tính được nên "Thống kê sản lượng" tháng 9 hiện 0 dòng dù đã có
+chuyến duyệt. Chủ dự án chốt trực tiếp (2026-11-04): *"Những phần nào khớp và được duyệt
+thì tính sản lượng thống kê theo cái đó."*
+
+**Quyết định:** `ProductionCalculationService.calculatePeriod(periodId, tkeMode, onlyApproved)`.
+`onlyApproved=true` giữ ĐÚNG những chuyến vượt qua cùng bộ kiểm tra của QĐ-16 (Vận tải
+`APPROVED` + có chuyến Khai thác ghép cặp cũng `APPROVED`) và BỎ QUA phần còn lại thay vì từ
+chối cả kỳ. Nguyên tắc cốt lõi của QĐ-16 vẫn giữ: chuyến chưa duyệt không bao giờ lọt vào số
+liệu; chỉ đổi cách phản ứng (bỏ qua + báo lại thay vì chặn cả kỳ).
+
+**Không được âm thầm tính thiếu** (lo ngại gốc của QĐ-16) → ba lớp báo lại:
+1. `CalculationSummary.excludedTripCount` + một dòng cảnh báo trong `warnings` + toast ở UI;
+2. `ProductionReportSummaryResponse.unapprovedTripCount` (= tổng chuyến của kỳ − số chuyến đã
+   tính) và băng cảnh báo cố định trên màn Báo cáo khi > 0;
+3. Nếu KHÔNG chuyến nào đã duyệt → vẫn từ chối (`PeriodNotFullyApprovedException`), không xoá
+   kết quả cũ.
+
+**Phạm vi (cố ý hẹp):**
+- Mặc định tầng API vẫn `onlyApproved=false` (nghiêm ngặt QĐ-16) → mọi caller khác không đổi.
+- Nút "Tính lại kỳ" có ô **"Chỉ tính chuyến đã duyệt"**, MẶC ĐỊNH BẬT; bỏ chọn = nghiêm ngặt.
+- **Tính lại tự động sau duyệt (QĐ-24) giữ NGHIÊM NGẶT**, không đổi — nếu cho nó tính từng phần
+  thì mỗi lần duyệt lẻ sẽ tính lại cả kỳ (hàng chục nghìn chuyến) và liên tục ghi số liệu dở dang.
+  Muốn cập nhật phần mới duyệt thì bấm "Tính lại kỳ".
+- Chốt kỳ (QĐ-03) không bị chặn khi còn chuyến chưa duyệt — băng cảnh báo vẫn hiển thị; việc có
+  nên chặn chốt kỳ dở là quyết định riêng, CHƯA chốt.
+
+**Test:** `ProductionCalculationServiceOnlyApprovedTest` (5 ca: chỉ chuyến đã duyệt được đưa vào
+tính, không chuyến nào đã duyệt → từ chối, chế độ mặc định vẫn nghiêm ngặt, số chưa duyệt ở màn
+Báo cáo, kỳ chưa tính → 0); các test cổng duyệt cũ không đổi.

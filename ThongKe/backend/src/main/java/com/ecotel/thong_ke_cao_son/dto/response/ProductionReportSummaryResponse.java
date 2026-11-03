@@ -35,6 +35,12 @@ public class ProductionReportSummaryResponse {
     /** Kỳ được tính ở chế độ TKE (QĐ-03) hay chế độ trắc địa. */
     Boolean tkeMode;
 
+    /**
+     * Số chuyến Vận tải của kỳ KHÔNG nằm trong số liệu đã tính vì chưa duyệt đối
+     * chiếu (QĐ-25). 0 khi kỳ chưa tính hoặc đã tính đủ mọi chuyến.
+     */
+    long unapprovedTripCount;
+
     BigDecimal totalM3;
     BigDecimal totalTon;
     BigDecimal totalTkm;

@@ -56,6 +56,8 @@ export interface ProductionReportSummary {
   rowCount: number;
   calculatedAt: string | null;
   tkeMode: boolean | null;
+  /** QĐ-25: số chuyến Vận tải của kỳ KHÔNG nằm trong số liệu vì chưa duyệt đối chiếu. */
+  unapprovedTripCount?: number;
   totalM3: number;
   totalTon: number;
   totalTkm: number;
@@ -71,6 +73,8 @@ export interface CalculationSummary {
   coefficientRowCount: number;
   tkeMode: boolean;
   warnings: string[];
+  /** QĐ-25: số chuyến chưa duyệt bị bỏ qua khi tính ở chế độ "chỉ tính chuyến đã duyệt". */
+  excludedTripCount?: number;
 }
 
 export interface ReportPeriodOption {
@@ -184,8 +188,12 @@ export const productionService = {
   coefficients: async (periodId: number): Promise<SurveyCoefficientRow[]> =>
     unwrap(await api.get("/production/survey-coefficients", { params: { periodId } })) ?? [],
 
-  calculate: async (periodId: number, tkeMode: boolean): Promise<CalculationSummary> =>
-    unwrap(await api.post("/production/calculate", null, { params: { periodId, tkeMode } })),
+  calculate: async (
+    periodId: number,
+    tkeMode: boolean,
+    onlyApproved = false,
+  ): Promise<CalculationSummary> =>
+    unwrap(await api.post("/production/calculate", null, { params: { periodId, tkeMode, onlyApproved } })),
 
   /** Chốt kỳ (QĐ-03) — đóng băng kết quả, chặn "Tính lại" cho tới khi mở khoá. */
   lockPeriod: async (periodId: number): Promise<ReportPeriodOption> =>

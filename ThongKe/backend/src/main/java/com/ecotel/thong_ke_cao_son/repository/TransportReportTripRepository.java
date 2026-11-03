@@ -70,4 +70,17 @@ public interface TransportReportTripRepository extends JpaRepository<TransportRe
     List<TransportReportTrip> findByReportDateBetween(
             @Param("fromDate") LocalDate fromDate,
             @Param("toDate") LocalDate toDate);
+
+    /**
+     * Tổng số chuyến Vận tải trong khoảng ngày (mọi trạng thái) — để màn Báo
+     * cáo biết kỳ "tính phần đã duyệt" còn bao nhiêu chuyến nằm ngoài số liệu
+     * (QĐ-25). Chỉ đếm, không nạp chuyến.
+     */
+    @Query("""
+        SELECT COUNT(t) FROM TransportReportTrip t
+        WHERE t.transportReport.reportDate BETWEEN :fromDate AND :toDate
+        """)
+    long countByReportDateBetween(
+            @Param("fromDate") LocalDate fromDate,
+            @Param("toDate") LocalDate toDate);
 }

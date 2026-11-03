@@ -7,6 +7,7 @@ import com.ecotel.thong_ke_cao_son.exception.ResourceNotFoundException;
 import com.ecotel.thong_ke_cao_son.model.*;
 import com.ecotel.thong_ke_cao_son.repository.ProductionResultRepository;
 import com.ecotel.thong_ke_cao_son.repository.ReportPeriodRepository;
+import com.ecotel.thong_ke_cao_son.repository.TransportReportTripRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -23,6 +24,7 @@ public class ProductionReportService {
 
     private final ProductionResultRepository resultRepository;
     private final ReportPeriodRepository periodRepository;
+    private final TransportReportTripRepository tripRepository;
 
     @Transactional(readOnly = true)
     public PageResponse<ProductionReportRowResponse> getRows(Long periodId, String keyword, Pageable pageable) {
@@ -61,9 +63,14 @@ public class ProductionReportService {
                     .build();
         }
 
+        // Mỗi chuyến đã tính có đúng 1 dòng kết quả -> phần còn lại của kỳ là chuyến
+        // bị bỏ qua vì chưa duyệt (QĐ-25), cần hiện rõ để không ai đọc nhầm là đủ.
+        long totalTrips = tripRepository.countByReportDateBetween(period.getFromDate(), period.getToDate());
+
         ProductionResult first = all.get(0);
         return b.calculatedAt(first.getCalculatedAt())
                 .tkeMode(first.isTkeMode())
+                .unapprovedTripCount(Math.max(0L, totalTrips - all.size()))
                 .totalM3(sum(all, ProductionResult::getTotalM3))
                 .totalTon(sum(all, ProductionResult::getTotalTon))
                 .totalTkm(sum(all, ProductionResult::getTotalTkm))
