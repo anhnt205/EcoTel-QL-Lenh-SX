@@ -79,7 +79,11 @@ public class FuelCalculator {
         String fuelClassKey = ProductionKeys.fuelNormVehicleKey(
                 vehicle.getFuelClass().getCode(),
                 ProductionKeys.vehicleTypeRankKey(vehicleTypeCode(vehicle), vehicleRankCode(vehicle)),
-                trip.getCargoType() != null ? trip.getCargoType().getCode() : null,
+                // Cột K của bảng tính là TÊN chủng loại hàng ("SPNT.via", "B.Loang…"), còn
+                // `CargoType.code` là mã danh mục (CLH-014) — truyền mã làm ba nhánh so tên
+                // (bùn HM400, đất cạp, SPNT vỉa → .BK) không bao giờ khớp. Đối soát tháng
+                // 9/2026 với Excel: truyền TÊN khớp 3.024/3.024 nhóm (xe, hàng, nơi dỡ).
+                trip.getCargoType() != null ? trip.getCargoType().getName() : null,
                 trip.getUnloadingPoint() != null ? trip.getUnloadingPoint().getName() : null,
                 base.getAcceptanceProduct(),
                 classification);

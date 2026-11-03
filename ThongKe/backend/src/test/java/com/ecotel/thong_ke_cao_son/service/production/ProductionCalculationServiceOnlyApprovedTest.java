@@ -6,6 +6,8 @@ import com.ecotel.thong_ke_cao_son.exception.PeriodNotFullyApprovedException;
 import com.ecotel.thong_ke_cao_son.model.*;
 import com.ecotel.thong_ke_cao_son.repository.*;
 import com.ecotel.thong_ke_cao_son.service.MatrixCatalogService;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.FlushModeType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -190,5 +192,38 @@ class ProductionCalculationServiceOnlyApprovedTest {
 
         assertThat(summary.getRowCount()).isZero();
         assertThat(summary.getUnapprovedTripCount()).isZero();
+    }
+
+    @Test
+    @DisplayName("Cảnh báo nhiên liệu/năng suất được gộp theo nguyên nhân kèm số chuyến (không in hàng nghìn dòng)")
+    void fuelWarningsAreSummarisedByReasonWithCounts() {
+        List<String> warnings = List.of(
+                "Chuyến id=1: lưới Năng suất xe chưa có ô [3 × CAT777.DAT].",
+                "Chuyến id=2: lưới Năng suất xe chưa có ô [3 × CAT777.DAT].",
+                "Chuyến id=3: lưới Năng suất xe chưa có ô [3 × VOLVOA40-GCoi.DAT].");
+
+        String notice = ProductionCalculationService.summarizeFuelWarnings(warnings);
+
+        assertThat(notice).contains("[3 × CAT777.DAT]. (2 chuyến)")
+                .contains("[3 × VOLVOA40-GCoi.DAT]. (1 chuyến)")
+                .contains("3 lượt tra")
+                .doesNotContain("Chuyến id=");
+    }
+
+    @Test
+    @DisplayName("Hiệu năng: lúc tính chuyển FlushMode.COMMIT (tránh dirty-check toàn bộ thực thể mỗi truy vấn) và LUÔN trả lại chế độ cũ, kể cả khi lỗi")
+    void flushModeIsCommitWhileCalculatingAndRestoredAfterwards() {
+        EntityManager entityManager = org.mockito.Mockito.mock(EntityManager.class);
+        when(entityManager.getFlushMode()).thenReturn(FlushModeType.AUTO);
+        ProductionCalculationService service = newService();
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "entityManager", entityManager);
+        when(periodRepository.findById(1L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.calculatePeriod(1L, true, true))
+                .isInstanceOf(com.ecotel.thong_ke_cao_son.exception.ResourceNotFoundException.class);
+
+        org.mockito.InOrder order = org.mockito.Mockito.inOrder(entityManager);
+        order.verify(entityManager).setFlushMode(FlushModeType.COMMIT);
+        order.verify(entityManager).setFlushMode(FlushModeType.AUTO);
     }
 }

@@ -8,6 +8,9 @@ import com.ecotel.thong_ke_cao_son.model.*;
 import com.ecotel.thong_ke_cao_son.repository.*;
 import com.ecotel.thong_ke_cao_son.dto.response.MatrixGridResponse;
 import com.ecotel.thong_ke_cao_son.service.SurveyStandardService;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.FlushModeType;
+import jakarta.persistence.PersistenceContext;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -58,6 +61,10 @@ public class ProductionCalculationService {
 
     private static final int HS_SCALE = 10;
     private static final int VALUE_SCALE = 6;
+
+    /** Không đưa vào constructor để các test thuần Mockito dựng service không phải đổi; null trong test. */
+    @PersistenceContext
+    private EntityManager entityManager;
 
     private final ReportPeriodRepository periodRepository;
     private final TransportReportTripRepository tripRepository;
@@ -113,6 +120,28 @@ public class ProductionCalculationService {
      */
     @Transactional
     public CalculationSummary calculatePeriod(Long periodId, boolean tkeMode, boolean onlyApproved) {
+        // Vài chục nghìn thực thể (chuyến + quan hệ + quyết định đối chiếu) nằm trong persistence
+        // context suốt lần tính, mà mỗi chuyến lại tra DB (tỷ trọng, hệ số...) → mặc định mỗi truy
+        // vấn kích hoạt một lượt auto-flush + dirty-check TOÀN BỘ thực thể đó: chi phí tăng theo
+        // bình phương số chuyến (kỳ ~10 nghìn chuyến chạy hơn 15 phút, nginx cắt 504 sau 300 s).
+        // Trong lúc tính KHÔNG có thay đổi nào cần flush trước truy vấn (xoá kết quả cũ là DELETE
+        // JPQL chạy ngay; kết quả mới chỉ ghi ở cuối) → chuyển sang FlushMode.COMMIT: vẫn flush
+        // đủ một lần khi commit, chỉ bỏ các lượt flush giữa chừng.
+        FlushModeType previousFlushMode = null;
+        if (entityManager != null) {
+            previousFlushMode = entityManager.getFlushMode();
+            entityManager.setFlushMode(FlushModeType.COMMIT);
+        }
+        try {
+            return doCalculatePeriod(periodId, tkeMode, onlyApproved);
+        } finally {
+            if (entityManager != null && previousFlushMode != null) {
+                entityManager.setFlushMode(previousFlushMode);
+            }
+        }
+    }
+
+    private CalculationSummary doCalculatePeriod(Long periodId, boolean tkeMode, boolean onlyApproved) {
         ReportPeriod period = periodRepository.findById(periodId).orElseThrow(
                 () -> new ResourceNotFoundException("Không tìm thấy kỳ báo cáo id: " + periodId));
 
@@ -255,7 +284,15 @@ public class ProductionCalculationService {
         // chuyến sẽ đọc lại cùng dữ liệu vài nghìn lần.
         // Kỳ nằm gọn trong một tháng (QĐ-05) và định mức đổi theo tháng, nên
         // một kỳ chỉ ứng với một phiên bản — nạp theo ngày đầu kỳ là đủ.
-        Map<String, MatrixGridResponse> grids = loadFuelGrids(period.getFromDate(), warnings);
+        //
+        // QĐ-25: ở chế độ "chỉ tính chuyến đã duyệt", thiếu định mức NHIÊN LIỆU /
+        // NĂNG SUẤT (DMNL, HS điều chỉnh, Năng suất xe) KHÔNG chặn sản lượng
+        // (m3/tấn/Tkm không dùng các định mức này — đúng ý đồ ghi ở FuelCalculator).
+        // Ô nhiên liệu của chuyến đó để TRỐNG (null, không phải 0 — giống #N/A của
+        // Excel) và số chuyến + nguyên nhân được báo lại ở cảnh báo, không âm thầm.
+        // Chế độ nghiêm ngặt giữ nguyên QĐ-04/QĐ-06: thiếu là từ chối.
+        List<String> fuelWarnings = onlyApproved ? new ArrayList<>() : warnings;
+        Map<String, MatrixGridResponse> grids = loadFuelGrids(period.getFromDate(), fuelWarnings);
 
         // ── LƯỢT 3 + lưu kết quả ────────────────────────────────────────────
         List<ProductionResult> results = new ArrayList<>();
@@ -263,7 +300,7 @@ public class ProductionCalculationService {
         for (Stage2 s : stage2) {
             GroupKey gk = new GroupKey(s.base.getSeamGroupExcavatorKey(), s.base.getAcceptanceProduct());
             ProductionResult result = finalise(period, s, apTdia.get(gk), apTkm.get(gk), tkeMode, now);
-            applyFuel(result, s.base(), grids, warnings);
+            applyFuel(result, s.base(), grids, fuelWarnings);
             results.add(result);
         }
 
@@ -300,6 +337,9 @@ public class ProductionCalculationService {
                 period.getDisplayName(), results.size(), apTdia.size() + apTkm.size(), tkeMode, excludedTripCount);
 
         List<String> notices = new ArrayList<>(warnings);
+        if (onlyApproved && !fuelWarnings.isEmpty()) {
+            notices.add(summarizeFuelWarnings(fuelWarnings));
+        }
         if (excludedTripCount > 0) {
             notices.add("Kỳ mới được tính trên phần ĐÃ DUYỆT đối chiếu: " + results.size()
                     + " chuyến Vận tải đã tính, " + excludedTripCount
@@ -307,6 +347,28 @@ public class ProductionCalculationService {
         }
         return new CalculationSummary(results.size(), apTdia.size() + apTkm.size(), tkeMode, notices,
                 excludedTripCount);
+    }
+
+    private static final int MAX_FUEL_REASONS_IN_NOTICE = 5;
+
+    /**
+     * Gộp cảnh báo nhiên liệu/năng suất theo NGUYÊN NHÂN (bỏ tiền tố "Chuyến id=N: ") và đếm số
+     * chuyến, để một dòng cảnh báo nói được "thiếu gì, bao nhiêu chuyến" thay vì hàng nghìn dòng.
+     */
+    static String summarizeFuelWarnings(List<String> fuelWarnings) {
+        Map<String, Integer> byReason = new LinkedHashMap<>();
+        for (String w : fuelWarnings) {
+            byReason.merge(w.replaceFirst("^Chuyến id=\\d+: ", ""), 1, Integer::sum);
+        }
+        String top = byReason.entrySet().stream()
+                .sorted(Map.Entry.<String, Integer>comparingByValue().reversed())
+                .limit(MAX_FUEL_REASONS_IN_NOTICE)
+                .map(e -> e.getKey() + " (" + e.getValue() + " chuyến)")
+                .collect(java.util.stream.Collectors.joining("; "));
+        String more = byReason.size() > MAX_FUEL_REASONS_IN_NOTICE
+                ? " … và " + (byReason.size() - MAX_FUEL_REASONS_IN_NOTICE) + " nguyên nhân khác" : "";
+        return "Nhiên liệu/năng suất để TRỐNG (thiếu định mức, như #N/A của Excel — không phải 0) ở "
+                + fuelWarnings.size() + " lượt tra; sản lượng m3/tấn/Tkm không bị ảnh hưởng: " + top + more + ".";
     }
 
     /**

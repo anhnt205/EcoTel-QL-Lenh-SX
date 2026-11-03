@@ -162,7 +162,7 @@ public final class ProductionKeys {
      *
      * @param fuelClassCode     {@code DQ} — {@code Device.fuelClass.code}
      * @param vehicleTypeRank   {@code DC} — xem {@link #vehicleTypeRankKey}
-     * @param cargoTypeCode     {@code K} — mã chủng loại hàng
+     * @param cargoTypeCode     {@code K} — TÊN chủng loại hàng (cột K của bảng tính, vd "SPNT.via"), không phải mã danh mục CLH-xxx
      * @param unloadingPoint    {@code I} — tên nơi dỡ tải
      * @param acceptanceProduct {@code AG} — sản phẩm nghiệm thu
      * @param classification    {@code AD} — xem {@link #classify}

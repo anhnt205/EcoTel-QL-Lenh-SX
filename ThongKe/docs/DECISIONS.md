@@ -955,3 +955,22 @@ liệu; chỉ đổi cách phản ứng (bỏ qua + báo lại thay vì chặn c
 **Test:** `ProductionCalculationServiceOnlyApprovedTest` (5 ca: chỉ chuyến đã duyệt được đưa vào
 tính, không chuyến nào đã duyệt → từ chối, chế độ mặc định vẫn nghiêm ngặt, số chưa duyệt ở màn
 Báo cáo, kỳ chưa tính → 0); các test cổng duyệt cũ không đổi.
+
+**Bổ sung QĐ-25 (2026-11-04, sau lần tính thật đầu tiên trên 9.840 chuyến đã duyệt của tháng 9):**
+1. **Thiếu định mức NHIÊN LIỆU/NĂNG SUẤT không chặn sản lượng — CHỈ ở chế độ `onlyApproved`.**
+   Tháng 9 có 1.308 chuyến đã duyệt (xe CAT777 hạng A và VOLVOA40-GCoi) không có cột trong lưới
+   Năng suất xe; Excel của khách cũng trả `#N/A` cho các dòng này nên không có số để nạp. Engine ở chế
+   độ này để ô nhiên liệu/năng suất của chuyến đó **null (không phải 0)** và báo MỘT cảnh báo gộp theo
+   nguyên nhân + số chuyến; m³/tấn/Tkm không dùng các định mức này nên vẫn tính. Chế độ nghiêm ngặt
+   giữ QĐ-04/QĐ-06 (thiếu là từ chối). **Đây là giả định chờ chủ dự án xác nhận** (bỏ chọn "Chỉ tính
+   chuyến đã duyệt" là quay về chặn).
+2. **Sửa lỗi khoá cột ĐMNL:** `FuelCalculator` truyền `CargoType.getCode()` (CLH-014) vào
+   `ProductionKeys.fuelNormVehicleKey`, hàm này so với TÊN chủng loại hàng → ba nhánh (bùn HM400, đất
+   cạp, SPNT vỉa → `.BK`) không bao giờ khớp. Nay truyền tên (đối soát với Excel: khớp 3.024/3.024
+   nhóm xe-hàng-nơi dỡ). Test: `FuelCalculatorCargoKeyTest`.
+3. **Hiệu năng:** `calculatePeriod` chuyển `FlushMode.COMMIT` khi tính — trước đó mỗi truy vấn tra cứu
+   kích hoạt dirty-check toàn bộ thực thể đã nạp (chậm bậc hai: ~10 nghìn chuyến > 15 phút, nginx cắt
+   504 sau 300 s).
+4. **Còn lệch so với Excel (CHƯA sửa, chỉ ảnh hưởng nhiên liệu):** nội suy DMNL dùng
+   `totalRouteLiftM`, Excel dùng cột P "Chênh cao thanh toán nhiên liệu" (gồm dốc cục bộ): 554/24.368 dòng
+   nâng tải nằm ngoài [h1,h2] của Excel, 89 dòng lệch ĐMNL tới 4,1%.
