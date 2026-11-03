@@ -195,6 +195,16 @@ class ProductionCalculationServiceOnlyApprovedTest {
     }
 
     @Test
+    @DisplayName("TKE: thể trọng quy đổi = tỷ trọng; riêng than_sx nhân thêm hệ số than để KLVC cuối = Tổng KLVC (QĐ-25 phương án A)")
+    void tkeBulkDensityAppliesCoalCoefficientOnlyForCoalSx() {
+        assertThat(ProductionCalculationService.tkeBulkDensity(new java.math.BigDecimal("2.617"), null))
+                .isEqualByComparingTo("2.617");
+        assertThat(ProductionCalculationService.tkeBulkDensity(
+                new java.math.BigDecimal("1.206"), new java.math.BigDecimal("0.893840")))
+                .isEqualByComparingTo("1.07797104"); // 1,206 × 0,89384
+    }
+
+    @Test
     @DisplayName("Cảnh báo nhiên liệu/năng suất được gộp theo nguyên nhân kèm số chuyến (không in hàng nghìn dòng)")
     void fuelWarningsAreSummarisedByReasonWithCounts() {
         List<String> warnings = List.of(

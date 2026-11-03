@@ -607,6 +607,16 @@ public class ProductionCalculationService {
     }
 
     /**
+     * Thể trọng quy đổi ở chế độ TKE (QĐ-25, phương án A): tỷ trọng, và với than_sx nhân thêm hệ số
+     * "Than tke trừ đá" ({@code HS.THAN.TRUDA}) — để "KLVC cuối"/"Số trắc địa" của than bằng đúng
+     * "Tổng KLVC (tấn)" đã nhân hệ số đó, không tự mâu thuẫn với {@code total_ton} trên cùng màn hình
+     * (đối soát tháng 9/2026: trước đây chênh +6.564 t, chỉ ở than_sx).
+     */
+    static BigDecimal tkeBulkDensity(BigDecimal density, BigDecimal coalCoefficient) {
+        return coalCoefficient == null ? density : density.multiply(coalCoefficient);
+    }
+
+    /**
      * AC5 — Thể trọng (TĐ) dùng để quy m3 trắc địa sang tấn.
      *
      * <p>Docx dòng 269–273: sản phẩm {@code Dat_TCN}/{@code Than_CN} thì dùng
@@ -621,7 +631,7 @@ public class ProductionCalculationService {
         if (tkeMode) {
             // Chế độ TKE không đụng tới số trắc địa; dùng tỷ trọng thường để
             // phép quy đổi vẫn có nghĩa thay vì ra 0.
-            return r.getDensity();
+            return tkeBulkDensity(r.getDensity(), r.getCoalCoefficient());
         }
         if (!equalsAny(product, "Dat_SX", "Than_SX", "Dat_CN")) {
             // KHÔNG phải tra trượt — đây là quy tắc nghiệp vụ thật (docx dòng

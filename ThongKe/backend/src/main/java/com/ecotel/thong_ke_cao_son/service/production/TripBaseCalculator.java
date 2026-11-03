@@ -85,7 +85,10 @@ public class TripBaseCalculator {
         BigDecimal weighed = nz(trip.getWeighedWeightTon());
 
         BigDecimal totalM3 = computeTotalM3(trip, cargoType, model, tripCount, deduction, weighed, density, earth);
-        BigDecimal totalTon = computeTotalTon(totalM3, density, wasteRock, deduction, coal, acceptanceProduct);
+        // Hệ số "Than tke trừ đá" chỉ áp cho than sản xuất (docx dòng 315); tra MỘT lần, dùng cho
+        // cả tổng tấn và KLVC cuối ở chế độ TKE (QĐ-25).
+        BigDecimal coalCoefficient = "than_sx".equalsIgnoreCase(acceptanceProduct) ? coalCoefficient() : null;
+        BigDecimal totalTon = computeTotalTon(totalM3, density, wasteRock, deduction, coal, coalCoefficient);
         BigDecimal totalTkm = computeTotalTkm(trip, weighed, totalTon);
 
         // ── Nhóm TKE "ban đầu" / "không quy ẩm" (CC…CG) ─────────────────────
@@ -119,6 +122,7 @@ public class TripBaseCalculator {
                 .totalM3(totalM3)
                 .totalTon(totalTon)
                 .totalTkm(totalTkm)
+                .coalCoefficient(coalCoefficient)
                 .densityOriginal(densityOriginal)
                 .densityNoMoisture(densityNoMoisture)
                 .totalM3Original(totalM3Original)
@@ -269,14 +273,14 @@ public class TripBaseCalculator {
 
     /** AM5 — Tổng KLVC (tấn). */
     private BigDecimal computeTotalTon(BigDecimal totalM3, BigDecimal density, BigDecimal wasteRock,
-                                       BigDecimal deduction, boolean coal, String acceptanceProduct) {
+                                       BigDecimal deduction, boolean coal, BigDecimal coalCoefficient) {
         BigDecimal result = totalM3.multiply(density).subtract(wasteRock);
         if (coal) {
             result = result.subtract(deduction);
         }
-        // Hệ số "Than tke trừ đá" chỉ áp cho than sản xuất (docx dòng 315).
-        if ("than_sx".equalsIgnoreCase(acceptanceProduct)) {
-            result = result.multiply(coalCoefficient());
+        // Hệ số "Than tke trừ đá" (chỉ than_sx — null với sản phẩm khác).
+        if (coalCoefficient != null) {
+            result = result.multiply(coalCoefficient);
         }
         return result.setScale(6, RoundingMode.HALF_UP);
     }

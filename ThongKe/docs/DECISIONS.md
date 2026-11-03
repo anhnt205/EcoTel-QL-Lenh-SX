@@ -974,3 +974,17 @@ Báo cáo, kỳ chưa tính → 0); các test cổng duyệt cũ không đổi.
 4. **Cột P "Chênh cao thanh toán nhiên liệu" (đã sửa 2026-11-04):** nội suy DMNL trước đây dùng `totalRouteLiftM`; nay dùng `FuelCalculator.fuelPaymentLift` (công thức Excel, tái tạo đúng 24.368/24.368 dòng). CÒN lệch nhỏ: 3 dòng `Dthai.` ở ô Roda (Excel chỉ cộng phụ cấp Roda khi ô là chữ "Roda"; engine cộng) — chủ dự án quyết.
    `totalRouteLiftM`, Excel dùng cột P "Chênh cao thanh toán nhiên liệu" (gồm dốc cục bộ): 554/24.368 dòng
    nâng tải nằm ngoài [h1,h2] của Excel, 89 dòng lệch ĐMNL tới 4,1%.
+
+**Chủ dự án chốt các điểm còn mở của QĐ-25 (2026-11-04):**
+1. **"KLVC cuối" / "Số trắc địa" của than ở chế độ TKE — phương án A:** TKE quy đổi than_sx bằng
+   tỷ trọng × `HS.THAN.TRUDA` (`ProductionCalculationService.tkeBulkDensity`), nên `final_ton`/`final_tkm`
+   của than bằng đúng `total_ton`/`total_tkm` đã nhân hệ số than (trước đó chênh +6.564 t, +25.612 T.km).
+2. **Phụ cấp Roda theo Excel:** chỉ ô chữ "Roda" mới cộng phụ cấp 0,5% nhiên liệu. Ô SỐ (vd 0,6667) là
+   mức tải "Khác": hệ số mức tải = chính số đó, KHÔNG có phụ cấp Roda → dữ liệu nạp phải để
+   `loadLevelType=OTHER`, không phải `RODA_2_3` (lỗi ánh xạ D6 lúc nạp tháng 9, đã sửa dữ liệu qua API).
+3. **Năng suất xe thiếu cột (CAT777.DAT, VOLVOA40-GCoi.DAT/Than): không có bảng bổ sung** — giữ trống,
+   giống `#N/A` của Excel (bảng QĐ 816/2025 có nhưng số khác bảng 3305, không trộn).
+4. **`HS.THAN.TRUDA` theo Excel = 0,8938399** (DB lưu numeric(19,6) → 0,893840), thay cho 0,985 ở tài liệu cũ.
+5. **Chốt kỳ KHÔNG bị chặn khi còn chuyến chưa duyệt**, nhưng màn Báo cáo luôn hiện băng báo VÀNG
+   "Số liệu mới tính trên phần ĐÃ DUYỆT… còn N chuyến chưa duyệt đối chiếu KHÔNG nằm trong bảng này"
+   (kể cả khi kỳ đã chốt).

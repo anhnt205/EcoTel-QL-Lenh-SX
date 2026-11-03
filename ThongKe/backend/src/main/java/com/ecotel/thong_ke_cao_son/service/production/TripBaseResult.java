@@ -57,6 +57,13 @@ public class TripBaseResult {
     /** BV — Vỉa KPMB; rỗng nếu nhóm vỉa không kết thúc bằng KPMB. */
     private final String seamKpmb;
 
+    /**
+     * Hệ số "Than tke trừ đá" ({@code HS.THAN.TRUDA}) đã nhân vào {@link #totalTon} — chỉ có với
+     * sản phẩm nghiệm thu {@code than_sx}, còn lại null. Giữ lại để chế độ TKE quy đổi KLVC cuối
+     * của than bằng đúng hệ số này (QĐ-25, phương án A).
+     */
+    private final BigDecimal coalCoefficient;
+
     // ── Nhóm TKE "ban đầu" / "không quy ẩm" (cột CC…CG) ─────────────────────
 
     /** CF — Tỷ trọng ban đầu: LUÔN lấy từ danh mục, bỏ qua giá trị tạm tính. */
