@@ -89,7 +89,7 @@ public class FuelCalculator {
                 classification);
 
         BigDecimal routeDistance = decimal(trip.getTotalRouteDistanceKm());
-        BigDecimal liftHeight = decimal(trip.getTotalRouteLiftM());
+        BigDecimal liftHeight = fuelPaymentLift(trip);
 
         // ── AZ: nội suy ĐMNL ────────────────────────────────────────────────
         MatrixGridResponse dmnl = grids.get(MATRIX_DMNL);
@@ -382,6 +382,34 @@ public class FuelCalculator {
 
     private static BigDecimal decimal(Double v) {
         return v == null ? BigDecimal.ZERO : BigDecimal.valueOf(v);
+    }
+
+    /**
+     * Cột P của bảng tính — "Chênh cao thanh toán nhiên liệu", đầu vào nội suy ĐMNL (thay cho nâng
+     * tải toàn tuyến thô; đối soát tháng 9/2026: công thức này tái tạo đúng cột P Excel trên
+     * 24.368/24.368 dòng và nội suy theo P khớp ĐMNL của Excel 24.368/24.368):
+     *
+     * <pre>
+     * P = IF(L=0, 0,
+     *       IF(O&lt;M, M,
+     *          ROUND(IF(N&lt;&gt;0, MAX(M,0) + (O - MAX(M,0)) * N / L, MAX(M,0)), 0)))
+     * </pre>
+     *
+     * với L = cung độ toàn tuyến (km), M = nâng tải toàn tuyến (m), N = cung độ dốc cục bộ (km),
+     * O = dốc cục bộ (m). Trường chưa khai coi là 0.
+     */
+    static BigDecimal fuelPaymentLift(TransportReportTrip trip) {
+        BigDecimal l = decimal(trip.getTotalRouteDistanceKm());
+        BigDecimal m = decimal(trip.getTotalRouteLiftM());
+        BigDecimal n = decimal(trip.getLocalSlopeDistanceKm());
+        BigDecimal o = decimal(trip.getLocalSlopeM());
+        if (l.signum() == 0) return BigDecimal.ZERO;
+        if (o.compareTo(m) < 0) return m;
+        BigDecimal base = m.max(BigDecimal.ZERO);
+        BigDecimal raw = n.signum() != 0
+                ? base.add(o.subtract(base).multiply(n).divide(l, 12, RoundingMode.HALF_UP))
+                : base;
+        return raw.setScale(0, RoundingMode.HALF_UP);
     }
 
     private static String trim(String v) {
