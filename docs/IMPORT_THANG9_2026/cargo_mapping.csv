@@ -1,0 +1,35 @@
+﻿nguon,ten_loai_hang_KT,chung_loai_hang_dich,trang_thai,nap_hay_khong,so_dong_KT,so_chuyen_KT,so_khoa_chung_hai_phia,so_khoa_ung_ho,so_khoa_mau_thuan,ty_le_ung_ho_pct,phieu_manh_chi_tiet,phieu_hoa(twin),phieu_yeu,ghi_chu
+KT1,Bùn chặn,B.chan,OK,NAP,286,1029,285,285,0,100,B.chan=285,,,
+KT1,Bùn chặn PA,B.chan,OK,NAP,43,91,43,43,0,100,B.chan=43,,,
+KT1,Bùn trộn PA,D.UOT,OK (có mâu thuẫn),NAP,245,1451,245,172,62,73.5,D.UOT=172; B.TRON=62,,,mâu thuẫn: B.TRON=62;
+KT1,P. Bùn trộn,B.TRON,OK (có mâu thuẫn),NAP,428,2208,427,293,79,78.8,B.TRON=293; D.UOT=79,D.UOT/Nomin./Nomin.CN=1,,"mâu thuẫn: D.UOT=80, Nomin.=1, Nomin.CN=1; hòa (twin): D.UOT/Nomin./Nomin.CN=1;"
+KT1,P. Đất trộn,DBTron,OK (có mâu thuẫn),NAP,428,2208,427,293,79,78.8,DBTron=293; D.UOT=79,D.UOT/Nomin./Nomin.CN=1,,"mâu thuẫn: D.UOT=80, Nomin.=1, Nomin.CN=1; hòa (twin): D.UOT/Nomin./Nomin.CN=1;"
+KT1,SPNT,SPNT.VIA,OK,NAP,17,49,17,17,0,100,SPNT.VIA=17,,,
+KT1,SPNT_CN,SPNT.BaiChua,OK,NAP,218,3326,218,207,0,100,SPNT.BaiChua=207,,SPNT.BaiChua=11,
+KT1,Than NK2,NKSXLĐ,OK,NAP,35,287,35,35,0,100,NKSXLĐ=35,,,
+KT1,Đá sàng (Máy to),,MƠ HỒ,KHONG NAP,9,147,9,0,7,0,XitLoai(Tu SPNT)-MayTo=4; XitLoai(Tu NK)-MayTo=3,,,mâu thuẫn: XitLoai(Tu NK)-MayTo=3;
+KT1,Đá to Bunke,DaBunKe,OK,NAP,19,218,19,19,0,100,DaBunKe=19,,,
+KT1,Đất SX,Nomin.,OK,NAP,3849,24423,3845,3617,12,99.7,Nomin.=3617; Nomin.CN=12,,Nomin.=23,mâu thuẫn: Nomin.CN=12;
+KT1,Đất SX- ướt CS,D.UOT,OK,NAP,460,2348,460,453,0,100,D.UOT=453,,D.UOT=4,
+KT1,Đất SX- ướt CS- PA,D.UOT,OK,NAP,31,119,10,10,0,100,D.UOT=10,,,
+KT1,Đất chặn PA,DBChan,OK,NAP,45,93,44,43,0,100,DBChan=43,,,
+KT1,Đất chặn đuôi(ĐCĐ),DBChan,OK,NAP,286,1029,285,285,0,100,DBChan=285,,,
+KT1,Đất phương án ( CS),Nomin.,OK,NAP,114,558,102,99,0,100,Nomin.=99,,,
+KT1,Đất thải Cao Sơn,Dthai.,OK,NAP,172,1438,172,164,4,97.6,Dthai.=164; Dthai.CN=4,,,mâu thuẫn: Dthai.CN=4;
+KT1,Đất trộn PA,D.UOT,OK (có mâu thuẫn),NAP,245,1451,245,172,62,73.5,D.UOT=172; DBTron=62,,,mâu thuẫn: DBTron=62;
+KT1,Đất_CN,Nomin.,OK,NAP,32,240,32,32,0,100,Nomin.=32,,,
+KT2,SPNT,SPNT.VIA,OK,NAP,7,17,7,7,0,100,SPNT.VIA=7,,,
+KT2,Đất SX,Nomin.,OK,NAP,1972,11549,1952,1884,19,99,Nomin.=1884; Dthai.=18; Nomin.CN=1,,Nomin.=27; Dthai.=2,"mâu thuẫn: Dthai.=18, Nomin.CN=1;"
+KT2,Đất thải,Dthai.,OK,NAP,196,1286,194,179,0,100,Dthai.=179,,Dthai.=5,
+KT2,Đất thải CN,Dthai.CN,OK,NAP,3,3,3,3,0,100,Dthai.CN=3,,,
+KT2,Đất_CN,Nomin.CN,OK,NAP,158,440,158,156,0,100,Nomin.CN=156,,,
+KT3 (than NK2->STTT),THAN:NK2,NKSXLĐ,OK,NAP,404,2207,398,398,0,100,NKSXLĐ=398,,,
+KT3,BùnTrộn,B.TRON,OK,NAP,494,2290,478,470,8,98.3,D.UOT=8,B.TRON/DBTron=470,,hòa dữ liệu giữa B.TRON / DBTron -> chọn theo tên; mâu thuẫn: D.UOT=8; hòa (twin): B.TRON/DBTron=470;
+KT3,BùnTrộn.CN,B.TRON.CN,OK (có mâu thuẫn),NAP,12,16,11,9,2,81.8,D.UOT=2,B.TRON.CN/DBTron.CN=9,,hòa dữ liệu giữa B.TRON.CN / DBTron.CN -> chọn theo tên; mâu thuẫn: D.UOT=2; hòa (twin): B.TRON.CN/DBTron.CN=9;
+KT3,SPNT,SPNT.VIA,OK,NAP,331,1152,331,331,0,100,SPNT.VIA=331,,,
+KT3,Thải,Dthai.,OK,NAP,360,2572,354,354,0,100,Dthai.=354,,,
+KT3,Thải.CN,Dthai.CN,OK,NAP,15,40,15,15,0,100,Dthai.CN=15,,,
+KT3,Đất.nổ,Nomin.,OK,NAP,4023,25563,3974,3968,0,100,Nomin.=3968,,Nomin.=2,
+KT3,Đất.nổ.CN,Nomin.CN,OK,NAP,215,546,205,204,0,100,Nomin.CN=204,,,
+KT3,ĐấtƯớt,D.UOT,OK,NAP,390,1480,375,375,0,100,D.UOT=375,,,
+KT3,ĐấtƯớtCN,D.UOT.CN,YẾU (ít khoá ủng hộ),NAP,1,1,1,1,0,100,D.UOT.CN=1,,,
