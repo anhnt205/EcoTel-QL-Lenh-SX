@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Box, Button, Typography, LinearProgress, TextField } from '@mui/material';
-import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
-import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import { LocalizationProvider } from "@mui/x-date-pickers";
+import DatePicker from "../../../components/design/DatePicker";
+import { AdapterDayjs } from "../../../components/design/AdapterDayjs";
 import dayjs from 'dayjs';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { showConfirmAlert, showErrorAlert, showSuccessAlert } from '../../../components/Alert';

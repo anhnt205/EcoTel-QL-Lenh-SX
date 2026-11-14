@@ -36,6 +36,11 @@ public class CargoGroup {
     @Column(name = "description")
     private String description;
 
+    /** Phân loại của nhóm chủng loại hàng — tuỳ chọn (danh mục Phân loại, QĐ-26). */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "classification_id")
+    private Classification classification;
+
     @CreatedDate
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

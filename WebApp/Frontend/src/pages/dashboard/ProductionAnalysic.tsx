@@ -16,8 +16,9 @@ import {
 } from '@mui/material';
 import LineChartProduction from '../../components/LineChartProduction';
 import { useState, useMemo, useEffect } from 'react';
-import { DatePicker, LocalizationProvider } from '@mui/x-date-pickers';
-import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import { LocalizationProvider } from "@mui/x-date-pickers";
+import DatePicker from "../../components/design/DatePicker";
+import { AdapterDayjs } from "../../components/design/AdapterDayjs";
 import dayjs, { Dayjs } from 'dayjs';
 import { useAtom } from 'jotai';
 import { userAtom } from '../../atoms/userAtoms';

@@ -1,0 +1,52 @@
+# Deploy CỤC BỘ lên http://192.168.1.130:6903 (192.168.1.130 = chính máy chạy factory, không phải server SSH
+# nên không qua scripts/deploy.*). Theo mẫu PM-DAUTU-NINHBINH/compose.local.yaml + VMS-ECOTEL: overlay riêng, KHÔNG sửa
+# docker-compose.unified.yaml; không chứa secret (secret nằm ở WebApp/.env, git-ignored).
+#
+#   docker compose -p dieu-phoi-mm --project-directory WebApp --env-file WebApp/.env \
+#     -f WebApp/docker-compose.unified.yaml -f .factory/local-deploy/compose.local-6903.yaml up -d
+#
+# Khác compose gốc:
+#  - Mongo dùng volume Docker có tên thay vì bind .ktv-mongodb-data: bind-mount NTFS làm mongod crash (exit 139) trên máy này
+#    (ktv_mongo_db / dieuphoimm_mongo_db đã chết như vậy) => DB MỚI, tách khỏi stack preview cổng 6869.
+#  - URL công khai + MONGODB_URI đè lên Backend/.env (đang trỏ localhost:6869 và mật khẩu Mongo cũ); biến environment thắng env_file.
+#  - Subnet tường minh (Docker trên máy này đã hết dải mạng tự cấp) + giới hạn RAM (máy dùng chung nhiều stack).
+services:
+  ktv_reverse_proxy_service:
+    mem_limit: 256m
+  ktv_Frontend_service:
+    mem_limit: 256m
+  ktv_Backend_service:
+    init: true
+    mem_limit: 1g
+    environment:
+      MONGODB_URI: mongodb://root:${MONGO_PASSWORD}@ktv_db:27017/dieuphoimm?authSource=admin
+      CLIENT_URL: ${PUBLIC_URL}
+      FRONTEND_URL: ${PUBLIC_URL}
+      API_URL: ${PUBLIC_URL}
+  ktv_db:
+    init: true
+    mem_limit: 2g
+    volumes: !override
+      - ktv_mongo_data:/data/db
+  tk_postgres:
+    mem_limit: 1g
+  tk_redis:
+    mem_limit: 128m
+  tk_backend_service:
+    init: true
+    mem_limit: 1g
+    environment:
+      JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=70
+  tk_frontend_service:
+    mem_limit: 256m
+
+networks:
+  frontnet:
+    ipam: {config: [{subnet: 10.251.80.0/24}]}
+  backnet:
+    ipam: {config: [{subnet: 10.251.81.0/24}]}
+  tknet:
+    ipam: {config: [{subnet: 10.251.82.0/24}]}
+
+volumes:
+  ktv_mongo_data:

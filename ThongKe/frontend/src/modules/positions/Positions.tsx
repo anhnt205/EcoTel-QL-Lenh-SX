@@ -19,7 +19,7 @@ import type { Position } from "@/types";
 const Positions = () => {
   const [searchValue, setSearchValue] = useState("");
   const [page, setPage] = useState(0);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(15);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Position | null>(null);
 

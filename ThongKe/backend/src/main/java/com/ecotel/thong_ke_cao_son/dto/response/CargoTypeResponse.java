@@ -20,6 +20,8 @@ public class CargoTypeResponse {
     String acceptanceProductName;
     Long ttlClhId;
     String ttlClhName;
+    Long mudMarkId;
+    String mudMarkName;
     Long cargoGroupId;
     String cargoGroupName;
     LocalDateTime createdAt;

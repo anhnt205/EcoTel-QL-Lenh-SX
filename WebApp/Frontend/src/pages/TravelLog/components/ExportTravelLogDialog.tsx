@@ -15,8 +15,9 @@ import {
   Typography,
   Chip,
 } from "@mui/material";
-import { DatePicker, LocalizationProvider } from "@mui/x-date-pickers";
-import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
+import { LocalizationProvider } from "@mui/x-date-pickers";
+import DatePicker from "../../../components/design/DatePicker";
+import { AdapterDayjs } from "../../../components/design/AdapterDayjs";
 import dayjs, { Dayjs } from "dayjs";
 import { Shift } from "../../../types";
 import TravelLogService from "../../../services/travelLogService";

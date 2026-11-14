@@ -1,13 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import DIcon from "../design/DIcon";
+import "@/styles/catalog-design.css";
 import api from "@/config/api.config";
 import { FUEL_NORM_SUFFIXES, type FuelNormSuffix, vehicleSuffixKeyOf } from "./fuelNormKeys";
 
@@ -54,58 +48,61 @@ export function FuelNormAddDatasetModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-md rounded-xl bg-white shadow-xl dark:bg-gray-900">
-        <div className="border-b border-gray-200 px-6 py-4 dark:border-gray-800">
-          <h2 className="text-base font-semibold">Thêm bộ định mức</h2>
-          <p className="text-xs text-muted-foreground">
-            Chọn Chủng loại xe và Hậu tố để mở một bộ dữ liệu mới.
-          </p>
+    <div
+      className="tkc-modal-overlay"
+      style={{ zIndex: 110 }}
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div className="modal" style={{ width: "min(520px, 100%)" }} role="dialog" aria-modal="true" aria-label="Thêm bộ định mức">
+        <div className="modal-header">
+          <div>
+            <h2>Thêm bộ định mức</h2>
+            <p>Chọn Chủng loại xe và Hậu tố để mở một bộ dữ liệu mới.</p>
+          </div>
+          <button className="close-modal" style={{ marginLeft: "auto" }} aria-label="Đóng" onClick={onClose}>
+            <DIcon name="x" />
+          </button>
         </div>
 
-        <div className="space-y-3 px-6 py-4">
-          <div>
-            <label className="mb-1 block text-xs font-medium">Chủng loại xe</label>
-            <Select value={vehicleCode} onValueChange={setVehicleCode}>
-              <SelectTrigger className="h-9 w-full text-sm">
-                <SelectValue placeholder={isLoading ? "Đang tải…" : "Chọn chủng loại xe"} />
-              </SelectTrigger>
-              <SelectContent className="z-[120]">
+        <div className="modal-body">
+          <div className="fn-form">
+            <div className="form-group">
+              <label>Chủng loại xe</label>
+              <select className="field" value={vehicleCode} onChange={(e) => setVehicleCode(e.target.value)}>
+                <option value="">{isLoading ? "Đang tải…" : "Chọn chủng loại xe"}</option>
                 {vehicles.map((v) => (
-                  <SelectItem key={v.id} value={v.code}>
+                  <option key={v.id} value={v.code}>
                     {v.name} ({v.code})
-                  </SelectItem>
+                  </option>
                 ))}
-              </SelectContent>
-            </Select>
-          </div>
+              </select>
+            </div>
 
-          <div>
-            <label className="mb-1 block text-xs font-medium">Hậu tố</label>
-            <Select value={suffix} onValueChange={(v) => setSuffix(v as FuelNormSuffix)}>
-              <SelectTrigger className="h-9 w-full text-sm">
-                <SelectValue placeholder="Chọn hậu tố" />
-              </SelectTrigger>
-              <SelectContent className="z-[120]">
+            <div className="form-group">
+              <label>Hậu tố</label>
+              <select className="field" value={suffix} onChange={(e) => setSuffix(e.target.value as FuelNormSuffix | "")}>
+                <option value="">Chọn hậu tố</option>
                 {FUEL_NORM_SUFFIXES.map((s) => (
-                  <SelectItem key={s.value} value={s.value}>
+                  <option key={s.value} value={s.value}>
                     {s.label}
-                  </SelectItem>
+                  </option>
                 ))}
-              </SelectContent>
-            </Select>
+              </select>
+            </div>
           </div>
 
-          {error && <p className="text-xs text-red-600">{error}</p>}
+          {error && <div className="form-error">{error}</div>}
         </div>
 
-        <div className="flex justify-end gap-2 border-t border-gray-200 px-6 py-3 dark:border-gray-800">
-          <Button variant="outline" onClick={onClose}>
+        <div className="modal-footer">
+          <button className="btn" onClick={onClose}>
             Huỷ
-          </Button>
-          <Button className="bg-blue-600 text-white hover:bg-blue-700" onClick={submit}>
+          </button>
+          <button className="btn btn-primary" onClick={submit}>
             Thêm
-          </Button>
+          </button>
         </div>
       </div>
     </div>

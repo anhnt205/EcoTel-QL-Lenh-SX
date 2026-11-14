@@ -20,10 +20,11 @@ import {  useQuery } from '@tanstack/react-query';
 import {
     RotateLeft as RotateLeftIcon,
 } from '@mui/icons-material';
-import { DatePicker, LocalizationProvider } from '@mui/x-date-pickers';
+import { LocalizationProvider } from "@mui/x-date-pickers";
+import DatePicker from "../../components/design/DatePicker";
 import dayjs, { Dayjs } from 'dayjs';
 import api from '../../config/api.config';
-import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import { AdapterDayjs } from "../../components/design/AdapterDayjs";
 import { useAtom } from 'jotai';
 import { userAtom } from '../../atoms/userAtoms';
 import { AlertSnackbar } from '../../components/Alert';

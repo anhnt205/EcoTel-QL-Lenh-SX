@@ -4,6 +4,7 @@ import { CalendarClock, CopyPlus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DatePickerString } from "@/components/common/DatePickerString";
 import { matrixService, type MatrixGrid } from "./matrixService";
 
 /**
@@ -145,12 +146,10 @@ export function MatrixVersionBar({
       {creating && (
         <div className="mt-2 flex flex-wrap items-end gap-2 border-t pt-2">
           <Field label="Từ ngày *">
-            <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)}
-              className="h-8 w-[150px] text-xs" />
+            <DatePickerString allowClear value={from} onChange={(v) => setFrom(v)} className="w-[150px]" popoverClassName="z-[200]" />
           </Field>
           <Field label="Đến ngày">
-            <Input type="date" value={to} onChange={(e) => setTo(e.target.value)}
-              className="h-8 w-[150px] text-xs" />
+            <DatePickerString allowClear value={to} onChange={(v) => setTo(v)} className="w-[150px]" popoverClassName="z-[200]" />
           </Field>
           <Field label="Nhãn">
             <Input value={label} onChange={(e) => setLabel(e.target.value)}

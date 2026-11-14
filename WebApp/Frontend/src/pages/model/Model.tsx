@@ -32,8 +32,9 @@ import { showConfirmAlert, showErrorAlert, showSuccessAlert } from '../../compon
 import CustomDataGrid from '../../components/Table/CustomDataGrid';
 import { GridRowModel } from '@mui/x-data-grid';
 import dayjs, { Dayjs } from 'dayjs';
-import { DatePicker, LocalizationProvider } from '@mui/x-date-pickers';
-import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import { LocalizationProvider } from "@mui/x-date-pickers";
+import DatePicker from "../../components/design/DatePicker";
+import { AdapterDayjs } from "../../components/design/AdapterDayjs";
 import ModelEditor from './ModelEditor';
 import { Table, TableColumnsType } from 'antd';
 

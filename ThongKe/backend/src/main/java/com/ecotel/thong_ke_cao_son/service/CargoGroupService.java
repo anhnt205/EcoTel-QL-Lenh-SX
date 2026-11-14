@@ -8,7 +8,9 @@ import com.ecotel.thong_ke_cao_son.exception.BadRequestException;
 import com.ecotel.thong_ke_cao_son.exception.ResourceNotFoundException;
 import com.ecotel.thong_ke_cao_son.mapper.CargoGroupMapper;
 import com.ecotel.thong_ke_cao_son.model.CargoGroup;
+import com.ecotel.thong_ke_cao_son.model.Classification;
 import com.ecotel.thong_ke_cao_son.repository.CargoGroupRepository;
+import com.ecotel.thong_ke_cao_son.repository.ClassificationRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -23,6 +25,7 @@ public class CargoGroupService {
 
     private final CargoGroupRepository repository;
     private final CargoGroupMapper mapper;
+    private final ClassificationRepository classificationRepository;
 
     @Transactional(readOnly = true)
     public PageResponse<CargoGroupResponse> getAll(String keyword, Pageable pageable) {
@@ -38,7 +41,7 @@ public class CargoGroupService {
     @Transactional
     public CargoGroupResponse create(CargoGroupRequest request) {
         ensureCodeAvailable(request.getCode(), null);
-        return mapper.toResponse(repository.save(mapper.toEntity(request)));
+        return mapper.toResponse(repository.save(withClassification(mapper.toEntity(request), request)));
     }
 
     /** Tạo nhiều bản ghi trong một lần — màn "Thêm mới" cho nhập nhiều dòng. */
@@ -51,7 +54,7 @@ public class CargoGroupService {
             throw new BadRequestException("Có mã nhóm chủng loại hàng bị trùng nhau trong danh sách gửi lên");
         }
         requests.forEach(r -> ensureCodeAvailable(r.getCode(), null));
-        return repository.saveAll(requests.stream().map(mapper::toEntity).toList())
+        return repository.saveAll(requests.stream().map(r -> withClassification(mapper.toEntity(r), r)).toList())
                 .stream().map(mapper::toResponse).toList();
     }
 
@@ -60,6 +63,7 @@ public class CargoGroupService {
         CargoGroup entity = find(id);
         ensureCodeAvailable(request.getCode(), id);
         mapper.updateEntity(entity, request);
+        withClassification(entity, request);
         return mapper.toResponse(repository.save(entity));
     }
 
@@ -76,6 +80,15 @@ public class CargoGroupService {
                 .requestedCount(ids.size())
                 .deletedCount(found.size())
                 .build();
+    }
+
+    /** Gắn Phân loại từ id (MapStruct bỏ qua); không gửi id thì để trống, gửi id thì id phải tồn tại. */
+    private CargoGroup withClassification(CargoGroup entity, CargoGroupRequest request) {
+        Long cid = request.getClassificationId();
+        Classification c = cid == null ? null : classificationRepository.findById(cid).orElseThrow(
+                () -> new ResourceNotFoundException("Không tìm thấy phân loại với id: " + cid));
+        entity.setClassification(c);
+        return entity;
     }
 
     private CargoGroup find(Long id) {

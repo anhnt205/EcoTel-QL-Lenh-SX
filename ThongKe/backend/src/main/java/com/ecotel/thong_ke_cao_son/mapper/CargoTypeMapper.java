@@ -18,18 +18,22 @@ public interface CargoTypeMapper {
     @Mapping(target = "acceptanceProductName", source = "acceptanceProduct.name")
     @Mapping(target = "ttlClhId", source = "ttlClh.id")
     @Mapping(target = "ttlClhName", source = "ttlClh.name")
+    @Mapping(target = "mudMarkId", source = "mudMark.id")
+    @Mapping(target = "mudMarkName", source = "mudMark.name")
     CargoTypeResponse toResponse(CargoType cargoType);
 
     /** Ba quan hệ do service tự resolve từ id tương ứng. */
     @Mapping(target = "cargoGroup", ignore = true)
     @Mapping(target = "acceptanceProduct", ignore = true)
     @Mapping(target = "ttlClh", ignore = true)
+    @Mapping(target = "mudMark", ignore = true)
     @Mapping(target = "id", ignore = true)
     CargoType toEntity(CargoTypeRequest request);
 
     @Mapping(target = "cargoGroup", ignore = true)
     @Mapping(target = "acceptanceProduct", ignore = true)
     @Mapping(target = "ttlClh", ignore = true)
+    @Mapping(target = "mudMark", ignore = true)
     @Mapping(target = "id", ignore = true)
     void updateEntity(@MappingTarget CargoType entity, CargoTypeRequest request);
 }

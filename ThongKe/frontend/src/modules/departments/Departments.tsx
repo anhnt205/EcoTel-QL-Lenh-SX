@@ -19,7 +19,7 @@ import type { Department } from "@/types";
 const Departments = () => {
   const [searchValue, setSearchValue] = useState("");
   const [page, setPage] = useState(0);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(15);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Department | null>(null);
 

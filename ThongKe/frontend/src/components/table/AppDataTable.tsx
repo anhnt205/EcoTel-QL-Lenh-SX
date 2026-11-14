@@ -40,7 +40,8 @@ declare module "@tanstack/react-table" {
     headerTitle?: string;
   }
 }
-import { ChevronRight, ChevronDown } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, ChevronRight, ChevronDown } from "lucide-react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Table,
@@ -52,6 +53,9 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import TableToolbar from "./TableToolbar";
+import ColumnToggleMenu from "./ColumnToggleMenu";
+import ColumnFilterButton from "./ColumnFilterButton";
+import { displayTextFilter } from "./useTanstackLayout";
 import TablePagination from "./TablePagination";
 import TableLoading from "./TableLoading";
 import TableEmpty from "./TableEmpty";
@@ -104,9 +108,43 @@ type BaseProps<TData> = {
   // Default page size khi dùng internal pagination
   defaultPageSize?: number;
 
+  /** Khoá ổn định của dòng (mặc định: chỉ số dòng). Cần khi chọn dòng phải sống sót qua lúc tải lại dữ liệu. */
+  getRowId?: (row: TData, index: number) => string;
+  /** Báo ra ngoài các dòng đang được chọn (đã qua bộ lọc cột) — để nút "Xoá"/"Tải xuống" ở ngoài bảng dùng. */
+  onSelectionChange?: (rows: TData[]) => void;
+  /** Hàng ô lọc ngay dưới tiêu đề: mỗi cột (có accessor) một ô nhập, lọc phía client trên dữ liệu đang có. */
+  showColumnFilters?: boolean;
+  /** Kẻ bảng rõ: viền ô/dòng đậm hơn mặc định (cả tiêu đề lẫn thân bảng). */
+  gridLines?: boolean;
+  /** Thu gọn chiều dọc: ô tiêu đề và ô dữ liệu đệm mỏng hơn để một màn hình hiện được nhiều dòng hơn. */
+  compact?: boolean;
+  /**
+   * Chiều ngang bảng vừa với nội dung (không giãn hết bề rộng trang): cột co theo chữ, ô dài tối đa 420px rồi cắt "…".
+   * Cột có `size` khai rõ (tick, STT, thao tác) giữ nguyên bề rộng đó.
+   */
+  fitContent?: boolean;
+  /**
+   * Bảng "chảy theo trang": rộng hết bề ngang khung chứa (bố cục cố định, cột chia theo `size`, chữ dài cắt "…"), KHÔNG có thanh cuộn riêng —
+   * cuộn dùng chung của trang; tiêu đề dính (`stickyHeader`) bám theo thanh cuộn của trang đó. Dùng cho bố cục thẻ.
+   */
+  flow?: boolean;
+  /** Cố định số dòng mỗi trang: ẩn ô chọn "Số dòng" ở thanh phân trang. */
+  fixedPageSize?: boolean;
+  /** Lớp màu nền tiêu đề cột (mặc định xanh nhạt `bg-blue-500`); truyền cả hover/dark: "bg-blue-700 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-700". */
+  headerBg?: string;
+  /** Hiện nút sắp xếp (mũi tên) ở ô tiêu đề các cột sắp xếp được (sắp xếp phía client). */
+  sortableHeaders?: boolean;
+  /** `id` của phần tử DOM bên NGOÀI bảng để đặt nút "Hiển thị cột" vào (thay cho thanh `columnToggleBar`). */
+  columnToggleSlotId?: string;
+  /** Kiểu thanh phân trang: `card` = "Hiển thị [n] bản ghi/trang" + « ‹ 1 2 › ». */
+  paginationVariant?: "card";
+  /** Thanh nhỏ phía trên bảng: "Tổng số bản ghi: N" bên trái, nút "Hiển thị cột" bên phải. */
+  columnToggleBar?: boolean;
+
   // Toolbar
   title?: string;
   searchValue?: string;
+  searchPlaceholder?: string;
   onSearch?: (value: string) => void;
   onRefresh?: () => void;
   onAdd?: () => void;
@@ -154,7 +192,37 @@ export type AppDataTableProps<TData> = BaseProps<TData> &
 
 export default AppDataTable;
 
-function AppDataTable<TData>({
+/**
+ * Bảng dữ liệu dùng chung. `preset="card"` = kiểu thẻ đồng bộ với CatalogPage (chủ dự án duyệt 2026-11-09): kẻ bảng rõ, dòng
+ * gọn, hết bề ngang, không thanh cuộn riêng (cuộn theo trang), 15 dòng cố định, nút "Hiển thị cột" + tổng số bản ghi phía
+ * trên bảng, không dòng kẻ sọc, không tên bảng. Các prop truyền vào vẫn ghi đè được (trừ chọn cột và tên bảng).
+ * Dùng chung với khung trang `components/layout/CardPage`.
+ */
+function AppDataTable<TData>(props: AppDataTableProps<TData> & { preset?: "card" }) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { preset, ...rest } = props as any;
+  if (preset !== "card") return <AppDataTableImpl {...rest} />;
+  return (
+    <AppDataTableImpl
+      gridLines
+      compact
+      flow
+      striped={false}
+      stickyHeader
+      columnToggleBar
+      fixedPageSize
+      {...rest}
+      showColumnToggle={false}
+      title={undefined}
+      className={cn(
+        "rounded-none border-0 shadow-none [&_tbody_tr:hover]:!bg-blue-50",
+        rest.className,
+      )}
+    />
+  );
+}
+
+function AppDataTableImpl<TData>({
   columns,
   data,
 
@@ -172,10 +240,25 @@ function AppDataTable<TData>({
   sorting: controlledSorting,
   onSortingChange: onControlledSortingChange,
 
-  defaultPageSize = 10,
+  defaultPageSize = 15,
+
+  getRowId,
+  onSelectionChange,
+  showColumnFilters = false,
+  gridLines = false,
+  compact = false,
+  fitContent = false,
+  flow = false,
+  fixedPageSize = false,
+  headerBg,
+  sortableHeaders = false,
+  columnToggleSlotId,
+  paginationVariant,
+  columnToggleBar = false,
 
   title,
   searchValue = "",
+  searchPlaceholder,
   onSearch,
   onRefresh,
   onAdd,
@@ -310,7 +393,9 @@ function AppDataTable<TData>({
   const table = useReactTable({
     data,
     columns: finalColumns,
-    defaultColumn: { minSize: 60 },
+    getRowId,
+    // includesString: lọc "chứa chuỗi" cho cả cột số (mặc định của cột số là khoảng min–max, không hợp ô nhập chữ).
+    defaultColumn: { minSize: 60, filterFn: displayTextFilter },
 
     // Pagination
     manualPagination,
@@ -411,6 +496,21 @@ function AppDataTable<TData>({
   const hasActiveFilters = Object.values(filterValues).some((v) => v !== "");
   const selectedCount = table.getFilteredSelectedRowModel().rows.length;
 
+  // Báo dòng đang chọn ra ngoài. Chỉ chạy khi chọn/dữ liệu/bộ lọc đổi (không mỗi lần render).
+  // Nút "Hiển thị cột" đặt ở chỗ khác ngoài bảng (phần tử có id = columnToggleSlotId): tìm sau khi trang dựng xong.
+  const [toggleSlot, setToggleSlot] = React.useState<HTMLElement | null>(null);
+  React.useEffect(() => {
+    setToggleSlot(columnToggleSlotId ? document.getElementById(columnToggleSlotId) : null);
+  }, [columnToggleSlotId]);
+  const selectionCbRef = React.useRef(onSelectionChange);
+  selectionCbRef.current = onSelectionChange;
+  React.useEffect(() => {
+    selectionCbRef.current?.(
+      table.getFilteredSelectedRowModel().rows.map((r) => r.original),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rowSelection, data, columnFilters]);
+
   const showEmptyState = !loading && data.length === 0;
   const showTable = !loading && data.length > 0;
 
@@ -418,11 +518,13 @@ function AppDataTable<TData>({
     <div
       className={cn(
         "bg-card shadow-sm border flex flex-col w-full",
+        // vừa nội dung: khung co theo bảng, nhưng không hẹp hơn thanh phân trang
+        fitContent && !isFullscreen && "mx-auto w-fit max-w-full min-w-[560px]",
         fullHeight || isFullscreen ? "flex-1 min-h-0 h-full" : "h-auto",
         bordered ? "border-border" : "border-transparent",
         isFullscreen
           ? "fixed inset-0 z-50 m-0 rounded-none w-screen h-screen overflow-hidden"
-          : "rounded-xl overflow-hidden",
+          : cn("rounded-xl overflow-hidden", flow && "overflow-visible"),
         className,
       )}
     >
@@ -431,6 +533,7 @@ function AppDataTable<TData>({
         <TableToolbar
           title={title}
           searchValue={searchValue}
+          searchPlaceholder={searchPlaceholder}
           onSearch={onSearch}
           onRefresh={onRefresh}
           onAdd={onAdd}
@@ -485,6 +588,20 @@ function AppDataTable<TData>({
         />
       )}
 
+      {/* Thanh phía trên bảng: tổng số bản ghi + nút "Hiển thị cột" (đứng riêng, không nằm trong tiêu đề) */}
+      {columnToggleSlotId && toggleSlot && createPortal(<ColumnToggleMenu table={table} />, toggleSlot)}
+      {columnToggleBar && (
+        <div className={cn("flex items-center justify-between gap-3 border-b bg-card px-3", compact ? "py-1" : "py-2")}>
+          <span className="text-sm text-muted-foreground">
+            Tổng số bản ghi:{" "}
+            <span className="font-bold text-foreground">
+              {totalCount ?? table.getFilteredRowModel().rows.length}
+            </span>
+          </span>
+          <ColumnToggleMenu table={table} />
+        </div>
+      )}
+
       {/* Loading skeleton */}
       {loading && (
         <TableLoading rows={pagination.pageSize} columns={columns.length} />
@@ -510,24 +627,34 @@ function AppDataTable<TData>({
           )}
 
           <Table
-            containerClassName={cn("w-full overflow-x-auto", (fullHeight || isFullscreen) && "flex-1 min-h-0")}
+            containerClassName={cn(
+              "w-full overflow-x-auto",
+              flow && "overflow-visible",
+              (fullHeight || isFullscreen) && "flex-1 min-h-0 overflow-y-auto",
+              fitContent && "w-fit max-w-full",
+              gridLines && "rounded-none border-slate-400 dark:border-slate-600",
+            )}
             containerStyle={{
               maxHeight: isFullscreen ? undefined : maxHeight,
             }}
             className={cn(dense && "text-xs")}
-            style={{
-              tableLayout: "fixed",
-              width: "100%",
-              minWidth: table.getTotalSize(),
-            }}
+            style={
+              fitContent
+                ? { tableLayout: "auto", width: "auto" }
+                : {
+                    tableLayout: "fixed",
+                    width: "100%",
+                    minWidth: table.getTotalSize(),
+                  }
+            }
           >
             <TableHeader
-              className={cn(stickyHeader && "sticky top-0 z-10 bg-card")}
+              className={cn(stickyHeader && "sticky top-0 z-10 bg-blue-500", headerBg)}
             >
               {table.getHeaderGroups().map((headerGroup) => (
                 <TableRow
                   key={headerGroup.id}
-                  className="border-b border-border bg-slate-100/90 dark:bg-slate-900/90 hover:bg-slate-100/90"
+                  className={cn("border-b border-blue-600 bg-blue-500 hover:bg-blue-500 dark:bg-blue-500 dark:hover:bg-blue-500", headerBg)}
                 >
                   {headerGroup.headers.map((header) => {
                     const meta = header.column.columnDef.meta;
@@ -543,23 +670,62 @@ function AppDataTable<TData>({
                       <TableHead
                         key={header.id}
                         style={{
-                          width: header.getSize(),
-                          minWidth: (
-                            header.column.columnDef as { minSize?: number }
-                          ).minSize,
+                          // vừa nội dung: chỉ cột khai `size` rõ mới bị ép bề rộng
+                          width:
+                            fitContent && header.column.columnDef.size === undefined
+                              ? undefined
+                              : header.getSize(),
+                          minWidth: fitContent
+                            ? undefined
+                            : (header.column.columnDef as { minSize?: number })
+                                .minSize,
                         }}
                         className={cn(
-                          "relative px-4 py-3.5 font-bold text-slate-800 dark:text-slate-100 text-sm uppercase tracking-wider whitespace-nowrap border-r border-border/70 last:border-r-0 overflow-hidden text-ellipsis align-middle",
+                          "relative px-4 py-3.5 font-bold text-white dark:text-white text-sm whitespace-nowrap border-r border-blue-400/60 last:border-r-0 overflow-hidden text-ellipsis align-middle",
+                          gridLines && "border-blue-200/80",
+                          compact && "h-auto px-2 py-1.5",
                           alignClass,
                           meta?.headerClassName || meta?.className
                         )}
                       >
-                        {header.isPlaceholder
-                          ? null
-                          : flexRender(
-                              header.column.columnDef.header,
-                              header.getContext(),
+                        {header.isPlaceholder ? null : (showColumnFilters &&
+                            header.column.getCanFilter()) ||
+                          (sortableHeaders && header.column.getCanSort()) ? (
+                          // Sắp xếp (mũi tên) + lọc theo cột (3 chấm dọc) NGAY TRONG ô tiêu đề; bấm 3 chấm mới hiện ô nhập nội dung lọc.
+                          <div className="flex items-center justify-center gap-1">
+                            <span className="min-w-0 truncate">
+                              {flexRender(
+                                header.column.columnDef.header,
+                                header.getContext(),
+                              )}
+                            </span>
+                            {sortableHeaders && header.column.getCanSort() && (
+                              <button
+                                type="button"
+                                title="Sắp xếp"
+                                aria-label="Sắp xếp"
+                                onClick={header.column.getToggleSortingHandler()}
+                                className="shrink-0 rounded p-0.5 text-white/90 hover:bg-white/20"
+                              >
+                                {header.column.getIsSorted() === "asc" ? (
+                                  <ArrowUp className="h-3.5 w-3.5" />
+                                ) : header.column.getIsSorted() === "desc" ? (
+                                  <ArrowDown className="h-3.5 w-3.5" />
+                                ) : (
+                                  <ArrowUpDown className="h-3.5 w-3.5" />
+                                )}
+                              </button>
                             )}
+                            {showColumnFilters && header.column.getCanFilter() && (
+                              <ColumnFilterButton column={header.column} table={table} />
+                            )}
+                          </div>
+                        ) : (
+                          flexRender(
+                            header.column.columnDef.header,
+                            header.getContext(),
+                          )
+                        )}
                         {header.column.getCanResize() && (
                           <div
                             onMouseDown={header.getResizeHandler()}
@@ -579,7 +745,7 @@ function AppDataTable<TData>({
               ))}
             </TableHeader>
 
-            <TableBody>
+            <TableBody className={cn(gridLines && "divide-slate-300 dark:divide-slate-600")}>
               {table.getRowModel().rows.map((row, index) => (
                 <React.Fragment key={row.id}>
                   <TableRow
@@ -587,6 +753,7 @@ function AppDataTable<TData>({
                     onClick={() => onRowClick?.(row.original)}
                     className={cn(
                       "transition-colors",
+                      gridLines && "border-b border-slate-300 dark:border-slate-600",
                       hoverable && "hover:bg-muted/50",
                       row.getIsSelected() && "bg-muted/80",
                       striped &&
@@ -610,13 +777,20 @@ function AppDataTable<TData>({
                         <TableCell
                           key={cell.id}
                           style={{
-                            width: cell.column.getSize(),
-                            minWidth: (
-                              cell.column.columnDef as { minSize?: number }
-                            ).minSize,
+                            width:
+                              fitContent && cell.column.columnDef.size === undefined
+                                ? undefined
+                                : cell.column.getSize(),
+                            minWidth: fitContent
+                              ? undefined
+                              : (cell.column.columnDef as { minSize?: number })
+                                  .minSize,
                           }}
                           className={cn(
                             "px-4 py-3 text-sm border-r last:border-r-0 overflow-hidden text-ellipsis whitespace-nowrap align-middle",
+                            gridLines && "border-slate-300 dark:border-slate-600",
+                            compact && "px-2 py-1",
+                            fitContent && "max-w-[420px]",
                             alignClass,
                             meta?.className
                           )}
@@ -663,6 +837,8 @@ function AppDataTable<TData>({
       {showPagination && !loading && data.length > 0 && (
         <TablePagination
           table={table}
+          showPageSize={!fixedPageSize}
+          variant={paginationVariant}
           totalCount={
             totalCount ?? (manualPagination ? undefined : data.length)
           }

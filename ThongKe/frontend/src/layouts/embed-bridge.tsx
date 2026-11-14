@@ -1,6 +1,17 @@
 import { useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { isEmbedded, MSG_LOCATION, MSG_NAVIGATE } from "@/lib/embed";
+import { isEmbedded, MSG_HEADER, MSG_LOCATION, MSG_NAVIGATE } from "@/lib/embed";
+
+/** Có phần tử cuộn dọc nào (từ `el` lên gốc) đang cuộn dở (scrollTop > 0) không. */
+const hasScrolledAncestor = (el: Element | null): boolean => {
+  for (let n: Element | null = el; n && n !== document.documentElement; n = n.parentElement) {
+    const oy = getComputedStyle(n).overflowY;
+    if ((oy === "auto" || oy === "scroll") && n.scrollHeight > n.clientHeight && n.scrollTop > 0) {
+      return true;
+    }
+  }
+  return false;
+};
 
 /**
  * Cầu nối điều hướng khi Thống kê chạy nhúng trong Điều phối (cùng origin).
@@ -35,6 +46,25 @@ export function EmbedBridge() {
       window.location.origin,
     );
   }, [embedded, pathname, search]);
+
+  // Lăn chuột xuống trong khung => báo cha thu banner phần mềm (chỉ còn thanh menu) để có thêm chỗ hiển thị;
+  // lăn LÊN mà bảng đã về đầu => báo cha hiện lại. Dùng sự kiện lăn chuột (không dùng vị trí cuộn) để khỏi
+  // dao động: banner thu => khung cao hơn => vị trí cuộn đổi => lại hiện banner...
+  useEffect(() => {
+    if (!embedded || window.parent === window) return;
+    let collapsed = false;
+    const onWheel = (e: WheelEvent) => {
+      if (e.ctrlKey || e.deltaY === 0) return;
+      let next = collapsed;
+      if (e.deltaY > 0) next = true;
+      else if (!hasScrolledAncestor(e.target as Element | null)) next = false;
+      if (next === collapsed) return;
+      collapsed = next;
+      window.parent.postMessage({ type: MSG_HEADER, collapse: next }, window.location.origin);
+    };
+    window.addEventListener("wheel", onWheel, { passive: true, capture: true });
+    return () => window.removeEventListener("wheel", onWheel, { capture: true });
+  }, [embedded]);
 
   return null;
 }

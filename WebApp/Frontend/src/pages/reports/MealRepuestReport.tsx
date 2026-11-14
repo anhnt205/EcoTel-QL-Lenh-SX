@@ -1,5 +1,6 @@
 import { Typography, IconButton, Paper, Grid, Box } from '@mui/material';
-import { DataGrid, GridColDef, GridRenderCellParams, useGridApiRef } from '@mui/x-data-grid';
+import { GridColDef, GridRenderCellParams } from '@mui/x-data-grid';
+import ReportGrid from '../../components/design/ReportGrid';
 import React, { useEffect, useState } from 'react'
 import { Department, Shift } from '../../types';
 import dayjs from 'dayjs';
@@ -26,8 +27,6 @@ export default function MealRequestReport({
     department: Department | null
 }) {
     const [user] = useAtom(userAtom)
-
-    const apiRef = useGridApiRef()
     const reportColumns: GridColDef[] = [
         {
             field: 'STT', headerName: 'STT', width: 50, headerAlign: 'center', align: 'center',
@@ -67,23 +66,7 @@ export default function MealRequestReport({
                 <Typography>Từ ngày: {startDate?.format('DD-MM-YYYY')}</Typography>
                 <Typography>Đến ngày: {endDate?.format('DD-MM-YYYY')}</Typography>
                 <Typography>Ca: {shifts.map(s => s.name).join(', ')}</Typography>
-                <DataGrid
-                    rows={data}
-                    apiRef={apiRef}
-                    columns={reportColumns}
-                    getRowId={(row) => row._id}
-                    autoHeight
-                    hideFooter
-                    sx={{
-                        width: '100%',
-                        '& .MuiDataGrid-cell': {
-                            border: '1px solid black',
-                        },
-                        '& .MuiDataGrid-columnHeader': {
-                            border: '1px solid black',
-                        },
-                    }}
-                />
+                <ReportGrid rows={data} columns={reportColumns} getRowId={(row) => row._id} />
                 {signatureUrl && (
                     <Box mt={2} sx={{ display: 'flex', justifyContent: 'flex-end' }}>
                         <img src={signatureUrl} alt="Chữ ký" style={{ maxWidth: 200, maxHeight: 100 }} />

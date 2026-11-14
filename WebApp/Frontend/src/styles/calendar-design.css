@@ -1,0 +1,82 @@
+/*
+ * Lịch chọn ngày (MUI X DatePicker) theo MẪU của chủ dự án (cùng kiểu lịch ở màn Nhập liệu khai thác – Thống kê):
+ * thanh trên "‹  Tháng 11 ▾ 2026  ›", hàng thứ "Th 2 … CN" xám, số ngày thường (14px, ô 32px như shadcn Calendar), ngày ngoài tháng xám,
+ * ngày đang chọn = ô xanh bo góc, hôm nay = nền xám nhạt. Áp cho MỌI ô chọn ngày của Điều phối
+ * (hộp lịch nằm trong portal ngoài thân trang nên dùng class gốc của MUI, không gắn vào .tkc).
+ * Tên thứ lấy từ theme (theme/index.ts → MuiDayPicker), tiếng Việt + tuần bắt đầu Thứ 2 từ components/design/AdapterDayjs.ts.
+ */
+.MuiPickersPopper-paper { border-radius: 12px !important; border: 1px solid #e2e8f0; box-shadow: 0 12px 32px rgba(15, 23, 42, .18) !important; background: #fff; }
+.MuiPickersPopper-paper .MuiCalendarPicker-root { width: auto; min-width: 0; padding: 6px 12px 12px; font-family: Arial, Helvetica, sans-serif; }
+
+/* thanh trên: nhãn tháng/năm ở giữa, 2 mũi tên hai đầu */
+.MuiPickersPopper-paper .MuiPickersCalendarHeader-root { position: relative; justify-content: center; margin: 8px 0 12px; padding: 0; min-height: 32px; max-height: none; }
+.MuiPickersPopper-paper .MuiPickersCalendarHeader-labelContainer { margin: 0 !important; max-height: none; font-family: Arial, Helvetica, sans-serif; font-size: 14px; font-weight: 500; color: #0f172a; }
+.MuiPickersPopper-paper .MuiPickersCalendarHeader-label { margin-right: 2px; }
+.MuiPickersPopper-paper .MuiPickersCalendarHeader-switchViewButton { margin: 0 !important; color: #64748b; }
+.MuiPickersPopper-paper .MuiPickersArrowSwitcher-root { position: absolute; inset: 0; justify-content: space-between; pointer-events: none; }
+.MuiPickersPopper-paper .MuiPickersArrowSwitcher-spacer { display: none; }
+.MuiPickersPopper-paper .MuiPickersArrowSwitcher-root .MuiIconButton-root { pointer-events: auto; color: #0f172a; }
+.MuiPickersPopper-paper .MuiPickersArrowSwitcher-root .MuiIconButton-root.Mui-disabled { color: #cbd5e1; }
+
+/* hàng thứ */
+.MuiPickersPopper-paper .MuiDayPicker-weekDayLabel { width: 32px !important; height: 32px !important; margin: 0 !important; font-family: Arial, Helvetica, sans-serif; font-size: 12.8px; font-weight: 400; color: #64748b !important; }
+
+/* lưới ngày */
+.MuiPickersPopper-paper .MuiDayPicker-slideTransition { min-height: 232px; }
+.MuiPickersPopper-paper .MuiDayPicker-weekContainer { margin: 8px 0 0; }
+.MuiPickersPopper-paper .MuiPickersDay-root { width: 32px; height: 32px; margin: 0; border-radius: 8px; font-family: Arial, Helvetica, sans-serif; font-size: 14px; font-weight: 400; color: #0f172a; background: transparent; }
+.MuiPickersPopper-paper .MuiPickersDay-root:hover { background: #f1f5f9; }
+.MuiPickersPopper-paper .MuiPickersDay-root.MuiPickersDay-dayOutsideMonth { color: #64748b; }
+.MuiPickersPopper-paper .MuiPickersDay-root.MuiPickersDay-today:not(.Mui-selected) { background: #f1f5f9; border: 0; }
+.MuiPickersPopper-paper .MuiPickersDay-root.Mui-selected,
+.MuiPickersPopper-paper .MuiPickersDay-root.Mui-selected:hover,
+.MuiPickersPopper-paper .MuiPickersDay-root.Mui-selected:focus { background: #0a74da; color: #fff; font-weight: 400; }
+.MuiPickersPopper-paper .MuiPickersDay-root.Mui-disabled { color: #cbd5e1; background: transparent; }
+
+/* chọn năm */
+.MuiPickersPopper-paper .PrivatePickersYear-yearButton { font-family: Arial, Helvetica, sans-serif; font-weight: 400; }
+.MuiPickersPopper-paper .PrivatePickersYear-yearButton.Mui-selected { background: #0a74da; color: #fff; }
+
+/* ===== Chọn giờ (MUI X TimePicker/DesktopTimePicker – Lệnh sản xuất, Ca): cùng bộ màu/bo góc với lịch ===== */
+.MuiPickersPopper-paper .MuiClockPicker-root { font-family: Arial, Helvetica, sans-serif; padding: 6px 8px 10px; }
+.MuiPickersPopper-paper .MuiClockPicker-arrowSwitcher { padding: 0 8px; }
+.MuiPickersPopper-paper .MuiClock-root { margin: 14px 12px 8px; }
+.MuiPickersPopper-paper .MuiClock-clock { background: #f1f5f9; }
+.MuiPickersPopper-paper .MuiClock-squareMask { outline: 0; }
+.MuiPickersPopper-paper .MuiClock-pin { background: #0a74da; }
+.MuiPickersPopper-paper .MuiClockPointer-root { background: #0a74da; }
+.MuiPickersPopper-paper .MuiClockPointer-thumb { background: #0a74da; border-color: #0a74da; }
+.MuiPickersPopper-paper .MuiClockNumber-root { font-family: Arial, Helvetica, sans-serif; font-size: 14px; font-weight: 400; color: #0f172a; }
+.MuiPickersPopper-paper .MuiClockNumber-root.Mui-selected { color: #fff; }
+.MuiPickersPopper-paper .MuiClockNumber-root.Mui-disabled { color: #cbd5e1; }
+
+/* ===== CalendarPanel (components/design/CalendarPanel.tsx): lịch chọn ngày DÙNG CHUNG, dựng lại đúng mẫu shadcn Calendar của
+   Nhập liệu Khai thác (Thống kê): ô 32px, số ngày đậm 14px, thứ 12.8px xám, tháng/năm là 2 ô thả xuống. ===== */
+.dpc-paper { border-radius: 8px !important; border: 1px solid #e5e7eb; background: #fff; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, .1), 0 2px 4px -2px rgba(0, 0, 0, .1) !important; }
+.dpc { box-sizing: border-box; width: 248px; padding: 12px; background: #fff; font-family: Arial, Helvetica, sans-serif; color: #0a0a0a; user-select: none; }
+.dpc *, .dpc *::before, .dpc *::after { box-sizing: border-box; font-family: inherit; }
+.dpc button { cursor: pointer; padding: 0; margin: 0; border: 0; background: transparent; color: inherit; font: inherit; }
+.dpc-head { position: relative; display: flex; align-items: center; justify-content: center; gap: 6px; height: 32px; padding: 0 32px; }
+.dpc .dpc-nav { position: absolute; top: 0; width: 32px; height: 32px; display: grid; place-items: center; border-radius: 8px; color: #0a0a0a; }
+.dpc-prev { left: 0; }
+.dpc-next { right: 0; }
+.dpc-nav:hover { background: #f1f5f9; }
+.dpc-nav svg { width: 16px; height: 16px; }
+.dpc-dd { position: relative; display: inline-flex; align-items: center; gap: 4px; height: 32px; padding: 0 4px; border-radius: 8px; font-size: 14px; font-weight: 500; white-space: nowrap; }
+.dpc-dd svg { width: 14px; height: 14px; color: #737373; }
+.dpc-dd:hover { background: #f1f5f9; }
+.dpc-dd select { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; font-size: 14px; }
+.dpc-wd, .dpc-row { display: flex; }
+.dpc-wd { margin-top: 8px; }
+.dpc-wd span { width: 32px; text-align: center; font-size: 12.8px; font-weight: 400; color: #64748b; line-height: 20px; }
+.dpc-row { margin-top: 8px; }
+.dpc .dpc-day { width: 32px; height: 32px; display: grid; place-items: center; border-radius: 8px; font-size: 14px; font-weight: 700; line-height: 1; color: #0a0a0a; }
+.dpc-day:hover:not(:disabled) { background: #f1f5f9; }
+.dpc-day.out { color: #64748b; }
+.dpc-day.today { background: #f1f5f9; }
+.dpc-day.sel, .dpc-day.sel:hover { background: #0a74da; color: #fff; }
+.dpc-day:disabled { opacity: .5; cursor: not-allowed; }
+/* `.dpc button { font: inherit }` (đặt ở trên) có độ ưu tiên cao hơn `.dpc-day` => số ngày mất chữ đậm + to lên 16px; khẳng định lại cỡ/độ đậm */
+.dpc .dpc-day { font-size: 14px; font-weight: 700; line-height: 1; }
+.dpc .dpc-dd { font-size: 14px; font-weight: 500; }
+.dpc .dpc-wd span { font-size: 12.8px; font-weight: 400; }

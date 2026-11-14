@@ -10,8 +10,9 @@ import {
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '../../config/api.config';
 import { Order, Job} from '../../types';
-import { DatePicker, LocalizationProvider } from '@mui/x-date-pickers';
-import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import { LocalizationProvider } from "@mui/x-date-pickers";
+import DatePicker from "../../components/design/DatePicker";
+import { AdapterDayjs } from "../../components/design/AdapterDayjs";
 import dayjs from 'dayjs';
 import { showErrorAlert, showSuccessAlert } from '../../components/Alert';
 import { StyledPopper } from '../../ui/poppers';

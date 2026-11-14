@@ -12,6 +12,7 @@ import com.ecotel.thong_ke_cao_son.model.CargoType;
 import com.ecotel.thong_ke_cao_son.repository.CargoGroupRepository;
 import com.ecotel.thong_ke_cao_son.repository.AcceptanceProductRepository;
 import com.ecotel.thong_ke_cao_son.repository.CargoTypeRepository;
+import com.ecotel.thong_ke_cao_son.repository.MudMarkRepository;
 import com.ecotel.thong_ke_cao_son.repository.TtlClhRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -31,6 +32,7 @@ public class CargoTypeService {
     private final CargoTypeMapper cargoTypeMapper;
     private final AcceptanceProductRepository acceptanceProductRepository;
     private final TtlClhRepository ttlClhRepository;
+    private final MudMarkRepository mudMarkRepository;
 
     @Transactional(readOnly = true)
     public PageResponse<CargoTypeResponse> getAll(String keyword, Pageable pageable) {
@@ -123,6 +125,11 @@ public class CargoTypeService {
                 : ttlClhRepository.findById(request.getTtlClhId()).orElseThrow(
                         () -> new ResourceNotFoundException("Không tìm thấy TTL CLH với id: "
                                 + request.getTtlClhId())));
+
+        entity.setMudMark(request.getMudMarkId() == null ? null
+                : mudMarkRepository.findById(request.getMudMarkId()).orElseThrow(
+                        () -> new ResourceNotFoundException("Không tìm thấy ký hiệu bùn với id: "
+                                + request.getMudMarkId())));
     }
 
     private void ensureCodeAvailable(String code, Long selfId) {

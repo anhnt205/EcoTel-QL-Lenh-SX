@@ -7,6 +7,8 @@ import 'leaflet/dist/leaflet.css';
 import 'leaflet.markercluster/dist/MarkerCluster.css';
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
 import './fixLeafletIcon';
+import './styles/calendar-design.css';
+import './styles/excel-filter.css';
 import BrandingProvider from './branding/BrandingProvider';
 
 const root = ReactDOM.createRoot(

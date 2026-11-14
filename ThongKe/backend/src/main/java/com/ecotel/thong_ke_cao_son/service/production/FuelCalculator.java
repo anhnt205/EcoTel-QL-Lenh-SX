@@ -148,7 +148,7 @@ public class FuelCalculator {
 
         // ── BR: định mức năng suất ──────────────────────────────────────────
         out.productivityNorm(productivityNorm(grids.get(MATRIX_NANG_SUAT), trip,
-                vehicle, classification, routeDistance, warnings));
+                vehicle, classification, areaGroup, routeDistance, warnings));
 
         return out.warnings(warnings).build();
     }
@@ -289,7 +289,7 @@ public class FuelCalculator {
      * (docx dòng 437–440). Dòng là cung độ, cột là chủng loại xe + phân loại.
      */
     private BigDecimal productivityNorm(MatrixGridResponse grid, TransportReportTrip trip,
-                                        Device vehicle, String classification,
+                                        Device vehicle, String classification, String areaGroup,
                                         BigDecimal routeDistance, List<String> warnings) {
         if (grid == null) return null;
         if (trip.getTripCount() == null || trip.getTripCount() == 0 || routeDistance.signum() == 0) {
@@ -314,7 +314,11 @@ public class FuelCalculator {
                     + lookupDistance + ".");
             return null;
         }
-        BigDecimal value = cell(grid, rowKey, colKey);
+        // Người dùng có thể khai năng suất RIÊNG theo nhóm khu vực (cột "<xe>.<DAT|Than>.<CS|KC>");
+        // ưu tiên cột riêng, không có thì lùi về cột chung không hậu tố (dữ liệu cũ vẫn chạy).
+        BigDecimal value = colKey.isEmpty() || areaGroup == null
+                ? null : cell(grid, rowKey, colKey + "." + areaGroup);
+        if (value == null) value = cell(grid, rowKey, colKey);
         if (value == null) {
             warnings.add("Chuyến id=" + trip.getId() + ": lưới Năng suất xe chưa có ô ["
                     + rowKey + " × " + colKey + "].");

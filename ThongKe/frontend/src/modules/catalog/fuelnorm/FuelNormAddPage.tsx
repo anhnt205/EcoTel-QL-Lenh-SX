@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { ArrowLeft, Download, Maximize, Minimize, Plus, Save, Trash2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DatePickerString } from "@/components/common/DatePickerString";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -386,10 +387,10 @@ export default function FuelNormAddPage() {
             <Input type="number" value={year} onChange={(e) => onYearChange(Number(e.target.value))} className="h-9 text-sm" />
           </Field>
           <Field label="Ngày hiệu lực từ" required>
-            <Input type="date" value={effectiveFrom} onChange={(e) => setEffectiveFrom(e.target.value)} className="h-9 text-sm" />
+            <DatePickerString allowClear value={effectiveFrom} onChange={(v) => setEffectiveFrom(v)} className="w-full" popoverClassName="z-[200]" />
           </Field>
           <Field label="Ngày hết hiệu lực">
-            <Input type="date" value={effectiveTo} onChange={(e) => setEffectiveTo(e.target.value)} className="h-9 text-sm" />
+            <DatePickerString allowClear value={effectiveTo} onChange={(v) => setEffectiveTo(v)} className="w-full" popoverClassName="z-[200]" />
           </Field>
           <Field label="Phiên bản">
             <Input value={versionLabel} onChange={(e) => setVersionLabel(e.target.value)} placeholder="vd T2-2025" className="h-9 text-sm" />

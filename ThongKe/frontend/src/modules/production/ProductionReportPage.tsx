@@ -1,3 +1,4 @@
+import RowsPerPage, { PageArrows } from "@/components/table/RowsPerPage";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -43,10 +44,11 @@ import {
   formatCell,
 } from "./productionReportColumns";
 import { productionService, type ProductionReportRow } from "./productionService";
+import { useTanstackLayout } from "@/components/table/useTanstackLayout";
 
 const VISIBLE_COLUMNS_KEY = "production-report-visible-columns";
 const DENSITY_KEY = "production-report-density";
-const PAGE_SIZES = [20, 50, 100, 200];
+const PAGE_SIZES = [15, 20, 50, 100];
 const MONTH_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 
 /**
@@ -115,7 +117,7 @@ export function ProductionReportPage() {
   const [sortKey, setSortKey] = useState<keyof ProductionReportRow | null>(null);
   const [sortDir, setSortDir] = useState<1 | -1>(1);
   const [page, setPage] = useState(0);
-  const [pageSize, setPageSize] = useState(20);
+  const [pageSize, setPageSize] = useState(15);
 
   const [columnPanelOpen, setColumnPanelOpen] = useState(false);
   const [columnSearch, setColumnSearch] = useState("");
@@ -226,6 +228,14 @@ export function ProductionReportPage() {
     () => ALL_REPORT_COLUMNS.filter((c) => visibleKeys.has(c.key as string)),
     [visibleKeys],
   );
+
+  // Hiển thị bảng do người dùng chọn: vừa nội dung lúc đầu, kéo cột, kiểu cột, chiều cao hàng
+  const layout = useTanstackLayout("production-report");
+  const defaultW = (c: (typeof ALL_REPORT_COLUMNS)[number]) => Number(c.width.match(/[(d+)px]/)?.[1] ?? 120);
+  const widthOf = (id: string, fallback: number) => layout.columnSizing[id] ?? fallback;
+  const frozenLeft = (i: number) =>
+    widthOf("__madong", MA_DONG_WIDTH) + visibleColumns.slice(0, i).reduce((s, c) => s + widthOf(String(c.key), defaultW(c)), 0);
+  const tableWidth = widthOf("__madong", MA_DONG_WIDTH) + visibleColumns.reduce((s, c) => s + widthOf(String(c.key), defaultW(c)), 0);
 
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ["production-summary"] });
@@ -368,7 +378,7 @@ export function ProductionReportPage() {
           </p>
         </div>
         <Button variant="outline" size="sm" className="h-9 gap-1.5" onClick={handleExport}>
-          <Download className="h-4 w-4" /> Xuất Excel
+          <Download className="h-4 w-4" /> Tải xuống (Excel)
         </Button>
       </div>
 
@@ -630,7 +640,7 @@ export function ProductionReportPage() {
             />
           </div>
           <Button variant="outline" size="sm" className="h-9 gap-1.5 text-xs" onClick={() => setColumnPanelOpen(true)}>
-            <Columns3 className="h-3.5 w-3.5" /> Cột hiển thị{" "}
+            <Columns3 className="h-3.5 w-3.5" /> Hiển thị cột{" "}
             <b>{visibleColumns.length}/{ALL_REPORT_COLUMNS.length}</b>
           </Button>
           <Button variant="outline" size="sm" className="h-9 text-xs" onClick={() => setPreset("main")}>
@@ -649,18 +659,31 @@ export function ProductionReportPage() {
             {compact ? <Menu className="h-3.5 w-3.5" /> : <LayoutGrid className="h-3.5 w-3.5" />}
             Mật độ
           </Button>
+          {layout.button}
         </div>
 
-        <div className="overflow-auto" style={{ maxHeight: "60vh" }}>
-          <table className="border-collapse text-xs">
+        <div ref={layout.containerRef} className={`${layout.rowClass} overflow-auto`} style={{ maxHeight: "60vh" }}>
+          <table className="tks-grid" style={{ tableLayout: "fixed", width: tableWidth }}>
+            <colgroup>
+              <col style={{ width: widthOf("__madong", MA_DONG_WIDTH) }} />
+              {visibleColumns.map((c) => (
+                <col key={c.key} style={{ width: widthOf(String(c.key), defaultW(c)) }} />
+              ))}
+            </colgroup>
             <thead>
               {/* Một dòng tiêu đề, cột theo ĐÚNG thứ tự sheet `tinh toan` của Excel (không chia nhóm). */}
               <tr>
                 <th
                   className="sticky left-0 top-0 z-30 border-b border-r bg-muted px-2 py-1.5 text-left font-bold"
-                  style={{ minWidth: MA_DONG_WIDTH }}
+                  data-col="__madong"
                 >
                   Mã dòng
+                  <div
+                    className="tks-resizer"
+                    role="separator"
+                    onMouseDown={(e) => layout.startResize("__madong", e, widthOf("__madong", MA_DONG_WIDTH))}
+                    onDoubleClick={() => layout.fitOne("__madong")}
+                  />
                 </th>
                 {visibleColumns.map((c, i) => {
                   const frozen = i < FROZEN_COLUMN_COUNT;
@@ -670,10 +693,11 @@ export function ProductionReportPage() {
                       onClick={() => sortBy(c.key)}
                       className={cn(
                         "sticky top-0 z-20 cursor-pointer select-none whitespace-nowrap border-b border-r bg-muted px-2 py-1.5 text-left font-semibold",
-                        c.width,
+
                         frozen && "z-30",
                       )}
-                      style={{ left: frozen ? frozenOffset(i) : undefined }}
+                      style={{ left: frozen ? frozenLeft(i) : undefined }}
+                      data-col={String(c.key)}
                       title={`Cột ${c.excel} của sheet tinh toan · ${c.label}`}
                     >
                       <span className="mr-1 text-[10px] font-normal text-muted-foreground">{c.excel}</span>
@@ -681,6 +705,17 @@ export function ProductionReportPage() {
                       {sortKey === c.key && (
                         <ArrowUpDown className="ml-1 inline h-3 w-3 text-blue-600" />
                       )}
+                      <div
+                        className="tks-resizer"
+                        role="separator"
+                        title="Kéo để đổi độ rộng cột — nhấp đúp để vừa nội dung"
+                        onMouseDown={(e) => layout.startResize(String(c.key), e, widthOf(String(c.key), defaultW(c)))}
+                        onClick={(e) => e.stopPropagation()}
+                        onDoubleClick={(e) => {
+                          e.stopPropagation();
+                          layout.fitOne(String(c.key));
+                        }}
+                      />
                     </th>
                   );
                 })}
@@ -714,6 +749,7 @@ export function ProductionReportPage() {
                       "sticky left-0 z-10 border-b border-r bg-card font-semibold text-blue-600 hover:underline",
                       compact ? "px-2 py-1" : "px-2 py-2",
                     )}
+                    data-col="__madong"
                   >
                     BC-{String(r.id).padStart(4, "0")}
                   </td>
@@ -721,12 +757,13 @@ export function ProductionReportPage() {
                     <td
                       key={c.key}
                       className={cn(
-                        "whitespace-nowrap border-b border-r",
+                        "overflow-hidden text-ellipsis whitespace-nowrap border-b border-r",
                         compact ? "px-2 py-1" : "px-2 py-2",
                         c.numeric ? "text-right tabular-nums" : "text-left",
                         i < FROZEN_COLUMN_COUNT && "sticky z-10 bg-card",
                       )}
-                      style={i < FROZEN_COLUMN_COUNT ? { left: frozenOffset(i) } : undefined}
+                      style={i < FROZEN_COLUMN_COUNT ? { left: frozenLeft(i) } : undefined}
+                      data-col={String(c.key)}
                     >
                       {formatCell(r[c.key], c)}
                     </td>
@@ -737,39 +774,22 @@ export function ProductionReportPage() {
           </table>
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-2 border-t px-3 py-2 text-xs text-muted-foreground">
-          <span>
-            Hiển thị {sortedRows.length === 0 ? 0 : page * pageSize + 1}–
-            {Math.min((page + 1) * pageSize, sortedRows.length)} / {sortedRows.length} dòng
-            {sortedRows.length !== allRows.length ? ` (đã lọc từ ${allRows.length})` : ""}
-          </span>
-          <div className="flex items-center gap-2">
-            <select
+        <div className="flex flex-wrap items-center justify-end gap-2 border-t px-3 py-2 text-xs text-muted-foreground">
+          <span className="flex items-center gap-2">
+            <RowsPerPage
               value={pageSize}
-              onChange={(e) => {
-                setPageSize(Number(e.target.value));
+              options={PAGE_SIZES}
+              onChange={(n) => {
+                setPageSize(n);
                 setPage(0);
               }}
-              className="h-7 rounded-md border bg-transparent px-1.5 text-xs"
-            >
-              {PAGE_SIZES.map((s) => (
-                <option key={s} value={s}>{s}/trang</option>
-              ))}
-            </select>
-            <Button variant="outline" size="sm" className="h-7 px-2" disabled={page === 0} onClick={() => setPage((p) => p - 1)}>
-              Trước
-            </Button>
-            <span>Trang {page + 1}/{totalPages}</span>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-7 px-2"
-              disabled={page + 1 >= totalPages}
-              onClick={() => setPage((p) => p + 1)}
-            >
-              Sau
-            </Button>
-          </div>
+              from={sortedRows.length === 0 ? 0 : page * pageSize + 1}
+              to={Math.min((page + 1) * pageSize, sortedRows.length)}
+              total={sortedRows.length}
+            />
+            {sortedRows.length !== allRows.length ? <span>(đã lọc từ {allRows.length})</span> : null}
+          </span>
+          <PageArrows canPrev={page > 0} canNext={page + 1 < totalPages} onPrev={() => setPage((p) => p - 1)} onNext={() => setPage((p) => p + 1)} onFirst={() => setPage(0)} onLast={() => setPage(Math.max(0, totalPages - 1))} />
         </div>
       </div>
 
@@ -801,9 +821,6 @@ export function ProductionReportPage() {
 
 // Cột "Mã dòng" dính trái (rộng MA_DONG_WIDTH); các cột đóng băng tiếp theo dính ngay sau nó.
 const MA_DONG_WIDTH = 90;
-const FROZEN_DATA_WIDTHS = [110, 80]; // Ngày, Ca — khớp min-w của hai cột đầu
-const frozenOffset = (index: number) =>
-  MA_DONG_WIDTH + FROZEN_DATA_WIDTHS.slice(0, index).reduce((a, b) => a + b, 0);
 
 /** Thông báo của lần tính gần nhất, hiện trong hộp thoại mở từ nút chuông (không phải khối đỏ). */
 interface CalculationNotice {

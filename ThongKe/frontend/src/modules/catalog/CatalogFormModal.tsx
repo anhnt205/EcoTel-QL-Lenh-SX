@@ -3,6 +3,7 @@ import { Copy, Maximize, Minimize, Plus, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DatePickerString } from "@/components/common/DatePickerString";
 import {
   Select,
   SelectContent,
@@ -21,6 +22,8 @@ interface Props {
   open: boolean;
   /** Bản ghi đang sửa; null = đang thêm mới. */
   editing: Record<string, unknown> | null;
+  /** "Sao chép" từ bảng: mở ở chế độ THÊM MỚI, dòng đầu điền sẵn bằng bản ghi này (chép nguyên, kể cả mã — sửa tay chỗ khác). */
+  copyFrom?: Record<string, unknown> | null;
   onClose: () => void;
   onSaved: () => void;
 }
@@ -39,6 +42,7 @@ export function CatalogFormModal({
   config,
   open,
   editing,
+  copyFrom = null,
   onClose,
   onSaved,
 }: Props) {
@@ -93,10 +97,16 @@ export function CatalogFormModal({
           fields.map((f) => [f.key, String(editing[f.key] ?? "")]),
         ) as Row,
       ]);
+    } else if (copyFrom) {
+      setRows([
+        Object.fromEntries(
+          fields.map((f) => [f.key, String(copyFrom[f.key] ?? "")]),
+        ) as Row,
+      ]);
     } else {
       setRows([emptyRow(fields)]);
     }
-  }, [open, editing, fields]);
+  }, [open, editing, copyFrom, fields]);
 
   // Nạp nguồn cho các combobox
   useEffect(() => {
@@ -172,6 +182,9 @@ export function CatalogFormModal({
       } else if (f.type === "number") {
         // Gửi số thật: backend nhận BigDecimal/Integer, chuỗi "1,5" sẽ hỏng.
         out[f.key] = raw === "" ? null : Number(raw.replace(",", "."));
+      } else if (f.type === "select" && f.options && raw === "") {
+        // ô chọn giá trị cố định (enum phía backend, vd Trạng thái) để trống → null; chuỗi rỗng "" làm backend không đọc được JSON
+        out[f.key] = null;
       } else {
         out[f.key] = raw;
       }
@@ -246,9 +259,20 @@ export function CatalogFormModal({
         </Select>
       );
     }
+    if (f.type === "date") {
+      return (
+        <DatePickerString
+          allowClear
+          value={String(row[f.key] ?? "")}
+          onChange={(v) => setCell(idx, f.key, v)}
+          className="h-9 w-full"
+          popoverClassName="z-[200]"
+        />
+      );
+    }
     return (
       <Input
-        type={f.type === "number" ? "number" : f.type === "date" ? "date" : "text"}
+        type={f.type === "number" ? "number" : "text"}
         // Cho phép số thập phân (tỷ trọng, hệ số); mặc định của input số là
         // bước nhảy 1 nên không gõ được 2,25.
         step={f.type === "number" ? "any" : undefined}

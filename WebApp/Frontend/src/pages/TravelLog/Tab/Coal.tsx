@@ -26,8 +26,9 @@ import {
 import { FormikProvider, useFormik } from "formik";
 import api from "../../../config/api.config";
 import { Device, Location, Shift, TravelLog } from "../../../types";
-import { DatePicker, LocalizationProvider } from "@mui/x-date-pickers";
-import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
+import { LocalizationProvider } from "@mui/x-date-pickers";
+import DatePicker from "../../../components/design/DatePicker";
+import { AdapterDayjs } from "../../../components/design/AdapterDayjs";
 import dayjs, { Dayjs } from "dayjs";
 import {
   showConfirmAlert,
@@ -63,7 +64,7 @@ const Coals: React.FC<props> = ({ type }) => {
   const formRef = useRef<HTMLDivElement>(null);
 
   const [page, setPage] = useState(0);
-  const [pageSize, setPageSize] = useState(50);
+  const [pageSize, setPageSize] = useState(15);
   const [total, setTotal] = useState(0);
   const [travelLogs, setTravelLogs] = useState<any[]>([]);
 
@@ -497,7 +498,7 @@ const Coals: React.FC<props> = ({ type }) => {
                     startIcon={<AddIcon />}
                     onClick={() => handleOpen()}
                   >
-                    Thêm
+                    Thêm mới
                   </Button>
                   <Button
                     variant="contained"
@@ -590,7 +591,7 @@ const Coals: React.FC<props> = ({ type }) => {
                       variant="contained"
                       startIcon={<UploadFile />}
                     >
-                      Tải lên excel
+                      Tải lên (Excel)
                     </Button>
                   </label>
                   <Button
@@ -599,7 +600,7 @@ const Coals: React.FC<props> = ({ type }) => {
                     startIcon={<Download />}
                     onClick={() => setExportDialogOpen(true)}
                   >
-                    Tải xuống
+                    Tải xuống (Excel)
                   </Button>
                 </Box>
               )}
@@ -904,12 +905,13 @@ const Coals: React.FC<props> = ({ type }) => {
               pageSize: pageSize,
               total: total,
               showSizeChanger: true,
-              pageSizeOptions: [10, 20, 50, 100],
+              pageSizeOptions: [15, 20, 50, 100],
               onChange: (newPage, newPageSize) => {
                 setPage(newPage - 1);
                 setPageSize(newPageSize);
               },
-              showTotal: (total) => `Tổng ${total} bản ghi`,
+              showTotal: (total, range) => `Hiển thị ${range[0]}–${range[1]} trong tổng ${total} bản ghi`,
+              locale: { items_per_page: "dòng/trang" },
             }}
             rowClassName={(_, index) =>
               index % 2 === 0 ? "row-even" : "row-odd"

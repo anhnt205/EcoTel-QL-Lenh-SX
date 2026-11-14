@@ -1,32 +1,14 @@
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import type { ColumnDef } from "@tanstack/react-table";
-import { Eye, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import AppDataTable from "@/components/table/AppDataTable";
-import { Button } from "@/components/ui/button";
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import api from "@/config/api.config";
-import { formatDate } from "@/lib/utils";
 import { createCatalogService } from "../catalogService";
 import { downloadCatalogExcel, parseCatalogExcel } from "../catalogExcel";
 import { densityParameterConfig } from "../configs";
+import { DesignListPage, type DesignColumn } from "../design/DesignListPage";
 import { DensityAddModal } from "./DensityAddModal";
 import { groupIntoBatches, type DensityBatch, type DensityParameterResponse } from "./types";
+import { DensityYearTable, groupIntoYears, type DensityYear } from "./DensityYearModal";
 
 interface ExcavationAreaOption {
   id: number;
@@ -36,19 +18,11 @@ interface ExcavationAreaOption {
 type ModalMode = "create" | "view" | "edit";
 
 /**
- * Màn danh mục Tỷ trọng — KHÔNG dùng `CatalogPage` chung nữa.
+ * Màn danh mục Tỷ trọng — bảng theo thiết kế, mỗi dòng là một LÔ (cùng Thời gian + Khu vực xúc), đúng đơn vị mà popup
+ * "Thêm mới tỷ trọng" tạo ra. Xem/Sửa mở lại đúng popup đó; xóa một lô xóa mọi bản ghi phẳng của lô.
  *
- * Trước đây mỗi bản ghi phẳng (một mã hàng × một khoảng thời gian) là một
- * dòng riêng trên bảng — đúng dữ liệu lưu, nhưng xem lại thì rã rời, không
- * còn thấy "lần nhập đó gồm những mã nào". Giờ bảng gộp các bản ghi có
- * CÙNG (Thời gian, Khu vực xúc) thành một LÔ — đúng đơn vị mà popup
- * "Thêm mới tỷ trọng" tạo ra. Bấm Xem/Sửa mở lại đúng popup đó, đọc lại
- * hoặc chỉnh cả lô cùng lúc.
- *
- * Dữ liệu tải MỘT LẦN (size lớn) rồi gộp/lọc/phân trang ở trình duyệt —
- * hợp lý cho quy mô một danh mục nội bộ (không phải bảng công khai hàng
- * triệu dòng), và là cách duy nhất để gộp theo (Thời gian, Khu vực xúc):
- * việc đó không làm được bằng phân trang phía server trên bảng phẳng.
+ * Dữ liệu tải MỘT LẦN (size lớn) rồi gộp/lọc/phân trang ở trình duyệt — không gộp theo (Thời gian, Khu vực xúc) được
+ * bằng phân trang phía server trên bảng phẳng.
  */
 export default function DensityParametersPage() {
   const service = useMemo(
@@ -79,10 +53,9 @@ export default function DensityParametersPage() {
       .catch(() => toast.error("Không tải được danh sách khu vực xúc."));
   }, []);
 
-  // ── Bộ lọc trên bảng: Năm + Khu vực xúc ──────────────────────────────────
+  // ── Bộ lọc cạnh ô tìm kiếm: Năm + Khu vực xúc ────────────────────────────
   const [yearFilter, setYearFilter] = useState("");
   const [areaFilter, setAreaFilter] = useState("");
-  const [searchValue, setSearchValue] = useState("");
 
   const yearOptions = useMemo(() => {
     const years = new Set<number>();
@@ -94,82 +67,55 @@ export default function DensityParametersPage() {
     return [...years].sort((a, b) => b - a);
   }, [batches]);
 
-  const filteredBatches = useMemo(() => {
-    const q = searchValue.trim().toLowerCase();
-    return batches.filter((b) => {
-      if (yearFilter) {
-        const y = Number(yearFilter);
-        const overlaps = b.effectiveFrom <= `${y}-12-31` && b.effectiveTo >= `${y}-01-01`;
-        if (!overlaps) return false;
-      }
-      if (areaFilter === "NONE" && b.excavationAreaId !== null) return false;
-      if (areaFilter && areaFilter !== "NONE" && String(b.excavationAreaId) !== areaFilter) {
-        return false;
-      }
-      if (q) {
-        const hit =
-          b.excavationAreaName.toLowerCase().includes(q) ||
-          b.records.some(
-            (r) =>
-              r.cargoTypeCode.toLowerCase().includes(q) ||
-              r.cargoTypeName.toLowerCase().includes(q),
-          );
-        if (!hit) return false;
-      }
-      return true;
-    });
-  }, [batches, yearFilter, areaFilter, searchValue]);
+  const filteredBatches = useMemo(
+    () =>
+      batches.filter((b) => {
+        if (yearFilter) {
+          const y = Number(yearFilter);
+          if (!(b.effectiveFrom <= `${y}-12-31` && b.effectiveTo >= `${y}-01-01`)) return false;
+        }
+        if (areaFilter === "NONE" && b.excavationAreaId !== null) return false;
+        if (areaFilter && areaFilter !== "NONE" && String(b.excavationAreaId) !== areaFilter) return false;
+        return true;
+      }),
+    [batches, yearFilter, areaFilter],
+  );
+
+  // Danh sách theo NĂM (đã áp bộ lọc) + toàn bộ năm (để cửa sổ chi tiết không bị bộ lọc cắt mất dòng)
+  const years = useMemo(() => groupIntoYears(filteredBatches), [filteredBatches]);
+  const allYears = useMemo(() => groupIntoYears(batches), [batches]);
+  const [yearEditKey, setYearEditKey] = useState<string | null>(null);
+  const yearEdit = allYears.find((y) => y.key === yearEditKey);
+  const [yearCopyKey, setYearCopyKey] = useState<string | null>(null);
+  const yearCopy = allYears.find((y) => y.key === yearCopyKey);
 
   // ── Modal thêm mới / xem / sửa ────────────────────────────────────────────
   const [modalOpen, setModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<ModalMode>("create");
   const [activeBatch, setActiveBatch] = useState<DensityBatch | undefined>(undefined);
 
-  const openCreate = () => {
-    setActiveBatch(undefined);
-    setModalMode("create");
-    setModalOpen(true);
-  };
-  const openView = (b: DensityBatch) => {
+  const open = (mode: ModalMode, b?: DensityBatch) => {
     setActiveBatch(b);
-    setModalMode("view");
-    setModalOpen(true);
-  };
-  const openEdit = (b: DensityBatch) => {
-    setActiveBatch(b);
-    setModalMode("edit");
+    setModalMode(mode);
     setModalOpen(true);
   };
 
-  /** Xoá cả LÔ — tức xoá mọi bản ghi phẳng đứng sau nó, không phải một dòng. */
-  const handleDeleteBatch = async (b: DensityBatch) => {
-    const codes = b.records.map((r) => r.cargoTypeCode).join(", ");
-    if (
-      !window.confirm(
-        `Xoá lô "${formatDate(b.effectiveFrom)} - ${formatDate(b.effectiveTo)}" (${b.excavationAreaName})?\n\n` +
-          `Toàn bộ ${b.records.length} mã hàng trong lô sẽ bị xoá: ${codes}`,
-      )
-    ) {
-      return;
-    }
-    try {
-      await service.bulkRemove(b.records.map((r) => r.id));
-      toast.success(`Đã xoá lô — ${b.records.length} tỷ trọng.`);
-      refetch();
-    } catch (e: unknown) {
-      const res = (e as { response?: { data?: { message?: string } } }).response;
-      toast.error(res?.data?.message ?? "Xoá thất bại.");
-    }
+  /** Xóa các NĂM — tức xóa mọi bản ghi phẳng của mọi lô trong năm. */
+  const handleDelete = async (rows: DensityYear[]) => {
+    const ids = rows.flatMap((y) => y.records.map((r) => r.id));
+    await service.bulkRemove(ids);
+    toast.success(`Đã xóa ${rows.length} năm — ${ids.length} tỷ trọng.`);
+    refetch();
   };
 
   // ── Xuất / nhập Excel — vẫn thao tác trên BẢN GHI PHẲNG bên dưới lô ───────
-  const handleExport = (selectedRows: DensityBatch[]) => {
-    const flat = selectedRows.flatMap((b) => b.records) as unknown as Record<string, unknown>[];
+  const handleExport = (selectedRows: DensityYear[]) => {
+    const flat = selectedRows.flatMap((y) => y.records) as unknown as Record<string, unknown>[];
     const { isTemplate, count } = downloadCatalogExcel(densityParameterConfig, flat);
     toast.success(
       isTemplate
-        ? "Đã tải file mẫu (chỉ có dòng tiêu đề). Chọn lô trong bảng nếu muốn tải kèm dữ liệu."
-        : `Đã tải ${count} dòng dữ liệu từ ${selectedRows.length} lô đã chọn.`,
+        ? "Đã tải file mẫu (chỉ có dòng tiêu đề). Chọn năm trong bảng nếu muốn tải kèm dữ liệu."
+        : `Đã tải ${count} dòng dữ liệu từ ${selectedRows.length} năm đã chọn.`,
     );
   };
 
@@ -179,10 +125,7 @@ export default function DensityParametersPage() {
     const lookups: Record<string, Map<string, number>> = {};
     for (const f of densityParameterConfig.fields.filter((x) => x.optionsPath)) {
       const res = await api.get(f.optionsPath!, { params: { size: 500 } });
-      const list = (res.data?.data?.content ?? res.data?.data ?? []) as {
-        id: number;
-        name: string;
-      }[];
+      const list = (res.data?.data?.content ?? res.data?.data ?? []) as { id: number; name: string }[];
       lookups[f.key] = new Map(list.map((it) => [String(it.name).trim().toLowerCase(), it.id]));
     }
     return lookups;
@@ -213,184 +156,76 @@ export default function DensityParametersPage() {
     }
   };
 
-  // ── Cột bảng: gộp theo lô, đúng thiết kế chủ dự án đưa ────────────────────
-  const columns = useMemo<ColumnDef<DensityBatch, unknown>[]>(
+  const columns = useMemo<DesignColumn<DensityYear>[]>(
     () => [
+      { key: "nam", label: "Năm", width: 120, value: (y) => `Năm ${y.year}` },
       {
-        id: "select",
-        size: 44,
-        enableSorting: false,
-        enableHiding: false,
-        header: ({ table }) => (
-          <input
-            type="checkbox"
-            aria-label="Chọn tất cả"
-            className="h-4 w-4 cursor-pointer accent-blue-600"
-            checked={table.getIsAllPageRowsSelected()}
-            ref={(el) => {
-              if (el) el.indeterminate = table.getIsSomePageRowsSelected();
-            }}
-            onChange={(e) => table.toggleAllPageRowsSelected(e.currentTarget.checked)}
-          />
-        ),
-        cell: ({ row }) => (
-          <input
-            type="checkbox"
-            aria-label="Chọn dòng"
-            className="h-4 w-4 cursor-pointer accent-blue-600"
-            checked={row.getIsSelected()}
-            onChange={(e) => row.toggleSelected(e.currentTarget.checked)}
-          />
-        ),
-      },
-      {
-        id: "stt",
-        header: "STT",
-        size: 64,
-        cell: ({ row }) => row.index + 1,
-      },
-      {
-        id: "thoiGian",
-        header: "Thời gian",
-        // Rộng hẳn để hút hết khoảng trống thừa của bảng — bảng chỉ có 3 cột
-        // dữ liệu, không đủ tự nhiên lấp đầy chiều rộng như các danh mục
-        // khác có 8-10 cột; không khai rộng thì phần thừa dồn hết vào cột
-        // Thao tác, kéo dài ra rất xấu dù chỉ có vài icon.
-        size: 340,
-        cell: ({ row }) =>
-          `${formatDate(row.original.effectiveFrom)} - ${formatDate(row.original.effectiveTo)}`,
-      },
-      {
-        id: "khuVucXuc",
-        header: "Khu vực xúc",
-        size: 420,
-        cell: ({ row }) => row.original.excavationAreaName,
-      },
-      {
-        id: "actions",
-        header: "Thao tác",
-        size: 130,
-        meta: { align: "left" },
-        cell: ({ row }) => (
-          <div className="flex items-center gap-1">
-            <button
-              title="Xem chi tiết"
-              onClick={() => openView(row.original)}
-              className="rounded p-1.5 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/30"
-            >
-              <Eye className="h-4 w-4" />
-            </button>
-            <button
-              title="Sửa"
-              onClick={() => openEdit(row.original)}
-              className="rounded p-1.5 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/30"
-            >
-              <Pencil className="h-4 w-4" />
-            </button>
-            <button
-              title="Xoá"
-              onClick={() => handleDeleteBatch(row.original)}
-              className="rounded p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30"
-            >
-              <Trash2 className="h-4 w-4" />
-            </button>
-          </div>
-        ),
+        key: "khuVucXuc",
+        label: "Khu vực xúc",
+        width: 420,
+        value: (y) => [...new Set(y.batches.map((b) => b.excavationAreaName))].join(", "),
       },
     ],
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   );
 
   return (
-    <div className="flex h-full flex-col gap-4 p-4 md:p-6">
-      <Breadcrumb>
-        <BreadcrumbList>
-          {densityParameterConfig.breadcrumb.map((b) => (
-            <React.Fragment key={b}>
-              <BreadcrumbItem>
-                <BreadcrumbLink href="#">{b}</BreadcrumbLink>
-              </BreadcrumbItem>
-              <BreadcrumbSeparator />
-            </React.Fragment>
-          ))}
-          <BreadcrumbItem>
-            <BreadcrumbPage>{densityParameterConfig.title}</BreadcrumbPage>
-          </BreadcrumbItem>
-        </BreadcrumbList>
-      </Breadcrumb>
-
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold text-blue-700 dark:text-blue-400">
-          {densityParameterConfig.title}
-        </h1>
-        <Button
-          onClick={openCreate}
-          className="h-9 gap-1.5 bg-blue-600 text-xs font-bold text-white hover:bg-blue-700"
-        >
-          <Plus className="h-4 w-4" />
-          Thêm mới
-        </Button>
-      </div>
-
-      {/* Bộ lọc — luôn hiện trên bảng, không cần bấm mở */}
-      <div className="flex flex-wrap items-end gap-3 rounded-md border border-gray-200 bg-gray-50/60 px-3 py-2.5 dark:border-gray-800 dark:bg-gray-900/30">
-        <div className="flex flex-col gap-1">
-          <span className="text-xs font-medium text-gray-600 dark:text-gray-400">Thời gian</span>
-          <Select value={yearFilter || "ALL"} onValueChange={(v) => setYearFilter(v === "ALL" ? "" : v)}>
-            <SelectTrigger className="h-9 w-36 text-sm">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ALL">Tất cả năm</SelectItem>
-              {yearOptions.map((y) => (
-                <SelectItem key={y} value={String(y)}>
-                  Năm {y}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="flex flex-col gap-1">
-          <span className="text-xs font-medium text-gray-600 dark:text-gray-400">Khu vực xúc</span>
-          <Select value={areaFilter || "ALL"} onValueChange={(v) => setAreaFilter(v === "ALL" ? "" : v)}>
-            <SelectTrigger className="h-9 w-56 text-sm">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ALL">Tất cả</SelectItem>
-              <SelectItem value="NONE">— Áp cho mọi khu vực —</SelectItem>
-              {excavationAreas.map((a) => (
-                <SelectItem key={a.id} value={String(a.id)}>
-                  {a.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      <div className="min-h-0 flex-1">
-        <AppDataTable
-          title="Bảng tỷ trọng"
-          data={filteredBatches}
-          columns={columns}
-          loading={isLoading}
-          searchValue={searchValue}
-          onSearch={setSearchValue}
-          onRefresh={refetch}
-          onImportExcel={handleImport}
-          importExcelAccept=".xlsx,.xls"
-          isImporting={isImporting}
-          showExport
-          onExportCsv={handleExport}
-          exportCsvLabel="Tải xuống (Excel)"
-          showColumnToggle
-          stickyHeader
-        />
-      </div>
-
+    <DesignListPage
+      trail={densityParameterConfig.breadcrumb}
+      title={densityParameterConfig.title}
+      description="Quản lý danh mục tỷ trọng theo năm"
+      noun="tỷ trọng"
+      rows={years}
+      getId={(y) => y.key}
+      columns={columns}
+      loading={isLoading}
+      onRefresh={() => refetch()}
+      onAdd={() => open("create")}
+      onEdit={(y) => setYearEditKey(y.key)}
+      renderDetail={(y) => <DensityYearTable year={y} />}
+      onCopy={(y) => setYearCopyKey(y.key)}
+      onDelete={handleDelete}
+      onImport={handleImport}
+      isImporting={isImporting}
+      onExport={handleExport}
+      extraSearch={(y) => y.records.map((r) => `${r.cargoTypeCode} ${r.cargoTypeName}`).join(" ")}
+      extraSearchLabel="mã, tên chủng loại hàng"
+      toolbarSlot={
+        <>
+          <select className="select" aria-label="Lọc theo năm" value={yearFilter} onChange={(e) => setYearFilter(e.target.value)}>
+            <option value="">Tất cả năm</option>
+            {yearOptions.map((y) => (
+              <option key={y} value={y}>
+                Năm {y}
+              </option>
+            ))}
+          </select>
+          <select className="select" aria-label="Lọc theo khu vực xúc" value={areaFilter} onChange={(e) => setAreaFilter(e.target.value)}>
+            <option value="">Tất cả khu vực xúc</option>
+            <option value="NONE">— Áp cho mọi khu vực —</option>
+            {excavationAreas.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.name}
+              </option>
+            ))}
+          </select>
+        </>
+      }
+    >
+      <DensityAddModal
+        open={!!yearCopy}
+        mode="copyYear"
+        yearRecords={yearCopy?.records}
+        onClose={() => setYearCopyKey(null)}
+        onSaved={refetch}
+      />
+      <DensityAddModal
+        open={!!yearEdit}
+        mode="editYear"
+        yearRecords={yearEdit?.records}
+        onClose={() => setYearEditKey(null)}
+        onSaved={refetch}
+      />
       <DensityAddModal
         open={modalOpen}
         mode={modalMode}
@@ -398,6 +233,6 @@ export default function DensityParametersPage() {
         onClose={() => setModalOpen(false)}
         onSaved={refetch}
       />
-    </div>
+    </DesignListPage>
   );
 }

@@ -61,6 +61,11 @@ public class CargoType {
     @JoinColumn(name = "cargo_group_id", nullable = false)
     private CargoGroup cargoGroup;
 
+    /** Ký hiệu bùn — tuỳ chọn (danh mục Ký hiệu bùn). */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "mud_mark_id")
+    private MudMark mudMark;
+
     @CreatedDate
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

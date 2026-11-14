@@ -63,25 +63,53 @@ describe("menu Danh mục gộp (Thống kê + Điều phối)", () => {
       expect(p).not.toContain(tkPageRoute(i.to));
     }
     expect(TK_NAV_BEFORE_CATALOG.map((i) => i.text)).toEqual(["Nhập liệu Khai thác", "Nhập liệu Vận tải"]);
-    expect(TK_NAV_AFTER_CATALOG.map((i) => i.text)).toEqual([
-      "Định mức nhiên liệu",
-      "Áp Trắc Địa",
-      "Đối chiếu",
-      "Thống kê sản lượng",
+    expect(TK_NAV_AFTER_CATALOG.map((i) => i.text)).toEqual(["Đối chiếu", "Thống kê sản lượng"]);
+  });
+
+  test("bố cục nhóm/thứ tự chốt 2026-11-09: 6 nhóm theo thứ tự, không còn nhóm tạm gom", () => {
+    const groups = buildMergedCatalog(legacy("admin"));
+    expect(groups.map((g) => g.label)).toEqual([
+      "Loại hàng",
+      "Vị trí",
+      "Thiết bị",
+      "Số Trắc địa",
+      "Đơn vị",
+      "Danh mục khác",
     ]);
+    const texts = (label: string) => groups.find((g) => g.label === label)!.items.map((i) => i.text);
+    expect(texts("Loại hàng")).toEqual([
+      "Chủng loại hàng", "Nhóm chủng loại hàng", "Phân loại", "Ký hiệu bùn", "Sản phẩm nghiệm thu", "TTL CLH", "Mô hình", "Tỷ trọng",
+    ]);
+    expect(texts("Vị trí")).toEqual(["Nơi nhận tải", "Nơi dỡ tải", "Nơi chất tải", "Khu vực xúc", "Nhóm vỉa"]);
+    expect(texts("Thiết bị")).toEqual([
+      "Xe", "Máy", "Chủng loại xe", "Chủng loại xe + DMNL", "Hạng xe", "Nhóm hạng xe", "Năng suất xe", "Định mức nhiên liệu",
+    ]);
+    expect(texts("Số Trắc địa")).toEqual(["STD (Đất CN)", "STD (Đất SX/Than SX)", "Áp Trắc địa"]);
+    expect(texts("Đơn vị")).toEqual(["Phòng ban", "Chức vụ", "Nhân viên", "Công việc", "Biện pháp an toàn"]);
+    expect(texts("Danh mục khác")).toEqual([
+      "Hệ số điều chỉnh", "Hệ số điều chỉnh DMNL", "Kỳ báo cáo", "Ca làm việc", "Hậu tố",
+    ]);
+  });
+
+  test("Định mức nhiên liệu và Áp Trắc địa nằm trong Danh mục, không còn là nút riêng trên thanh menu", () => {
+    const p = paths(legacy("admin"));
+    expect(p).toContain(tkPageRoute("/danh-muc/dinh-muc-nhien-lieu"));
+    expect(p).toContain(tkPageRoute("/danh-muc/ap-tracdia"));
+    expect(TK_TOP_ITEMS.map((i) => i.to)).not.toContain("/danh-muc/dinh-muc-nhien-lieu");
+    expect(TK_TOP_ITEMS.map((i) => i.to)).not.toContain("/danh-muc/ap-tracdia");
   });
 
   test("admin (chưa cấu hình) thấy cả danh mục Thống kê lẫn danh mục chỉ có ở Điều phối, gồm Phòng ban/Chức vụ/Cán bộ", () => {
     const p = paths(legacy("admin"));
-    for (const x of ["/tk/danh-muc/chung-loai-hang", "/materials", "/locations", "/vehicles", "/departments", "/positions", "/users", "/jobs", "/safetyMeasures", "/travelLog", "/models"]) {
+    for (const x of ["/tk/danh-muc/chung-loai-hang", "/departments", "/positions", "/users", "/jobs", "/safetyMeasures"]) {
       expect(p).toContain(x);
     }
   });
 
-  test("điều độ viên cũ giữ đúng quyền cũ (không thấy Vật liệu, Điểm đổ, Công việc, Chức vụ...)", () => {
+  test("điều độ viên cũ giữ đúng quyền cũ (không thấy Công việc, Chức vụ...; nhóm Danh mục tạm gom đã bỏ nên cũng không có Vật liệu, Điểm đổ, Xe/Máy Điều phối...)", () => {
     const p = paths(legacy("dispatcher"));
-    expect(p).toEqual(expect.arrayContaining(["/vehicles", "/machines", "/users", "/models", "/departments"]));
-    for (const x of ["/materials", "/locations", "/jobs", "/safetyMeasures", "/travelLog", "/positions"]) {
+    expect(p).toEqual(expect.arrayContaining(["/users", "/departments"]));
+    for (const x of ["/materials", "/locations", "/jobs", "/safetyMeasures", "/travelLog", "/positions", "/vehicles", "/machines", "/models"]) {
       expect(p).not.toContain(x);
     }
   });

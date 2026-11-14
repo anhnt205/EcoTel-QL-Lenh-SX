@@ -526,7 +526,7 @@ const Machines: React.FC = () => {
                   startIcon={<AddIcon />}
                   onClick={() => handleOpen()}
                 >
-                  Thêm
+                  Thêm mới
                 </Button>
                 <Button
                   variant="contained"
@@ -612,7 +612,7 @@ const Machines: React.FC = () => {
                     variant="contained"
                     startIcon={<UploadFile />}
                   >
-                    Tải lên excel
+                    Tải lên (Excel)
                   </Button>
                 </label>
                 <Button
@@ -621,7 +621,7 @@ const Machines: React.FC = () => {
                   startIcon={<Download />}
                   onClick={() => exportExcel.mutate()}
                 >
-                  Tải xuống
+                  Tải xuống (Excel)
                 </Button>
               </Box>
             )}

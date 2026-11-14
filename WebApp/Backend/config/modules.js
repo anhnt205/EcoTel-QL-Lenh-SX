@@ -47,6 +47,8 @@ const MODULES = [
   // --- Danh mục: Vật liệu, hàng hoá ---
   m("tk-cargo-types", "Chủng loại hàng", G_MATERIAL, ADM_DISP, ["cargo-types"]),
   m("tk-cargo-groups", "Nhóm chủng loại hàng", G_MATERIAL, ADM_DISP, ["cargo-groups"]),
+  m("tk-classifications", "Phân loại", G_MATERIAL, ADM_DISP, ["classifications"]),
+  m("tk-mud-marks", "Ký hiệu bùn", G_MATERIAL, ADM_DISP, ["mud-marks"]),
   m("tk-acceptance-products", "Sản phẩm nghiệm thu", G_MATERIAL, ADM_DISP, ["acceptance-products"]),
   m("materials", "Vật liệu — tỷ trọng (Điều phối)", G_MATERIAL, ADM),
 
@@ -83,6 +85,7 @@ const MODULES = [
   m("tk-attrs-vehicle", "Thuộc tính sản lượng — Xe", G_OTHER, ADM_DISP, ["device-production-attributes"]),
   m("tk-attrs-machine", "Thuộc tính sản lượng — Máy xúc", G_OTHER, ADM_DISP, ["device-production-attributes"]),
   m("tk-shifts", "Ca làm việc", G_OTHER, ADM_DISP, ["shifts"]),
+  m("tk-suffixes", "Hậu tố", G_OTHER, ADM_DISP, ["suffixes"]),
 
   // --- Danh mục: Hệ thống (do Điều phối quản lý hẳn) ---
   m("departments", "Phòng ban", G_SYSTEM, ADM_DISP),
@@ -103,7 +106,7 @@ const MODULE_BY_KEY = Object.fromEntries(MODULES.map((x) => [x.key, x]));
 const TK_RESOURCES = [
   "users", "departments", "positions", "shifts", "locations", "devices", "device-types",
   "materials", "cargo-groups", "cargo-types", "excavation-reports", "transport-reports",
-  "reconciliation", "acceptance-products", "classifications", "coefficients",
+  "reconciliation", "acceptance-products", "cargo-categories", "classifications", "suffixes", "mud-marks", "coefficients",
   "density-parameters", "device-production-attributes", "excavation-areas", "matrix-catalogs",
   "model-periods", "pickup-points", "production", "receiving-points", "report-periods",
   "seam-groups", "survey-standards", "ttl-clh-items", "unloading-points",

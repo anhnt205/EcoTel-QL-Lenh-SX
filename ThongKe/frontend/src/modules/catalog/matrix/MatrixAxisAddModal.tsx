@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import api from "@/config/api.config";
-import { Button } from "@/components/ui/button";
+import DIcon from "../design/DIcon";
+import "@/styles/catalog-design.css";
 import { matrixService, type MatrixGrid } from "./matrixService";
 
 interface SourceItem {
@@ -107,49 +108,51 @@ export function MatrixAxisAddModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4">
-      <div className="flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl bg-white shadow-xl dark:bg-gray-900">
-        <div className="border-b border-gray-200 px-6 py-4 dark:border-gray-800">
-          <h2 className="text-base font-semibold">
-            Thêm {isRow ? "dòng" : "cột"} — {axisLabel}
-          </h2>
-          <p className="text-xs text-muted-foreground">
-            {sourcePath
-              ? "Chọn từ danh mục nguồn. Mục đã có trong lưới sẽ bị bỏ qua."
-              : `Mỗi dòng một giá trị.${numeric ? " Trục này chỉ nhận số." : ""}`}
-          </p>
+    <div
+      className="tkc-modal-overlay"
+      style={{ zIndex: 100 }}
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div className="modal" style={{ width: "min(720px, 100%)" }} role="dialog" aria-modal="true" aria-label={`Thêm ${isRow ? "dòng" : "cột"}`}>
+        <div className="modal-header">
+          <div>
+            <h2>
+              Thêm {isRow ? "dòng" : "cột"} — {axisLabel}
+            </h2>
+            <p>
+              {sourcePath
+                ? "Chọn từ danh mục nguồn. Mục đã có trong lưới sẽ bị bỏ qua."
+                : `Mỗi dòng một giá trị.${numeric ? " Trục này chỉ nhận số." : ""}`}
+            </p>
+          </div>
+          <button className="close-modal" style={{ marginLeft: "auto" }} aria-label="Đóng" onClick={onClose}>
+            <DIcon name="x" />
+          </button>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-auto px-6 py-4">
+        <div className="modal-body">
           {sourcePath ? (
             isLoading ? (
-              <p className="text-sm text-muted-foreground">Đang tải danh mục…</p>
+              <p className="entry-empty">Đang tải danh mục…</p>
             ) : (
-              <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
+              <div className="mx-add-list">
                 {source.map((s) => {
                   const already = existing.has(s.code);
                   return (
-                    <label
-                      key={s.id}
-                      className={`flex items-center gap-2 rounded px-2 py-1.5 text-sm ${
-                        already ? "opacity-40" : "hover:bg-muted/60"
-                      }`}
-                    >
+                    <label key={s.id} className={`mx-add-item ${already ? "is-had" : ""}`}>
                       <input
                         type="checkbox"
-                        className="h-4 w-4 accent-blue-600"
+                        className="checkbox"
                         disabled={already}
                         checked={already || selected.has(s.code)}
                         onChange={() => toggle(s.code)}
                       />
-                      <span className="truncate" title={s.code}>
+                      <span className="mx-add-name" title={s.code}>
                         {s.name}
                       </span>
-                      {already && (
-                        <span className="ml-auto shrink-0 text-[11px] text-muted-foreground">
-                          đã có
-                        </span>
-                      )}
+                      {already && <span className="mx-add-had">đã có</span>}
                     </label>
                   );
                 })}
@@ -161,28 +164,20 @@ export function MatrixAxisAddModal({
               value={manual}
               onChange={(e) => setManual(e.target.value)}
               placeholder={numeric ? "0\n0.5\n1\n1.5" : "Mỗi dòng một giá trị"}
-              className="w-full resize-y rounded-md border bg-transparent px-3 py-2 font-mono text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              className="field mx-add-textarea"
             />
           )}
+
+          {error && <div className="form-error">{error}</div>}
         </div>
 
-        {error && (
-          <p className="border-t border-red-200 bg-red-50 px-6 py-2 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-300">
-            {error}
-          </p>
-        )}
-
-        <div className="flex justify-end gap-2 border-t border-gray-200 px-6 py-3 dark:border-gray-800">
-          <Button variant="outline" onClick={onClose} disabled={submitting}>
+        <div className="modal-footer">
+          <button className="btn" onClick={onClose} disabled={submitting}>
             Huỷ
-          </Button>
-          <Button
-            className="bg-blue-600 text-white hover:bg-blue-700"
-            onClick={submit}
-            disabled={submitting}
-          >
+          </button>
+          <button className="btn btn-primary" onClick={submit} disabled={submitting}>
             {submitting ? "Đang lưu…" : "Xác nhận"}
-          </Button>
+          </button>
         </div>
       </div>
     </div>

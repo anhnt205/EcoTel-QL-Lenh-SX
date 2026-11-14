@@ -42,6 +42,9 @@ const UnloadingPointsPage = lazy(() => import("@/modules/catalog/pages/Unloading
 const PickupPointsPage = lazy(() => import("@/modules/catalog/pages/PickupPoints"));
 const CargoTypesCatalogPage = lazy(() => import("@/modules/catalog/pages/CargoTypesCatalog"));
 const CargoGroupsCatalogPage = lazy(() => import("@/modules/catalog/pages/CargoGroupsCatalog"));
+const ClassificationsPage = lazy(() => import("@/modules/catalog/pages/Classifications"));
+const SuffixesPage = lazy(() => import("@/modules/catalog/pages/Suffixes"));
+const MudMarksPage = lazy(() => import("@/modules/catalog/pages/MudMarks"));
 const AcceptanceProductsPage = lazy(() => import("@/modules/catalog/pages/AcceptanceProducts"));
 const TtlClhItemsPage = lazy(() => import("@/modules/catalog/pages/TtlClhItems"));
 const SeamGroupsPage = lazy(() => import("@/modules/catalog/pages/SeamGroups"));
@@ -54,7 +57,7 @@ const ReportPeriodsPage = lazy(() => import("@/modules/catalog/pages/ReportPerio
 const ModelMatrixPage = lazy(() => import("@/modules/catalog/pages/ModelMatrix"));
 const ModelPeriodsPage = lazy(() => import("@/modules/catalog/model/ModelPeriodsPage"));
 const FuelNormMatrixPage = lazy(() => import("@/modules/catalog/pages/FuelNormMatrix"));
-const FuelNormOverviewPage = lazy(() => import("@/modules/catalog/fuelnorm/FuelNormOverviewPage"));
+const FuelNormYearsPage = lazy(() => import("@/modules/catalog/fuelnorm/FuelNormYearsPage"));
 const FuelNormAddPage = lazy(() => import("@/modules/catalog/fuelnorm/FuelNormAddPage"));
 const VehicleOutputMatrixPage = lazy(() => import("@/modules/catalog/pages/VehicleOutputMatrix"));
 const FuelAdjustMatrixPage = lazy(() => import("@/modules/catalog/pages/FuelAdjustMatrix"));
@@ -219,6 +222,30 @@ export const mainRoutes = (
         }
       />
       <Route
+        path={ROUTES.DANH_MUC.PHAN_LOAI}
+        element={
+          <Suspense fallback={<PageLoader />}>
+            <ClassificationsPage />
+          </Suspense>
+        }
+      />
+      <Route
+        path={ROUTES.DANH_MUC.KY_HIEU_BUN}
+        element={
+          <Suspense fallback={<PageLoader />}>
+            <MudMarksPage />
+          </Suspense>
+        }
+      />
+      <Route
+        path={ROUTES.DANH_MUC.HAU_TO}
+        element={
+          <Suspense fallback={<PageLoader />}>
+            <SuffixesPage />
+          </Suspense>
+        }
+      />
+      <Route
         path={ROUTES.DANH_MUC.SAN_PHAM_NGHIEM_THU}
         element={
           <Suspense fallback={<PageLoader />}>
@@ -315,7 +342,7 @@ export const mainRoutes = (
         path={ROUTES.DANH_MUC.DINH_MUC_NHIEN_LIEU}
         element={
           <Suspense fallback={<PageLoader />}>
-            <FuelNormOverviewPage />
+            <FuelNormYearsPage />
           </Suspense>
         }
       />

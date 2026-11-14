@@ -1,0 +1,52 @@
+/*
+ * Hộp lọc cột kiểu Excel DÙNG CHUNG (components/design/ExcelFilterPopup.tsx) — cùng giao diện hộp lọc cột của Lệnh sản xuất
+ * (`.col-filter-pop.xl` trong catalog-design.css). Hộp gắn vào <body> nên CSS ở đây là toàn cục (không nằm trong .tkc).
+ */
+.xlp { position: fixed; z-index: 1500; width: 280px; padding: 10px; background: #fff; border: 1px solid #bfd1e8; border-radius: 9px; box-shadow: 0 10px 28px rgba(8, 40, 100, .22); font-family: Arial, Helvetica, sans-serif; font-size: 13px; color: #223b60; box-sizing: border-box; }
+.xlp *, .xlp *::before, .xlp *::after { box-sizing: border-box; font-family: inherit; }
+.xlp-title { font-weight: 700; margin-bottom: 6px; color: #113f8b; }
+.xlp-search { width: 100%; height: 34px; padding: 0 10px; border: 1px solid #bfd1e8; border-radius: 6px; outline: none; font-size: 13px; color: #223b60; background: #fff; }
+.xlp-search:focus { border-color: #3886f8; box-shadow: 0 0 0 3px #dcecff; }
+.xlp-list { margin-top: 8px; max-height: 250px; overflow-y: auto; border: 1px solid #dce6f3; border-radius: 6px; padding: 3px 0; background: #fff; }
+.xlp-item { display: flex; align-items: center; gap: 8px; margin: 0; padding: 5px 10px; font-weight: 400; color: #223b60; cursor: pointer; }
+.xlp-item:hover { background: #eef5ff; }
+.xlp-item input { width: 16px; height: 16px; padding: 0; margin: 0; flex-shrink: 0; accent-color: #1368e8; cursor: pointer; }
+.xlp-item span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.xlp-all { font-weight: 700; border-bottom: 1px solid #e3ecf8; margin-bottom: 2px; }
+.xlp-empty, .xlp-note { padding: 8px 10px; color: #6a7e9d; font-size: 12px; }
+.xlp-count { margin-top: 6px; font-size: 12px; color: #6a7e9d; }
+.xlp-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 9px; }
+.xlp-actions button { height: 28px; padding: 0 12px; border: 1px solid #c2d3ea; border-radius: 6px; background: #fff; color: #294267; cursor: pointer; font-size: 13px; }
+.xlp-actions button:hover:not(:disabled) { background: #eef5ff; }
+.xlp-actions button.primary { background: #1263e7; border-color: #1263e7; color: #fff; font-weight: 700; }
+.xlp-actions button.primary:hover:not(:disabled) { background: #0f55c7; }
+.xlp-actions button:disabled { opacity: .5; cursor: not-allowed; }
+
+/* ===== Tiêu đề cột của lưới dùng chung (CustomDataGrid): tên cột + ⇅ sắp xếp + ⋮ lọc — đúng mẫu tiêu đề của Lệnh sản xuất ===== */
+.xl-grid .MuiDataGrid-iconButtonContainer, .xl-grid .MuiDataGrid-menuIcon { display: none !important; }
+.xl-grid .MuiDataGrid-columnHeaderTitleContainer { width: 100%; }
+.xl-grid .MuiDataGrid-columnHeaderTitleContainerContent { width: 100%; }
+.xlh { display: flex; align-items: center; justify-content: space-between; gap: 6px; width: 100%; }
+.xlh-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; color: #fff; }
+.xlh-tools { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
+.xlh-btn { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 24px; padding: 0; border: 0; border-radius: 5px; background: transparent; color: #fff; cursor: pointer; opacity: .8; }
+.xlh-btn:hover { background: rgba(255, 255, 255, .2); opacity: 1; }
+.xlh-btn.active { background: #ffd54a; color: #08306b; opacity: 1; }
+.xlh-btn svg { width: 14px; height: 14px; stroke: currentColor; stroke-width: 1.9; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+
+/* Báo cáo dạng "tờ giấy" (ReportGrid): đầu cột theo theme báo cáo (không nền xanh) nên chữ/nút kế thừa màu */
+.xl-report .xlh-label, .xl-report .xlh-btn { color: inherit; }
+.xl-report .xlh-btn:hover { background: rgba(0, 0, 0, .08); }
+.xl-report .xlh-btn.active { background: #ffd54a; color: #08306b; }
+@media print { .xl-report .xlh-tools { display: none !important; } }
+
+/* Chọn số dòng + câu "Hiển thị a–b trong tổng n bản ghi" (components/.../RowsPerPage.tsx) — mẫu chân trang của bảng Lệnh sản xuất */
+.rpf { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; color: #1f2937; white-space: nowrap; font-family: inherit; }
+.rpf-select { appearance: none; -webkit-appearance: none; border: 0; background: transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%236b7280'/%3E%3C/svg%3E") no-repeat right 4px center; font: inherit; color: inherit; padding: 4px 20px 4px 6px; border-radius: 4px; cursor: pointer; outline: none; }
+.rpf-select:hover, .rpf-select:focus-visible { background-color: #f1f5f9; }
+.rpf-info { margin-left: 12px; }
+.tkc .pagination-info select.rpf-select { min-width: 0; height: auto; border: 0; }
+.rpf-nav { display: inline-flex; align-items: center; gap: 2px; margin-left: 8px; }
+.rpf-nav button { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: #1f2937; cursor: pointer; }
+.rpf-nav button:hover:not(:disabled) { background: #f1f5f9; }
+.rpf-nav button:disabled { color: #c7cdd6; cursor: default; }

@@ -26,6 +26,9 @@ public class CargoTypeRequest {
 
     Long ttlClhId;
 
+    /** Ký hiệu bùn (tuỳ chọn): id trong danh mục Ký hiệu bùn. */
+    Long mudMarkId;
+
     /** Ghi chú. */
     String description;
 }

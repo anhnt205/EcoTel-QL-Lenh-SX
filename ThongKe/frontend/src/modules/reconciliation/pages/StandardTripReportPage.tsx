@@ -1,3 +1,4 @@
+import RowsPerPage, { PageArrows } from "@/components/table/RowsPerPage";
 import React, { useState, useEffect, useMemo } from "react";
 import {
   useReactTable,
@@ -8,6 +9,7 @@ import {
   flexRender,
   type ColumnDef,
   type SortingState,
+  type ColumnFiltersState,
   type VisibilityState,
 } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
@@ -22,19 +24,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import ColumnToggleMenu from "@/components/table/ColumnToggleMenu";
+import ColumnFilterButton from "@/components/table/ColumnFilterButton";
+import { displayTextFilter } from "@/components/table/useTanstackLayout";
 import {
   Combobox,
   ComboboxChips,
@@ -53,11 +45,6 @@ import {
   Download,
   Search,
   ArrowUpDown,
-  Columns3,
-  ChevronLeft,
-  ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
   Truck,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -113,6 +100,7 @@ export const StandardTripReportPage: React.FC = () => {
 
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
 
   const shiftAnchorRef = useComboboxAnchor();
   const vehicleAnchorRef = useComboboxAnchor();
@@ -331,6 +319,7 @@ export const StandardTripReportPage: React.FC = () => {
       {
         accessorKey: "reportDate",
         id: "reportDate",
+        meta: { headerTitle: "Thời gian" },
         header: ({ column }) => (
           <Button
             variant="ghost"
@@ -349,6 +338,7 @@ export const StandardTripReportPage: React.FC = () => {
       {
         accessorKey: "shift",
         id: "shift",
+        meta: { headerTitle: "Ca" },
         header: ({ column }) => (
           <Button
             variant="ghost"
@@ -365,6 +355,7 @@ export const StandardTripReportPage: React.FC = () => {
       {
         accessorKey: "vehicleNo",
         id: "vehicleNo",
+        meta: { headerTitle: "Số xe" },
         header: ({ column }) => (
           <Button
             variant="ghost"
@@ -519,9 +510,12 @@ export const StandardTripReportPage: React.FC = () => {
     state: {
       sorting,
       columnVisibility,
+      columnFilters,
     },
     onSortingChange: setSorting,
     onColumnVisibilityChange: setColumnVisibility,
+    onColumnFiltersChange: setColumnFilters,
+    defaultColumn: { filterFn: displayTextFilter },
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
@@ -529,7 +523,7 @@ export const StandardTripReportPage: React.FC = () => {
     getRowId: (row, relativeIndex) => `${row.id || "std"}_t_${relativeIndex}`,
     initialState: {
       pagination: {
-        pageSize: 20,
+        pageSize: 15,
       },
     },
   });
@@ -787,41 +781,7 @@ export const StandardTripReportPage: React.FC = () => {
             </strong>
           </span>
 
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-7 text-xs gap-1.5 bg-white dark:bg-gray-900"
-              >
-                <Columns3 className="w-3.5 h-3.5" />
-                <span>Hiển thị cột</span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
-              {table
-                .getAllColumns()
-                .filter((column) => column.getCanHide())
-                .map((column) => {
-                  const headerText =
-                    typeof column.columnDef.header === "string"
-                      ? column.columnDef.header
-                      : column.id;
-                  return (
-                    <DropdownMenuCheckboxItem
-                      key={column.id}
-                      className="capitalize text-xs"
-                      checked={column.getIsVisible()}
-                      onCheckedChange={(value) =>
-                        column.toggleVisibility(!!value)
-                      }
-                    >
-                      {headerText}
-                    </DropdownMenuCheckboxItem>
-                  );
-                })}
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <ColumnToggleMenu table={table} />
         </div>
 
         {/* Main Data Table */}
@@ -852,12 +812,14 @@ export const StandardTripReportPage: React.FC = () => {
                       style={{ width: header.getSize() }}
                       className="px-1.5 py-1.5 text-center border-r border-blue-400/60 dark:border-blue-400/60 text-white font-bold whitespace-normal break-words leading-tight align-middle min-h-[36px] overflow-hidden [&_button]:text-white [&_button]:hover:text-white [&_button]:hover:bg-blue-600/50"
                     >
-                      {header.isPlaceholder
-                        ? null
-                        : flexRender(
-                            header.column.columnDef.header,
-                            header.getContext(),
-                          )}
+                      {header.isPlaceholder ? null : (
+                        <div className="flex items-center justify-center gap-0.5">
+                          <span className="min-w-0 truncate">
+                            {flexRender(header.column.columnDef.header, header.getContext())}
+                          </span>
+                          {header.column.getCanFilter() && <ColumnFilterButton column={header.column} table={table} />}
+                        </div>
+                      )}
                     </TableHead>
                   ))}
                 </TableRow>
@@ -903,77 +865,16 @@ export const StandardTripReportPage: React.FC = () => {
         </div>
 
         {/* Pagination Bar */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-1 text-xs text-gray-600 dark:text-gray-400">
-          <div className="flex items-center gap-2">
-            <span>Hiển thị</span>
-            <Select
-              value={String(table.getState().pagination.pageSize)}
-              onValueChange={(v) => table.setPageSize(Number(v))}
-            >
-              <SelectTrigger className="h-7 text-xs w-28 bg-white dark:bg-gray-900">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="10">10</SelectItem>
-                <SelectItem value="20">20</SelectItem>
-                <SelectItem value="50">50</SelectItem>
-                <SelectItem value="100">100</SelectItem>
-              </SelectContent>
-            </Select>
-            <span>
-              trên tổng số{" "}
-              <strong className="text-gray-900 dark:text-gray-100">
-                {filteredReports.length}
-              </strong>{" "}
-              chuyến
-            </span>
-          </div>
+        <div className="flex flex-col sm:flex-row items-center justify-end gap-2 pt-1 text-xs text-gray-600 dark:text-gray-400">
+          <RowsPerPage
+            value={table.getState().pagination.pageSize}
+            onChange={(n) => table.setPageSize(n)}
+            from={filteredReports.length ? table.getState().pagination.pageIndex * table.getState().pagination.pageSize + 1 : 0}
+            to={Math.min((table.getState().pagination.pageIndex + 1) * table.getState().pagination.pageSize, filteredReports.length)}
+            total={filteredReports.length}
+          />
 
-          {/* Page controls */}
-          <div className="flex items-center gap-1">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={!table.getCanPreviousPage()}
-              onClick={() => table.setPageIndex(0)}
-              className="h-7 w-7 p-0"
-            >
-              <ChevronsLeft className="w-3.5 h-3.5" />
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={!table.getCanPreviousPage()}
-              onClick={() => table.previousPage()}
-              className="h-7 w-7 p-0"
-            >
-              <ChevronLeft className="w-3.5 h-3.5" />
-            </Button>
-
-            <span className="px-2 text-xs font-semibold">
-              Trang {table.getState().pagination.pageIndex + 1} /{" "}
-              {table.getPageCount() || 1}
-            </span>
-
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={!table.getCanNextPage()}
-              onClick={() => table.nextPage()}
-              className="h-7 w-7 p-0"
-            >
-              <ChevronRight className="w-3.5 h-3.5" />
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={!table.getCanNextPage()}
-              onClick={() => table.setPageIndex(table.getPageCount() - 1)}
-              className="h-7 w-7 p-0"
-            >
-              <ChevronsRight className="w-3.5 h-3.5" />
-            </Button>
-          </div>
+          <PageArrows canPrev={table.getCanPreviousPage()} canNext={table.getCanNextPage()} onPrev={() => table.previousPage()} onNext={() => table.nextPage()} onFirst={() => table.setPageIndex(0)} onLast={() => table.setPageIndex(Math.max(0, table.getPageCount() - 1))} />
         </div>
       </div>
     </div>

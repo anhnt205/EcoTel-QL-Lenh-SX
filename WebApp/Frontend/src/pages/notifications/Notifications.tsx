@@ -79,7 +79,7 @@ const Notifications: React.FC = () => {
     };
 
     const [page, setPage] = React.useState(0);
-    const [pageSize, setPageSize] = React.useState(10);
+    const [pageSize, setPageSize] = React.useState(15);
 
     const handleChangePage = (event: React.MouseEvent<HTMLButtonElement, MouseEvent> | null, page: number) => {
         setPage(page);
@@ -170,6 +170,11 @@ const Notifications: React.FC = () => {
                     page={page}
                     onPageChange={handleChangePage}
                     rowsPerPage={pageSize}
+                    rowsPerPageOptions={[15, 20, 50, 100]}
+                    labelRowsPerPage="Số dòng:"
+                    showFirstButton
+                    showLastButton
+                    labelDisplayedRows={({ from, to, count }) => `Hiển thị ${from}–${to} trong tổng ${count === -1 ? `hơn ${to}` : count} bản ghi`}
                     onRowsPerPageChange={(event) => {
                         setPageSize(parseInt(event.target.value, 10));
                         setPage(0);

@@ -5,15 +5,8 @@ import { toast } from "sonner";
 import * as XLSX from "xlsx";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb";
 import api from "@/config/api.config";
+import DesignShell from "../catalog/design/DesignShell";
 import { productionService, type AreaApplicationRow } from "./productionService";
 
 interface NamedOption {
@@ -165,27 +158,10 @@ export default function AreaApplicationReportPage() {
   );
 
   return (
-    <div className="flex h-full flex-col gap-4 p-4 md:p-6">
-      <Breadcrumb>
-        <BreadcrumbList>
-          <BreadcrumbItem>
-            <BreadcrumbLink href="#">Danh mục</BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbLink href="#">Thống kê sản lượng</BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbPage>Áp Trắc Địa (m3-tấn-tkm)</BreadcrumbPage>
-          </BreadcrumbItem>
-        </BreadcrumbList>
-      </Breadcrumb>
+    <DesignShell trail={["Danh mục", "Số Trắc địa"]} title="Áp Trắc địa (m3-tấn-tkm)" description="Danh mục áp trắc địa theo năm, máy xúc và nhóm vỉa">
+      <div className="flex flex-col gap-4">
 
-      <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
-        <h1 className="mb-3 text-lg font-bold text-blue-700 dark:text-blue-400">
-          Áp Trắc Địa (m3-tấn-tkm) - Danh mục
-        </h1>
+      <div>
         <div className="flex flex-wrap items-end gap-4">
           <Field label="Năm">
             <div className="flex items-center gap-1.5">
@@ -356,7 +332,8 @@ export default function AreaApplicationReportPage() {
           </div>
         </div>
       </div>
-    </div>
+      </div>
+    </DesignShell>
   );
 }
 

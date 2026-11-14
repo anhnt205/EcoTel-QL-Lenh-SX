@@ -23,7 +23,8 @@ import type { MatrixAxisEntry, MatrixGrid } from "../matrix/matrixService";
  * KHÁC NHAU trong bảng tính — không gộp, không đổi hoa thường.
  */
 
-export type FuelNormSuffix = "Bun" | "Dat" | "BK" | "DAT" | "Than";
+/** Năm hậu tố mặc định + bất kỳ mã Phân loại nào người dùng khai ở danh mục Phân loại (hậu tố = MÃ phân loại). */
+export type FuelNormSuffix = "Bun" | "Dat" | "BK" | "DAT" | "Than" | (string & {});
 
 export const FUEL_NORM_SUFFIXES: { value: FuelNormSuffix; label: string }[] = [
   { value: "DAT", label: ".DAT (Phân loại Đất)" },
@@ -53,6 +54,9 @@ export function parseVehicleSuffixKey(
       return { vehicleCode: key.slice(0, -tail.length), suffix };
     }
   }
+  // Hậu tố là mã Phân loại tự khai: tách tại dấu chấm CUỐI CÙNG
+  const dot = key.lastIndexOf(".");
+  if (dot > 0 && dot < key.length - 1) return { vehicleCode: key.slice(0, dot), suffix: key.slice(dot + 1) };
   return null;
 }
 
@@ -218,6 +222,98 @@ export function interpolateBilinear(
   const value = linear(routeDistance, hb, ha, av, ay);
   if (value === null) return null;
   return { value, distanceLow: hb, distanceHigh: ha, slopeLow: h1, slopeHigh: h2 };
+}
+
+/** Các bước nội suy theo đúng ký hiệu của tài liệu nghiệp vụ (Hb, Ha, h1, h2, Nb, Na, Nt) — dùng cho khung "Tính nội suy". */
+export interface InterpolationSteps {
+  /** Cung độ toàn tuyến = 0 → định mức tiêu hao cần tìm = 0. */
+  zero: boolean;
+  hb: number | null;
+  ha: number | null;
+  h1: number | null;
+  h2: number | null;
+  /** Cung độ / nâng tải nhập vào nằm NGOÀI khoảng của bảng → lấy mốc gần nhất (giống backend). */
+  distanceOutside: boolean;
+  slopeOutside: boolean;
+  nbH1: number | null;
+  nbH2: number | null;
+  nb: number | null;
+  naH1: number | null;
+  naH2: number | null;
+  na: number | null;
+  nt: number | null;
+}
+
+/** Cột ứng với (nhóm xe + phân loại, cung độ) — so theo SỐ nên "0,05" và "0.05" là một. */
+function colKeyAt(grid: MatrixGrid, vehicleSuffixKey: string, distance: number | null): string | null {
+  if (distance === null) return null;
+  const col = grid.cols.find((c) => {
+    const p = parseColumnKey(c.key);
+    return p !== null && p.vehicleSuffixKey === vehicleSuffixKey && p.distance === distance;
+  });
+  return col?.key ?? null;
+}
+
+/** Giá trị tại (độ dốc, cung độ); thiếu ô → null. */
+function normAt(grid: MatrixGrid, vehicleSuffixKey: string, distance: number | null, slope: number | null): number | null {
+  const colKey = colKeyAt(grid, vehicleSuffixKey, distance);
+  if (colKey === null) return null;
+  return cellAtSlope(grid, slope, colKey);
+}
+
+/** Nội suy theo độ dốc giữa h1 và h2 (h1 = h2 → lấy luôn giá trị tại h1; thiếu một đầu → lấy đầu kia). */
+function overSlope(slope: number, h1: number | null, h2: number | null, v1: number | null, v2: number | null): number | null {
+  if (v1 === null) return v2;
+  if (v2 === null) return v1;
+  if (h1 === null || h2 === null || h1 === h2) return v1;
+  return v1 + (v2 - v1) * ((slope - h1) / (h2 - h1));
+}
+
+/**
+ * Tính TỪNG BƯỚC nội suy cho một nhóm Chủng loại xe + Phân loại: Hb/Ha (cung độ cận trên/dưới), h1/h2 (dốc cận trước/sau),
+ * Nb/Na (nhiên liệu tương ứng Hb/Ha, nội suy theo độ dốc) rồi Nt (nội suy theo cung độ toàn tuyến). Chỉ để tính nhanh trên UI.
+ */
+export function interpolateSteps(
+  grid: MatrixGrid,
+  vehicleSuffixKey: string,
+  routeDistance: number,
+  slope: number,
+): InterpolationSteps | null {
+  const empty: InterpolationSteps = {
+    zero: false, hb: null, ha: null, h1: null, h2: null, distanceOutside: false, slopeOutside: false,
+    nbH1: null, nbH2: null, nb: null, naH1: null, naH2: null, na: null, nt: null,
+  };
+  if (routeDistance === 0) return { ...empty, zero: true, nt: 0 };
+
+  const distances = distanceBandsOf(grid, vehicleSuffixKey);
+  const slopes = slopeBandsOf(grid);
+  if (distances.length === 0 || slopes.length === 0) return null;
+
+  let hb = floorOf(distances, routeDistance);
+  let ha = ceilOf(distances, routeDistance);
+  const distanceOutside = hb === null || ha === null;
+  if (hb === null) hb = ha;
+  if (ha === null) ha = hb;
+
+  let h1 = floorOf(slopes, slope);
+  let h2 = ceilOf(slopes, slope);
+  const slopeOutside = h1 === null || h2 === null;
+  if (h1 === null) h1 = h2;
+  if (h2 === null) h2 = h1;
+
+  const nbH1 = normAt(grid, vehicleSuffixKey, hb, h1);
+  const nbH2 = normAt(grid, vehicleSuffixKey, hb, h2);
+  const naH1 = normAt(grid, vehicleSuffixKey, ha, h1);
+  const naH2 = normAt(grid, vehicleSuffixKey, ha, h2);
+  const nb = overSlope(slope, h1, h2, nbH1, nbH2);
+  const na = overSlope(slope, h1, h2, naH1, naH2);
+
+  let nt: number | null;
+  if (nb === null) nt = na;
+  else if (na === null || hb === ha || hb === null || ha === null) nt = nb;
+  else nt = nb + (na - nb) * ((routeDistance - hb) / (ha - hb));
+
+  return { ...empty, hb, ha, h1, h2, distanceOutside, slopeOutside, nbH1, nbH2, nb, naH1, naH2, na, nt };
 }
 
 // ── Trạng thái + mã hiển thị ────────────────────────────────────────────────

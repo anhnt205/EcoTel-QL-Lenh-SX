@@ -11,7 +11,9 @@ export interface CatalogField {
    * `select` — combobox; nguồn lấy từ `optionsFrom` (endpoint phụ trả
    *            mảng chuỗi) hoặc `optionsPath` (danh mục khác, dùng id)
    */
-  type: "text" | "number" | "date" | "select";
+  type: "text" | "number" | "date" | "select" | "checkbox";
+  /** Với checkbox: giá trị lưu khi được tick (bỏ tick = để trống). Mặc định "true". */
+  checkedValue?: string;
   /** Với select: hậu tố endpoint trả mảng chuỗi, vd "seam-groups". */
   optionsFrom?: string;
   /** Với select tham chiếu danh mục khác: đường dẫn API, vd "/cargo-groups". */
@@ -35,6 +37,10 @@ export interface CatalogField {
    */
   formHidden?: boolean;
   placeholder?: string;
+  /** Với select: danh sách lựa chọn CỐ ĐỊNH (giá trị gửi lên + nhãn hiển thị), vd trạng thái thiết bị. */
+  options?: { value: string; label: string }[];
+  /** Với select tham chiếu danh mục khác: tham số lọc thêm khi tải lựa chọn, vd { group: "XE" }. */
+  optionsParams?: Record<string, unknown>;
   /** Bề rộng cột trong bảng nhập nhiều dòng (tailwind class). */
   width?: string;
 }
@@ -51,6 +57,12 @@ export interface CatalogConfig {
   breadcrumb: string[];
   /** Gợi ý cho ô tìm kiếm. */
   searchPlaceholder: string;
+  /** Dòng mô tả dưới tên trang (bố cục thẻ); không đặt thì dùng "Quản lý danh mục {nounPhrase}". */
+  description?: string;
+  /** Bộ lọc nhóm trên thanh công cụ (thiết kế): lọc theo giá trị của cột `key` (vd "cargoGroupName"), nhãn hiển thị `label`. */
+  filterField?: { key: string; label: string };
+  /** Bề rộng cột (px) của bảng theo thiết kế, theo thứ tự `fields`; không đặt thì lấy từ `width` của từng trường. */
+  designWidths?: number[];
   fields: CatalogField[];
   /**
    * Trường đóng vai trò MÃ duy nhất, dùng để chặn trùng khi nhập Excel.
@@ -96,4 +108,10 @@ export interface CatalogConfig {
    * Trường hiển thị trong câu hỏi xác nhận xoá. Mặc định là trường thứ hai.
    */
   labelKey?: string;
+  /** Màn có nút Tải lên/Tải xuống (Excel). Mặc định `true`; đặt `false` cho màn chưa hỗ trợ file mẫu (vd Xe, Máy). */
+  canExcel?: boolean;
+  /** Thêm số liệu "giờ hoạt động lũy kế" (cột `cumulativeHours`) theo MÃ thiết bị, lấy từ Điều phối qua khung cha. */
+  deviceHoursByCode?: boolean;
+  /** Cột nào trống thì lấy giá trị cột khác của cùng dòng để hiển thị/sửa, vd { vehicleNumber: "code" } (Số xe trống => dùng Biển số/mã). */
+  valueFallbacks?: Record<string, string>;
 }

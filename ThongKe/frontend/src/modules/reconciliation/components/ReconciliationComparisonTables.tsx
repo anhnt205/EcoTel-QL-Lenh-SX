@@ -1,3 +1,4 @@
+import RowsPerPage, { PageArrows } from "@/components/table/RowsPerPage";
 import React, { useState, useMemo, useRef, useCallback } from "react";
 import type {
   ReconciliationItem,
@@ -18,13 +19,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
-import {
-  ChevronLeft,
-  ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
-} from "lucide-react";
 import { toast } from "sonner";
 import { useRoleStore } from "@/stores/useRoleStore";
 import { RequestChangeModal } from "./RequestChangeModal";
@@ -53,6 +47,7 @@ interface ReconciliationComparisonTablesProps {
   >;
 }
 
+/** * Vùng màu của bảng Đối chiếu (để phân biệt nhanh khi nhìn): Thông tin chung (xanh dương đậm) · Số liệu báo chuyến Vận tải (xanh lá) · * Số liệu báo chuyến Khai thác (xanh da trời) · Kết quả đối chiếu (tím) · Thao tác/Trạng thái (xám xanh). Màu dòng theo trạng thái * (đỏ/vàng/đã chọn) vẫn thắng màu vùng — xem tk-skin.css (`.tks-recon`). */const zoneOf = (id: string): string => {  if (id === "group_transport_data" || id.startsWith("trans")) return "transport";  if (id === "group_mining_data" || id.startsWith("mining")) return "mining";  if (id === "group_reconciliation_result" || id === "matched" || id === "mismatched") return "result";  if (id === "group_workflow_action" || id === "workflowAction" || id === "actions") return "action";  return "common";};
 export const ReconciliationComparisonTables: React.FC<
   ReconciliationComparisonTablesProps
 > = ({
@@ -296,6 +291,7 @@ export const ReconciliationComparisonTables: React.FC<
     columns,
     getRowId: (row) => row.id,
     state: { rowSelection },
+    initialState: { pagination: { pageSize: 15 } },
     onRowSelectionChange: setRowSelection,
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
@@ -310,7 +306,7 @@ export const ReconciliationComparisonTables: React.FC<
   return (
     <div className="space-y-3">
       <div className="border border-gray-200 dark:border-gray-800 rounded-xl overflow-x-auto  dark:bg-gray-900 shadow-sm">
-        <Table>
+        <Table containerClassName="tks-recon">
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow
@@ -359,6 +355,7 @@ export const ReconciliationComparisonTables: React.FC<
                     <TableHead
                       key={header.id}
                       colSpan={header.colSpan}
+                      data-zone={zoneOf(header.column.parent?.id ?? header.column.id)}
                       className={`text-center font-bold text-sm border-r border-gray-200 dark:border-gray-700 last:border-r-0 ${headerBg} ${
                         header.id === "common_info_panel"
                           ? "p-0 overflow-hidden"
@@ -473,6 +470,8 @@ export const ReconciliationComparisonTables: React.FC<
                       return (
                         <TableCell
                           key={cell.id}
+                          data-zone={zoneOf(cell.column.parent?.id ?? cell.column.id)}
+                          data-status={isSelected ? "selected" : isRevisionRequested ? "revision" : isAwaitingReapproval ? "reapproval" : undefined}
                           className={`text-center ${cellBg} ${stripe} ${
                             isCommonInfo ? "p-0 overflow-hidden" : "px-2 py-2"
                           }`}
@@ -513,109 +512,16 @@ export const ReconciliationComparisonTables: React.FC<
       </div>
 
       {/* ══ Pagination & Footer Controls ════════════════════════════════ */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-1 text-sm text-gray-600 dark:text-gray-400">
-        <div>
-          Hiển thị{" "}
-          <strong>
-            {items.length > 0
-              ? table.getState().pagination.pageIndex *
-                  table.getState().pagination.pageSize +
-                1
-              : 0}{" "}
-            -{" "}
-            {Math.min(
-              (table.getState().pagination.pageIndex + 1) *
-                table.getState().pagination.pageSize,
-              items.length,
-            )}
-          </strong>{" "}
-          trong tổng số{" "}
-          <strong className="text-gray-900 dark:text-gray-100">
-            {items.length}
-          </strong>{" "}
-          bản ghi
-        </div>
+      <div className="flex flex-col sm:flex-row items-center justify-end gap-2 pt-1 text-sm text-gray-600 dark:text-gray-400">
+        <RowsPerPage
+          value={table.getState().pagination.pageSize}
+          onChange={(n) => table.setPageSize(n)}
+          from={items.length ? table.getState().pagination.pageIndex * table.getState().pagination.pageSize + 1 : 0}
+          to={Math.min((table.getState().pagination.pageIndex + 1) * table.getState().pagination.pageSize, items.length)}
+          total={items.length}
+        />
 
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <span>Số bản ghi trên trang</span>
-            <select
-              value={String(table.getState().pagination.pageSize)}
-              onChange={(e) => {
-                table.setPageSize(Number(e.target.value));
-              }}
-              className="h-7 text-xs px-2 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded font-medium text-gray-800 dark:text-gray-200 outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer shadow-2xs"
-            >
-              <option value="10">10</option>
-              <option value="20">20</option>
-              <option value="50">50</option>
-              <option value="100">100</option>
-            </select>
-          </div>
-
-          <div className="flex items-center gap-1">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={!table.getCanPreviousPage()}
-              onClick={() => table.setPageIndex(0)}
-              className="h-7 w-7 p-0"
-            >
-              <ChevronsLeft className="w-3.5 h-3.5" />
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={!table.getCanPreviousPage()}
-              onClick={() => table.previousPage()}
-              className="h-7 w-7 p-0"
-            >
-              <ChevronLeft className="w-3.5 h-3.5" />
-            </Button>
-
-            {Array.from(
-              { length: Math.min(5, table.getPageCount()) },
-              (_, i) => i + 1,
-            ).map((page) => (
-              <Button
-                key={page}
-                variant={
-                  page === table.getState().pagination.pageIndex + 1
-                    ? "default"
-                    : "outline"
-                }
-                size="sm"
-                onClick={() => table.setPageIndex(page - 1)}
-                className={`h-7 w-7 p-0 text-sm font-semibold ${
-                  page === table.getState().pagination.pageIndex + 1
-                    ? "bg-blue-600 text-white hover:bg-blue-700"
-                    : ""
-                }`}
-              >
-                {page}
-              </Button>
-            ))}
-
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={!table.getCanNextPage()}
-              onClick={() => table.nextPage()}
-              className="h-7 w-7 p-0"
-            >
-              <ChevronRight className="w-3.5 h-3.5" />
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={!table.getCanNextPage()}
-              onClick={() => table.setPageIndex(table.getPageCount() - 1)}
-              className="h-7 w-7 p-0"
-            >
-              <ChevronsRight className="w-3.5 h-3.5" />
-            </Button>
-          </div>
-        </div>
+        <PageArrows canPrev={table.getCanPreviousPage()} canNext={table.getCanNextPage()} onPrev={() => table.previousPage()} onNext={() => table.nextPage()} onFirst={() => table.setPageIndex(0)} onLast={() => table.setPageIndex(Math.max(0, table.getPageCount() - 1))} />
       </div>
 
       {/* Modal Yêu Cầu Sửa */}

@@ -108,6 +108,7 @@ const App = () => {
   return (
     <BrowserRouter>
       <Suspense fallback={<PageLoader />}>
+        <CatalogThemeBoundary>
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/privacy_policy" element={<PrivacyPolicy />} />
@@ -122,13 +123,13 @@ const App = () => {
           <Route
             path="/orders"
             element={
-              <PrivateRoute><RequireModule module="orders">
+              <PrivateRoute><RequireModule module="orders"><CatalogThemeBoundary>
                 {user?.role === RoleEnum.DISPATCHER ? (
                   <DispatcherOrders />
                 ) : (
                   <Orders />
                 )}
-              </RequireModule></PrivateRoute>
+              </CatalogThemeBoundary></RequireModule></PrivateRoute>
             }
           />
           <Route
@@ -297,6 +298,7 @@ const App = () => {
             }
           />
         </Routes>
+        </CatalogThemeBoundary>
       </Suspense>
     </BrowserRouter>
   );

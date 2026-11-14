@@ -12,7 +12,7 @@ export const excavationAreaConfig: CatalogConfig = {
   title: "Khu vực xúc",
   nounPhrase: "khu vực xúc",
   breadcrumb: ["Danh mục", "Khai thác"],
-  searchPlaceholder: "Tìm kiếm theo mã khu vực xúc, tên khu vực xúc",
+  searchPlaceholder: "Tìm kiếm theo mã khu vực xúc, khu vực xúc",
   // "Nhóm khu vực" (CS/KC) là chiều mà MỌI công thức sản lượng so sánh —
   // bảng tính so `D5="CS"`/`"KC"` trong khi danh mục thật có nhiều khu.
   // Xem QĐ-13. Không khai nhóm thì engine không tính được chuyến đó.
@@ -49,7 +49,7 @@ export const unloadingPointConfig: CatalogConfig = {
   title: "Nơi dỡ tải",
   nounPhrase: "nơi dỡ tải",
   breadcrumb: ["Danh mục", "Khai thác"],
-  searchPlaceholder: "Tìm kiếm theo mã nơi dỡ tải, tên nơi dỡ tải",
+  searchPlaceholder: "Tìm kiếm theo mã nơi dỡ tải, nơi dỡ tải",
   fields: placeFields("nơi dỡ tải"),
 };
 
@@ -58,7 +58,7 @@ export const pickupPointConfig: CatalogConfig = {
   title: "Nơi chất tải",
   nounPhrase: "nơi chất tải",
   breadcrumb: ["Danh mục", "Khai thác"],
-  searchPlaceholder: "Tìm kiếm theo mã nơi chất tải, tên nơi chất tải",
+  searchPlaceholder: "Tìm kiếm theo mã nơi chất tải, nơi chất tải",
   fields: placeFields("nơi chất tải"),
 };
 
@@ -67,13 +67,16 @@ export const cargoTypeConfig: CatalogConfig = {
   title: "Chủng loại hàng",
   nounPhrase: "chủng loại hàng",
   breadcrumb: ["Danh mục", "Thống kê sản lượng"],
-  searchPlaceholder: "Tìm kiếm theo mã chủng loại hàng, tên chủng loại hàng",
+  searchPlaceholder: "Tìm kiếm theo mã, tên chủng loại hàng...",
+  description: "Quản lý danh mục chủng loại hàng",
+  designWidths: [150, 205, 195, 165, 138, 130, 105],
   fields: [
     { key: "code", label: "Mã chủng loại hàng", required: true, type: "text", width: "min-w-[150px]" },
     { key: "name", label: "Chủng loại hàng", required: true, type: "text", width: "min-w-[150px]" },
     { key: "cargoGroupId", label: "Nhóm chủng loại hàng", required: true, type: "select", optionsPath: "/cargo-groups", width: "min-w-[170px]" },
     { key: "acceptanceProductId", label: "Sản phẩm nghiệm thu", type: "select", optionsPath: "/acceptance-products", width: "min-w-[160px]" },
     { key: "ttlClhId", label: "TTL CLH", type: "select", optionsPath: "/ttl-clh-items", width: "min-w-[120px]" },
+    { key: "mudMarkId", label: "Ký hiệu bùn", type: "select", optionsPath: "/mud-marks", width: "min-w-[130px]" },
     { key: "description", label: "Ghi chú", type: "text", width: "min-w-[150px]" },
   ],
 };
@@ -87,10 +90,11 @@ export const cargoGroupConfig: CatalogConfig = {
   title: "Nhóm chủng loại hàng",
   nounPhrase: "nhóm chủng loại hàng",
   breadcrumb: ["Danh mục", "Thống kê sản lượng"],
-  searchPlaceholder: "Tìm kiếm theo mã nhóm, tên nhóm chủng loại hàng",
+  searchPlaceholder: "Tìm kiếm theo mã nhóm, nhóm chủng loại hàng",
   fields: [
     { key: "code", label: "Mã nhóm chủng loại hàng", required: true, type: "text", width: "min-w-[190px]" },
     { key: "name", label: "Nhóm chủng loại hàng", required: true, type: "text", width: "min-w-[180px]" },
+    { key: "classificationId", label: "Phân loại", type: "select", optionsPath: "/classifications", width: "min-w-[160px]" },
     { key: "description", label: "Ghi chú", type: "text", width: "min-w-[200px]" },
   ],
 };
@@ -100,7 +104,7 @@ export const acceptanceProductConfig: CatalogConfig = {
   title: "Sản phẩm nghiệm thu",
   nounPhrase: "sản phẩm nghiệm thu",
   breadcrumb: ["Danh mục", "Thống kê sản lượng"],
-  searchPlaceholder: "Tìm kiếm theo mã, tên sản phẩm nghiệm thu",
+  searchPlaceholder: "Tìm kiếm theo mã, sản phẩm nghiệm thu",
   fields: [
     { key: "code", label: "Mã sản phẩm nghiệm thu", required: true, type: "text", width: "min-w-[190px]" },
     { key: "name", label: "Sản phẩm nghiệm thu", required: true, type: "text", width: "min-w-[180px]" },
@@ -129,7 +133,7 @@ export const seamGroupConfig: CatalogConfig = {
   title: "Nhóm vỉa",
   nounPhrase: "nhóm vỉa",
   breadcrumb: ["Danh mục", "Thống kê sản lượng"],
-  searchPlaceholder: "Tìm kiếm theo mã nhóm vỉa, tên nhóm vỉa",
+  searchPlaceholder: "Tìm kiếm theo mã nhóm vỉa, nhóm vỉa",
   fields: [
     { key: "code", label: "Mã nhóm vỉa", required: true, type: "text", width: "min-w-[170px]" },
     { key: "name", label: "Nhóm vỉa", required: true, type: "text", width: "min-w-[170px]" },
@@ -142,8 +146,32 @@ export const vehicleTypeConfig: CatalogConfig = {
   title: "Chủng loại xe",
   nounPhrase: "chủng loại xe",
   breadcrumb: ["Danh mục", "Thống kê sản lượng"],
-  searchPlaceholder: "Tìm kiếm theo mã chủng loại xe, tên chủng loại xe",
+  searchPlaceholder: "Tìm kiếm theo mã chủng loại xe, chủng loại xe",
   fields: placeFields("chủng loại xe"),
+};
+
+export const mudMarkConfig: CatalogConfig = {
+  basePath: "/mud-marks",
+  title: "Ký hiệu bùn",
+  nounPhrase: "ký hiệu bùn",
+  breadcrumb: ["Danh mục", "Thống kê sản lượng"],
+  searchPlaceholder: "Tìm kiếm theo ký hiệu bùn, ghi chú",
+  fields: [
+    { key: "name", label: "Ký hiệu bùn", required: true, type: "text", width: "min-w-[200px]" },
+    { key: "note", label: "Ghi chú", type: "text", width: "min-w-[240px]" },
+  ],
+};
+
+export const suffixConfig: CatalogConfig = {
+  basePath: "/suffixes",
+  title: "Hậu tố",
+  nounPhrase: "hậu tố",
+  breadcrumb: ["Danh mục", "Danh mục khác"],
+  searchPlaceholder: "Tìm kiếm theo hậu tố, ghi chú",
+  fields: [
+    { key: "suffix", label: "Hậu tố", required: true, type: "text", width: "min-w-[200px]" },
+    { key: "note", label: "Ghi chú", type: "text", width: "min-w-[240px]" },
+  ],
 };
 
 export const classificationConfig: CatalogConfig = {
@@ -160,7 +188,7 @@ export const vehicleRankGroupConfig: CatalogConfig = {
   title: "Nhóm hạng xe",
   nounPhrase: "nhóm hạng xe",
   breadcrumb: ["Danh mục", "Thống kê sản lượng"],
-  searchPlaceholder: "Tìm kiếm theo mã nhóm, tên nhóm hạng xe",
+  searchPlaceholder: "Tìm kiếm theo mã nhóm, nhóm hạng xe",
   fields: placeFields("nhóm hạng xe"),
 };
 
@@ -183,7 +211,7 @@ export const vehicleFuelClassConfig: CatalogConfig = {
   title: "Chủng loại xe + DMNL",
   nounPhrase: "chủng loại xe + DMNL",
   breadcrumb: ["Danh mục", "Thống kê sản lượng"],
-  searchPlaceholder: "Tìm kiếm theo mã, tên chủng loại xe + DMNL",
+  searchPlaceholder: "Tìm kiếm theo mã, chủng loại xe + DMNL",
   fields: [
     { key: "code", label: "Mã chủng loại xe + DMNL", required: true, type: "text", width: "min-w-[200px]" },
     { key: "name", label: "Chủng loại xe + DMNL", required: true, type: "text", width: "min-w-[190px]" },
@@ -196,7 +224,7 @@ export const vehicleCategoryClassConfig: CatalogConfig = {
   title: "Chủng loại xe + Phân loại",
   nounPhrase: "chủng loại xe + phân loại",
   breadcrumb: ["Danh mục", "Thống kê sản lượng"],
-  searchPlaceholder: "Tìm kiếm theo mã, tên chủng loại xe + phân loại",
+  searchPlaceholder: "Tìm kiếm theo mã, chủng loại xe + phân loại",
   fields: [
     { key: "code", label: "Mã chủng loại xe + phân loại", required: true, type: "text", width: "min-w-[210px]" },
     { key: "name", label: "Chủng loại xe + phân loại", required: true, type: "text", width: "min-w-[200px]" },
@@ -209,7 +237,7 @@ export const coefficientConfig: CatalogConfig = {
   title: "Hệ số",
   nounPhrase: "hệ số",
   breadcrumb: ["Danh mục", "Thống kê sản lượng"],
-  searchPlaceholder: "Tìm kiếm theo mã hệ số, tên hệ số",
+  searchPlaceholder: "Tìm kiếm theo mã hệ số, hệ số",
   fields: [
     { key: "code", label: "Mã hệ số", required: true, type: "text", width: "min-w-[150px]" },
     { key: "name", label: "Tên hệ số", required: true, type: "text", width: "min-w-[200px]" },
@@ -392,7 +420,7 @@ export const machineProductionAttrConfig: CatalogConfig = {
   title: "Thuộc tính sản lượng — Máy xúc",
   nounPhrase: "thuộc tính sản lượng của máy xúc",
   breadcrumb: ["Danh mục", "Thống kê sản lượng"],
-  searchPlaceholder: "Tìm theo mã máy, tên máy",
+  searchPlaceholder: "Tìm theo mã máy, máy",
   uniqueCodeKey: null,
   labelKey: "code",
   canCreate: false,
@@ -407,4 +435,105 @@ export const machineProductionAttrConfig: CatalogConfig = {
     // Máy xúc chỉ cần gầu xúc; hạng xe / chủng loại xe là chuyện của xe tải.
     { key: "bucketCapacity", label: "Gầu xúc", type: "number", width: "min-w-[130px]" },
   ],
+};
+
+// ── Ca làm việc, Xe, Máy (CRUD tay; backend /api/shifts, /api/devices) ─────────────────────────────
+
+export const shiftConfig: CatalogConfig = {
+  basePath: "/shifts",
+  title: "Ca làm việc",
+  nounPhrase: "ca làm việc",
+  breadcrumb: ["Danh mục", "Danh mục khác"],
+  searchPlaceholder: "Tìm kiếm ca làm việc",
+  description: "Quản lý danh mục ca làm việc và thời gian bắt đầu, kết thúc",
+  canExcel: false,
+  labelKey: "name",
+  designWidths: [160, 220, 220],
+  fields: [
+    { key: "name", label: "Ca", required: true, type: "number", width: "min-w-[120px]" },
+    { key: "startTime", label: "Giờ bắt đầu", type: "text", placeholder: "HH:mm, vd 06:00", width: "min-w-[140px]" },
+    { key: "endTime", label: "Giờ kết thúc", type: "text", placeholder: "HH:mm, vd 14:00", width: "min-w-[140px]" },
+  ],
+};
+
+const DEVICE_STATUS_OPTIONS = [
+  { value: "AVAILABLE", label: "Chờ điều động" },
+  { value: "IN_USE", label: "Đang hoạt động" },
+  { value: "MAINTENANCE", label: "SC; BD" },
+  { value: "BROKEN", label: "Hỏng" },
+  { value: "RETIRED", label: "Niêm cất" },
+];
+
+// Cột gộp từ màn "Thuộc tính sản lượng" (2026-11-09): Mã thiết bị = Biển số, Tên thiết bị = Tên xe/máy, Đơn vị quản lý = Đơn vị
+// → chỉ giữ một cột; các cột chưa có (Chủng loại xe NL, Chủng loại xe, Hạng xe, Chủng loại xe + Phân loại, Chất lượng,
+// Cải tạo toa, Gầu xúc) được thêm vào đây. Backend ghi qua DeviceService.applyProductionAttributes theo `categoryGroup`.
+const deviceFields = (kind: "XE" | "MAY"): CatalogField[] => [
+  // "Số xe/Số máy" = gộp cột Biển số (mã thiết bị, khóa) và cột Số xe cũ: hiển thị Số xe, trống thì lấy mã; mã chỉ đặt lúc thêm mới.
+  { key: "vehicleNumber", label: kind === "XE" ? "Số xe" : "Số máy", required: true, type: "text", width: "min-w-[130px]" },
+  { key: "name", label: kind === "XE" ? "Tên xe" : "Tên máy", type: "text", width: "min-w-[180px]" },
+
+  // Màn Xe không hiển thị Loại xe / Chủng loại (2026-11-09). Màn Máy: gộp Loại máy + Chủng loại thành MỘT cột "Chủng loại máy" (dữ liệu: 126/126 máy có loại, 0 máy có chủng loại).
+  ...(kind === "MAY"
+    ? ([
+        { key: "categoryId", label: "Chủng loại máy", type: "select", optionsPath: "/device-types", optionsParams: { group: kind }, width: "min-w-[160px]" },
+      ] as CatalogField[])
+    : []),
+  ...(kind === "XE"
+    ? ([
+        { key: "fuelClassId", label: "Chủng loại xe (NL)", type: "select", optionsPath: "/vehicle-fuel-classes", width: "min-w-[190px]" },
+        { key: "vehicleTypeId", label: "Chủng loại xe", type: "select", optionsPath: "/vehicle-types", width: "min-w-[180px]" },
+        { key: "categoryClassId", label: "Chủng loại xe + Phân loại", type: "select", optionsPath: "/vehicle-category-classes", width: "min-w-[210px]" },
+        { key: "vehicleRankId", label: "Hạng xe", type: "select", optionsPath: "/vehicle-ranks", width: "min-w-[130px]" },
+        {
+          key: "qualityLevel",
+          label: "Chất lượng",
+          type: "select",
+          options: [
+            { value: "A", label: "A" },
+            { value: "B", label: "B" },
+            { value: "C", label: "C" },
+          ],
+          width: "min-w-[140px]",
+        },
+        // Tick = "CaiToa" (đúng giá trị mà FuelCalculator.carRenovationFactor nhận ra); bỏ tick = để trống
+        { key: "carRenovation", label: "Cải tạo toa", type: "checkbox", checkedValue: "CaiToa", width: "min-w-[140px]" },
+      ] as CatalogField[])
+    : []),
+  { key: "fuelType", label: "Nhiên liệu", type: "text", width: "min-w-[110px]" },
+  ...(kind === "XE" ? ([{ key: "capacity", label: "Trọng tải", type: "number", width: "min-w-[100px]" }] as CatalogField[]) : []),
+  { key: "departmentId", label: "Đơn vị quản lý", type: "select", optionsPath: "/departments", width: "min-w-[170px]" },
+  { key: "cumulativeHours", label: "Giờ hoạt động lũy kế", type: "number", readOnly: true, width: "min-w-[170px]" },
+  { key: "status", label: "Trạng thái", type: "select", options: DEVICE_STATUS_OPTIONS, width: "min-w-[140px]" },
+];
+
+export const vehicleConfig: CatalogConfig = {
+  basePath: "/devices",
+  title: "Xe",
+  nounPhrase: "xe",
+  breadcrumb: ["Danh mục", "Thiết bị"],
+  searchPlaceholder: "Tìm kiếm xe",
+  description: "Quản lý danh mục xe, gồm cả thuộc tính sản lượng: chủng loại xe, hạng xe, chất lượng, cải tạo toa",
+  canExcel: false,
+  labelKey: "vehicleNumber",
+  valueFallbacks: { vehicleNumber: "code" },
+  deviceHoursByCode: true,
+  uniqueCodeKey: "vehicleNumber",
+  fixedValues: { categoryGroup: "XE" },
+  fields: deviceFields("XE"),
+};
+
+export const machineConfig: CatalogConfig = {
+  basePath: "/devices",
+  title: "Máy",
+  nounPhrase: "máy",
+  breadcrumb: ["Danh mục", "Thiết bị"],
+  searchPlaceholder: "Tìm kiếm máy",
+  description: "Quản lý danh mục máy xúc và các thuộc tính phục vụ tính sản lượng",
+  canExcel: false,
+  labelKey: "vehicleNumber",
+  valueFallbacks: { vehicleNumber: "code" },
+  deviceHoursByCode: true,
+  uniqueCodeKey: "vehicleNumber",
+  fixedValues: { categoryGroup: "MAY" },
+  fields: deviceFields("MAY"),
 };

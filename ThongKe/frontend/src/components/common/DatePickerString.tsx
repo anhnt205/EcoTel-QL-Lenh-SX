@@ -13,6 +13,8 @@ interface DatePickerStringProps {
   className?: string;
   popoverClassName?: string;
   placeholder?: string;
+  /** Cho phép xóa ngày đã chọn (ô ngày không bắt buộc) — onChange("") */
+  allowClear?: boolean;
 }
 
 export const DatePickerString: React.FC<DatePickerStringProps> = ({
@@ -21,6 +23,7 @@ export const DatePickerString: React.FC<DatePickerStringProps> = ({
   className,
   popoverClassName,
   placeholder = "Chọn ngày",
+  allowClear = false,
 }) => {
   const [open, setOpen] = useState(false);
 
@@ -77,6 +80,20 @@ export const DatePickerString: React.FC<DatePickerStringProps> = ({
           captionLayout="dropdown"
           className="rounded-md border-0"
         />
+        {allowClear && selectedDate && (
+          <div className="flex justify-end border-t px-3 py-2">
+            <button
+              type="button"
+              className="text-xs font-medium text-blue-600 hover:underline"
+              onClick={() => {
+                onChange("");
+                setOpen(false);
+              }}
+            >
+              Xóa ngày
+            </button>
+          </div>
+        )}
       </PopoverContent>
     </Popover>
   );

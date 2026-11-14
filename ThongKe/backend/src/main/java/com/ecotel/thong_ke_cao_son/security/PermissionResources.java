@@ -28,7 +28,7 @@ public final class PermissionResources {
             "users", "departments", "positions", "shifts", "locations",
             "devices", "device-types", "materials", "cargo-groups", "cargo-types",
             "excavation-reports", "transport-reports", "reconciliation",
-            "acceptance-products", "classifications", "coefficients",
+            "acceptance-products", "cargo-categories", "classifications", "suffixes", "mud-marks", "coefficients",
             "density-parameters", "device-production-attributes", "excavation-areas",
             "matrix-catalogs", "model-periods", "pickup-points", "production",
             "receiving-points", "report-periods", "seam-groups", "survey-standards",

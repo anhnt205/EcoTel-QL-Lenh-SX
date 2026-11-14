@@ -268,7 +268,7 @@ const DeviceTypes: React.FC = () => {
                                     startIcon={<AddIcon />}
                                     onClick={() => handleOpen()}
                                 >
-                                    Thêm
+                                    Thêm mới
                                 </Button>
                                 <Button
                                     variant="contained"

@@ -2,10 +2,34 @@ import { useState } from "react";
 import { Box, Button, Popover, TextField } from "@mui/material";
 import { CalendarMonth, ExpandMore } from "@mui/icons-material";
 import dayjs, { Dayjs } from "dayjs";
+import { CalendarPopover } from "../../components/design/CalendarPanel";
 
 const LINE = "#e5e9f0";
 const INK = "#0f172a";
 const MUTED = "#64748b";
+
+/** Ô ngày chỉ-đọc: bấm mở hộp lịch dùng chung (CalendarPanel) thay cho ô `type="date"` gốc của trình duyệt. */
+function DateBox({ label, value, onChange }: { label: string; value: Dayjs | null; onChange: (v: Dayjs) => void }) {
+  const [open, setOpen] = useState(false);
+  const [el, setEl] = useState<HTMLElement | null>(null);
+  return (
+    <>
+      <TextField
+        size="small"
+        label={label}
+        InputLabelProps={{ shrink: true }}
+        value={value ? dayjs(value).format("DD/MM/YYYY") : ""}
+        placeholder="Chọn ngày"
+        inputProps={{ readOnly: true, style: { cursor: "pointer" } }}
+        onClick={(e) => {
+          setEl(e.currentTarget);
+          setOpen(true);
+        }}
+      />
+      <CalendarPopover anchorEl={el} open={open} onClose={() => setOpen(false)} value={value ? dayjs(value) : null} onChange={onChange} />
+    </>
+  );
+}
 
 /**
  * Nút chọn khoảng ngày kiểu "01/10/2026 – 06/10/2026": bấm mở khung có các lựa chọn nhanh
@@ -99,32 +123,8 @@ export default function DateRangeFilter({
           ))}
         </Box>
         <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1.25 }}>
-          <TextField
-            size="small"
-            type="date"
-            label="Từ ngày"
-            InputLabelProps={{ shrink: true }}
-            value={startTime ? dayjs(startTime).format("YYYY-MM-DD") : ""}
-            onChange={(e) =>
-              onChange(
-                e.target.value ? dayjs(e.target.value).startOf("day") : null,
-                endTime,
-              )
-            }
-          />
-          <TextField
-            size="small"
-            type="date"
-            label="Đến ngày"
-            InputLabelProps={{ shrink: true }}
-            value={endTime ? dayjs(endTime).format("YYYY-MM-DD") : ""}
-            onChange={(e) =>
-              onChange(
-                startTime,
-                e.target.value ? dayjs(e.target.value).endOf("day") : null,
-              )
-            }
-          />
+          <DateBox label="Từ ngày" value={startTime} onChange={(v) => onChange(v.startOf("day"), endTime)} />
+          <DateBox label="Đến ngày" value={endTime} onChange={(v) => onChange(startTime, v.endOf("day"))} />
         </Box>
         <Box sx={{ display: "flex", justifyContent: "space-between", mt: 1.5 }}>
           <Button

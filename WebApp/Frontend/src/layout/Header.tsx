@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import api from "../config/api.config";
 import { useAtom } from "jotai";
 import { useQuery } from "@tanstack/react-query";
@@ -62,6 +62,9 @@ import { allowModule, showModule } from "../permissions/access";
 import { CATALOG_PATHS_MOVED_TO_TK } from "./thongkeMenu";
 import ThongKeNav from "./ThongKeNav";
 import HeaderBanner from "./HeaderBanner";
+import SideNav from "./SideNav";
+import { useHeaderCollapsed } from "./headerCollapse";
+import { setHeaderBottom } from "./headerMetrics";
 
 export default function Header() {
   const navigate = useNavigate();
@@ -78,6 +81,43 @@ export default function Header() {
   const HDR_FG = brandOnColor(HDR_BG); // chữ + biểu tượng trên thanh trên (trắng, hoặc tối nếu nền quá sáng)
   const HDR_NAVY = brandNavy(theme.palette.primary.main); // sắc đậm cho biểu tượng ảnh đại diện
   const isMobile = useMediaQuery(theme.breakpoints.down("lg"));
+  // Banner phần mềm (màn rộng): tự thu khi lăn chuột xuống để nhường chỗ cho nội dung, chỉ giữ thanh menu.
+  //  - Trang cuộn cả trang: header dính với `top` = -chiều cao banner => banner cuộn trôi đi, thanh menu dính lại.
+  //  - Khung nhúng Thống kê (không cuộn cả trang): Thống kê báo "tk:header" => banner co về 0 (xem headerCollapse.ts).
+  const headerCollapsed = useHeaderCollapsed();
+  const bannerInnerRef = useRef<HTMLDivElement>(null);
+  const [bannerH, setBannerH] = useState<number | null>(null);
+  useLayoutEffect(() => {
+    const el = bannerInnerRef.current;
+    if (!el) {
+      setBannerH(null);
+      return;
+    }
+    const measure = () => setBannerH(el.offsetHeight);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [isMobile]);
+  const bannerVisibleH = bannerH === null ? null : headerCollapsed ? 0 : bannerH;
+  // Đo mép dưới của header đang hiển thị để thanh menu dọc (SideNav) bám theo: đổi khi banner co/giãn (ResizeObserver),
+  // khi trang cuộn làm banner trôi đi (scroll) và khi đổi cỡ cửa sổ.
+  const headerElRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const el = headerElRef.current;
+    if (!el) return;
+    const measure = () => setHeaderBottom(Math.max(0, Math.round(el.getBoundingClientRect().bottom)));
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    window.addEventListener("scroll", measure, { passive: true });
+    window.addEventListener("resize", measure);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("scroll", measure);
+      window.removeEventListener("resize", measure);
+    };
+  }, []);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [openProfile, setOpenProfile] = useState(false);
   const [openChangePassword, setOpenChangePassword] = useState(false);
@@ -220,27 +260,72 @@ export default function Header() {
   return (
     <ThemeProvider theme={uiSansTheme}>
       <Box
+        ref={headerElRef}
         sx={{
           position: "sticky",
-          top: 0,
+          top: bannerVisibleH === null ? 0 : -bannerVisibleH,
           zIndex: (t) => t.zIndex.appBar,
           fontFamily: UI_FONT,
         }}
       >
         {/* Màn rộng: banner theo ảnh mẫu (logo, tên công ty, tên hệ thống, ảnh toà nhà). */}
         {!isMobile && (
-          <HeaderBanner
-            logoUrl={branding.logoUrl}
-            hasCustomLogo={branding.hasCustomLogo}
-            title={branding.loginTitle}
-            companyName={branding.companyName}
-            baseColor={HDR_BG}
-            hasCustomColor={branding.hasCustomColor}
-            textColor={HDR_FG}
-          />
+          <Box
+            sx={{
+              overflow: "hidden",
+              height: bannerVisibleH === null ? "auto" : bannerVisibleH,
+              transition: "height .25s ease",
+            }}
+          >
+            <div ref={bannerInnerRef}>
+              <HeaderBanner
+                logoUrl={branding.logoUrl}
+                hasCustomLogo={branding.hasCustomLogo}
+                title={branding.loginTitle}
+                companyName={branding.companyName}
+                baseColor={HDR_BG}
+                hasCustomColor={branding.hasCustomColor}
+                textColor={HDR_FG}
+                compact={TK_EMBED}
+                rightSlot={
+                  TK_EMBED ? (
+                    <>
+                      <Tooltip
+                        title={`Thông báo${notificationCount ? ` (${notificationCount} chưa đọc)` : ""}`}
+                      >
+                        <IconButton color="inherit" onClick={() => navigate("/notifications")}>
+                          <Badge variant="dot" color="error" invisible={!notificationCount} overlap="circular">
+                            <Notifications />
+                          </Badge>
+                        </IconButton>
+                      </Tooltip>
+                      <ButtonBase
+                        onClick={(e) => setAvatarAnchorEl(e.currentTarget)}
+                        sx={{
+                          gap: 1,
+                          px: 1,
+                          py: 0.5,
+                          borderRadius: "999px",
+                          color: HDR_FG,
+                          "&:hover": { bgcolor: alpha(HDR_FG, 0.12) },
+                        }}
+                      >
+                        <Avatar
+                          src={url}
+                          sx={{ width: 34, height: 34, bgcolor: "#fff", color: "#0a4db6" }}
+                        />
+                        <Typography sx={{ fontSize: 13, fontWeight: 700, fontFamily: "Arial, Helvetica, sans-serif" }}>{displayName}</Typography>
+                        <ExpandMore fontSize="small" />
+                      </ButtonBase>
+                    </>
+                  ) : undefined
+                }
+              />
+            </div>
+          </Box>
         )}
 
-        {/* Màn hẹp: thanh trên gọn có nút mở ngăn kéo + thông báo + tài khoản */}
+        {/* Thanh trên GỌN (60px): logo + tên hệ thống + chuông + tài khoản. Màn hẹp thêm nút mở ngăn kéo; màn rộng nhúng Thống kê thì menu nằm ở thanh dọc bên trái (không banner lớn, không menu ngang) để nhường chỗ cho nội dung */}
         {isMobile && (
         <Box
           sx={{
@@ -471,7 +556,7 @@ export default function Header() {
         )}
 
         {/* Hàng tab điều hướng (màn rộng); màn hẹp dùng ngăn kéo ở trên */}
-        {!isMobile && (
+        {!isMobile && !TK_EMBED && (
           <Box
             sx={{
               bgcolor: "#fff",
@@ -484,7 +569,8 @@ export default function Header() {
             }}
           >
             {/* Các mục menu: tự xuống dòng khi nhiều; chuông + tài khoản luôn ở góc phải hàng đầu */}
-            <Box sx={{ display: "flex", alignItems: "stretch", gap: 0.5, flexWrap: TK_EMBED ? "wrap" : "nowrap", flex: 1, minWidth: 0 }}>
+            {/* Nhúng Thống kê: hàng nút menu ngang hiện khi CHƯA kéo; khi đã kéo (banner thu) thì ẩn, chỉ còn thanh dọc (SideNav) + chuông/tài khoản */}
+            <Box sx={{ display: "flex", alignItems: "stretch", gap: 0.5, flexWrap: "nowrap", flex: 1, minWidth: 0 }}>
             {showModule(user, "dashboard") && (
             <Button
               color="inherit"
@@ -600,7 +686,7 @@ export default function Header() {
             </Box>
 
             {/* Thông báo + tài khoản nằm bên phải hàng menu (theo ảnh mẫu) */}
-            <Box sx={{ display: "flex", alignItems: "center", gap: 1, pl: 1, alignSelf: "flex-start", height: 54, flexShrink: 0 }}>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1, pl: 1, ml: "auto", alignSelf: "flex-start", height: 54, flexShrink: 0 }}>
               {allowModule(user, "system", [RoleEnum.ADMIN]) && (
                 <Tooltip title="Hệ thống">
                   <IconButton
@@ -656,12 +742,26 @@ export default function Header() {
           </Box>
         )}
 
+        {/* Màn rộng + nhúng Thống kê: thanh menu DỌC bên trái LUÔN hiện (không còn menu ngang), đứng cố định ngay dưới thanh trên; MainLayout chừa lề trái cho nội dung */}
+        {!isMobile && TK_EMBED && (
+          <SideNav
+            user={user}
+            displayName={displayName}
+            avatarSrc={url || branding.logoUrl}
+            notificationCount={notificationCount}
+            onBell={() => navigate("/notifications")}
+            onAccount={(el) => setAvatarAnchorEl(el)}
+            showAccount={headerCollapsed}
+          />
+        )}
+
             <Popover
               open={Boolean(avatarAnchorEl)}
               anchorEl={avatarAnchorEl}
               onClose={() => setAvatarAnchorEl(null)}
-              anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-              transformOrigin={{ vertical: "top", horizontal: "right" }}
+              // tài khoản nằm ở banner (xuống dưới, căn phải); khi banner thu thì nằm ở CHÂN thanh dọc (bung lên trên)
+              anchorOrigin={!isMobile && TK_EMBED && headerCollapsed ? { vertical: "top", horizontal: "right" } : { vertical: "bottom", horizontal: "right" }}
+              transformOrigin={!isMobile && TK_EMBED && headerCollapsed ? { vertical: "bottom", horizontal: "left" } : { vertical: "top", horizontal: "right" }}
             >
               <Box padding={2} display="flex" flexDirection="column" gap={1}>
                 <Typography variant="h6" align="center">

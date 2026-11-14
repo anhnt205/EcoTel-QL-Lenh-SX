@@ -20,6 +20,10 @@ public interface DeviceRepository extends JpaRepository<Device, Long> {
 
     Optional<Device> findByExternalTaiSanId(String externalTaiSanId);
 
+    boolean existsByCode(String code);
+
+    boolean existsByCodeAndIdNot(String code, Long id);
+
     @Query("""
         SELECT d FROM Device d
         LEFT JOIN d.department dep

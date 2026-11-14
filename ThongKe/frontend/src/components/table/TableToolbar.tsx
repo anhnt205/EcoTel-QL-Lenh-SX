@@ -218,12 +218,13 @@ const TableToolbar: React.FC<TableToolbarProps> = ({
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-9 w-9">
+                      <Button variant="outline" size="sm" className="h-9 gap-1.5 px-3 text-xs font-medium">
                         <Columns className="w-4 h-4" />
+                        <span className="hidden sm:inline-block">Hiển thị cột</span>
                       </Button>
                     </DropdownMenuTrigger>
                   </TooltipTrigger>
-                  <TooltipContent>Cột hiển thị</TooltipContent>
+                  <TooltipContent>Chọn cột hiển thị</TooltipContent>
                 </Tooltip>
                 <DropdownMenuContent align="end" className="w-[180px]">
                   <DropdownMenuLabel>Hiển thị cột</DropdownMenuLabel>

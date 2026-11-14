@@ -36,6 +36,20 @@ declare module '@mui/material/styles' {
     }
 }
 
+// Tên thứ trong lịch: bộ chuyển đổi tiếng Việt trả "T2…T7, CN" (hoặc "Mo…Su" nếu ô dùng locale en) → hiển thị "Th 2 … Th 7, CN" như mẫu.
+const WEEKDAY_LABEL: Record<string, string> = {
+    T2: "Th 2", T3: "Th 3", T4: "Th 4", T5: "Th 5", T6: "Th 6", T7: "Th 7", CN: "CN",
+    Mo: "Th 2", Tu: "Th 3", We: "Th 4", Th: "Th 5", Fr: "Th 6", Sa: "Th 7", Su: "CN",
+};
+const pickerComponents = {
+    MuiDayPicker: {
+        defaultProps: {
+            dayOfWeekFormatter: (day: string) => WEEKDAY_LABEL[day] ?? day,
+            showDaysOutsideCurrentMonth: true,
+        },
+    },
+};
+
 const isDefaultPrimary = (primary: string) => primary.toLowerCase() === DEFAULT_PRIMARY;
 
 // Làm đậm dần cho tới khi chữ màu đó đọc được trên nền trắng (màu chủ đạo quá nhạt như vàng vẫn dùng được làm chữ)
@@ -160,6 +174,8 @@ export const buildAppTheme = (primary: string = DEFAULT_PRIMARY) => createTheme(
                 },
             },
         },
+        // Lịch chọn ngày: nhãn thứ theo mẫu "Th 2 … CN" (xem styles/calendar-design.css cho phần giao diện)
+        ...(pickerComponents as any),
     },
 });
 

@@ -42,8 +42,9 @@ import { Order } from "../../types";
 import OrderFormAdd from "./OrderFormAdd";
 import OrderFormEdit from "./OrderFormEdit";
 import OrderFormTransfer from "./OrderFormTransfer";
-import { DatePicker, LocalizationProvider } from "@mui/x-date-pickers";
-import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
+import { LocalizationProvider } from "@mui/x-date-pickers";
+import DateFilterField from "../../components/design/DateFilterField";
+import { AdapterDayjs } from "../../components/design/AdapterDayjs";
 import dayjs, { Dayjs } from "dayjs";
 import {
   AlertSnackbar,
@@ -57,17 +58,32 @@ import {
   DataGrid,
   GridColDef,
   GridRenderCellParams,
-  GridToolbar,
+  GridSortModel,
+  useGridApiRef,
 } from "@mui/x-data-grid";
 import { StyledPopper } from "../../ui/poppers";
+import DIcon from "../../components/design/DIcon";
+import { ColumnToggleButton } from "../../components/design/tableLayout";
+import "../../styles/catalog-design.css";
+import { AUTOSIZE, LayoutToolbar } from "../../components/Table/CustomDataGrid";
+import DataGridLayoutButton, { HEADER_HEIGHT, ROW_HEIGHT, type RowPreset } from "../../components/Table/DataGridLayoutButton";
 import { JobTypeEnum, RoleEnum, StatusOrderEnum } from "../../enums/index";
 import OrderHistories from "../../components/Modal/OrderHistories";
 import ShiftReport from "../../components/Modal/ShiftReport";
 import DepartmentService from "../../services/departmentService";
 import OrderService from "../../services/orderService";
 import { parseAxiosError } from "../../utils/handleApiError";
-import { Route } from "lucide-react";
+import { Download, FileSpreadsheet, Pencil, Plus, Route, Trash2 } from "lucide-react";
 import SearchInput from "../../components/SearchInput";
+
+/**
+ * Bảng Lệnh sản xuất: mặc định 15 dòng/trang, khung bảng cao đúng 15 dòng (không cuộn). Chọn nhiều dòng hơn ở ô "Số dòng"
+ * (chân trang) thì khung giữ nguyên chiều cao 15 dòng và CUỘN DỌC bên trong bảng.
+ */
+const ORDERS_PAGE_SIZE = 15;
+const ORDERS_PAGE_SIZE_OPTIONS = [15, 20, 50, 100];
+/** Phần ngoài các dòng dữ liệu: chân trang (52) + thanh cuộn ngang (~17) + viền (2). */
+const GRID_CHROME = 52 + 17 + 2;
 
 const Orders: React.FC = () => {
   const [open, setOpen] = useState(false);
@@ -75,8 +91,9 @@ const Orders: React.FC = () => {
   const [shiftReport, setShiftReport] = useState(false);
   const [transfer, setTransfer] = useState(false);
   const [status, setStatus] = useState("");
-  const [startTime, setStartTime] = useState<Dayjs | null>(null);
-  const [endTime, setEndTime] = useState<Dayjs | null>(null);
+  // Mặc định = tháng hiện tại (ngày 1 → ngày cuối tháng), giống màn Nhập liệu khai thác.
+  const [startTime, setStartTime] = useState<Dayjs | null>(() => dayjs().startOf("month"));
+  const [endTime, setEndTime] = useState<Dayjs | null>(() => dayjs().endOf("month"));
   const [department, setDepartment] = useState("");
   const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
   const [selectedRow, setSelectedRow] = useState<any | null>(null);
@@ -92,7 +109,7 @@ const Orders: React.FC = () => {
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
 
   const [paginationModel, setPaginationModel] = useState({
-    pageSize: 50,
+    pageSize: ORDERS_PAGE_SIZE,
     page: 0,
   });
   const [total, setTotal] = useState(0);
@@ -144,13 +161,26 @@ const Orders: React.FC = () => {
     setStatus((prev) => (prev === value ? "" : value)); // bỏ chọn nếu click lại
   };
 
+  // Lọc theo cột kiểu Excel: mỗi cột giữ danh sách giá trị đã tick (null = không lọc)
   const [serverFilters, setServerFilters] = useState<
-    Record<string, string | null>
+    Record<string, string[] | null>
   >({});
 
   const { data: departments = [] } = useQuery({
     queryKey: ["departments"],
     queryFn: () => DepartmentService.getAll(),
+  });
+
+  // Bộ lọc hiện hành (ngày, đơn vị, trạng thái, tìm kiếm, các cột đã tick) — dùng cho cả danh sách lệnh lẫn danh sách giá trị của hộp lọc cột
+  const baseParams: Record<string, any> = {
+    department: department,
+    status: status || undefined,
+    startTime: startTime ? startTime.toISOString() : "",
+    endTime: endTime ? endTime.toISOString() : "",
+    q: value,
+  };
+  Object.entries(serverFilters).forEach(([f, arr]) => {
+    if (arr && arr.length) baseParams[`${f}__in`] = JSON.stringify(arr);
   });
 
   const {
@@ -172,20 +202,7 @@ const Orders: React.FC = () => {
       OrderService.getAll({
         page: paginationModel.page + 1,
         limit: paginationModel.pageSize,
-        department: department,
-        status: status || undefined,
-        startTime: startTime ? startTime.toISOString() : "",
-        endTime: endTime ? endTime.toISOString() : "",
-        q: value,
-
-        // filters từ Table
-        assignedTo: serverFilters.assignedTo || undefined,
-        salaryCode: serverFilters.salaryCode || undefined,
-        createdBy: serverFilters.createdBy || undefined,
-        shift: serverFilters.shift || undefined,
-        job: serverFilters.job || undefined,
-        device: serverFilters.device || undefined,
-        material: serverFilters.material || undefined,
+        ...baseParams,
       }),
   });
   useEffect(() => {
@@ -332,6 +349,25 @@ const Orders: React.FC = () => {
     }, 500);
   };
 
+  // "Chỉnh sửa" ở đầu trang: sửa lệnh đang được tích chọn (đúng 1 lệnh), giống Nhập liệu Khai thác.
+  const handleEditSelected = () => {
+    if (selectedOrders.length === 0) return showErrorAlert("Vui lòng chọn lệnh cần chỉnh sửa");
+    if (selectedOrders.length > 1) return showErrorAlert("Chỉ chỉnh sửa được một lệnh mỗi lần");
+    handleOpen(selectedOrders[0]);
+  };
+
+  // Phím tắt F3 = Thêm mới (như Nhập liệu Khai thác)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "F3") {
+        e.preventDefault();
+        handleOpen();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
+
   const handleClose = () => {
     setOpen(false);
     setTransfer(false);
@@ -401,6 +437,32 @@ const Orders: React.FC = () => {
       }, 500);
     }
   }, [transfer]);
+
+  // Hiển thị bảng theo thiết kế: lúc đầu "vừa nội dung" (hiện đủ ký tự), nút Vừa nội dung / Chia đều, Mật độ = chiều cao hàng.
+  // Cột dính trái (STT, Người nhận lệnh) giữ bề rộng cố định vì vị trí dính tính theo bề rộng đó.
+  const gridApiRef = useGridApiRef();
+  const [dlAnchor, setDlAnchor] = useState<HTMLElement | null>(null);
+  // Chiều cao hàng DỮ LIỆU (Gọn 30 / Vừa 39 / Rộng 56); hàng tiêu đề luôn 43px — đúng như bảng danh mục
+  const [rowPreset, setRowPreset] = useState<RowPreset>("standard");
+  // chiều cao khung bảng = tiêu đề + đúng 15 dòng (theo độ cao hàng đang chọn) + chân trang; trên 15 dòng/trang thì cuộn dọc trong khung
+  const ordersGridHeight = HEADER_HEIGHT + ORDERS_PAGE_SIZE * ROW_HEIGHT[rowPreset] + GRID_CHROME;
+  const gridUserSized = useRef(false);
+  const gridAutosize = () => {
+    const api = gridApiRef.current;
+    if (!api?.autosizeColumns) return Promise.resolve();
+    const fields = api.getVisibleColumns().map((c) => c.field).filter((f) => !["__check__", "number", "assignedTo"].includes(f));
+    return api.autosizeColumns({ ...AUTOSIZE, columns: fields }).then(() => {
+      const m: Record<string, number> = {};
+      fields.forEach((f) => (m[f] = Math.round(api.getColumn(f)?.computedWidth ?? 0)));
+      setColWidths((prev) => ({ ...prev, ...m }));
+    });
+  };
+  useEffect(() => {
+    if (isLoading || orders.length === 0 || gridUserSized.current) return;
+    const t = window.setTimeout(() => void gridAutosize(), 80);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orders, isLoading]);
 
   const orderColumns: GridColDef[] = [
     {
@@ -708,6 +770,199 @@ const Orders: React.FC = () => {
     [orderColumns, visibleColumns],
   );
 
+  // ── Bề rộng cột + lọc theo cột (nút ba chấm ở tiêu đề) ──
+  // Bề rộng giữ trong state vì `orderColumns` được dựng lại mỗi lần render (nếu không, mọi chỉnh sửa bề rộng bị đặt lại).
+  const [colWidths, setColWidths] = useState<Record<string, number>>({});
+  // Các cột máy chủ hỗ trợ lọc (xem tham số của truy vấn danh sách lệnh)
+  const FILTER_FIELDS = [
+    "assignedTo",
+    "salaryCode",
+    "workingDate",
+    "shift",
+    "job",
+    "workContent",
+    "device",
+    "repairVehicles",
+    "excavator",
+    "material",
+    "location",
+    "createdBy",
+  ];
+  const [filterPop, setFilterPop] = useState<{ field: string; label: string; top: number; left: number } | null>(null);
+  // ── Sắp xếp theo cột (nút ⇅ ở tiêu đề, giống màn Chủng loại hàng): sắp xếp các dòng của trang đang xem ──
+  const [sortModel, setSortModel] = useState<GridSortModel>([]);
+  const NO_TOOLS = ["number", "view", "edit", "cancel", "transfer"]; // cột STT / thao tác: không sắp xếp, không lọc
+  const viCollator = React.useMemo(() => new Intl.Collator("vi", { numeric: true, sensitivity: "base" }), []);
+  /** Chữ dùng để sắp xếp của từng cột (các cột chứa object lồng nhau nên không thể so sánh trực tiếp giá trị gốc). */
+  const sortText = (field: string, row: any): string => {
+    const codes = (arr: any[] | undefined, pick: (x: any) => any) => (arr ?? []).map((x) => String(pick(x) ?? "")).join(", ");
+    switch (field) {
+      case "assignedTo":
+        return row.assignedTo?.fullName ?? "";
+      case "salaryCode":
+        return row.assignedTo?.salaryCode ?? "";
+      case "shift":
+        return row.shift?.name ?? "";
+      case "job":
+        return row.job?.name ?? "";
+      case "device":
+        return codes(row.device, (d) => d.code);
+      case "repairVehicles":
+        return codes(row.repairVehicles, (d) => d.device?.code);
+      case "excavator":
+        return codes(row.excavator, (d) => d.device?.code);
+      case "material":
+        return codes(row.material, (m) => m.name);
+      case "location":
+        return codes(row.location, (l) => l.name);
+      case "createdBy":
+        return row.createdBy?.fullName ?? "";
+      case "deviceStatus":
+        return codes(row.shiftReport?.vehicleSummaries, (i) => (i.status === "good" ? "Tốt" : "Hỏng"));
+      default:
+        return String(row[field] ?? ""); // chữ / ngày dạng ISO (so sánh chuỗi đúng thứ tự thời gian)
+    }
+  };
+  const cycleSort = (field: string) => {
+    setSortModel((m) => {
+      const cur = m.find((s) => s.field === field)?.sort;
+      return cur === "asc" ? [{ field, sort: "desc" }] : cur === "desc" ? [] : [{ field, sort: "asc" }];
+    });
+  };
+  const gridColumns = filteredColumns.map((col: GridColDef) => {
+    const field = String(col.field);
+    const next: GridColDef = { ...col, width: colWidths[field] ?? col.width };
+    if (NO_TOOLS.includes(field)) return { ...next, sortable: false };
+    next.sortComparator = (_a, _b, p1, p2) => viCollator.compare(sortText(field, p1.api.getRow(p1.id) ?? {}), sortText(field, p2.api.getRow(p2.id) ?? {}));
+    const dir = sortModel.find((s) => s.field === field)?.sort;
+    const filterable = FILTER_FIELDS.includes(field);
+    const selCount = serverFilters[field]?.length ?? 0;
+    const active = filterable && selCount > 0;
+    next.renderHeader = () => (
+      <span className="orders-th">
+        <span className="orders-th-label">{col.headerName}</span>
+        <span className="th-tools">
+          <button
+            type="button"
+            className={`col-sort-btn ${dir ? "active" : ""}`}
+            title={dir === "asc" ? "Đang sắp xếp tăng dần — bấm để giảm dần" : dir === "desc" ? "Đang sắp xếp giảm dần — bấm để bỏ sắp xếp" : `Sắp xếp theo ${col.headerName}`}
+            aria-label={`Sắp xếp theo ${col.headerName}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              cycleSort(field);
+            }}
+          >
+            <DIcon name="sort" />
+          </button>
+          {filterable && (
+            <button
+              type="button"
+              className={`col-filter-btn ${active ? "active" : ""}`}
+              title={active ? `Đang lọc ${selCount} giá trị — bấm để sửa` : `Lọc theo ${col.headerName}`}
+              aria-label={`Lọc theo ${col.headerName}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                const r = e.currentTarget.getBoundingClientRect();
+                setFilterPop((p) =>
+                  p?.field === field
+                    ? null
+                    : { field, label: String(col.headerName ?? field), top: r.bottom + 6, left: Math.max(8, Math.min(r.right - 280, window.innerWidth - 288)) },
+                );
+              }}
+            >
+              <DIcon name="more-vertical" />
+            </button>
+          )}
+        </span>
+      </span>
+    );
+    return next;
+  });
+  const setColumnFilter = (field: string, v: string[] | null) => {
+    setServerFilters((prev) => ({ ...prev, [field]: v && v.length ? v : null }));
+    setPaginationModel((m) => ({ ...m, page: 0 }));
+  };
+  // ── Hộp lọc kiểu Excel: liệt kê các giá trị của cột để tick chọn, có ô tìm kiếm ──
+  const serverFiltersRef = useRef(serverFilters);
+  serverFiltersRef.current = serverFilters;
+  const filterField = filterPop?.field ?? null;
+  const [filterSearch, setFilterSearch] = useState("");
+  /** Các giá trị đang tick; null = tất cả (không lọc) */
+  const [filterSel, setFilterSel] = useState<Set<string> | null>(null);
+  const filterInitialRef = useRef<Set<string> | null>(null);
+  // bỏ dấu + không phân biệt hoa thường để tìm "nguyen" ra "Nguyễn"
+  const normText = (s: string) =>
+    s
+      .normalize("NFD")
+      .replace(/[̀-ͯ]/g, "")
+      .replace(/đ/g, "d")
+      .replace(/Đ/g, "D")
+      .toLowerCase();
+  // danh sách giá trị của cột đang mở: áp mọi bộ lọc hiện hành trừ chính cột này (máy chủ lo phần đó)
+  const { data: colValuesData, isFetching: colValuesLoading } = useQuery({
+    queryKey: ["orders-col-values", filterField, baseParams],
+    queryFn: () => OrderService.getColumnValues({ field: filterField, ...baseParams }),
+    enabled: Boolean(filterField),
+    staleTime: 0,
+  });
+  const colValues = colValuesData?.values ?? [];
+  const searchNorm = normText(filterSearch.trim());
+  const filterItems = searchNorm ? colValues.filter((v) => normText(v).includes(searchNorm)) : colValues;
+  const isChecked = (v: string) => filterSel === null || filterSel.has(v);
+  const allShownChecked = filterItems.length > 0 && filterItems.every(isChecked);
+  const checkedCount = filterSel === null ? colValues.length : colValues.filter((v) => filterSel.has(v)).length;
+  // mở hộp lọc ở cột nào thì nạp các giá trị đang tick của cột đó
+  useEffect(() => {
+    setFilterSearch("");
+    const cur = filterField ? serverFiltersRef.current[filterField] : null;
+    const init = cur && cur.length ? new Set(cur) : null;
+    filterInitialRef.current = init;
+    setFilterSel(init);
+  }, [filterField]);
+  const toggleFilterValue = (v: string) => {
+    const next = new Set(filterSel ?? colValues);
+    if (next.has(v)) next.delete(v);
+    else next.add(v);
+    setFilterSel(next);
+  };
+  const toggleAllShown = () => {
+    if (!searchNorm) {
+      setFilterSel(allShownChecked ? new Set() : null);
+      return;
+    }
+    const next = new Set(filterSel ?? colValues);
+    filterItems.forEach((v) => (allShownChecked ? next.delete(v) : next.add(v)));
+    setFilterSel(next);
+  };
+  // gõ tìm kiếm: như Excel, chỉ các kết quả khớp được tick; xoá ô tìm kiếm thì trở lại lựa chọn ban đầu
+  const onFilterSearchChange = (s: string) => {
+    setFilterSearch(s);
+    const n = normText(s.trim());
+    setFilterSel(n ? new Set(colValues.filter((v) => normText(v).includes(n))) : filterInitialRef.current);
+  };
+  const applyColumnFilter = () => {
+    if (!filterField) return;
+    const picked = filterSel === null ? null : colValues.filter((v) => filterSel.has(v));
+    // tick đủ tất cả = không lọc
+    setColumnFilter(filterField, picked === null || picked.length === colValues.length ? null : picked);
+    setFilterPop(null);
+  };
+  // bấm ra ngoài / Esc: đóng, không áp dụng (như Excel)
+  useEffect(() => {
+    if (!filterField) return;
+    const close = (e: Event) => {
+      if ((e.target as HTMLElement | null)?.closest?.(".col-filter-pop, .col-filter-btn")) return;
+      setFilterPop(null);
+    };
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && setFilterPop(null);
+    document.addEventListener("mousedown", close);
+    document.addEventListener("keydown", esc);
+    return () => {
+      document.removeEventListener("mousedown", close);
+      document.removeEventListener("keydown", esc);
+    };
+  }, [filterField]);
+
   const [alert, setAlert] = useState<{
     open: boolean;
     message: string;
@@ -719,376 +974,231 @@ const Orders: React.FC = () => {
   });
 
   return (
-    <Box>
+    <div className="tkc">
       <AlertSnackbar alert={alert} setAlert={setAlert} />
-      <Box sx={{ display: "flex", justifyContent: "space-between", mb: 3 }}>
-        <Typography variant="h3" color="brand.title">
-          Lệnh sản xuất
-        </Typography>
-      </Box>
-      <Accordion expanded={expanded} ref={formRef}>
-        <AccordionSummary
-          expandIcon={<></>}
-          aria-controls="panel1-content"
-          id="panel1-header"
-          sx={{
-            backgroundColor: "white",
-            "&.Mui-focusVisible": {
-              backgroundColor: "white",
-            },
-          }}
-        >
-          <Box
-            sx={{
-              display: "flex",
-              gap: 2,
-              alignItems: "center",
-              width: "100%",
-              flexWrap: "wrap", // Tự động xuống dòng khi không đủ không gian
-              flexDirection: {
-                xs: "column", // Màn hình nhỏ: các items xếp dọc
-                md: "row", // Màn hình lớn: các items xếp ngang
-              },
-              // Thêm các thuộc tính căn chỉnh để bố cục đẹp hơn
-              justifyContent: {
-                xs: "flex-start", // Màn hình nhỏ: căn trái
-                md: "space-between", // Màn hình lớn: giãn đều các items
-              },
-            }}
-          >
-            {/* Nhóm các nút lại với nhau */}
-            <Box
-              sx={{
-                display: "flex",
-                gap: 1, // Khoảng cách nhỏ hơn giữa các nút
-                flexDirection: {
-                  xs: "column",
-                  md: "row",
-                },
-                width: {
-                  xs: "100%", // Group này chiếm 100% khi xếp dọc
-                  md: "auto",
-                },
-              }}
-            >
-              <Button
-                variant="contained"
-                startIcon={<AddIcon />}
-                onClick={() => handleOpen()}
-              >
-                Thêm
-              </Button>
-              <Button
-                variant="contained"
-                startIcon={<DeleteIcon />}
-                color="error"
-                onClick={handleDelete}
-              >
-                Xóa
-              </Button>
-              <Button
-                variant="contained"
-                startIcon={<InfoOutlined />}
-                color="inherit"
-                onClick={() => setHistory(true)}
-              >
-                Lịch sử
-              </Button>
-              <Button
-                variant="contained"
-                startIcon={<FileDownload />}
-                color="success"
-                onClick={() => {
-                  if (selectedOrders.length > 0) {
-                    reportExcel.mutate();
-                  } else {
-                    showErrorAlert("Vui lòng chọn bản ghi cần tải xuống");
-                  }
-                }}
-              >
-                Tải xuống
-              </Button>
-            </Box>
 
-            {/* Nhóm các Autocomplete và DatePicker lại với nhau */}
-            <Box
-              sx={{
-                display: "flex",
-                flexGrow: 1, // Chiếm hết phần còn lại của không gian
-                gap: 2,
-                alignItems: "center",
-                flexDirection: {
-                  xs: "column",
-                  md: "row",
-                },
-                width: {
-                  xs: "100%", // Group này chiếm 100% khi xếp dọc
-                  md: "auto",
-                },
+      {/* Đầu trang: cùng thiết kế với màn Nhập liệu Khai thác (Thống kê) — tiêu đề + mô tả bên trái, nút chức năng bên phải */}
+      <div className="page-head">
+        <div className="heading">
+          <span className="heading-icon">
+            <FileSpreadsheet />
+          </span>
+          <div>
+            <h1>DANH SÁCH LỆNH SẢN XUẤT</h1>
+            <p>Giao, theo dõi và bàn giao lệnh sản xuất theo ca</p>
+          </div>
+        </div>
+        <div className="head-actions">
+          <button className="hb hb-primary" onClick={() => handleOpen()}>
+            <Plus className="ic-lg" />
+            Thêm mới (F3)
+          </button>
+          <button className="hb" onClick={handleEditSelected}>
+            <Pencil />
+            Chỉnh sửa
+          </button>
+          <button className="hb hb-danger" onClick={handleDelete}>
+            <Trash2 />
+            Xóa {selectedOrders.length > 0 ? `(${selectedOrders.length})` : ""}
+          </button>
+          <span className="head-sep" aria-hidden />
+          <button
+            className="hb"
+            title={
+              user?.role === RoleEnum.ADMIN
+                ? "Tải file Excel các lệnh đã chọn (phiếu lệnh hoặc danh sách)"
+                : "Tải file Excel của các lệnh đã chọn"
+            }
+            onClick={(e) => {
+              if (selectedOrders.length === 0) return showErrorAlert("Vui lòng chọn bản ghi cần tải xuống");
+              // admin: chọn kiểu file; vai trò khác: tải phiếu lệnh như trước
+              if (user?.role === RoleEnum.ADMIN) setDlAnchor(e.currentTarget);
+              else reportExcel.mutate();
+            }}
+          >
+            <Download />
+            Tải xuống (Excel)
+          </button>
+          <Menu anchorEl={dlAnchor} open={Boolean(dlAnchor)} onClose={() => setDlAnchor(null)}>
+            <MenuItem
+              onClick={() => {
+                setDlAnchor(null);
+                reportExcel.mutate();
               }}
             >
-              <SearchInput
-                placeholder="Thẻ lương, công việc ..."
-                value={value}
-                onChange={setValue}
-              />
-              {user?.role === RoleEnum.ADMIN && (
-                <Autocomplete
-                  fullWidth
-                  options={departments}
-                  getOptionLabel={(option: any) => option.code || ""}
-                  value={
-                    departments.find((p: any) => p._id === department) || null
-                  }
-                  onChange={(event, newValue) => {
-                    setDepartment(newValue?._id || "");
-                  }}
-                  PopperComponent={StyledPopper}
-                  renderInput={(params) => (
-                    <TextField
-                      {...params}
-                      fullWidth
-                      size="small"
-                      label="Đơn vị"
-                    />
-                  )}
-                />
-              )}
-              <LocalizationProvider dateAdapter={AdapterDayjs}>
-                <DatePicker
-                  label="Từ ngày"
-                  inputFormat="DD/MM/YYYY"
-                  value={startTime ? dayjs(startTime) : null}
-                  onChange={(value) => setStartTime(value)}
-                  renderInput={(params) => (
-                    <TextField {...params} fullWidth size="small" />
-                  )}
-                />
-              </LocalizationProvider>
-              <LocalizationProvider dateAdapter={AdapterDayjs}>
-                <DatePicker
-                  label="Đến ngày"
-                  inputFormat="DD/MM/YYYY"
-                  value={endTime ? dayjs(endTime) : null}
-                  onChange={(value) => setEndTime(value)}
-                  renderInput={(params) => (
-                    <TextField {...params} fullWidth size="small" />
-                  )}
-                />
-              </LocalizationProvider>
-            </Box>
-          </Box>
-        </AccordionSummary>
-        <AccordionDetails>
-          {selectedOrder && open && (
-            <OrderFormEdit
-              initialValues={selectedOrder}
-              onSubmit={handleSubmit}
-              onCancel={handleClose}
-            />
-          )}
-          {!selectedOrder && open && (
-            <OrderFormAdd onSubmit={handleSubmit} onCancel={handleClose} />
-          )}
-          {selectedOrder && transfer && (
-            <OrderFormTransfer
-              initialValues={selectedOrder}
-              onCancel={handleClose}
-            />
-          )}
-        </AccordionDetails>
-      </Accordion>
-      <Box
-        display="flex"
-        gap={2}
-        alignItems={"center"}
-        justifyContent="flex-end"
-      >
-        <Box display="flex" alignItems={"center"}>
-          <Checkbox
-            color="info"
-            name="status"
-            checked={status === ""}
-            onChange={() => handleChange("")}
-          />
-          <ListItemText
-            primary={`Tất cả (${statusCounts.all})`}
-            sx={{ color: "brand.title" }}
-          />
-        </Box>
-        <Box display="flex" alignItems={"center"}>
-          <Checkbox
-            color="default"
-            name="status"
-            checked={status === StatusOrderEnum.PENDING}
-            onChange={() => handleChange(StatusOrderEnum.PENDING)}
-          />
-          <ListItemText
-            primary={`Chưa nhận lệnh (${statusCounts.pending})`}
-            sx={{ color: "grey" }}
-          />
-        </Box>
-        <Box display="flex" alignItems={"center"}>
-          <Checkbox
-            color="success"
-            name="status"
-            checked={status === StatusOrderEnum.INPROGRESS}
-            onChange={() => handleChange(StatusOrderEnum.INPROGRESS)}
-          />
-          <ListItemText
-            primary={`Đã nhận lệnh (${statusCounts.in_progress})`}
-            sx={{ color: "green" }}
-          />
-        </Box>
-        <Box display="flex" alignItems={"center"}>
-          <Checkbox
-            color="warning"
-            name="status"
-            checked={status === StatusOrderEnum.WARNING}
-            onChange={() => handleChange(StatusOrderEnum.WARNING)}
-          />
-          <ListItemText
-            primary={`Lỗi (${statusCounts.warning})`}
-            sx={{ color: "orange" }}
-          />
-        </Box>
-        <Box display="flex" alignItems={"center"}>
-          <Checkbox
-            color="error"
-            name="status"
-            checked={status === StatusOrderEnum.COMPLETED}
-            onChange={() => handleChange(StatusOrderEnum.COMPLETED)}
-          />
-          <ListItemText
-            primary={`Đã kết thúc (${statusCounts.completed})`}
-            sx={{ color: "red" }}
-          />
-        </Box>
-        <Box display="flex" alignItems={"center"}>
-          <Checkbox
-            color="secondary"
-            name="status"
-            checked={status === StatusOrderEnum.CANCEL}
-            onChange={() => handleChange(StatusOrderEnum.CANCEL)}
-          />
-          <ListItemText
-            primary={`Đã hủy (${statusCounts.cancel})`}
-            sx={{ color: "purple" }}
-          />
-        </Box>
-      </Box>
-      <Box display="flex" justifyContent="space-between" sx={{ mb: 2, mt: 2 }}>
-        <Box display="flex" alignItems="center">
-          <Typography variant="h4">Bảng lệnh sản xuất</Typography>
-          <IconButton
-            onClick={async () => {
-              try {
-                await refetchOrder(); // đợi xong refetch
-                setAlert({
-                  open: true,
-                  message: "Cập nhật thành công",
-                  severity: "success",
-                });
-              } catch (e) {
-                setAlert({
-                  open: true,
-                  message: "Cập nhật thất bại",
-                  severity: "error",
-                });
-              }
-            }}
-            disabled={isLoading}
-          >
-            {isLoading ? (
-              <CircularProgress size={24} />
-            ) : (
-              <RotateLeft
-                sx={{
-                  transition: "transform 0.3s ease",
-                  "&:hover": { transform: "rotate(-180deg)" }, // xoay khi hover
-                  color: "primary.main",
-                }}
-              />
-            )}
-          </IconButton>
-        </Box>
-        <Box display="flex" gap={2}>
-          <IconButton
-            color="primary"
-            onClick={() => setInfo(!info)}
-            sx={{
-              textTransform: "none",
-              borderRadius: 2,
-              py: 0.75,
-              border: "1px solid",
-            }}
-          >
-            {info ? <VisibilityOff /> : <Visibility />}
-          </IconButton>
-          {user?.role === RoleEnum.ADMIN && (
-            <IconButton
-              color="primary"
-              onClick={async () => {
-                if (selectedOrders.length === 0)
-                  return showErrorAlert("Vui lòng chọn bản ghi");
+              Phiếu lệnh đã chọn
+            </MenuItem>
+            <MenuItem
+              onClick={() => {
+                setDlAnchor(null);
                 reportListorderExcel.mutate();
               }}
-              sx={{
-                textTransform: "none",
-                borderRadius: 2,
-                py: 0.75,
-                border: "1px solid",
-              }}
             >
-              <CloudUpload />
-            </IconButton>
-          )}
-          {user?.role === RoleEnum.ADMIN && (
-            <IconButton
-              color="primary"
-              onClick={async () => reportTravelogExcel.mutate()}
-              sx={{
-                textTransform: "none",
-                borderRadius: 2,
-                py: 0.75,
-                border: "1px solid",
-              }}
-            >
-              <Route />
-            </IconButton>
-          )}
-        </Box>
-        <Menu
-          anchorEl={anchorEl}
-          open={Boolean(anchorEl)}
-          onClose={() => setAnchorEl(null)}
-          sx={{ maxHeight: 400 }}
-        >
-          {defaultColumns.map((col) => (
-            <MenuItem key={col.id} onClick={() => handleToggleColumn(col.id)}>
-              <Switch checked={visibleColumns.includes(col.id)} />
-              <ListItemText primary={col.label} />
+              Danh sách lệnh đã chọn
             </MenuItem>
-          ))}
-        </Menu>
-      </Box>
-      {isDownloadLoading && (
-        <Box sx={{ mt: 2 }}>
-          <Typography variant="body2" align="center">
-            Đang xử lý...
-          </Typography>
-          <LinearProgress variant="determinate" />
-        </Box>
+          </Menu>
+        </div>
+      </div>
+
+      {/* Biểu mẫu Thêm / Sửa / Chuyển lệnh: chỉ hiện khi đang thao tác */}
+      {expanded && (
+        <Accordion expanded ref={formRef} sx={{ mb: 2 }}>
+          <AccordionSummary sx={{ display: "none" }} />
+          <AccordionDetails>
+            {selectedOrder && open && (
+              <OrderFormEdit
+                initialValues={selectedOrder}
+                onSubmit={handleSubmit}
+                onCancel={handleClose}
+              />
+            )}
+            {!selectedOrder && open && (
+              <OrderFormAdd onSubmit={handleSubmit} onCancel={handleClose} />
+            )}
+            {selectedOrder && transfer && (
+              <OrderFormTransfer
+                initialValues={selectedOrder}
+                onCancel={handleClose}
+              />
+            )}
+          </AccordionDetails>
+        </Accordion>
       )}
-      <Grid container spacing={2} sx={{ mb: 2 }}>
-        <Grid item xs={12} sm={info ? 8 : 12} maxHeight="60vh">
+
+      {/* Thẻ lọc riêng (như Nhập liệu Khai thác): Thời gian bắt đầu - kết thúc → Đơn vị → ô tìm kiếm (giãn hết chỗ còn lại) → Làm mới */}
+      <section className="filter-card orders-filters">
+        <LocalizationProvider dateAdapter={AdapterDayjs}>
+          <DateFilterField label="Thời gian bắt đầu" value={startTime} onChange={setStartTime} />
+          <span className="date-dash">-</span>
+          <DateFilterField label="Thời gian kết thúc" value={endTime} onChange={setEndTime} />
+        </LocalizationProvider>
+        {user?.role === RoleEnum.ADMIN && (
+          <div className="date-field">
+            <span className="date-field-label">Đơn vị</span>
+            <Autocomplete
+              sx={{ width: 200 }}
+              options={departments}
+              getOptionLabel={(option: any) => option.code || ""}
+              value={departments.find((p: any) => p._id === department) || null}
+              onChange={(event, newValue) => {
+                setDepartment(newValue?._id || "");
+              }}
+              PopperComponent={StyledPopper}
+              renderInput={(params) => <TextField {...params} size="small" placeholder="Chọn đơn vị..." />}
+            />
+          </div>
+        )}
+        <Box sx={{ flex: "1 1 280px", minWidth: 240 }}>
+          <SearchInput
+            placeholder="Tìm theo thẻ lương, công việc ..."
+            value={value}
+            onChange={setValue}
+          />
+        </Box>
+        <button
+          className="hb hb-icon"
+          title="Làm mới danh sách"
+          aria-label="Làm mới"
+          disabled={isLoading}
+          onClick={async () => {
+            try {
+              await refetchOrder();
+              setAlert({ open: true, message: "Cập nhật thành công", severity: "success" });
+            } catch (e) {
+              setAlert({ open: true, message: "Cập nhật thất bại", severity: "error" });
+            }
+          }}
+        >
+          <DIcon name="refresh" />
+        </button>
+      </section>
+
+      <section className="panel">
+        {/* Một hàng duy nhất: trạng thái lệnh (trái) · Lịch sử / Thông tin lệnh / Cột / Hiển thị bảng (phải) */}
+        <div className="panel-bar">
+        {/* Lọc theo trạng thái lệnh (mỗi trạng thái một màu, khớp màu dòng trong bảng) */}
+        <div className="status-chips">
+          {(
+            [
+              ["", `Tất cả (${statusCounts.all})`, "all"],
+              [StatusOrderEnum.PENDING, `Chưa nhận lệnh (${statusCounts.pending})`, "pending"],
+              [StatusOrderEnum.INPROGRESS, `Đã nhận lệnh (${statusCounts.in_progress})`, "in-progress"],
+              [StatusOrderEnum.WARNING, `Lỗi (${statusCounts.warning})`, "warning"],
+              [StatusOrderEnum.COMPLETED, `Đã kết thúc (${statusCounts.completed})`, "completed"],
+              [StatusOrderEnum.CANCEL, `Đã hủy (${statusCounts.cancel})`, "cancel"],
+            ] as [string, string, string][]
+          ).map(([val, label, tone]) => (
+            <button
+              key={tone}
+              type="button"
+              className={`status-chip tone-${tone} ${status === val ? "on" : ""}`}
+              onClick={() => handleChange(val)}
+            >
+              <span className="dot" />
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {/* Lịch sử · Thông tin lệnh · Hiển thị cột/bảng — cùng hàng với trạng thái, căn phải */}
+          <div className="toolbar-right">
+            <button className="btn" onClick={() => setHistory(true)}>
+              <DIcon name="eye" />
+              Lịch sử
+            </button>
+            <button
+              className="btn"
+              title={info ? "Ẩn khung thông tin lệnh" : "Hiện khung thông tin lệnh"}
+              onClick={() => setInfo(!info)}
+            >
+              <DIcon name={info ? "minimize" : "maximize"} />
+              Thông tin lệnh
+            </button>
+            <ColumnToggleButton
+              layout={{
+                hidden: new Set(defaultColumns.filter((c) => !visibleColumns.includes(c.id)).map((c) => c.id)),
+                toggleHidden: handleToggleColumn,
+                showAll: () => setVisibleColumns(defaultColumns.map((c) => c.id)),
+              }}
+              columns={defaultColumns.filter((c) => c.id !== "number").map((c) => ({ key: c.id, label: c.label }))}
+            />
+            <DataGridLayoutButton
+              iconOnly
+              look="design"
+              apiRef={gridApiRef}
+              rowPreset={rowPreset}
+              onRowPreset={setRowPreset}
+              lockedFields={["number", "assignedTo"]}
+              setWidths={(patch) => setColWidths((prev) => ({ ...prev, ...patch }))}
+              onUserSized={(v) => {
+                gridUserSized.current = v;
+              }}
+            />
+          </div>
+        </div>
+
+        {isDownloadLoading && (
+          <Box sx={{ mb: 1.5 }}>
+            <Typography variant="body2" align="center">
+              Đang xử lý...
+            </Typography>
+            <LinearProgress />
+          </Box>
+        )}
+
+      <Grid container spacing={2} sx={{ mb: 0 }}>
+        <Grid item xs={12} sm={info ? 8 : 12} sx={{ height: ordersGridHeight }}>
           <DataGrid
+            className="orders-grid"
+            sortModel={sortModel}
+            onSortModelChange={setSortModel}
+            disableColumnMenu
             // rowSelection={rowSelection}
-            pageSizeOptions={[20, 50, 100]}
+            pageSizeOptions={ORDERS_PAGE_SIZE_OPTIONS}
             paginationModel={paginationModel}
             onPaginationModelChange={setPaginationModel}
             paginationMode="server"
-            columns={filteredColumns}
+            columns={gridColumns}
             rows={orders}
             rowCount={total}
             loading={isLoading}
@@ -1131,33 +1241,36 @@ const Orders: React.FC = () => {
             }}
             disableVirtualization={true}
             filterMode="server"
-            initialState={{
-              density: "compact",
+            density="standard"
+            rowHeight={ROW_HEIGHT[rowPreset]}
+            columnHeaderHeight={HEADER_HEIGHT}
+            apiRef={gridApiRef}
+            autosizeOptions={AUTOSIZE}
+            onColumnWidthChange={(p) => {
+              // giữ bề rộng cột trong state (cột dựng lại mỗi lần render nên nếu không giữ sẽ bị đặt lại)
+              setColWidths((prev) => (prev[p.colDef.field] === p.width ? prev : { ...prev, [p.colDef.field]: p.width }));
             }}
-            slots={{ toolbar: GridToolbar }}
+            onColumnResize={() => {
+              gridUserSized.current = true;
+            }}
             localeText={{
               toolbarColumns: "Cột",
               toolbarFilters: "Bộ lọc",
               toolbarDensity: "Mật độ",
               toolbarExport: "Xuất dữ liệu",
+              noRowsLabel: "Không có dữ liệu",
+              footerRowSelected: (count) => `Đã chọn ${count} dòng`,
+              MuiTablePagination: {
+                labelRowsPerPage: "Số dòng:",
+                labelDisplayedRows: ({ from, to, count }) =>
+                  `Hiển thị ${from}–${to} trong tổng ${count === -1 ? `hơn ${to}` : count} bản ghi`,
+              },
             }}
             slotProps={{
+                pagination: { showFirstButton: true, showLastButton: true } as any,
               filterPanel: {
                 disableAddFilterButton: false,
               },
-              toolbar: {
-                csvOptions: { disableToolbarButton: true },
-                printOptions: { disableToolbarButton: true },
-              },
-            }}
-            onFilterModelChange={(model) => {
-              const filters: Record<string, string> = {};
-              model.items.forEach((item) => {
-                if (item.value) {
-                  filters[item.field] = item.value; // Bỏ qua operator
-                }
-              });
-              setServerFilters(filters);
             }}
             sx={{
               // Áp dụng cho tiêu đề cột
@@ -1195,6 +1308,7 @@ const Orders: React.FC = () => {
                 backgroundColor: "inherit !important",
                 boxShadow: "2px 0 4px rgba(0,0,0,0.1)",
               },
+              height: "100%",
               "& .MuiDataGrid-virtualScroller": {
                 overflowX: "auto",
               },
@@ -1207,10 +1321,10 @@ const Orders: React.FC = () => {
               sx={{
                 position: "sticky",
                 top: 0,
-                maxHeight: "80vh",
+                maxHeight: ordersGridHeight,
                 overflowY: "auto",
-                border: "1px solid #ccc",
-                borderRadius: 2,
+                border: "1px solid #d6e3f3",
+                borderRadius: "10px",
                 p: 1.5, // Giảm padding một chút để phù hợp với cột nhỏ hơn
                 transition:
                   "width 0.3s ease-in-out, background-color 0.3s ease-in-out", // Thêm hiệu ứng chuyển đổi
@@ -1418,6 +1532,55 @@ const Orders: React.FC = () => {
           </Grid>
         )}
       </Grid>
+      </section>
+      {filterPop && (
+        <div className="col-filter-pop xl" style={{ top: filterPop.top, left: filterPop.left }} role="dialog" aria-label={`Lọc ${filterPop.label}`}>
+          <div className="xl-title">Lọc: {filterPop.label}</div>
+          <input
+            autoFocus
+            className="xl-search"
+            placeholder="Tìm kiếm…"
+            value={filterSearch}
+            onChange={(e) => onFilterSearchChange(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") applyColumnFilter();
+            }}
+          />
+          <div className="xl-list">
+            <label className="xl-item xl-all">
+              <input type="checkbox" checked={allShownChecked} onChange={toggleAllShown} disabled={!filterItems.length} />
+              <span>{searchNorm ? "(Chọn tất cả kết quả tìm kiếm)" : "(Chọn tất cả)"}</span>
+            </label>
+            {colValuesLoading && !colValues.length && <div className="xl-empty">Đang tải…</div>}
+            {!colValuesLoading && !filterItems.length && <div className="xl-empty">Không có giá trị nào</div>}
+            {filterItems.map((v) => (
+              <label key={v} className="xl-item" title={v}>
+                <input type="checkbox" checked={isChecked(v)} onChange={() => toggleFilterValue(v)} />
+                <span>{v}</span>
+              </label>
+            ))}
+          </div>
+          {colValuesData?.truncated && <div className="xl-note">Chỉ hiện {colValues.length} giá trị đầu — gõ tìm kiếm để thu hẹp.</div>}
+          <div className="xl-count">{checkedCount}/{colValues.length} giá trị được chọn</div>
+          <div className="pop-actions">
+            <button
+              type="button"
+              onClick={() => {
+                setColumnFilter(filterPop.field, null);
+                setFilterPop(null);
+              }}
+            >
+              Xóa lọc
+            </button>
+            <button type="button" onClick={() => setFilterPop(null)}>
+              Hủy
+            </button>
+            <button type="button" className="primary" onClick={applyColumnFilter} disabled={colValues.length > 0 && checkedCount === 0}>
+              Áp dụng
+            </button>
+          </div>
+        </div>
+      )}
       <OrderHistories
         open={history}
         setOpen={setHistory}
@@ -1429,7 +1592,7 @@ const Orders: React.FC = () => {
         setOpen={setShiftReport}
         initialValues={selectedOrder}
       />
-    </Box>
+    </div>
   );
 };
 

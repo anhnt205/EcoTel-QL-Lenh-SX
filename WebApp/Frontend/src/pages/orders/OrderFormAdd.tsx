@@ -16,8 +16,9 @@ import {
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '../../config/api.config';
 import { Order, Device, Job, Location, Material, SafetyMeasure, Shift, Department } from '../../types';
-import { DatePicker, DesktopTimePicker, LocalizationProvider } from '@mui/x-date-pickers';
-import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import { DesktopTimePicker, LocalizationProvider } from "@mui/x-date-pickers";
+import DatePicker from "../../components/design/DatePicker";
+import { AdapterDayjs } from "../../components/design/AdapterDayjs";
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { showConfirmAlert, showSuccessAlert } from '../../components/Alert';

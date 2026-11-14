@@ -29,6 +29,10 @@ export const routerBasename = (): string => {
 /** Thông điệp giữa khung cha (Điều phối) và Thống kê. */
 export const MSG_NAVIGATE = "tk:navigate"; // cha -> con: { type, path }
 export const MSG_LOCATION = "tk:location"; // con -> cha: { type, path }
+/** con -> cha: người dùng lăn chuột trong khung. { type, collapse } — collapse=true: lăn xuống => cha thu banner phần mềm. */
+export const MSG_HEADER = "tk:header";
+/** con -> cha: chiều cao nội dung trang ({ type, height }; height <= 0 = bỏ) — cha cho khung cao bằng nội dung để chỉ cuộn bằng thanh cuộn của cha. */
+export const MSG_HEIGHT = "tk:height";
 
 /** Xin/cấp token qua khung cha (Điều phối) — đăng nhập một lần ở Điều phối. */
 export const MSG_REQUEST_TOKEN = "tk:request-token"; // con -> cha: { type }
@@ -73,4 +77,37 @@ export function requestParentToken(): Promise<string> {
     window.parent.postMessage({ type: MSG_REQUEST_TOKEN }, window.location.origin);
   });
   return inFlightToken;
+}
+
+/** Xin khung cha (Điều phối) số giờ hoạt động lũy kế theo mã thiết bị — số liệu này chỉ có bên Điều phối (báo cáo ca). */
+export const MSG_REQUEST_DEVICE_HOURS = "tk:request-device-hours"; // con -> cha: { type }
+export const MSG_DEVICE_HOURS = "tk:device-hours"; // cha -> con: { type, hours: { [maThietBi]: soGio } }
+
+const DEVICE_HOURS_TIMEOUT_MS = 15000;
+
+/**
+ * Giờ hoạt động lũy kế của thiết bị theo MÃ (biển số), lấy từ khung cha. Ngoài chế độ nhúng, hết giờ chờ hoặc lỗi thì trả `{}`
+ * (cột để trống) — không bao giờ làm hỏng trang.
+ */
+export function requestDeviceHours(): Promise<Record<string, number>> {
+  return new Promise((resolve) => {
+    if (window.parent === window) {
+      resolve({});
+      return;
+    }
+    const done = (value: Record<string, number>) => {
+      window.removeEventListener("message", onMessage);
+      window.clearTimeout(timer);
+      resolve(value);
+    };
+    const onMessage = (e: MessageEvent) => {
+      if (e.source !== window.parent || e.origin !== window.location.origin) return;
+      if (e.data?.type === MSG_DEVICE_HOURS) {
+        done(e.data.hours && typeof e.data.hours === "object" ? (e.data.hours as Record<string, number>) : {});
+      }
+    };
+    const timer = window.setTimeout(() => done({}), DEVICE_HOURS_TIMEOUT_MS);
+    window.addEventListener("message", onMessage);
+    window.parent.postMessage({ type: MSG_REQUEST_DEVICE_HOURS }, window.location.origin);
+  });
 }

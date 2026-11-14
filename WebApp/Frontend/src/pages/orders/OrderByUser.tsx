@@ -23,8 +23,9 @@ import {
     RotateLeft,
 } from '@mui/icons-material';
 import dayjs, { Dayjs } from 'dayjs';
-import { DatePicker, LocalizationProvider } from '@mui/x-date-pickers';
-import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import { LocalizationProvider } from "@mui/x-date-pickers";
+import DatePicker from "../../components/design/DatePicker";
+import { AdapterDayjs } from "../../components/design/AdapterDayjs";
 import { DataGrid, GridColDef, GridRenderCellParams, GridToolbar } from '@mui/x-data-grid';
 import OrderService from '../../services/orderService';
 import { AlertSnackbar } from '../../components/Alert';
@@ -39,7 +40,7 @@ const OrderByUsers: React.FC = () => {
     const [info, setInfo] = useState(false);
 
     const [paginationModel, setPaginationModel] = useState({
-        pageSize: 50,
+        pageSize: 15,
         page: 0,
     });
     const [total, setTotal] = useState(0);
@@ -303,7 +304,7 @@ const OrderByUsers: React.FC = () => {
                     <DataGrid
                         columns={orderColumns.filter((col: GridColDef) => col.field && visibleColumns.includes(col.field.toString()))}
                         rows={orderByUser}
-                        pageSizeOptions={[20, 50, 100]}
+                        pageSizeOptions={[15, 20, 50, 100]}
                         paginationModel={paginationModel}
                         onPaginationModelChange={setPaginationModel}
                         paginationMode="server"
@@ -345,9 +346,16 @@ const OrderByUsers: React.FC = () => {
                             toolbarFilters: 'Bộ lọc',
                             toolbarDensity: 'Mật độ',
                             toolbarExport: 'Xuất dữ liệu',
+                            footerRowSelected: (count) => `Đã chọn ${count} dòng`,
+                            MuiTablePagination: {
+                                labelRowsPerPage: 'Số dòng:',
+                                labelDisplayedRows: ({ from, to, count }) =>
+                                    `Hiển thị ${from}–${to} trong tổng ${count === -1 ? `hơn ${to}` : count} bản ghi`,
+                            },
                         }}
                         disableColumnFilter
                         slotProps={{
+                            pagination: { showFirstButton: true, showLastButton: true } as any,
                             filterPanel: {
                                 disableAddFilterButton: false,
                             },

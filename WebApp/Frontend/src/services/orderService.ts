@@ -8,6 +8,11 @@ const OrderService = {
     const res = await api.get("/orders", { params });
     return res.data;
   },
+  /** Giá trị khác nhau của một cột (hộp lọc kiểu Excel) — kèm đúng các bộ lọc đang áp dụng. */
+  getColumnValues: async (params: Record<string, any>): Promise<{ values: string[]; truncated: boolean }> => {
+    const res = await api.get("/orders/column-values", { params });
+    return { values: res.data.values ?? [], truncated: Boolean(res.data.truncated) };
+  },
   getAllDispatcher: async (params?: Record<string, any>): Promise<any[]> => {
     const res = await api.get("/orders", { params });
     return res.data.data;

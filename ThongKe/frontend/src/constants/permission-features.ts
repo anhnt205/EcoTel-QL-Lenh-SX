@@ -19,7 +19,7 @@
  *   view lọc theo trạng thái của cùng dữ liệu đối chiếu, không có quyền
  *   riêng — xem `ReconciliationController`).
  * - `matrix-catalogs`: "Định mức nhiên liệu" (mục nav riêng) và 2 danh mục
- *   con "Năng suất xe (996)"/"HS điều chỉnh NLĐM" trong dropdown Danh mục.
+ *   con "Năng suất xe (3305)"/"HS điều chỉnh NLĐM" trong dropdown Danh mục.
  * - `devices`, `device-production-attributes`, `survey-standards`: mỗi
  *   resource có 2 trang riêng trong dropdown Danh mục (vd Thông tin xe /
  *   Thông tin máy) — cùng lý do, hiện đủ 2 dòng để khớp menu thật.
@@ -62,6 +62,8 @@ export const PERMISSION_FEATURE_GROUPS: PermissionFeatureGroup[] = [
         items: [
           { resource: "cargo-types", label: "Chủng loại hàng" },
           { resource: "cargo-groups", label: "Nhóm chủng loại hàng" },
+          { resource: "classifications", label: "Phân loại" },
+          { resource: "mud-marks", label: "Ký hiệu bùn" },
           { resource: "acceptance-products", label: "Sản phẩm nghiệm thu" },
         ],
       },
@@ -100,12 +102,13 @@ export const PERMISSION_FEATURE_GROUPS: PermissionFeatureGroup[] = [
           { resource: "coefficients", label: "Hệ số" },
           { resource: "report-periods", label: "Kỳ báo cáo" },
           { resource: "model-periods", label: "Mô hình" },
-          { resource: "matrix-catalogs", label: "Năng suất xe (996)", sharedWith: "Định mức nhiên liệu" },
+          { resource: "matrix-catalogs", label: "Năng suất xe (3305)", sharedWith: "Định mức nhiên liệu" },
           { resource: "matrix-catalogs", label: "HS điều chỉnh NLĐM", sharedWith: "Định mức nhiên liệu" },
           { resource: "density-parameters", label: "Tỷ trọng" },
           { resource: "device-production-attributes", label: "Thuộc tính sản lượng — Xe" },
           { resource: "device-production-attributes", label: "Thuộc tính sản lượng — Máy xúc" },
           { resource: "shifts", label: "Ca làm việc" },
+          { resource: "suffixes", label: "Hậu tố" },
         ],
       },
       {
@@ -122,7 +125,6 @@ export const PERMISSION_FEATURE_GROUPS: PermissionFeatureGroup[] = [
           { resource: "locations", label: "Vị trí (dùng nội bộ cho nhập liệu)" },
           { resource: "materials", label: "Vật tư (dùng nội bộ cho nhập liệu)" },
           { resource: "device-types", label: "Loại thiết bị" },
-          { resource: "classifications", label: "Phân loại" },
           { resource: "vehicle-category-classes", label: "Chủng loại xe + Phân loại" },
         ],
       },
@@ -134,7 +136,7 @@ export const PERMISSION_FEATURE_GROUPS: PermissionFeatureGroup[] = [
       {
         resource: "matrix-catalogs",
         label: "Định mức nhiên liệu",
-        sharedWith: "Năng suất xe (996), HS điều chỉnh NLĐM (trong Danh mục)",
+        sharedWith: "Năng suất xe (3305), HS điều chỉnh NLĐM (trong Danh mục)",
       },
     ],
   },

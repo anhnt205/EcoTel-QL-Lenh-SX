@@ -988,3 +988,12 @@ Báo cáo, kỳ chưa tính → 0); các test cổng duyệt cũ không đổi.
 5. **Chốt kỳ KHÔNG bị chặn khi còn chuyến chưa duyệt**, nhưng màn Báo cáo luôn hiện băng báo VÀNG
    "Số liệu mới tính trên phần ĐÃ DUYỆT… còn N chuyến chưa duyệt đối chiếu KHÔNG nằm trong bảng này"
    (kể cả khi kỳ đã chốt).
+
+---
+
+## QĐ-26 (2026-11-13) — Đưa lại "Phân loại" và thêm "Loại hàng" thành danh mục độc lập (đảo một phần QĐ-20)
+
+**Chủ dự án yêu cầu trực tiếp:** thêm hai danh mục nhỏ, mỗi danh mục gồm *Mã*, *Tên*, *Ghi chú*.
+- **Phân loại** (`/api/classifications`, bảng `classifications` đã có sẵn từ 06/09): QĐ-20 đã gỡ khỏi menu nhưng cố ý giữ backend — nay bật lại menu + route `/danh-muc/phan-loai`.
+- **Loại hàng** (danh mục nhỏ mới): đã làm rồi GỠ lại cùng ngày theo yêu cầu chủ dự án — chỉ còn backend `cargo_categories` (rỗng, không dùng), không có menu/route.
+- Cả hai nằm trong nhóm menu "Vật liệu, hàng hoá". **Chưa có khoá ngoại/công thức nào đọc** hai danh mục này (engine vẫn tự suy Phân loại DAT/Than theo QĐ-10) — chỉ là danh mục tra cứu độc lập cho tới khi có yêu cầu gắn vào nghiệp vụ.

@@ -15,6 +15,8 @@ public class CargoGroupResponse {
     String name;
     String code;
     String description;
+    Long classificationId;
+    String classificationName;
     LocalDateTime createdAt;
     LocalDateTime updatedAt;
 }

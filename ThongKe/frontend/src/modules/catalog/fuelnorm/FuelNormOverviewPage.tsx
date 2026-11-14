@@ -13,8 +13,6 @@ import {
   Layers,
   Maximize,
   Minimize,
-  Plus,
-  Settings2,
   SquarePen,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -26,15 +24,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb";
 import { cn } from "@/lib/utils";
+import DesignShell from "../design/DesignShell";
+import DIcon from "../design/DIcon";
 import { ROUTES } from "@/constants/routes";
 import { matrixService, type MatrixGrid } from "../matrix/matrixService";
 import { downloadFuelNormExcel } from "./fuelNormExcelImport";
@@ -49,6 +41,7 @@ import {
 } from "./fuelNormKeys";
 import { FuelNormAddDatasetModal } from "./FuelNormAddDatasetModal";
 import { FuelNormChartPanel } from "./FuelNormChartPanel";
+import { FuelNormCreateModal } from "./FuelNormCreateModal";
 
 const DMNL_CODE = "DMNL";
 
@@ -187,6 +180,7 @@ export default function FuelNormOverviewPage() {
   // ── sao chép 1 bộ dữ liệu sang chủng loại xe/hậu tố khác (cùng phiên bản) ─
   const [copySource, setCopySource] = useState<FuelNormRow | null>(null);
   const [copying, setCopying] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
 
   const doCopy = async (targetKey: string) => {
     if (!copySource) return;
@@ -240,35 +234,31 @@ export default function FuelNormOverviewPage() {
   const isLoading = loadingVersions || loadingGrids;
 
   return (
-    <div className="flex h-full flex-col gap-4 p-4 md:p-6">
-      <Breadcrumb>
-        <BreadcrumbList>
-          <BreadcrumbItem>
-            <BreadcrumbLink href="#">Danh mục</BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbPage>Định mức nhiên liệu</BreadcrumbPage>
-          </BreadcrumbItem>
-        </BreadcrumbList>
-      </Breadcrumb>
-
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <h1 className="text-xl font-bold text-blue-700 dark:text-blue-400">Định mức nhiên liệu</h1>
-          <p className="text-xs text-muted-foreground">
-            Quản lý, tra cứu bộ định mức nhiên liệu theo chủng loại xe, hậu tố và năm áp dụng.
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button size="sm" className="h-9 gap-1.5 bg-blue-600 text-xs text-white hover:bg-blue-700" onClick={() => navigate(ROUTES.DANH_MUC.DINH_MUC_NHIEN_LIEU_THEM_MOI)}>
-            <Plus className="h-4 w-4" /> Thêm mới
-          </Button>
-          <Button variant="outline" size="sm" className="h-9 gap-1.5 text-xs" onClick={() => navigate(ROUTES.DANH_MUC.DINH_MUC_NHIEN_LIEU_LUOI)}>
-            <Settings2 className="h-3.5 w-3.5" /> Chỉnh sửa toàn bộ lưới (nâng cao)
-          </Button>
-        </div>
-      </div>
+    <DesignShell
+      trail={["Danh mục", "Thiết bị"]}
+      title="Định mức nhiên liệu"
+      description="Quản lý, tra cứu bộ định mức nhiên liệu theo chủng loại xe, hậu tố và năm áp dụng."
+      actions={
+        <>
+          <button className="btn btn-primary" onClick={() => setCreateOpen(true)}>
+            <DIcon name="plus" /> Thêm mới
+          </button>
+          <button className="btn" onClick={() => navigate(ROUTES.DANH_MUC.DINH_MUC_NHIEN_LIEU_LUOI)}>
+            Chỉnh sửa toàn bộ lưới (nâng cao)
+          </button>
+        </>
+      }
+    >
+      <div className="flex flex-col gap-4">
+      <FuelNormCreateModal
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        onSaved={() => {
+          queryClient.invalidateQueries({ queryKey: ["matrix-all-grids", DMNL_CODE] });
+          queryClient.invalidateQueries({ queryKey: ["matrix-versions", DMNL_CODE] });
+          queryClient.invalidateQueries({ queryKey: ["matrix", DMNL_CODE] });
+        }}
+      />
 
       {/* Bộ lọc — áp lên bộ dữ liệu của kỳ đang chọn bên dưới */}
       <div className="grid grid-cols-2 gap-2 rounded-lg border bg-card p-3 sm:grid-cols-4">
@@ -395,7 +385,7 @@ export default function FuelNormOverviewPage() {
                           >
                             <Copy className="h-3.5 w-3.5" />
                           </button>
-                          <button title="Xuất Excel" onClick={() => handleExportDataset(yearGrid, ds)}>
+                          <button title="Tải xuống (Excel)" onClick={() => handleExportDataset(yearGrid, ds)}>
                             <Download className="h-3.5 w-3.5" />
                           </button>
                         </div>
@@ -511,7 +501,8 @@ export default function FuelNormOverviewPage() {
           }}
         />
       )}
-    </div>
+      </div>
+    </DesignShell>
   );
 }
 

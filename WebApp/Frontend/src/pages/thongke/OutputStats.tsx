@@ -32,14 +32,14 @@ const OutputStats = () => {
       <Tabs
         value={active}
         onChange={(_, key) => setParams(key === visible[0].key ? {} : { tab: key }, { replace: true })}
-        sx={{ borderBottom: "1px solid #e5e9f0" }}
+        sx={{ borderBottom: "2px solid #d6e3f3", bgcolor: "#fff", "& .MuiTabs-indicator": { height: 3, bgcolor: "#1263e7" } }}
       >
         {visible.map((t) => (
           <Tab
             key={t.key}
             value={t.key}
             label={t.label}
-            sx={{ textTransform: "none", fontWeight: 600 }}
+            sx={{ textTransform: "none", fontWeight: 700, fontFamily: "Arial, Helvetica, sans-serif", fontSize: 14, color: "#33496d", "&.Mui-selected": { color: "#1263e7" } }}
           />
         ))}
       </Tabs>

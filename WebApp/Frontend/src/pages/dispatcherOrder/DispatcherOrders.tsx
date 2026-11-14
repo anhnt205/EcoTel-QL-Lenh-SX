@@ -504,12 +504,12 @@ const DispatcherOrders: React.FC = () => {
     } as const;
     // Ô bảng: gọn, viền mảnh
     const cellSx = { py: 0.75, px: 1.5, borderBottom: '1px solid #eef1f5', fontSize: 13, color: INK, whiteSpace: 'nowrap' } as const;
-    const headCellSx = { ...cellSx, py: 1, bgcolor: '#f8fafc', borderTop: `1px solid ${LINE}`, borderBottom: `1px solid ${LINE}`, fontWeight: 700, fontSize: 12.5 } as const;
+    const headCellSx = { ...cellSx, py: 1, background: 'linear-gradient(180deg,#0860d9,#064caf)', color: '#fff', borderTop: '1px solid #3a83e3', borderBottom: '1px solid #3a83e3', borderRight: '1px solid #3a83e3', fontWeight: 700, fontSize: 13 } as const;
 
     return (
         <ThemeProvider theme={uiSansTheme}>
             {/* Phủ kín nền, bù lại padding 24px của MainLayout; fontFamily để thẻ div con kế thừa phông không chân */}
-            <Box sx={{ bgcolor: '#f7f8fa', m: -3, p: 3, minHeight: '100%', fontFamily: UI_FONT }}>
+            <Box sx={{ bgcolor: '#edf4fd', m: -3, p: 3, minHeight: '100%', fontFamily: UI_FONT }}>
                 {/* Tiêu đề trang + 3 nút hành động */}
                 <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2, flexWrap: 'wrap', mb: 2 }}>
                     <Box sx={{ minWidth: 0 }}>

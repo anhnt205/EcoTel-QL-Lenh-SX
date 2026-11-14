@@ -18,4 +18,7 @@ public class CargoGroupRequest {
     String name;
 
     String description;
+
+    /** Phân loại (tuỳ chọn): id trong danh mục Phân loại. */
+    Long classificationId;
 }

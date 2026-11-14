@@ -1,17 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Maximize, Minimize, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import DIcon from "../design/DIcon";
+import { moveItem, useRowDnD } from "../design/useRowDnD";
+import { CatalogQuickImportDialog } from "../CatalogQuickImportDialog";
+import type { CatalogField } from "../types";
+import "@/styles/catalog-design.css";
 import api from "@/config/api.config";
+import { versionLabelOf } from "../vehicleoutput/VehicleOutputYearTable";
 import { matrixService, type MatrixCellUpsert, type MatrixGrid } from "../matrix/matrixService";
 import {
   AREA_GROUPS,
@@ -39,56 +35,105 @@ interface VehicleRankOption {
   code: string;
 }
 
+/** Hệ số 12 tháng của từng nhóm khu vực — nhập cả hai nhóm trong cùng một lượt, bảng chỉ hiện nhóm đang chọn. */
+type MonthsByArea = Record<AreaGroup, string[]>;
+
 interface Row {
   id: number;
   vehicleCode: string;
   rankCode: string;
   classification: FuelAdjustClassification | "";
-  months: string[];
+  months: MonthsByArea;
+  /** Dòng đã có nhưng khoá không theo quy ước <xe>_<chữ đầu hạng>_<DAT|Than> — giữ nguyên khoá, không cho đổi. */
+  rawKey?: string;
 }
+
+export type FuelAdjustModalMode = "create" | "editYear" | "copyYear";
 
 const currentYear = new Date().getFullYear();
 const YEAR_OPTIONS = Array.from({ length: 7 }, (_, i) => currentYear - 3 + i);
 
 const emptyMonths = (): string[] => Array.from({ length: MONTH_COUNT }, () => "");
+const emptyByArea = (): MonthsByArea => ({ CS: emptyMonths(), KC: emptyMonths() });
+
+/** Tách khoá dòng `<xe>_<chữ đầu hạng>_<DAT|Than>` về từng thành phần; null nếu không theo quy ước. */
+const parseRowKey = (key: string): { vehicleCode: string; rankCode: string; classification: FuelAdjustClassification } | null => {
+  const m = /^(.*)_([^_]*)_(DAT|Than)$/.exec(key);
+  return m ? { vehicleCode: m[1], rankCode: m[2], classification: m[3] as FuelAdjustClassification } : null;
+};
 
 /**
- * Modal "Thêm mới HS điều chỉnh NLDM" — bespoke cho danh mục HS điều
- * chỉnh NLĐM (HS_DIEU_CHINH_NLDM), một trong 4 lưới dùng chung
- * (`MatrixDefinition`/`MatrixCell` qua `matrixService`, giống cách Năng
- * suất xe đã làm). Chọn Năm + NHÓM khu vực (CS/KC), sau đó nhập hệ số cho
- * từng dòng (Chủng loại xe (NL) + Hạng + Phân loại) × 12 tháng — cột "HSNL
- * điều chỉnh" tự tính TRUNG BÌNH 12 tháng, cập nhật ngay khi gõ.
+ * Modal "Thêm mới / Sửa / Sao chép HS điều chỉnh NLDM" — bespoke cho danh mục HS điều chỉnh NLĐM (HS_DIEU_CHINH_NLDM), một trong các lưới dùng
+ * chung (`MatrixDefinition`/`MatrixCell` qua `matrixService`, giống Năng suất xe): mỗi năm một phiên bản lưới. Chọn Năm, sau đó nhập hệ số cho từng
+ * dòng (Chủng loại xe (NL) + Hạng + Phân loại) × 12 tháng — cột "HSNL điều chỉnh" tự tính TRUNG BÌNH 12 tháng, cập nhật ngay khi gõ.
  *
- * <p>Khoá cột mang cả THÁNG lẫn nhóm khu vực ({@code T6.CS}) theo QĐ-12, nên
- * một lượt nhập chỉ ghi cho MỘT nhóm khu vực; muốn đủ cả hai thì mở lại và
- * chọn nhóm còn lại — cột mới tự nối vào cùng phiên bản lưới của năm đó.
+ * <p>Khoá cột mang cả THÁNG lẫn nhóm khu vực ({@code T6.CS}) theo QĐ-12: ô "Nhóm khu vực" chỉ đổi nhóm đang HIỆN trong bảng; hệ số của cả hai nhóm
+ * (CS, KC) đã nhập đều được lưu cùng một lượt khi bấm Xác nhận.
+ *  - {@code create}: tạo mới cho một năm (đã có phiên bản của năm đó thì ghi bổ sung vào phiên bản ấy).
+ *  - {@code editYear}: sửa CẢ bảng của phiên bản (`versions`; có nhiều phiên bản trong năm thì chọn ở ô Phiên bản).
+ *  - {@code copyYear}: nạp bảng của năm nguồn rồi lưu sang năm khác (tạo phiên bản mới).
  */
 export function FuelAdjustAddModal({
   open,
+  mode = "create",
+  versions: sourceVersions,
   onClose,
   onSaved,
 }: {
   open: boolean;
+  mode?: FuelAdjustModalMode;
+  /** Các phiên bản (đủ lưới) của năm nguồn — dùng cho editYear / copyYear. */
+  versions?: MatrixGrid[];
   onClose: () => void;
   onSaved: () => void;
 }) {
   const [year, setYear] = useState(currentYear);
+  const [versionId, setVersionId] = useState<number | null>(null);
   const [areaGroup, setAreaGroup] = useState<AreaGroup>("CS");
   const [rows, setRows] = useState<Row[]>([]);
+  // Kéo thả đổi vị trí dòng (setRows ổn định nên gọi hook ở đây, trước early return)
+  const dnd = useRowDnD((f, t) => setRows((prev) => moveItem(prev, f, t)));
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [quickOpen, setQuickOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const idRef = useRef(0);
   const nextId = () => ++idRef.current;
+  const blankRow = (): Row => ({ id: nextId(), vehicleCode: "", rankCode: "", classification: "", months: emptyByArea() });
+
+  /** Nạp bảng của một phiên bản vào các dòng của modal. */
+  const loadGrid = (g: MatrixGrid) => {
+    const list = [...g.rows].sort((a, b) => a.sortOrder - b.sortOrder).map((r): Row => {
+      const p = parseRowKey(r.key);
+      const months = emptyByArea();
+      AREA_GROUPS.forEach(({ value: a }) =>
+        months[a].forEach((_, i) => {
+          const v = g.cells?.[r.key]?.[monthColumnKeyOf(i + 1, a)];
+          if (v != null) months[a][i] = String(v);
+        }),
+      );
+      return p ? { id: nextId(), ...p, months } : { id: nextId(), vehicleCode: "", rankCode: "", classification: "", months, rawKey: r.key };
+    });
+    setRows(list.length ? list : [blankRow()]);
+  };
 
   useEffect(() => {
     if (!open) return;
     setError(null);
-    setYear(currentYear);
     setAreaGroup("CS");
-    setRows([{ id: nextId(), vehicleCode: "", rankCode: "", classification: "", months: emptyMonths() }]);
+    if (mode !== "create" && sourceVersions && sourceVersions.length > 0) {
+      const first = sourceVersions[0];
+      setVersionId(first.versionId);
+      loadGrid(first);
+      const y = Number((first.effectiveFrom ?? "").slice(0, 4)) || currentYear;
+      setYear(mode === "copyYear" ? y + 1 : y);
+    } else {
+      setVersionId(null);
+      setYear(currentYear);
+      setRows([blankRow()]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   const { data: vehicles = [] } = useQuery({
@@ -113,7 +158,7 @@ export function FuelAdjustAddModal({
   // trị TỰ SUY DAT/Than (QĐ-10), còn khu vực chỉ vào khoá dưới dạng NHÓM
   // CS/KC (QĐ-13) — chọn từng khu vực cụ thể sẽ sinh cột sai.
 
-  const { data: versions = [] } = useQuery({
+  const { data: allVersions = [] } = useQuery({
     queryKey: ["matrix-versions", CODE],
     queryFn: () => matrixService.versions(CODE),
     enabled: open,
@@ -121,30 +166,77 @@ export function FuelAdjustAddModal({
 
   if (!open) return null;
 
-  const addRow = () =>
-    setRows((prev) => [...prev, { id: nextId(), vehicleCode: "", rankCode: "", classification: "", months: emptyMonths() }]);
+  const isEdit = mode === "editYear";
+
+  const addRow = () => setRows((prev) => [...prev, blankRow()]);
+  /** "+" ở đầu dòng: chèn một dòng trống ngay dưới. */
+  const addRowAfter = (id: number) =>
+    setRows((prev) => {
+      const at = prev.findIndex((r) => r.id === id);
+      const next = [...prev];
+      next.splice(at + 1, 0, blankRow());
+      return next;
+    });
   const removeRow = (id: number) => setRows((prev) => (prev.length === 1 ? prev : prev.filter((r) => r.id !== id)));
   const setRowField = (id: number, field: "vehicleCode" | "rankCode" | "classification", value: string) =>
     setRows((prev) => prev.map((r) => (r.id !== id ? r : { ...r, [field]: value })));
 
   /** Khoá dòng — dùng chung cho kiểm tra trùng, tạo dòng và ghi ô. */
-  const keyOf = (r: Row) =>
-    rowKeyOf(r.vehicleCode, r.rankCode, r.classification as FuelAdjustClassification);
+  const keyOf = (r: Row) => r.rawKey ?? rowKeyOf(r.vehicleCode, r.rankCode, r.classification as FuelAdjustClassification);
   const setMonthValue = (id: number, monthIdx: number, value: string) =>
     setRows((prev) =>
-      prev.map((r) => (r.id !== id ? r : { ...r, months: r.months.map((m, i) => (i === monthIdx ? value : m)) })),
+      prev.map((r) =>
+        r.id !== id ? r : { ...r, months: { ...r.months, [areaGroup]: r.months[areaGroup].map((m, i) => (i === monthIdx ? value : m)) } },
+      ),
     );
+  const hasValueIn = (r: Row, a: AreaGroup) => r.months[a].some((m) => m.trim());
+
+  const switchVersion = (id: number) => {
+    const g = sourceVersions?.find((v) => v.versionId === id);
+    if (!g) return;
+    setVersionId(id);
+    loadGrid(g);
+    setError(null);
+  };
+
+  /** Nhập nhanh (ảnh/Excel): mỗi dòng nguồn = Chủng loại xe, Hạng xe, Phân loại, rồi 12 tháng (cột "HSNL điều chỉnh" phía sau tự bỏ qua) — vào nhóm khu vực đang chọn. */
+  const quickFields: CatalogField[] = [
+    { key: "vehicleCode", label: "Chủng loại xe", type: "select", required: true },
+    { key: "rankCode", label: "Hạng xe", type: "select", required: true },
+    { key: "classification", label: "Phân loại", type: "select", required: true },
+    ...Array.from({ length: MONTH_COUNT }, (_, i): CatalogField => ({ key: `m${i + 1}`, label: `Tháng ${i + 1}`, type: "number" })),
+  ];
+  const quickOptions = {
+    vehicleCode: vehicles.map((v) => ({ value: v.code, label: v.code, alt: [v.name] })),
+    rankCode: ranks.map((rk) => ({ value: rk.code, label: rk.code })),
+    classification: FUEL_ADJUST_CLASSIFICATIONS.map((c) => ({ value: c.value, label: c.value, alt: [c.label, c.value === "DAT" ? "Đất" : "Than"] })),
+  };
+  const addQuickRows = (list: Record<string, string>[]) =>
+    setRows((prev) => {
+      const untouched =
+        prev.length === 1 && !prev[0].vehicleCode && !prev[0].rankCode && !prev[0].classification && !prev[0].rawKey && !hasValueIn(prev[0], "CS") && !hasValueIn(prev[0], "KC");
+      const added: Row[] = list.map((v) => {
+        const months = emptyByArea();
+        months[areaGroup] = Array.from({ length: MONTH_COUNT }, (_, i) => (v[`m${i + 1}`] ?? "").replace(",", "."));
+        return { id: nextId(), vehicleCode: v.vehicleCode, rankCode: v.rankCode, classification: v.classification as FuelAdjustClassification, months };
+      });
+      return [...(untouched ? [] : prev), ...added];
+    });
 
   const validate = (): string | null => {
-    if (rows.some((r) => !r.vehicleCode || !r.rankCode || !r.classification))
+    if (rows.some((r) => !r.rawKey && (!r.vehicleCode || !r.rankCode || !r.classification)))
       return "Có dòng chưa chọn đủ Chủng loại xe (NL) + Hạng + Phân loại.";
     const keys = rows.map(keyOf);
     // Khoá chỉ lấy CHỮ ĐẦU của mã hạng, nên "C" và "C1" cho ra cùng một dòng
     // — báo trùng ở đây thay vì để hai dòng âm thầm đè lên nhau khi lưu.
     if (new Set(keys).size !== keys.length)
       return "Có dòng bị trùng nhau (cùng Chủng loại xe + chữ đầu Hạng xe + Phân loại).";
-    const hasAnyValue = rows.some((r) => r.months.some((m) => m.trim()));
-    if (!hasAnyValue) return "Chưa nhập hệ số tháng nào.";
+    if (!isEdit) {
+      const hasAnyValue = rows.some((r) => hasValueIn(r, "CS") || hasValueIn(r, "KC"));
+      if (!hasAnyValue) return "Chưa nhập hệ số tháng nào.";
+    }
+    if (mode === "copyYear" && allVersions.some((v) => (v.effectiveFrom ?? "").startsWith(`${year}-`)))
+      return `Năm ${year} đã có dữ liệu HS điều chỉnh NLĐM — chọn năm khác hoặc dùng Sửa.`;
     return null;
   };
 
@@ -157,50 +249,61 @@ export function FuelAdjustAddModal({
     setError(null);
     setSubmitting(true);
     try {
-      const effectiveFrom = `${year}-01-01`;
-      const effectiveTo = `${year}-12-31`;
+      let grid: MatrixGrid;
+      if (isEdit) {
+        grid = await matrixService.getGrid(CODE, versionId ?? undefined);
+      } else {
+        const effectiveFrom = `${year}-01-01`;
+        const effectiveTo = `${year}-12-31`;
+        const existingVersion = mode === "create" ? allVersions.find((v) => v.effectiveFrom === effectiveFrom) : undefined;
+        grid = existingVersion
+          ? await matrixService.getGrid(CODE, existingVersion.versionId)
+          : await matrixService.createVersion(CODE, { effectiveFrom, effectiveTo, note: `HS điều chỉnh NLĐM năm ${year}`, copyCells: false });
+      }
+      const original = grid;
 
-      const existingVersion = versions.find((v) => v.effectiveFrom === effectiveFrom);
-      let grid: MatrixGrid = existingVersion
-        ? await matrixService.getGrid(CODE, existingVersion.versionId)
-        : await matrixService.createVersion(CODE, {
-            effectiveFrom,
-            effectiveTo,
-            note: `HS điều chỉnh NLĐM năm ${year}`,
-            copyCells: false,
-          });
-
+      const rowKeys = rows.map(keyOf);
+      if (isEdit) {
+        const wanted = new Set(rowKeys);
+        for (const r of original.rows) {
+          if (!wanted.has(r.key)) grid = await matrixService.removeRow(CODE, grid.versionId, r.key);
+        }
+      }
       const existingRowKeys = new Set(grid.rows.map((r) => r.key));
-      const newRowKeys = rows.map(keyOf).filter((k) => !existingRowKeys.has(k));
+      const newRowKeys = rowKeys.filter((k) => !existingRowKeys.has(k));
       if (newRowKeys.length > 0) {
         grid = await matrixService.addRows(CODE, grid.versionId, [...new Set(newRowKeys)].map((k) => ({ key: k, label: k })));
       }
 
-      // Cột mang cả tháng lẫn nhóm khu vực (QĐ-12); lượt này chỉ tạo 12 cột
-      // của nhóm đang chọn + cột hệ số năm của nhóm đó.
-      const monthColKeys = Array.from({ length: MONTH_COUNT }, (_, i) => monthColumnKeyOf(i + 1, areaGroup));
-      const yearlyColKey = yearlyColumnKeyOf(areaGroup);
+      // Cột mang cả tháng lẫn nhóm khu vực (QĐ-12): tạo 12 cột tháng + cột hệ số năm của mỗi nhóm có dữ liệu (hoặc đã có sẵn trong lưới).
       const existingColKeys = new Set(grid.cols.map((c) => c.key));
-      const newColKeys = [...monthColKeys, yearlyColKey].filter((k) => !existingColKeys.has(k));
-      if (newColKeys.length > 0) {
-        const labels: Record<string, string> = { [yearlyColKey]: `${YEARLY_COL_LABEL} — ${areaGroup}` };
-        monthColKeys.forEach((k, i) => (labels[k] = `Tháng ${i + 1} — ${areaGroup}`));
-        grid = await matrixService.addCols(CODE, grid.versionId, newColKeys.map((k) => ({ key: k, label: labels[k] ?? k })));
-      }
+      const activeAreas = AREA_GROUPS.map((a) => a.value).filter((a) => rows.some((r) => hasValueIn(r, a)) || existingColKeys.has(yearlyColumnKeyOf(a)));
+      const newCols: { key: string; label: string }[] = [];
+      activeAreas.forEach((a) => {
+        Array.from({ length: MONTH_COUNT }, (_, i) => i + 1).forEach((m) => {
+          const k = monthColumnKeyOf(m, a);
+          if (!existingColKeys.has(k)) newCols.push({ key: k, label: `Tháng ${m} — ${a}` });
+        });
+        const yk = yearlyColumnKeyOf(a);
+        if (!existingColKeys.has(yk)) newCols.push({ key: yk, label: `${YEARLY_COL_LABEL} — ${a}` });
+      });
+      if (newCols.length > 0) grid = await matrixService.addCols(CODE, grid.versionId, newCols);
 
       const cellPayload: MatrixCellUpsert[] = [];
       for (const r of rows) {
         const rowKey = keyOf(r);
-        r.months.forEach((m, i) => {
-          const raw = m.trim();
-          if (!raw) return;
-          const num = Number(raw.replace(",", "."));
-          if (Number.isNaN(num)) return;
-          cellPayload.push({ rowKey, colKey: monthColKeys[i], value: num });
-        });
-        const avg = averageOf(r.months);
-        if (avg !== null) {
-          cellPayload.push({ rowKey, colKey: yearlyColKey, value: Math.round(avg * 1e6) / 1e6 });
+        for (const a of activeAreas) {
+          r.months[a].forEach((m, i) => {
+            const colKey = monthColumnKeyOf(i + 1, a);
+            const raw = m.trim();
+            const num = raw ? Number(raw.replace(",", ".")) : NaN;
+            if (raw && !Number.isNaN(num)) cellPayload.push({ rowKey, colKey, value: num });
+            else if (isEdit && original.cells?.[rowKey]?.[colKey] != null) cellPayload.push({ rowKey, colKey, value: null });
+          });
+          const yk = yearlyColumnKeyOf(a);
+          const avg = averageOf(r.months[a]);
+          if (avg !== null) cellPayload.push({ rowKey, colKey: yk, value: Math.round(avg * 1e6) / 1e6 });
+          else if (isEdit && original.cells?.[rowKey]?.[yk] != null) cellPayload.push({ rowKey, colKey: yk, value: null });
         }
       }
       if (cellPayload.length > 0) {
@@ -218,170 +321,223 @@ export function FuelAdjustAddModal({
     }
   };
 
+  const title = isEdit ? "Sửa HS điều chỉnh NLDM" : mode === "copyYear" ? "Sao chép HS điều chỉnh NLDM" : "Thêm mới HS điều chỉnh NLDM";
+  const subtitle = isEdit
+    ? "Sửa hệ số từng tháng của các dòng đã có (không thêm/bớt dòng). Hệ số năm tự động cập nhật (trung bình 12 tháng)."
+    : mode === "copyYear"
+      ? "Chọn năm đích, chỉnh lại nếu cần rồi lưu — bảng sẽ được tạo mới cho năm đó."
+      : "Chọn năm và nhóm khu vực, sau đó nhập hệ số cho từng tháng. Hệ số năm được hệ thống tự động cập nhật (trung bình 12 tháng).";
+
+  const vehicleOptions = (current: string) =>
+    current && !vehicles.some((v) => v.code === current) ? [{ id: -1, code: current, name: "" }, ...vehicles] : vehicles;
+  // khoá dòng chỉ giữ CHỮ ĐẦU của hạng nên dòng đã lưu có thể mang "C" trong khi danh mục hạng là "C1" — vẫn hiện được giá trị đang có
+  const rankOptions = (current: string) =>
+    current && !ranks.some((rk) => rk.code === current) ? [{ id: -1, code: current }, ...ranks] : ranks;
+
+  const WIDTHS = { stt: 96, vehicle: 170, rank: 110, cls: 130, month: 84, yearly: 120, action: 43 };
+  const tableWidth = WIDTHS.stt + WIDTHS.vehicle + WIDTHS.rank + WIDTHS.cls + WIDTHS.month * MONTH_COUNT + WIDTHS.yearly + WIDTHS.action;
+
   return (
-    <div className={`fixed inset-0 z-[100] flex items-center justify-center bg-black/40 ${isFullscreen ? "" : "p-4"}`}>
+    <>
+    <div
+      className="tkc-modal-overlay"
+      style={isFullscreen ? { padding: 0 } : undefined}
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
       <div
-        className={
-          isFullscreen
-            ? "flex h-screen w-screen flex-col overflow-hidden bg-white dark:bg-gray-900"
-            : "flex max-h-[90vh] w-full max-w-[1400px] flex-col overflow-hidden rounded-xl bg-white shadow-xl dark:bg-gray-900"
-        }
+        className="modal"
+        style={isFullscreen ? { width: "100%", height: "100%", maxHeight: "100%", borderRadius: 0 } : { width: "min(1560px, 100%)" }}
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
       >
-        <div className="flex items-start justify-between border-b border-gray-200 px-6 py-4 dark:border-gray-800">
+        <div className="modal-header">
           <div>
-            <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">Thêm mới HS điều chỉnh NLDM</h2>
-            <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-              Chọn năm và khu vực xúc, sau đó nhập hệ số cho từng tháng. Hệ số năm được hệ thống tự động cập nhật
-              (trung bình 12 tháng).
-            </p>
+            <h2>{title}</h2>
+            <p>{subtitle}</p>
           </div>
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => setIsFullscreen((v) => !v)}
-              title={isFullscreen ? "Thu nhỏ" : "Toàn màn hình"}
-              className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800"
-            >
-              {isFullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
-            </button>
-            <button onClick={onClose} className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800">
-              <X className="h-5 w-5" />
-            </button>
-          </div>
+          <button
+            className="close-modal"
+            style={{ marginLeft: "auto", marginRight: 6 }}
+            aria-label={isFullscreen ? "Thu nhỏ cửa sổ" : "Phóng to cửa sổ"}
+            title={isFullscreen ? "Thu nhỏ cửa sổ" : "Phóng to cửa sổ"}
+            onClick={() => setIsFullscreen((v) => !v)}
+          >
+            <DIcon name={isFullscreen ? "minimize" : "maximize"} />
+          </button>
+          <button className="close-modal" aria-label="Đóng" onClick={onClose}>
+            <DIcon name="x" />
+          </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-6 py-4">
-          <div className="mb-4 flex flex-wrap items-end gap-4">
-            <div className="flex flex-col gap-1">
-              <span className="text-xs font-medium text-gray-600 dark:text-gray-400">Năm *</span>
-              <Select value={String(year)} onValueChange={(v) => setYear(Number(v))}>
-                <SelectTrigger className="h-9 w-32 text-sm">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="z-[120]">
-                  {YEAR_OPTIONS.map((y) => (
-                    <SelectItem key={y} value={String(y)}>
+        <div className="modal-body">
+          <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-end", gap: 14, marginBottom: 18 }}>
+            {isEdit && sourceVersions && sourceVersions.length > 1 ? (
+              <div className="form-group" style={{ width: 260 }}>
+                <label>Phiên bản (trong năm) *</label>
+                <select className="field" value={String(versionId ?? "")} onChange={(e) => switchVersion(Number(e.target.value))}>
+                  {sourceVersions.map((v, i) => (
+                    <option key={v.versionId} value={String(v.versionId)}>
+                      {versionLabelOf(v, i)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : (
+              <div className="form-group" style={{ width: 140 }}>
+                <label>Năm *</label>
+                <select className="field" value={String(year)} disabled={isEdit} onChange={(e) => setYear(Number(e.target.value))}>
+                  {(YEAR_OPTIONS.includes(year) ? YEAR_OPTIONS : [year, ...YEAR_OPTIONS]).map((y) => (
+                    <option key={y} value={String(y)}>
                       {y}
-                    </SelectItem>
+                    </option>
                   ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex flex-col gap-1">
-              <span className="text-xs font-medium text-gray-600 dark:text-gray-400">Nhóm khu vực *</span>
-              <Select value={areaGroup} onValueChange={(v) => setAreaGroup(v as AreaGroup)}>
-                <SelectTrigger className="h-9 w-40 text-sm">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="z-[120]">
-                  {AREA_GROUPS.map((a) => (
-                    <SelectItem key={a.value} value={a.value}>
-                      {a.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                </select>
+              </div>
+            )}
+            <div className="form-group" style={{ width: 200 }}>
+              <label>Nhóm khu vực *</label>
+              <select className="field" value={areaGroup} onChange={(e) => setAreaGroup(e.target.value as AreaGroup)}>
+                {AREA_GROUPS.map((a) => (
+                  <option key={a.value} value={a.value}>
+                    {a.label}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 
-          <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
-            <table className="w-full min-w-[1200px] border-collapse text-sm">
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+            {!isEdit && (
+              <button className="btn add-row-btn" style={{ margin: 0 }} onClick={addRow}>
+                <DIcon name="plus" /> Thêm dòng
+              </button>
+            )}
+            {mode === "create" && (
+              <button className="btn" type="button" style={{ margin: 0 }} onClick={() => setQuickOpen(true)} title="Chụp ảnh bảng / chọn file Excel — tự tách xe, hạng, phân loại và 12 tháng">
+                <DIcon name="upload" /> Nhập liệu thông minh (Ảnh/Excel)
+              </button>
+            )}
+          </div>
+
+          <div className="modal-table-scroll entry-clean-wrap" style={{ overflow: "auto", maxHeight: "calc(100vh - 340px)" }}>
+            <table className="entry-table entry-clean" style={{ tableLayout: "fixed", width: tableWidth, minWidth: 0 }}>
+              <colgroup>
+                <col style={{ width: WIDTHS.stt }} />
+                <col style={{ width: WIDTHS.vehicle }} />
+                <col style={{ width: WIDTHS.rank }} />
+                <col style={{ width: WIDTHS.cls }} />
+                {Array.from({ length: MONTH_COUNT }, (_, i) => (
+                  <col key={i} style={{ width: WIDTHS.month }} />
+                ))}
+                <col style={{ width: WIDTHS.yearly }} />
+                <col style={{ width: WIDTHS.action }} />
+              </colgroup>
               <thead>
                 <tr>
-                  <th rowSpan={2} className="w-14 border-b border-r border-gray-200 bg-gray-100 px-2 py-2 text-center font-bold dark:border-gray-700 dark:bg-gray-900">
+                  <th rowSpan={2} className="fa-group">
                     STT
                   </th>
-                  <th colSpan={3} className="border-b border-r border-gray-200 bg-gray-100 px-3 py-2 text-center font-bold dark:border-gray-700 dark:bg-gray-900">
+                  <th colSpan={3} className="fa-group">
                     Chủng loại xe (NL) + Hạng xe + Phân loại
                   </th>
-                  <th colSpan={MONTH_COUNT} className="border-b border-r border-gray-200 bg-gray-100 px-3 py-2 text-center font-bold dark:border-gray-700 dark:bg-gray-900">
-                    Hệ số theo tháng
+                  <th colSpan={MONTH_COUNT} className="fa-group">
+                    Hệ số theo tháng — {areaGroup}
                   </th>
-                  <th rowSpan={2} className="min-w-[110px] border-b border-r border-gray-200 bg-gray-100 px-2 py-2 text-center font-bold dark:border-gray-700 dark:bg-gray-900">
+                  <th rowSpan={2} className="fa-group">
                     {YEARLY_COL_LABEL}
                   </th>
-                  <th rowSpan={2} className="w-10 border-b border-gray-200 bg-gray-100 dark:border-gray-700 dark:bg-gray-900" />
+                  <th rowSpan={2} />
                 </tr>
                 <tr>
-                  <th className="min-w-[150px] border-b border-r border-gray-200 bg-gray-50 px-2 py-1.5 dark:border-gray-700 dark:bg-gray-900/60">Chủng loại xe</th>
-                  <th className="min-w-[110px] border-b border-r border-gray-200 bg-gray-50 px-2 py-1.5 dark:border-gray-700 dark:bg-gray-900/60">Hạng xe</th>
-                  <th className="min-w-[130px] border-b border-r border-gray-200 bg-gray-50 px-2 py-1.5 dark:border-gray-700 dark:bg-gray-900/60">Phân loại</th>
+                  <th className="fa-sub">Chủng loại xe</th>
+                  <th className="fa-sub">Hạng xe</th>
+                  <th className="fa-sub">Phân loại</th>
                   {Array.from({ length: MONTH_COUNT }, (_, i) => i + 1).map((m) => (
-                    <th key={m} className="min-w-[80px] border-b border-r border-gray-200 bg-gray-50 px-1 py-1.5 text-center text-xs dark:border-gray-700 dark:bg-gray-900/60">
-                      {`Tháng ${m}`}
-                    </th>
+                    <th key={m} className="fa-sub fa-center">{`Tháng ${m}`}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {rows.map((r, ri) => {
-                  const avg = averageOf(r.months);
+                  const avg = averageOf(r.months[areaGroup]);
                   return (
-                    <tr key={r.id} className={ri % 2 === 0 ? "bg-white dark:bg-gray-950" : "bg-gray-50/50 dark:bg-gray-900/40"}>
-                      <td className="border-b border-r border-gray-200 px-2 py-1.5 text-center text-gray-500 dark:border-gray-700">{ri + 1}</td>
-                      <td className="border-b border-r border-gray-200 px-1.5 py-1.5 dark:border-gray-700">
-                        <Select value={r.vehicleCode} onValueChange={(v) => setRowField(r.id, "vehicleCode", v)}>
-                          <SelectTrigger className="h-8 w-full text-xs">
-                            <SelectValue placeholder="Chọn xe" />
-                          </SelectTrigger>
-                          <SelectContent className="z-[120]">
-                            {vehicles.map((v) => (
-                              <SelectItem key={v.id} value={v.code}>
-                                {v.code}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                    <tr key={r.id} {...dnd.rowProps(ri)}>
+                      <td style={{ textAlign: "center", paddingTop: 9 }}>
+                        <div className="entry-stt" style={{ justifyContent: "center" }}>
+                          <span className="dnd-handle" {...dnd.handleProps(ri)} title="Kéo để đổi vị trí" aria-label="Kéo để đổi vị trí">
+                            <DIcon name="grip" />
+                          </span>
+                          <span className="entry-stt-no">{ri + 1}</span>
+                          {!isEdit && (
+                          <span className="time-actions">
+                            <button className="icon-mini" title="Thêm dòng vào bên dưới" aria-label="Thêm dòng vào bên dưới" onClick={() => addRowAfter(r.id)}>
+                              <DIcon name="plus" />
+                            </button>
+                            {rows.length > 1 && (
+                              <button className="icon-mini x" title="Xoá dòng này" aria-label="Xoá dòng này" onClick={() => removeRow(r.id)}>
+                                <DIcon name="x" />
+                              </button>
+                            )}
+                          </span>
+                          )}
+                        </div>
                       </td>
-                      <td className="border-b border-r border-gray-200 px-1.5 py-1.5 dark:border-gray-700">
-                        <Select value={r.rankCode} onValueChange={(v) => setRowField(r.id, "rankCode", v)}>
-                          <SelectTrigger className="h-8 w-full text-xs">
-                            <SelectValue placeholder="C" />
-                          </SelectTrigger>
-                          <SelectContent className="z-[120]">
-                            {ranks.map((rk) => (
-                              <SelectItem key={rk.id} value={rk.code}>
-                                {rk.code}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </td>
-                      <td className="border-b border-r border-gray-200 px-1.5 py-1.5 dark:border-gray-700">
-                        <Select value={r.classification} onValueChange={(v) => setRowField(r.id, "classification", v)}>
-                          <SelectTrigger className="h-8 w-full text-xs">
-                            <SelectValue placeholder="DAT" />
-                          </SelectTrigger>
-                          <SelectContent className="z-[120]">
-                            {/* Hai giá trị tự suy từ SPNT, không phải danh mục (QĐ-10). */}
-                            {FUEL_ADJUST_CLASSIFICATIONS.map((c) => (
-                              <SelectItem key={c.value} value={c.value}>
-                                {c.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </td>
-                      {r.months.map((m, mi) => (
-                        <td key={mi} className="border-b border-r border-gray-200 px-1 py-1.5 dark:border-gray-700">
-                          <Input
+                      {r.rawKey ? (
+                        <td colSpan={3} title="Dòng có khoá ngoài quy ước — giữ nguyên">
+                          <span className="entry-text" style={{ fontWeight: 700 }}>{r.rawKey}</span>
+                        </td>
+                      ) : (
+                        <>
+                          <td>
+                            <select className="field" value={r.vehicleCode} onChange={(e) => setRowField(r.id, "vehicleCode", e.target.value)}>
+                              <option value="">Chọn xe</option>
+                              {vehicleOptions(r.vehicleCode).map((v) => (
+                                <option key={v.id} value={v.code}>
+                                  {v.code}
+                                </option>
+                              ))}
+                            </select>
+                          </td>
+                          <td>
+                            <select className="field" value={r.rankCode} onChange={(e) => setRowField(r.id, "rankCode", e.target.value)}>
+                              <option value="">C</option>
+                              {rankOptions(r.rankCode).map((rk) => (
+                                <option key={rk.id} value={rk.code}>
+                                  {rk.code}
+                                </option>
+                              ))}
+                            </select>
+                          </td>
+                          <td>
+                            <select className="field" value={r.classification} onChange={(e) => setRowField(r.id, "classification", e.target.value)}>
+                              <option value="">DAT</option>
+                              {/* Hai giá trị tự suy từ SPNT, không phải danh mục (QĐ-10). */}
+                              {FUEL_ADJUST_CLASSIFICATIONS.map((c) => (
+                                <option key={c.value} value={c.value}>
+                                  {c.label}
+                                </option>
+                              ))}
+                            </select>
+                          </td>
+                        </>
+                      )}
+                      {r.months[areaGroup].map((m, mi) => (
+                        <td key={mi}>
+                          <input
+                            className="field"
+                            style={{ textAlign: "center" }}
                             type="number"
                             step="any"
                             value={m}
                             onChange={(e) => setMonthValue(r.id, mi, e.target.value)}
-                            className="h-8 w-20 text-center text-xs"
                           />
                         </td>
                       ))}
-                      <td className="border-b border-r border-gray-200 px-2 py-1.5 text-center font-semibold text-blue-700 dark:border-gray-700 dark:text-blue-400">
-                        {avg !== null ? avg.toFixed(2) : ""}
-                      </td>
-                      <td className="border-b border-gray-200 px-1 py-1.5 text-center dark:border-gray-700">
-                        {rows.length > 1 && (
-                          <button title="Xoá dòng này" onClick={() => removeRow(r.id)} className="text-red-500 hover:text-red-700">
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        )}
-                      </td>
+                      <td className="fa-avg">{avg !== null ? avg.toFixed(2) : ""}</td>
+                      <td />
                     </tr>
                   );
                 })}
@@ -389,24 +545,29 @@ export function FuelAdjustAddModal({
             </table>
           </div>
 
-          <button onClick={addRow} className="mt-3 rounded-md border border-dashed px-3 py-1.5 text-xs text-blue-700">
-            + Thêm dòng mới
-          </button>
-
-          {error && (
-            <p className="mt-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-300">{error}</p>
-          )}
+          {error && <div className="form-error">{error}</div>}
         </div>
 
-        <div className="flex justify-end gap-3 border-t border-gray-200 px-6 py-4 dark:border-gray-800">
-          <Button variant="outline" onClick={onClose} disabled={submitting}>
+        <div className="modal-footer">
+          <button className="btn" onClick={onClose} disabled={submitting}>
             Huỷ
-          </Button>
-          <Button onClick={handleSubmit} disabled={submitting} className="bg-blue-600 font-semibold text-white hover:bg-blue-700">
-            {submitting ? "Đang lưu..." : "Xác nhận"}
-          </Button>
+          </button>
+          <button className="btn btn-primary" onClick={handleSubmit} disabled={submitting}>
+            {submitting ? "Đang lưu..." : isEdit ? "Lưu thay đổi" : "Xác nhận"}
+          </button>
         </div>
       </div>
     </div>
+    {quickOpen && (
+      <CatalogQuickImportDialog
+        fields={quickFields}
+        options={quickOptions}
+        nounPhrase="hệ số điều chỉnh NLĐM"
+        ignoreExtra
+        onAdd={addQuickRows}
+        onClose={() => setQuickOpen(false)}
+      />
+    )}
+    </>
   );
 }

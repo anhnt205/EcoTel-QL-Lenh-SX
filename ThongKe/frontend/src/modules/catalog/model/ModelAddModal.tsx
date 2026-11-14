@@ -1,15 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Maximize, Minimize, Plus, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { MonthRangePicker, splitByMonth } from "../design/MonthInput";
+import DIcon from "../design/DIcon";
+import { ColResizer, TableLayoutButton, useTableLayout } from "../design/tableLayout";
+import ViewGrid, { ColumnsMenuButton, type ViewColumn } from "../design/ViewGrid";
+import { MatrixQuickImportDialog, type MxResult } from "../design/MatrixQuickImportDialog";
+import { moveItem, useRowDnD } from "../design/useRowDnD";
+import "@/styles/catalog-design.css";
 import {
   Combobox,
   ComboboxChip,
@@ -24,7 +21,7 @@ import {
 } from "@/components/ui/combobox";
 import api from "@/config/api.config";
 import { createCatalogService } from "../catalogService";
-import { vehicleSuffixKeyOf } from "./modelKeys";
+import { parseVehicleSuffixKey, vehicleSuffixKeyOf } from "./modelKeys";
 import type { ModelPeriodResponse } from "./types";
 
 const BASE_PATH = "/model-periods";
@@ -67,17 +64,17 @@ interface Row {
   periods: SubPeriod[];
 }
 
-const today = new Date();
-const defaultFrom = () => `${today.getFullYear()}-01-01`;
-const defaultTo = () => `${today.getFullYear()}-12-31`;
+const currentYear = new Date().getFullYear();
+const YEAR_OPTIONS = Array.from({ length: 7 }, (_, i) => currentYear - 3 + i);
 
 const parseISO = (s: string) => new Date(`${s}T00:00:00Z`);
 const toISO = (d: Date) => d.toISOString().slice(0, 10);
 const ONE_DAY_MS = 86_400_000;
 
+/** Chỉ dùng để HIỂN THỊ cột "Thời gian" ở chế độ xem — dạng tháng/năm (MM/yyyy); ô nhập vẫn chọn đến ngày. */
 const formatVN = (s: string) => {
-  const [y, m, d] = s.split("-");
-  return `${d}/${m}/${y}`;
+  const [y, m] = s.split("-");
+  return `${m}/${y}`;
 };
 
 /** Hai khoảng chồng lấn khi khoảng sau bắt đầu trước khi khoảng trước kết thúc. */
@@ -89,7 +86,33 @@ const hasOverlap = (periods: SubPeriod[]) => {
   return false;
 };
 
-type Mode = "create" | "view" | "edit";
+
+/** Sửa một ô ngày thì tự nối tiếp khoảng liền kề trong cùng mã hàng: đổi "Đến" → "Từ" của khoảng SAU = Đến + 1 ngày; đổi "Từ" → "Đến" của khoảng TRƯỚC = Từ − 1 ngày. */
+const chainPeriods = <P extends { id: number; effectiveFrom: string; effectiveTo: string }>(
+  periods: P[],
+  periodId: number,
+  key: "effectiveFrom" | "effectiveTo",
+  value: string,
+): P[] => {
+  const idx = periods.findIndex((p) => p.id === periodId);
+  if (idx === -1) return periods;
+  const out = periods.map((p) => (p.id === periodId ? { ...p, [key]: value } : p));
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return out;
+  const shifted = (days: number) => toISO(new Date(parseISO(value).getTime() + days * ONE_DAY_MS));
+  if (key === "effectiveTo" && idx + 1 < out.length) out[idx + 1] = { ...out[idx + 1], effectiveFrom: shifted(1) };
+  if (key === "effectiveFrom" && idx > 0) out[idx - 1] = { ...out[idx - 1], effectiveTo: shifted(-1) };
+  return out;
+};
+
+type Mode = "create" | "view" | "edit" | "editYear" | "copyYear";
+
+/** Dời một ngày yyyy-MM-dd sang năm khác (29/02 sang năm không nhuận → 28/02). */
+const shiftToYear = (iso: string, y: number) => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return iso;
+  const mmdd = iso.slice(5);
+  const d = mmdd === "02-29" && new Date(y, 1, 29).getMonth() !== 1 ? "02-28" : mmdd;
+  return `${y}-${d}`;
+};
 
 /**
  * Modal "Thêm mới mô hình" — thiết kế riêng, phỏng theo đúng
@@ -112,6 +135,7 @@ export function ModelAddModal({
   open,
   mode = "create",
   record,
+  yearRecords,
   onClose,
   onSaved,
 }: {
@@ -120,28 +144,40 @@ export function ModelAddModal({
   mode?: Mode;
   /** Bản ghi hiện có — bắt buộc khi `mode` là "view"/"edit", bỏ trống khi "create". */
   record?: ModelPeriodResponse;
+  /** Mọi bản ghi của một NĂM — bắt buộc khi `mode` là "editYear" (sửa cả năm) hoặc "copyYear" (sao chép năm). */
+  yearRecords?: ModelPeriodResponse[];
   onClose: () => void;
   onSaved: () => void;
 }) {
   const service = useMemo(() => createCatalogService<ModelPeriodPayload>(BASE_PATH), []);
   const isReadOnly = mode === "view";
+  const yearMode = mode === "editYear" || mode === "copyYear";
+  /** Chỉnh sửa = sửa dữ liệu ĐÃ CÓ: không thêm/bớt mã hàng, chủng loại xe, khoảng thời gian */
+  const lockStructure = mode === "edit" || mode === "editYear";
 
+  const [year, setYear] = useState(currentYear);
+  const [cargoCodes, setCargoCodes] = useState<string[]>([]);
   const [vehicleCodes, setVehicleCodes] = useState<string[]>([]);
   const [rows, setRows] = useState<Row[]>([]);
   const [cargoTypes, setCargoTypes] = useState<CargoTypeOption[]>([]);
   const [vehicles, setVehicles] = useState<VehicleFuelClassOption[]>([]);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [quickOpen, setQuickOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const vehicleAnchorRef = useComboboxAnchor();
+  const cargoAnchorRef = useComboboxAnchor();
+  // năm hiện chọn — giữ trong ref để effect đồng bộ dòng dùng cho dòng MỚI mà không ghi đè ngày của dòng cũ
+  const yearRef = useRef(year);
+  yearRef.current = year;
   const idRef = useRef(0);
   const nextId = () => ++idRef.current;
 
-  const defaultPeriod = (): SubPeriod => ({
+  const defaultPeriod = (y: number = yearRef.current): SubPeriod => ({
     id: nextId(),
-    effectiveFrom: defaultFrom(),
-    effectiveTo: defaultTo(),
+    effectiveFrom: `${y}-01-01`,
+    effectiveTo: `${y}-12-31`,
     values: {},
     note: "",
   });
@@ -159,6 +195,8 @@ export function ModelAddModal({
         if (idx > 0) codes.add(key.slice(0, idx));
       });
       setVehicleCodes([...codes]);
+      setYear(Number(record.effectiveFrom.slice(0, 4)));
+      setCargoCodes([record.cargoTypeCode]);
       setRows([
         {
           id: nextId(),
@@ -174,12 +212,47 @@ export function ModelAddModal({
           ],
         },
       ]);
+    } else if (yearMode && yearRecords?.length) {
+      // SỬA/SAO CHÉP CẢ NĂM: nạp MỌI bản ghi của năm — mỗi mã hàng một dòng với các khoảng thời gian theo ngày; cột xe suy từ các khoá có giá trị.
+      const srcYear = Number(yearRecords[0].effectiveFrom.slice(0, 4));
+      const targetYear = mode === "copyYear" ? srcYear + 1 : srcYear;
+      setYear(targetYear);
+      const vcodes = new Set<string>();
+      yearRecords.forEach((r) =>
+        Object.keys(r.values).forEach((key) => {
+          const idx = key.lastIndexOf(".");
+          if (idx > 0) vcodes.add(key.slice(0, idx));
+        }),
+      );
+      setVehicleCodes([...vcodes]);
+      const byCode = new Map<string, Row>();
+      [...yearRecords]
+        .sort((a, b) => a.cargoTypeCode.localeCompare(b.cargoTypeCode, "vi", { numeric: true }) || a.effectiveFrom.localeCompare(b.effectiveFrom))
+        .forEach((r) => {
+          let row = byCode.get(r.cargoTypeCode);
+          if (!row) {
+            row = { id: nextId(), cargoTypeCode: r.cargoTypeCode, periods: [] };
+            byCode.set(r.cargoTypeCode, row);
+          }
+          row.periods.push({
+            id: nextId(),
+            effectiveFrom: mode === "copyYear" ? shiftToYear(r.effectiveFrom, targetYear) : r.effectiveFrom,
+            effectiveTo: mode === "copyYear" ? shiftToYear(r.effectiveTo, targetYear) : r.effectiveTo,
+            values: Object.fromEntries(Object.entries(r.values).map(([k, v]) => [k, String(v)])),
+            note: r.note ?? "",
+          });
+        });
+      const seeded = [...byCode.values()];
+      setRows(seeded);
+      setCargoCodes(seeded.map((r) => r.cargoTypeCode));
     } else {
       setVehicleCodes([]);
-      setRows([{ id: nextId(), cargoTypeCode: "", periods: [defaultPeriod()] }]);
+      setYear(currentYear);
+      setCargoCodes([]);
+      setRows([]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, record]);
+  }, [open, record, yearRecords, mode]);
 
   useEffect(() => {
     if (!open) return;
@@ -201,6 +274,51 @@ export function ModelAddModal({
     })();
   }, [open]);
 
+  // Đồng bộ dòng theo ô "Mã chủng loại hàng": chọn mã nào là có dòng của mã đó (theo ĐÚNG thứ tự chọn), giữ nguyên dữ liệu đã nhập
+  // của dòng còn được chọn, bỏ dòng của mã bị bỏ chọn; dòng mới = cả năm đang chọn, chưa có tỷ lệ.
+  useEffect(() => {
+    setRows((prev) => {
+      const byCode = new Map(prev.map((r) => [r.cargoTypeCode, r]));
+      return cargoCodes.map((code) => byCode.get(code) ?? { id: nextId(), cargoTypeCode: code, periods: [defaultPeriod(yearRef.current)] });
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cargoCodes]);
+
+  // Cột của bảng nhập (không kể STT/nút xoá) cho "Hiển thị bảng": kéo độ rộng, độ cao hàng như bảng Chủng loại hàng
+  const modelCols = useMemo(
+    () => [
+      { key: "time", label: "Thời gian" },
+      { key: "code", label: "Mã chủng loại hàng" },
+      { key: "name", label: "Chủng loại hàng" },
+      ...vehicleCodes
+        .flatMap((code) => [vehicleSuffixKeyOf(code, "CS"), vehicleSuffixKeyOf(code, "KC")])
+        .map((k) => ({ key: k, label: k })),
+      { key: "note", label: "Ghi chú" },
+    ],
+    [vehicleCodes],
+  );
+  // Chế độ XEM: danh sách phẳng (mỗi khoảng thời gian một dòng) cho bảng gọn có lọc cột / ẩn hiện cột
+  const viewCols: ViewColumn[] = useMemo(
+    () => modelCols.map((c, i) => (i < 3 || c.key === "note" ? { ...c, strong: c.key === "code" } : { ...c, align: "right" as const })),
+    [modelCols],
+  );
+  const viewRows = useMemo(() => {
+    const byCode = new Map(cargoTypes.map((c) => [c.code, c]));
+    return rows.flatMap((r) => r.periods.map((p) => ({ r, p, name: byCode.get(r.cargoTypeCode)?.name ?? "" })));
+  }, [rows, cargoTypes]);
+  // "vừa nội dung": chỉ đo cột tên (tĩnh); cột chọn mã/ngày/ô số dùng bề rộng tối thiểu để không nhảy khi gõ
+  // Kéo thả đổi vị trí DÒNG mã hàng (hàm di chuyển gán sau early return qua ref)
+  const moveRef = useRef<(from: number, to: number) => void>(() => {});
+  const dnd = useRowDnD((f, t) => moveRef.current(f, t));
+  const layout = useTableLayout(
+    "popup:model-add",
+    modelCols,
+    viewRows,
+    (x, k) => (k === "name" ? x.name : ""),
+    (k) => ({ time: 370, code: 120, name: 100, note: 170 } as Record<string, number>)[k] ?? 100,
+    48,
+  );
+
   if (!open) return null;
 
   const cargoByCode = new Map(cargoTypes.map((c) => [c.code, c]));
@@ -209,20 +327,70 @@ export function ModelAddModal({
     vehicleSuffixKeyOf(code, "KC"),
   ]);
 
-  const addRow = () =>
-    setRows((prev) => [...prev, { id: nextId(), cargoTypeCode: "", periods: [defaultPeriod()] }]);
+  /**
+   * Nhập nhanh (ảnh/Excel): thêm mã hàng + chủng loại xe thấy trong bảng nguồn vào các ô chọn, rồi điền giá trị vào khoảng thời gian ĐẦU TIÊN
+   * của mỗi mã hàng (mã đã có thì ghi đè đúng các ô có trong nguồn, ô khác giữ nguyên).
+   */
+  const applyQuick = (res: MxResult) => {
+    const vcodes = [...new Set(res.cols.flatMap((k) => parseVehicleSuffixKey(k)?.vehicleCode ?? []))];
+    const byRow = new Map<string, Record<string, string>>();
+    res.cells.forEach((c) => byRow.set(c.row, { ...(byRow.get(c.row) ?? {}), [c.col]: c.value }));
+    setRows((prev) => {
+      const have = new Set(prev.map((r) => r.cargoTypeCode));
+      const added: Row[] = res.rows
+        .filter((c, i) => !have.has(c) && res.rows.indexOf(c) === i)
+        .map((code) => ({ id: nextId(), cargoTypeCode: code, periods: [defaultPeriod(yearRef.current)] }));
+      return [...prev, ...added].map((r) => {
+        const vals = byRow.get(r.cargoTypeCode);
+        return !vals ? r : { ...r, periods: r.periods.map((p, i) => (i === 0 ? { ...p, values: { ...p.values, ...vals } } : p)) };
+      });
+    });
+    setCargoCodes((prev) => [...prev, ...res.rows.filter((c, i) => !prev.includes(c) && res.rows.indexOf(c) === i)]);
+    setVehicleCodes((prev) => [...prev, ...vcodes.filter((c) => !prev.includes(c))]);
+    toast.success(`Đã thêm ${res.rows.length} dòng (${res.cells.length} ô) từ bảng nguồn.`);
+  };
 
-  const removeRow = (rowId: number) => setRows((prev) => prev.filter((r) => r.id !== rowId));
+  /** Đổi Năm: khi SAO CHÉP thì dời toàn bộ ngày của bảng sang năm mới. */
+  const changeYear = (y: number) => {
+    setYear(y);
+    if (mode === "copyYear") {
+      setRows((prev) =>
+        prev.map((r) => ({
+          ...r,
+          periods: r.periods.map((p) => ({ ...p, effectiveFrom: shiftToYear(p.effectiveFrom, y), effectiveTo: shiftToYear(p.effectiveTo, y) })),
+        })),
+      );
+    }
+  };
 
-  const setRowCargoType = (rowId: number, code: string) =>
-    setRows((prev) => prev.map((r) => (r.id !== rowId ? r : { ...r, cargoTypeCode: code })));
+  /** Kéo thả: đưa dòng `from` tới vị trí `to`; thứ tự ô "Mã chủng loại hàng" đổi theo để effect đồng bộ không xếp lại. */
+  const moveRow = (from: number, to: number) => {
+    const next = moveItem(rows, from, to);
+    if (next === rows) return;
+    setRows(next);
+    setCargoCodes(next.map((r) => r.cargoTypeCode));
+  };
+  moveRef.current = moveRow;
+
+  /** Xóa cả dòng = bỏ luôn mã đó khỏi ô "Mã chủng loại hàng". */
+  const removeRow = (rowId: number) => {
+    const target = rows.find((r) => r.id === rowId);
+    setRows((prev) => prev.filter((r) => r.id !== rowId));
+    if (target) setCargoCodes((prev) => prev.filter((c) => c !== target.cargoTypeCode));
+  };
 
   const setPeriodField = (rowId: number, periodId: number, key: "effectiveFrom" | "effectiveTo" | "note", value: string) =>
     setRows((prev) =>
       prev.map((r) =>
         r.id !== rowId
           ? r
-          : { ...r, periods: r.periods.map((p) => (p.id !== periodId ? p : { ...p, [key]: value })) },
+          : {
+              ...r,
+              periods:
+                key === "effectiveFrom" || key === "effectiveTo"
+                  ? chainPeriods(r.periods, periodId, key, value)
+                  : r.periods.map((p) => (p.id !== periodId ? p : { ...p, [key]: value })),
+            },
       ),
     );
 
@@ -248,16 +416,12 @@ export function ModelAddModal({
         const idx = r.periods.findIndex((p) => p.id === periodId);
         if (idx === -1) return r;
         const target = r.periods[idx];
-        const fromMs = parseISO(target.effectiveFrom).getTime();
-        const toMs = parseISO(target.effectiveTo).getTime();
-        const totalDays = Math.round((toMs - fromMs) / ONE_DAY_MS);
-        if (!(totalDays > 0)) {
-          toast.error("Khoảng thời gian này chỉ có 1 ngày, không tách được.");
+        const cut = splitByMonth(target.effectiveFrom, target.effectiveTo);
+        if (!cut) {
+          toast.error("Khoảng thời gian này chỉ có 1 tháng, không tách được.");
           return r;
         }
-        const midMs = fromMs + Math.floor(totalDays / 2) * ONE_DAY_MS;
-        const firstTo = toISO(new Date(midMs));
-        const secondFrom = toISO(new Date(midMs + ONE_DAY_MS));
+        const { firstTo, secondFrom } = cut;
         const periods = [...r.periods];
         periods.splice(
           idx,
@@ -277,10 +441,9 @@ export function ModelAddModal({
     );
 
   const validate = (): string | null => {
-    if (rows.length === 0) return "Thêm ít nhất một dòng.";
+    if (rows.length === 0) return "Chọn ít nhất một mã chủng loại hàng.";
     if (vehicleCodes.length === 0) return "Chọn ít nhất một chủng loại xe.";
     for (const r of rows) {
-      if (!r.cargoTypeCode) return "Có dòng chưa chọn Mã chủng loại.";
       const label = cargoByCode.get(r.cargoTypeCode)?.name ?? r.cargoTypeCode;
       for (let i = 0; i < r.periods.length; i++) {
         const p = r.periods[i];
@@ -303,6 +466,16 @@ export function ModelAddModal({
     setError(null);
     setSubmitting(true);
     try {
+      // Sao chép = tạo bản MỚI: năm đích không được trùng năm đã có dữ liệu
+      if (mode === "copyYear") {
+        const all = await api.get(BASE_PATH, { params: { size: 1000 } });
+        const existing = (all.data?.data?.content ?? all.data?.data ?? []) as { effectiveFrom: string }[];
+        if (existing.some((r) => r.effectiveFrom.startsWith(`${year}-`))) {
+          setError(`Năm ${year} đã có dữ liệu mô hình — chọn năm khác để sao chép (hoặc dùng Sửa).`);
+          setSubmitting(false);
+          return;
+        }
+      }
       const payloads: ModelPeriodPayload[] = rows.flatMap((r) => {
         const cargoTypeId = cargoByCode.get(r.cargoTypeCode)!.id;
         return r.periods.map((p) => ({
@@ -317,10 +490,11 @@ export function ModelAddModal({
           ),
         }));
       });
-      if (mode === "edit" && record) {
-        const res = await api.put(`${BASE_PATH}/batch`, { deleteIds: [record.id], creates: payloads });
+      if ((mode === "edit" && record) || (mode === "editYear" && yearRecords?.length)) {
+        const deleteIds = mode === "editYear" ? (yearRecords ?? []).map((r) => r.id) : [record!.id];
+        const res = await api.put(`${BASE_PATH}/batch`, { deleteIds, creates: payloads });
         const saved = (res.data?.data ?? []) as unknown[];
-        toast.success(`Đã cập nhật — ${saved.length} bản ghi.`);
+        toast.success(mode === "editYear" ? `Đã cập nhật năm ${year} — ${saved.length} bản ghi.` : `Đã cập nhật — ${saved.length} bản ghi.`);
       } else {
         await service.bulkCreate(payloads);
         toast.success(`Đã thêm ${payloads.length} bản ghi.`);
@@ -337,69 +511,140 @@ export function ModelAddModal({
 
   const totalPeriods = rows.reduce((n, r) => n + r.periods.length, 0);
 
-  const title = mode === "view" ? "Chi tiết mô hình" : mode === "edit" ? "Sửa mô hình" : "Thêm mới mô hình";
+  const title =
+    mode === "view"
+      ? "Chi tiết mô hình"
+      : mode === "edit"
+        ? "Sửa mô hình"
+        : mode === "editYear"
+          ? `Sửa bảng mô hình năm ${year}`
+          : mode === "copyYear"
+            ? "Sao chép bảng mô hình"
+            : "Thêm mới mô hình";
   const subtitle =
     mode === "view"
       ? "Xem lại bản ghi đã lưu — bấm nút Sửa ở bảng danh mục nếu cần chỉnh."
       : mode === "edit"
         ? "Sửa xong bấm Lưu thay đổi — hệ thay toàn bộ dữ liệu cũ bằng dữ liệu mới."
-        : "Chọn Chủng loại xe, thêm dòng và chọn Mã chủng loại — mỗi dòng có thể tách nhiều khoảng thời gian riêng.";
+        : mode === "editYear"
+          ? "Sửa cả bảng mô hình của năm: đổi thời gian và giá trị đã có (không thêm/bớt mã hàng, chủng loại xe). Lưu thay toàn bộ dữ liệu của năm này bằng bảng mới."
+          : mode === "copyYear"
+            ? "Sao chép cả bảng mô hình của năm cũ — đổi ô Năm để dời toàn bộ ngày sang năm mới, chỉnh sửa rồi bấm Xác nhận để tạo."
+        : "Chọn Năm, Mã chủng loại hàng và Chủng loại xe — bảng tự sinh dòng theo mã đã chọn, chủng loại xe là các cột; mỗi dòng tách được nhiều khoảng thời gian.";
+
+  const hid = (k: string) => k !== "time" && layout.hidden.has(k);
+  const shownVehicleCols = activeColumns.filter((k) => !hid(k));
+  const headRows = 2;
+  const shownWidth = modelCols.reduce((s, c) => (hid(c.key) ? s : s + layout.widthOf(c.key)), 0);
 
   return (
-    <div className={`fixed inset-0 z-[100] flex items-center justify-center bg-black/40 ${isFullscreen ? "" : "p-4"}`}>
+    <>
+    <div
+      className="tkc-modal-overlay"
+      style={isFullscreen ? { padding: 0 } : isReadOnly ? { padding: 8 } : undefined}
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
       <div
-        className={
-          isFullscreen
-            ? "flex h-screen w-screen flex-col overflow-hidden bg-white dark:bg-gray-900"
-            : "flex max-h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-xl bg-white shadow-xl dark:bg-gray-900"
-        }
+        className="modal"
+        style={isFullscreen ? { width: "100%", height: "100%", maxHeight: "100%", borderRadius: 0 } : { width: isReadOnly ? "fit-content" : "min(1560px, 100%)", ...(isReadOnly ? { minWidth: "min(760px, 98vw)", maxWidth: "98vw", maxHeight: "96vh" } : null) }}
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
       >
-        <div className="flex items-start justify-between border-b border-gray-200 px-6 py-4 dark:border-gray-800">
+        <div className="modal-header" style={isReadOnly ? { padding: "10px 18px" } : undefined}>
           <div>
-            <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">{title}</h2>
-            <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{subtitle}</p>
+            <h2 style={isReadOnly ? { margin: 0 } : undefined}>{title}</h2>
+            {!isReadOnly && <p>{subtitle}</p>}
           </div>
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => setIsFullscreen((v) => !v)}
-              title={isFullscreen ? "Thu nhỏ" : "Toàn màn hình"}
-              className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800"
-            >
-              {isFullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
-            </button>
-            <button onClick={onClose} className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800">
-              <X className="h-5 w-5" />
-            </button>
-          </div>
+          <button
+            className="close-modal"
+            style={{ marginLeft: "auto", marginRight: 6 }}
+            aria-label={isFullscreen ? "Thu nhỏ cửa sổ" : "Phóng to cửa sổ"}
+            title={isFullscreen ? "Thu nhỏ cửa sổ" : "Phóng to cửa sổ"}
+            onClick={() => setIsFullscreen((v) => !v)}
+          >
+            <DIcon name={isFullscreen ? "minimize" : "maximize"} />
+          </button>
+          <button className="close-modal" aria-label="Đóng" onClick={onClose}>
+            <DIcon name="x" />
+          </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-6 py-4">
+        <div
+          className="modal-body"
+          style={isReadOnly ? { display: "flex", flexDirection: "column", overflow: "hidden", minHeight: 0, padding: "8px 14px", flex: "1 1 auto" } : undefined}
+        >
           {!isReadOnly && (
-            /* mb lớn hơn bình thường: danh sách xổ xuống của combobox nổi
-               (portal, z-40) không tự né nội dung bên dưới — chỉ né mép
-               màn hình. Sát ngay bảng bên dưới như trước (mb-4 = 16px) thì
-               dù chỉ 1 mục trong danh sách cũng đủ che mất hàng tiêu đề. */
-            <div className="mb-14 flex flex-wrap items-end gap-4">
-              <div className="flex flex-col gap-1 min-w-[320px] flex-1">
-                <span className="text-xs font-medium text-gray-600 dark:text-gray-400">Chủng loại xe *</span>
-                <Combobox items={vehicles.map((v) => v.code)} multiple value={vehicleCodes} onValueChange={setVehicleCodes}>
-                  <ComboboxChips ref={vehicleAnchorRef} className="min-h-9 text-sm">
-                    <ComboboxValue placeholder="Chọn một hoặc nhiều chủng loại xe...">
-                      {vehicleCodes.map((code) => (
-                        <ComboboxChip key={code} className="text-xs py-0.5">
+            /* mb lớn: danh sách xổ xuống của combobox nổi (portal) không tự né nội dung bên dưới — chỉ né mép màn hình.
+               Sát ngay bảng thì dù chỉ 1 mục cũng đủ che mất hàng tiêu đề. */
+            <div className="entry-top" style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-end", gap: 14, marginBottom: 28 }}>
+              <div className="form-group" style={{ width: 140 }}>
+                <label>Năm *</label>
+                <select className="field" value={String(year)} disabled={mode === "editYear"} onChange={(e) => changeYear(Number(e.target.value))}>
+                  {(YEAR_OPTIONS.includes(year) ? YEAR_OPTIONS : [year, ...YEAR_OPTIONS]).map((y) => (
+                    <option key={y} value={String(y)}>
+                      {y}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-group" style={{ minWidth: 300, flex: 1 }}>
+                <label>Mã chủng loại hàng *</label>
+                <Combobox items={cargoTypes.map((c) => c.code)} multiple disabled={lockStructure} value={cargoCodes} onValueChange={setCargoCodes}>
+                  <ComboboxChips ref={cargoAnchorRef} className="min-h-[39px] flex-nowrap overflow-hidden rounded-[8px] border-[#cfdbec] text-sm">
+                    <ComboboxValue placeholder="Chọn một hoặc nhiều mã...">
+                      {cargoCodes.slice(0, 3).map((code) => (
+                        <ComboboxChip key={code} className="rounded-full bg-[#b8c6dc] px-2.5 py-0.5 text-xs font-medium text-[#16294a]">
                           {code}
                         </ComboboxChip>
                       ))}
+                      {cargoCodes.length > 3 && (
+                        <span className="rounded-full bg-[#dde8f7] px-2.5 py-0.5 text-xs font-semibold text-[#16294a]">+{cargoCodes.length - 3}</span>
+                      )}
+                    </ComboboxValue>
+                    <ComboboxChipsInput placeholder={cargoCodes.length === 0 ? "Chọn một hoặc nhiều mã..." : ""} className="text-sm" />
+                  </ComboboxChips>
+                  <ComboboxContent anchor={cargoAnchorRef} sideOffset={4} align="start" className="z-[120]">
+                    <ComboboxEmpty className="py-2 text-xs text-gray-400">Không tìm thấy chủng loại hàng</ComboboxEmpty>
+                    <ComboboxList>
+                      {(code: string) => (
+                        <ComboboxItem key={code} value={code} className="text-sm data-selected:bg-[#dde8f7] data-selected:font-medium">
+                          <span className="font-mono text-xs text-gray-500">{code}</span>
+                          {" — "}
+                          {cargoTypes.find((c) => c.code === code)?.name ?? code}
+                        </ComboboxItem>
+                      )}
+                    </ComboboxList>
+                  </ComboboxContent>
+                </Combobox>
+              </div>
+
+              <div className="form-group" style={{ minWidth: 300, flex: 1 }}>
+                <label>Chủng loại xe *</label>
+                <Combobox items={vehicles.map((v) => v.code)} multiple disabled={lockStructure} value={vehicleCodes} onValueChange={setVehicleCodes}>
+                  <ComboboxChips ref={vehicleAnchorRef} className="min-h-[39px] flex-nowrap overflow-hidden rounded-[8px] border-[#cfdbec] text-sm">
+                    <ComboboxValue placeholder="Chọn một hoặc nhiều chủng loại xe...">
+                      {vehicleCodes.slice(0, 3).map((code) => (
+                        <ComboboxChip key={code} className="rounded-full bg-[#b8c6dc] px-2.5 py-0.5 text-xs font-medium text-[#16294a]">
+                          {code}
+                        </ComboboxChip>
+                      ))}
+                      {vehicleCodes.length > 3 && (
+                        <span className="rounded-full bg-[#dde8f7] px-2.5 py-0.5 text-xs font-semibold text-[#16294a]">+{vehicleCodes.length - 3}</span>
+                      )}
                     </ComboboxValue>
                     <ComboboxChipsInput placeholder={vehicleCodes.length === 0 ? "Chọn một hoặc nhiều chủng loại xe..." : ""} className="text-sm" />
                   </ComboboxChips>
                   <ComboboxContent anchor={vehicleAnchorRef} sideOffset={4} align="start" className="z-[120]">
-                    <ComboboxEmpty className="text-xs py-2 text-gray-400">Không tìm thấy chủng loại xe</ComboboxEmpty>
+                    <ComboboxEmpty className="py-2 text-xs text-gray-400">Không tìm thấy chủng loại xe</ComboboxEmpty>
                     <ComboboxList>
                       {(code: string) => {
                         const v = vehicles.find((x) => x.code === code);
                         return (
-                          <ComboboxItem key={code} value={code} className="text-sm">
+                          <ComboboxItem key={code} value={code} className="text-sm data-selected:bg-[#dde8f7] data-selected:font-medium">
                             <span className="font-mono text-xs text-gray-500">{code}</span>
                             {" — "}
                             {v?.name ?? code}
@@ -413,150 +658,179 @@ export function ModelAddModal({
             </div>
           )}
 
-          {isReadOnly && (
-            <div className="mb-4 flex flex-wrap gap-x-8 gap-y-2 rounded-md border border-gray-200 bg-gray-50 px-4 py-3 text-sm dark:border-gray-700 dark:bg-gray-900/40">
-              <span>
-                <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Thời gian: </span>
-                <span className="font-semibold text-gray-800 dark:text-gray-200">
-                  {record ? `${formatVN(record.effectiveFrom)} – ${formatVN(record.effectiveTo)}` : "—"}
-                </span>
-              </span>
-              <span>
-                <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Chủng loại xe: </span>
-                <span className="font-semibold text-gray-800 dark:text-gray-200">{vehicleCodes.join(", ") || "—"}</span>
-              </span>
+          {/* Thanh công cụ của bảng nhập: Hiển thị cột + Hiển thị bảng (căn phải như các UI khác) */}
+          {!isReadOnly && (
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-start", gap: 8, marginBottom: 12 }}>
+              {mode === "create" && (
+                <button className="btn" type="button" onClick={() => setQuickOpen(true)} title="Chụp ảnh bảng / chọn file Excel — tự tách mã hàng, chủng loại xe và giá trị">
+                  <DIcon name="upload" /> Nhập liệu thông minh (Ảnh/Excel)
+                </button>
+              )}
+              <ColumnsMenuButton layout={layout} columns={modelCols.filter((c) => c.key !== "time")} />
+              <TableLayoutButton layout={layout} columns={modelCols} />
             </div>
           )}
 
-          {rows.length === 0 ? (
-            <p className="rounded-md border border-dashed border-gray-300 px-4 py-6 text-center text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">
-              Bấm "+ Thêm dòng" để bắt đầu.
-            </p>
+          {isReadOnly && rows.length === 0 ? (
+            <p className="entry-empty">Không có dữ liệu.</p>
+          ) : isReadOnly ? (
+            <ViewGrid
+              columns={viewCols}
+              rows={viewRows}
+              storageKey="view:model"
+              summary={
+                <div className="vg-summary">
+                  <span>Thời gian<strong>{record ? `${formatVN(record.effectiveFrom)} – ${formatVN(record.effectiveTo)}` : "—"}</strong></span>
+                  <span>Chủng loại xe<strong>{vehicleCodes.join(", ") || "—"}</strong></span>
+                </div>
+              }
+              textOf={(x, k) => (k === "time" ? `${formatVN(x.p.effectiveFrom)} – ${formatVN(x.p.effectiveTo)}` : k === "code" ? x.r.cargoTypeCode : k === "name" ? x.name : k === "note" ? x.p.note : (x.p.values[k] ?? ""))}
+            />
           ) : (
-            <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
-              <table className="w-full min-w-[900px] border-collapse text-sm">
+            <div className="modal-table-scroll entry-clean-wrap">
+              <table
+                className={`entry-table entry-clean ${layout.tableClass}`}
+                style={{ tableLayout: "fixed", width: "100%", minWidth: 76 + shownWidth }}
+              >
+                <colgroup>
+                  <col style={{ width: 76 }} />
+                  {modelCols.map((c) => (
+                    <col key={c.key} hidden={hid(c.key)} style={{ width: layout.widthOf(c.key) }} />
+                  ))}
+                </colgroup>
                 <thead>
-                  <tr className="bg-gray-100 text-left text-sm font-bold text-gray-800 dark:bg-gray-900 dark:text-gray-100">
-                    <th className="w-16 border-b border-r border-gray-200 px-3 py-2.5 text-center dark:border-gray-700">#</th>
-                    <th className="min-w-[240px] border-b border-r border-gray-200 px-3 py-2.5 dark:border-gray-700">Thời gian</th>
-                    <th className="min-w-[150px] border-b border-r border-gray-200 px-3 py-2.5 dark:border-gray-700">
-                      Mã chủng loại {!isReadOnly && <span className="text-red-500">*</span>}
-                    </th>
-                    <th className="min-w-[150px] border-b border-r border-gray-200 px-3 py-2.5 dark:border-gray-700">Chủng loại hàng</th>
-                    {activeColumns.map((k) => (
-                      <th key={k} className="min-w-[100px] border-b border-r border-gray-200 px-2 py-2.5 text-center dark:border-gray-700">
-                        {k}
+                  <tr>
+                    <th rowSpan={headRows} style={{ textAlign: "center" }}>STT</th>
+                    {modelCols.slice(0, 3).map((c) => (
+                      <th key={c.key} rowSpan={headRows} hidden={hid(c.key)} style={{ position: "relative", ...(c.key === "time" ? { textAlign: "center" } : null) }}>
+                        {c.label}
+                        {c.key === "code" ? " *" : ""}
+                        <ColResizer colKey={c.key} layout={layout} />
                       </th>
                     ))}
-                    {!isReadOnly && <th className="w-10 border-b border-gray-200 dark:border-gray-700" />}
+                    <th colSpan={Math.max(1, shownVehicleCols.length)} style={{ textAlign: "center" }}>
+                      <div style={{ position: "sticky", left: 8, width: "fit-content", margin: "0 auto" }}>Chủng loại xe *</div>
+                    </th>
+                    <th rowSpan={headRows} hidden={hid("note")} style={{ position: "relative" }}>
+                      Ghi chú
+                      <ColResizer colKey="note" layout={layout} />
+                    </th>
+                  </tr>
+                  <tr>
+                    {shownVehicleCols.length > 0 ? (
+                      shownVehicleCols.map((k) => (
+                        <th key={k} style={{ position: "relative", textAlign: "center" }}>
+                          {k}
+                          <ColResizer colKey={k} layout={layout} />
+                        </th>
+                      ))
+                    ) : (
+                      <th style={{ textAlign: "center", fontWeight: 400, fontStyle: "italic", color: "#8aa0bd" }}>Chọn chủng loại xe</th>
+                    )}
                   </tr>
                 </thead>
                 <tbody>
+                  {rows.length === 0 && (
+                    <>
+                      <tr className="entry-ghost">
+                        <td colSpan={modelCols.slice(0, 3).filter((c) => !hid(c.key)).length + 1 + Math.max(1, shownVehicleCols.length) + (hid("note") ? 0 : 1)} className="entry-ghost-hint">
+                          Chọn mã chủng loại hàng, chọn chủng loại xe ...
+                        </td>
+                      </tr>
+                      {[0, 1].map((i) => (
+                        <tr key={`ghost${i}`} className="entry-ghost">
+                          {Array.from({ length: modelCols.slice(0, 3).filter((c) => !hid(c.key)).length + 1 + Math.max(1, shownVehicleCols.length) + (hid("note") ? 0 : 1) }).map((_, j) => (
+                            <td key={j}>
+                              <span className="entry-skel" />
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </>
+                  )}
                   {rows.map((r, ri) =>
                     r.periods.map((p, pi) => (
-                      <tr
-                        key={p.id}
-                        className={`${ri % 2 === 0 ? "bg-white dark:bg-gray-950" : "bg-gray-50/50 dark:bg-gray-900/40"} ${
-                          pi === 0 && ri > 0 ? "border-t-2 border-t-gray-300 dark:border-t-gray-600" : ""
-                        }`}
-                      >
-                        <td className="border-b border-r border-gray-200 px-2 py-2 text-center dark:border-gray-700">
-                          <div className="flex items-center justify-center gap-1">
-                            {pi === 0 && <span className="font-semibold text-gray-500">{ri + 1}</span>}
-                            {!isReadOnly && (
-                              <button
-                                onClick={() => splitPeriod(r.id, p.id)}
-                                title="Tách thời gian này thành hai khoảng"
-                                className="rounded p-0.5 text-gray-400 hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-blue-950/30"
-                              >
-                                <Plus className="h-3.5 w-3.5" />
-                              </button>
+                      <tr key={p.id} {...dnd.rowProps(ri)}>
+                        <td style={{ textAlign: "center", fontWeight: 700, color: "#5b6f8f" }}>
+                          <div className="entry-stt" style={{ justifyContent: "center" }}>
+                            {pi === 0 ? (
+                              <span className="dnd-handle" {...dnd.handleProps(ri)} title="Kéo để đổi vị trí" aria-label="Kéo để đổi vị trí">
+                                <DIcon name="grip" />
+                              </span>
+                            ) : (
+                              <span className="dnd-handle ghost" />
                             )}
-                            {!isReadOnly && pi === 0 && (
-                              <button
-                                onClick={() => removeRow(r.id)}
-                                title="Xoá cả dòng này"
-                                className="rounded p-0.5 text-gray-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/30"
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </button>
-                            )}
+                            <span className="entry-stt-no">{pi === 0 ? ri + 1 : ""}</span>
                           </div>
                         </td>
-                        <td className="border-b border-r border-gray-200 px-2 py-1.5 dark:border-gray-700">
+                        <td hidden={hid("time")}>
                           {isReadOnly ? (
-                            <span className="px-1 text-gray-700 dark:text-gray-300">
+                            <span className="entry-text">
                               {formatVN(p.effectiveFrom)} – {formatVN(p.effectiveTo)}
                             </span>
                           ) : (
-                            <div className="flex items-center gap-1">
-                              <Input
-                                type="date"
-                                value={p.effectiveFrom}
-                                onChange={(e) => setPeriodField(r.id, p.id, "effectiveFrom", e.target.value)}
-                                className="h-9 text-xs"
-                              />
-                              <span className="text-gray-400">–</span>
-                              <Input
-                                type="date"
-                                value={p.effectiveTo}
-                                onChange={(e) => setPeriodField(r.id, p.id, "effectiveTo", e.target.value)}
-                                className="h-9 text-xs"
-                              />
+                            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                              <div style={{ flex: "1 1 0", minWidth: 0 }}>
+                                <MonthRangePicker
+                                  from={p.effectiveFrom}
+                                  to={p.effectiveTo}
+                                  onChange={(f, t) => {
+                                    setPeriodField(r.id, p.id, "effectiveFrom", f);
+                                    setPeriodField(r.id, p.id, "effectiveTo", t);
+                                  }}
+                                />
+                              </div>
+                              {!lockStructure && (
+                              <span className="time-actions">
+                            <button
+                              className="icon-mini"
+                              onClick={() => splitPeriod(r.id, p.id)}
+                              title="Tách thời gian này thành hai khoảng"
+                              aria-label="Tách thời gian này thành hai khoảng"
+                            >
+                              <DIcon name="plus" />
+                            </button>
+                            <button
+                              className="icon-mini x"
+                              onClick={() => (r.periods.length > 1 ? removePeriod(r.id, p.id) : removeRow(r.id))}
+                              title={r.periods.length > 1 ? "Xoá khoảng thời gian này" : "Xoá dòng này"}
+                              aria-label={r.periods.length > 1 ? "Xoá khoảng thời gian này" : "Xoá dòng này"}
+                            >
+                              <DIcon name="x" />
+                            </button>
+                              </span>
+                              )}
                             </div>
                           )}
                         </td>
-                        <td className="border-b border-r border-gray-200 px-2 py-1.5 dark:border-gray-700">
-                          {pi > 0 ? (
-                            <span className="px-1 text-gray-400">″</span>
-                          ) : isReadOnly ? (
-                            <span className="px-1">{r.cargoTypeCode}</span>
-                          ) : (
-                            <Select value={r.cargoTypeCode} onValueChange={(v) => setRowCargoType(r.id, v)}>
-                              <SelectTrigger className="h-9 w-full text-sm">
-                                <SelectValue placeholder="Chọn mã..." />
-                              </SelectTrigger>
-                              <SelectContent className="z-[120]">
-                                {cargoTypes.map((c) => (
-                                  <SelectItem key={c.id} value={c.code}>
-                                    {c.code}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          )}
+                        <td hidden={hid("code")} className="entry-text" style={{ fontWeight: 700, color: "#1a4f9d" }}>
+                          {r.cargoTypeCode}
                         </td>
-                        <td className="border-b border-r border-gray-200 px-3 py-2 text-gray-500 dark:border-gray-700 dark:text-gray-400">
-                          {pi === 0 ? (cargoByCode.get(r.cargoTypeCode)?.name ?? "") : ""}
-                        </td>
+                        <td hidden={hid("name")} className="entry-text">{cargoByCode.get(r.cargoTypeCode)?.name ?? ""}</td>
+                        {shownVehicleCols.length === 0 && <td className="entry-ghost-cell" />}
                         {activeColumns.map((k) => (
-                          <td key={k} className="border-b border-r border-gray-200 px-1.5 py-1 dark:border-gray-700">
+                          <td key={k} hidden={hid(k)}>
                             {isReadOnly ? (
-                              <span className="block px-1 text-right">{p.values[k] ?? ""}</span>
+                              <span className="entry-text" style={{ textAlign: "right" }}>{p.values[k] ?? ""}</span>
                             ) : (
-                              <Input
+                              <input
+                                className="field"
+                                style={{ textAlign: "right" }}
                                 type="number"
                                 step="any"
                                 value={p.values[k] ?? ""}
                                 onChange={(e) => setPeriodValue(r.id, p.id, k, e.target.value)}
-                                className="h-9 text-right text-sm"
                               />
                             )}
                           </td>
                         ))}
-                        {!isReadOnly && (
-                          <td className="border-b border-gray-200 px-2 py-1.5 text-center dark:border-gray-700">
-                            {r.periods.length > 1 && (
-                              <button
-                                onClick={() => removePeriod(r.id, p.id)}
-                                title="Xoá khoảng thời gian này"
-                                className="rounded p-1 text-red-500 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950/30"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </button>
-                            )}
-                          </td>
-                        )}
+                        <td hidden={hid("note")}>
+                          {isReadOnly ? (
+                            <span className="entry-text">{p.note || "—"}</span>
+                          ) : (
+                            <input className="field" value={p.note} onChange={(e) => setPeriodField(r.id, p.id, "note", e.target.value)} placeholder="Ghi chú..." />
+                          )}
+                        </td>
                       </tr>
                     )),
                   )}
@@ -565,46 +839,50 @@ export function ModelAddModal({
             </div>
           )}
 
-          {!isReadOnly && (
-            <button
-              onClick={addRow}
-              className="mt-3 rounded-md border border-dashed px-3 py-1.5 text-xs text-blue-700"
-            >
-              + Thêm dòng
-            </button>
-          )}
-
           {rows.length > 0 && !isReadOnly && (
-            <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
+            <p className="entry-total">
               Tổng số{" "}
-              <span className="font-semibold text-blue-700 dark:text-blue-400">
+              <strong>
                 {rows.length} dòng · {totalPeriods} khoảng thời gian
-              </span>
+              </strong>
             </p>
           )}
 
-          {error && (
-            <p className="mt-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-300">{error}</p>
-          )}
+          {error && <div className="form-error">{error}</div>}
         </div>
 
-        <div className="flex justify-end gap-3 border-t border-gray-200 px-6 py-4 dark:border-gray-800">
+        <div className="modal-footer" style={isReadOnly ? { padding: "8px 18px" } : undefined}>
           {isReadOnly ? (
-            <Button variant="outline" onClick={onClose}>
+            <button className="btn" onClick={onClose}>
               Đóng
-            </Button>
+            </button>
           ) : (
             <>
-              <Button variant="outline" onClick={onClose} disabled={submitting}>
+              <button className="btn" onClick={onClose} disabled={submitting}>
                 Huỷ
-              </Button>
-              <Button onClick={handleSubmit} disabled={submitting} className="bg-blue-600 font-semibold text-white hover:bg-blue-700">
-                {submitting ? "Đang lưu..." : mode === "edit" ? "Lưu thay đổi" : "Xác nhận"}
-              </Button>
+              </button>
+              <button className="btn btn-primary" onClick={handleSubmit} disabled={submitting}>
+                {submitting ? "Đang lưu..." : mode === "edit" || mode === "editYear" ? "Lưu thay đổi" : "Xác nhận"}
+              </button>
             </>
           )}
         </div>
       </div>
     </div>
+    {quickOpen && (
+      <MatrixQuickImportDialog
+        title="mô hình"
+        rowAxis={{ label: "Mã chủng loại hàng", options: cargoTypes.map((c) => ({ value: c.code, label: c.code, alt: [c.name] })) }}
+        colAxis={{
+          label: "Chủng loại xe",
+          options: vehicles.flatMap((v) =>
+            (["CS", "KC"] as const).map((s) => ({ value: vehicleSuffixKeyOf(v.code, s), label: vehicleSuffixKeyOf(v.code, s), alt: [`${v.name}.${s}`] })),
+          ),
+        }}
+        onApply={applyQuick}
+        onClose={() => setQuickOpen(false)}
+      />
+    )}
+    </>
   );
 }

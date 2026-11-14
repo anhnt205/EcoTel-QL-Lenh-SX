@@ -29,19 +29,41 @@ export const VEHICLE_OUTPUT_CLASSIFICATIONS: {
   { value: "Than", label: "Than" },
 ];
 
+/**
+ * Nhóm khu vực xúc (QĐ-13). Rỗng = "Tất cả khu vực" → khoá KHÔNG có hậu tố (hành vi cũ, mọi dữ liệu đã có).
+ * Có giá trị → khoá thêm hậu tố `.CS`/`.KC`; engine (FuelCalculator.productivityNorm) tra cột riêng theo nhóm trước,
+ * không có thì lùi về cột chung.
+ */
+export type VehicleOutputArea = "" | "CS" | "KC";
+
+export const VEHICLE_OUTPUT_AREAS: { value: "CS" | "KC"; label: string }[] = [
+  { value: "CS", label: "CS" },
+  { value: "KC", label: "KC" },
+];
+
 export const vehicleClassificationKeyOf = (
   vehicleTypeCode: string,
   classification: VehicleOutputClassification,
-): string => `${vehicleTypeCode}.${classification}`;
+  area: VehicleOutputArea = "",
+): string => `${vehicleTypeCode}.${classification}${area ? `.${area}` : ""}`;
 
-/** Tách khoá cột về {mã xe, phân loại}; null nếu cột không theo quy ước. */
+/** Tách khoá cột về {mã xe, phân loại, khu vực}; null nếu cột không theo quy ước. */
 export function parseVehicleOutputKey(
   key: string,
-): { vehicleTypeCode: string; classification: VehicleOutputClassification } | null {
+): { vehicleTypeCode: string; classification: VehicleOutputClassification; area: VehicleOutputArea } | null {
+  let base = key;
+  let area: VehicleOutputArea = "";
+  for (const a of ["CS", "KC"] as const) {
+    if (base.endsWith(`.${a}`)) {
+      area = a;
+      base = base.slice(0, -(a.length + 1));
+      break;
+    }
+  }
   for (const c of ["Than", "DAT"] as VehicleOutputClassification[]) {
     const tail = `.${c}`;
-    if (key.endsWith(tail)) {
-      return { vehicleTypeCode: key.slice(0, -tail.length), classification: c };
+    if (base.endsWith(tail)) {
+      return { vehicleTypeCode: base.slice(0, -tail.length), classification: c, area };
     }
   }
   return null;

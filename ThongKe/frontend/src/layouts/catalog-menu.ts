@@ -26,6 +26,8 @@ export const CATALOG_MENU: CatalogMenuGroup[] = [
     items: [
       { label: "Chủng loại hàng", to: ROUTES.DANH_MUC.CHUNG_LOAI_HANG },
       { label: "Nhóm chủng loại hàng", to: ROUTES.DANH_MUC.NHOM_CHUNG_LOAI_HANG },
+      { label: "Phân loại", to: ROUTES.DANH_MUC.PHAN_LOAI },
+      { label: "Ký hiệu bùn", to: ROUTES.DANH_MUC.KY_HIEU_BUN },
       { label: "Sản phẩm nghiệm thu", to: ROUTES.DANH_MUC.SAN_PHAM_NGHIEM_THU },
     ],
   },
@@ -64,12 +66,11 @@ export const CATALOG_MENU: CatalogMenuGroup[] = [
       { label: "Hệ số", to: ROUTES.DANH_MUC.HE_SO },
       { label: "Kỳ báo cáo", to: ROUTES.DANH_MUC.KY_BAO_CAO },
       { label: "Mô hình", to: ROUTES.DANH_MUC.MO_HINH },
-      { label: "Năng suất xe (996)", to: ROUTES.DANH_MUC.NANG_SUAT_XE },
+      { label: "Năng suất xe (3305)", to: ROUTES.DANH_MUC.NANG_SUAT_XE },
       { label: "HS điều chỉnh NLĐM", to: ROUTES.DANH_MUC.HS_DIEU_CHINH_NLDM },
       { label: "Tỷ trọng", to: ROUTES.DANH_MUC.TY_TRONG },
-      { label: "Thuộc tính SL — Xe", to: ROUTES.DANH_MUC.TTSL_XE },
-      { label: "Thuộc tính SL — Máy xúc", to: ROUTES.DANH_MUC.TTSL_MAY },
       { label: "Ca làm việc", to: ROUTES.DANH_MUC.CA_LAM_VIEC },
+      { label: "Hậu tố", to: ROUTES.DANH_MUC.HAU_TO },
     ],
   },
   {

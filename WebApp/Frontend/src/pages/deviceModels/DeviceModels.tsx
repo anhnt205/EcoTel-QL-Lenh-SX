@@ -337,7 +337,7 @@ const DeviceModels: React.FC = () => {
                                     startIcon={<AddIcon />}
                                     onClick={() => handleOpen()}
                                 >
-                                    Thêm
+                                    Thêm mới
                                 </Button>
                                 <Button
                                     variant="contained"
@@ -394,7 +394,7 @@ const DeviceModels: React.FC = () => {
                                         variant="contained"
                                         startIcon={<UploadFile />}
                                     >
-                                        Tải lên excel
+                                        Tải lên (Excel)
                                     </Button>
                                 </label>
                                 <Button
@@ -403,7 +403,7 @@ const DeviceModels: React.FC = () => {
                                     startIcon={<Download />}
                                     onClick={() => exportExcel.mutate()}
                                 >
-                                    Tải xuống
+                                    Tải xuống (Excel)
                                 </Button>
                             </Box>
                         )}

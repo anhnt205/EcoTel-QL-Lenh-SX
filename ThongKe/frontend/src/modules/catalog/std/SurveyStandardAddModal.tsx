@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Maximize, Minimize, Plus, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import api from "@/config/api.config";
 import { createCatalogService } from "../catalogService";
+import DIcon from "../design/DIcon";
+import { ColResizer, TableLayoutButton, useTableLayout } from "../design/tableLayout";
+import ViewGrid, { ColumnsMenuButton, type ViewColumn } from "../design/ViewGrid";
+import { moveItem, useRowDnD } from "../design/useRowDnD";
+import "@/styles/catalog-design.css";
 import { formatStdCode, type SurveyStandardResponse } from "./types";
+import { StdQuickImportDialog, type QuickRow } from "./StdQuickImportDialog";
 
 interface NamedOption {
   id: number;
@@ -13,7 +16,13 @@ interface NamedOption {
   name: string;
 }
 
-type StdCatalogType = "DAT_CN" | "DAT_SX_THAN_SX";
+/** Một hậu tố trong danh mục Hậu tố. */
+interface SuffixOption {
+  id: number;
+  suffix: string;
+}
+
+export type StdCatalogType = "DAT_CN" | "DAT_SX_THAN_SX";
 
 /**
  * Hai màn STD dùng CHUNG modal này — chỉ khác nhãn khối "Đất" và có/không
@@ -21,12 +30,58 @@ type StdCatalogType = "DAT_CN" | "DAT_SX_THAN_SX";
  * để sửa một chỗ (vd luồng lưu, sinh khoá sống) tự áp dụng cho cả hai, không
  * còn nguy cơ sửa một bên quên sửa bên kia.
  */
-const STD_VARIANTS: Record<StdCatalogType, { title: string; earthLabel: string; hasCoal: boolean }> = {
+export const STD_VARIANTS: Record<StdCatalogType, { title: string; earthLabel: string; hasCoal: boolean }> = {
   DAT_CN: { title: "STD (Đất CN)", earthLabel: "Đất CN", hasCoal: false },
   DAT_SX_THAN_SX: { title: "STD (Đất SX/Than SX)", earthLabel: "Đất SX", hasCoal: true },
 };
 
 const BASE_PATH = "/survey-standards";
+
+/** Bề rộng cột STT của bảng nhập: tay nắm kéo + số + hai nút + / x. */
+const STT_W = 150;
+
+/**
+ * Các cột LÁ của bảng nhập (không kể STT và nút xoá), theo đúng thứ tự hiển thị — dùng cho "Hiển thị bảng"
+ * (kéo độ rộng, độ cao hàng) và cho `<colgroup>`. Nhãn "đất" đổi theo màn (Đất CN / Đất SX).
+ */
+export const buildStdCols = (earth: string, hasCoal: boolean) => [
+  { key: "time", label: "Thời gian" },
+  { key: "seamGroup", label: "Nhóm vỉa" },
+  { key: "benchGroup", label: "Nhóm tầng" },
+  { key: "excavator", label: "Máy xúc" },
+  { key: "mudMark", label: "Ký hiệu bùn" },
+  { key: "excavationArea", label: "Khu vực xúc" },
+  { key: "suffix", label: "Hậu tố" },
+  { key: "key", label: "Khoá" },
+  { key: "earthM3", label: `${earth} (m3)` },
+  { key: "earthDesignVolume", label: "V Tke" },
+  { key: "earthDeviation", label: "Clech" },
+  { key: "earthTon", label: `${earth} (tấn)` },
+  { key: "earthHaulDistance", label: "CD đất" },
+  { key: "earthBulkDensity", label: "Thể trọng đất (TĐ)" },
+  { key: "earthTkm", label: `${earth} (tkm)` },
+  ...(hasCoal
+    ? [
+        { key: "coalM3", label: "Than SX (m3)" },
+        { key: "coalBulkDensity", label: "Thể trọng than (TĐ)" },
+        { key: "coalTon", label: "Than SX (tấn)" },
+        { key: "coalDesignVolume", label: "Q Tke" },
+        { key: "coalDeviation", label: "Clech" },
+        { key: "coalHaulDistance", label: "CD than" },
+        { key: "coalTkm", label: "Than SX (Tkm)" },
+      ]
+    : []),
+  { key: "note", label: "Ghi chú" },
+];
+
+/** Bề rộng tối thiểu (px) mỗi cột lá: ô nhập/ô ngày cần rộng hơn chữ đang có. */
+const stdFloor = (key: string, label: string): number => {
+  if (key === "time") return 340;
+  if (key === "key") return 230;
+  if (key === "note") return 180;
+  if (key === "seamGroup" || key === "excavationArea") return 150;
+  return Math.max(110, label.length * 8 + 44);
+};
 
 /** Payload gửi lên — khớp `SurveyStandardRequest` phía backend. */
 interface SurveyStandardPayload {
@@ -181,9 +236,16 @@ const KEY_FIELDS = ["seamGroup", "benchGroup", "excavator", "mudMark", "excavati
 
 const currentYear = new Date().getFullYear();
 
+/** Đổi năm của ngày yyyy-MM-dd (29/2 sang năm không nhuận → 28/2) — dùng khi Sao chép sang năm khác. */
+const shiftToYear = (iso: string, y: number) => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return iso;
+  const mmdd = iso.slice(5);
+  const d = mmdd === "02-29" && new Date(y, 1, 29).getMonth() !== 1 ? "02-28" : mmdd;
+  return `${y}-${d}`;
+};
+
 /** yyyy-MM-dd, tính theo UTC-nửa đêm để tránh lệch ngày do múi giờ máy khách. */
 const parseISO = (s: string) => new Date(`${s}T00:00:00Z`);
-const toISO = (d: Date) => d.toISOString().slice(0, 10);
 const ONE_DAY_MS = 86_400_000;
 
 const numOrNull = (s: string): number | null => {
@@ -192,7 +254,7 @@ const numOrNull = (s: string): number | null => {
 };
 
 /** dd/mm/yy — chủ dự án chốt định dạng hiển thị (chỉ áp cho ô CHỈ ĐỌC; ô ngày sửa được là input type="date" gốc, định dạng hiện theo trình duyệt/hệ điều hành, không tự đổi được). */
-const formatVN = (s: string) => {
+export const formatVN = (s: string) => {
   const [y, m, d] = s.split("-");
   return `${d}/${m}/${y.slice(-2)}`;
 };
@@ -280,9 +342,9 @@ export function SurveyStandardAddModal({
   open: boolean;
   /** Quyết định nhãn khối "Đất" và có/không khối "Than SX" — xem {@link STD_VARIANTS}. */
   catalogType: StdCatalogType;
-  /** "create" thêm mới trống · "view" chỉ xem · "edit" sửa các bản ghi đã có. */
-  mode?: "create" | "view" | "edit";
-  /** Bản ghi hiện có — bắt buộc khi `mode` là "view"/"edit", bỏ trống khi "create". */
+  /** "create" thêm mới trống · "view" chỉ xem · "edit" sửa các bản ghi đã có · "copy" nạp các bản ghi của một năm để lưu thành năm khác. */
+  mode?: "create" | "view" | "edit" | "copy";
+  /** Bản ghi hiện có — bắt buộc khi `mode` là "view"/"edit"/"copy", bỏ trống khi "create". */
   records?: SurveyStandardResponse[];
   onClose: () => void;
   onSaved: () => void;
@@ -295,9 +357,13 @@ export function SurveyStandardAddModal({
   const [seamGroups, setSeamGroups] = useState<NamedOption[]>([]);
   const [excavationAreas, setExcavationAreas] = useState<NamedOption[]>([]);
   const [excavators, setExcavators] = useState<NamedOption[]>([]);
+  const [mudMarks, setMudMarks] = useState<NamedOption[]>([]);
+  const [suffixes, setSuffixes] = useState<SuffixOption[]>([]);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [quickOpen, setQuickOpen] = useState(false);
+  const [catalogRev, setCatalogRev] = useState(0);
 
   const entryIdRef = useRef(0);
   const nextEntryId = () => ++entryIdRef.current;
@@ -305,6 +371,8 @@ export function SurveyStandardAddModal({
   // Id các bản ghi GỐC — dùng để xoá khi "Lưu thay đổi" ở chế độ sửa (xem
   // handleSubmit). Chụp lại đúng lúc mở, không đổi theo entries về sau.
   const originalIdsRef = useRef<number[]>([]);
+  /** Năm của các bản ghi nguồn khi Sao chép — năm đích phải khác năm này. */
+  const sourceYearRef = useRef(0);
 
   // year đổi không được kéo lùi ngày của các dòng ĐÃ có — chỉ dòng MỚI thêm
   // sau đó mới dùng khoảng mặc định (1/1 – 31/12 của năm) hiện tại.
@@ -319,7 +387,20 @@ export function SurveyStandardAddModal({
   useEffect(() => {
     if (!open) return;
     setError(null);
-    if (records && records.length > 0) {
+    if (records && records.length > 0 && mode === "copy") {
+      // Sao chép: nạp các dòng của năm nguồn nhưng như dòng MỚI (bỏ originalId) và dời sang năm kế tiếp; người dùng đổi năm đích ở ô Thời gian
+      const y = parseInt(records[0].effectiveFrom.slice(0, 4), 10);
+      const src = Number.isNaN(y) ? currentYear : y;
+      sourceYearRef.current = src;
+      setYear(src + 1);
+      originalIdsRef.current = [];
+      setEntries(
+        records.map((r) => {
+          const e = entryFromRecord(r, nextEntryId);
+          return { ...e, originalId: undefined, effectiveFrom: shiftToYear(e.effectiveFrom, src + 1), effectiveTo: shiftToYear(e.effectiveTo, src + 1) };
+        }),
+      );
+    } else if (records && records.length > 0) {
       const y = parseInt(records[0].effectiveFrom.slice(0, 4), 10);
       setYear(Number.isNaN(y) ? currentYear : y);
       originalIdsRef.current = records.map((r) => r.id);
@@ -352,6 +433,22 @@ export function SurveyStandardAddModal({
     })();
     (async () => {
       try {
+        const res = await api.get("/suffixes", { params: { size: 500 } });
+        setSuffixes((res.data?.data?.content ?? []) as SuffixOption[]);
+      } catch {
+        toast.error("Không tải được danh sách hậu tố.");
+      }
+    })();
+    (async () => {
+      try {
+        const res = await api.get("/mud-marks", { params: { size: 500 } });
+        setMudMarks((res.data?.data?.content ?? []) as NamedOption[]);
+      } catch {
+        toast.error("Không tải được danh sách ký hiệu bùn.");
+      }
+    })();
+    (async () => {
+      try {
         const res = await api.get("/devices", {
           params: { categoryName: "Máy xúc", categoryGroup: "MAY", size: 500 },
         });
@@ -360,7 +457,7 @@ export function SurveyStandardAddModal({
         toast.error("Không tải được danh sách máy xúc.");
       }
     })();
-  }, [open]);
+  }, [open, catalogRev]);
 
   // Ghép khoá SỐNG cho mọi dòng — gọi backend mỗi khi sáu ô khoá của dòng
   // nào đó đổi. Debounce 300ms để không gọi dồn dập lúc đang gõ.
@@ -401,6 +498,62 @@ export function SurveyStandardAddModal({
   // tới lúc bấm lưu mới biết (xem doc `findContiguityIssue`).
   const contiguityIssue = useMemo(() => findContiguityIssue(entries), [entries]);
 
+  // Hiển thị bảng (kéo cột, độ cao hàng) — phải gọi TRƯỚC early return bên dưới
+  const stdCols = useMemo(() => buildStdCols(variant.earthLabel, variant.hasCoal), [variant]);
+  /** Cột của bảng NHẬP: không có cột Thời gian (năm chọn ở trên quyết định ngày). Chế độ xem vẫn dùng đủ `stdCols`. */
+  const editCols = useMemo(() => stdCols.filter((c) => c.key !== "time"), [stdCols]);
+  /** Các năm chọn được: quanh năm hiện tại (và luôn gồm năm đang chọn). */
+  const yearOptions = Array.from(new Set([...Array.from({ length: 13 }, (_, i) => currentYear - 6 + i), year])).sort((a, b) => a - b);
+  const layout = useTableLayout(
+    `popup:std-${catalogType}`,
+    stdCols,
+    [] as never[],
+    () => "",
+    (k) => stdFloor(k, stdCols.find((c) => c.key === k)?.label ?? ""),
+  );
+
+  // Kéo thả đổi vị trí dòng (hàm di chuyển gán sau early return qua ref — hook phải gọi TRƯỚC early return)
+  const moveRef = useRef<(from: number, to: number) => void>(() => {});
+  const dnd = useRowDnD((f, t) => moveRef.current(f, t));
+
+  // Chế độ XEM: bảng phẳng gọn (lọc cột, ẩn/hiện cột). Nhãn cột con trùng tên giữa Đất và Than được thêm tên nhóm cho khỏi lẫn.
+  const viewCols: ViewColumn[] = useMemo(
+    () =>
+      stdCols.map((c) => ({
+        key: c.key,
+        label: c.key === "earthDeviation" ? `${variant.earthLabel}: Clech` : c.key === "coalDeviation" ? "Than SX: Clech" : c.label,
+        align: c.key.startsWith("earth") || c.key.startsWith("coal") ? ("right" as const) : ("left" as const),
+        strong: c.key === "key",
+      })),
+    [stdCols, variant],
+  );
+  /** Các cột số liệu theo thứ tự bảng nhập — dùng cho Nhập nhanh (số dán kèm rơi vào cột nào). */
+  const valueCols = useMemo(
+    () =>
+      stdCols
+        .filter((c) => c.key.startsWith("earth") || c.key.startsWith("coal"))
+        .map((c) => {
+          const group = c.key.startsWith("earth") ? variant.earthLabel : "Than SX";
+          // nhãn đầy đủ như bảng STD ("Đất CN (m3)", "V Tke", "Clech", "Đất CN (tấn)"…) dưới tiêu đề nhóm
+          return { key: c.key, label: `${group}: ${c.label}`, group, short: c.label };
+        }),
+    [stdCols, variant],
+  );
+  const viewText = (e: Entry, k: string): string => {
+    switch (k) {
+      case "time":
+        return `${formatVN(e.effectiveFrom)} – ${formatVN(e.effectiveTo)}`;
+      case "seamGroup":
+        return seamGroups.find((s) => s.code === e.seamGroup)?.name || e.seamGroup;
+      case "excavationArea":
+        return e.excavationArea;
+      case "key":
+        return e.composedKey;
+      default:
+        return String((e as unknown as Record<string, unknown>)[k] ?? "");
+    }
+  };
+
   if (!open) return null;
 
   const addEntry = () =>
@@ -415,45 +568,34 @@ export function SurveyStandardAddModal({
   const setField = (id: number, field: keyof Omit<Entry, "id">, value: string) =>
     setEntries((prev) => prev.map((e) => (e.id !== id ? e : { ...e, [field]: value })));
 
-  /**
-   * "+" — COPY dòng hiện tại thành một dòng MỚI ĐỘC LẬP ngay bên dưới:
-   * chia đôi khoảng thời gian còn lại của dòng gốc, dòng mới kế thừa cả
-   * sáu ô khoá lẫn 14 ô giá trị làm điểm bắt đầu — sửa tiếp từ đó, kể cả
-   * đổi hẳn máy xúc/khu vực nếu dòng mới thực ra là một khoá khác.
-   */
-  const duplicateEntry = (id: number) =>
+  moveRef.current = (from, to) => setEntries((prev) => moveItem(prev, from, to));
+
+  /** Thêm các dòng đã tách từ ảnh/Excel (Nhập nhanh): nếu bảng chỉ có đúng một dòng trống chưa nhập gì thì thay luôn dòng đó. */
+  const addQuickRows = (rows: QuickRow[]) =>
+    setEntries((prev) => {
+      const untouched = prev.length === 1 && KEY_FIELDS.every((f) => !prev[0][f]) && !prev[0].earthM3 && !prev[0].note;
+      const made = rows.map((r) => ({
+        ...emptyEntry(`${yearRef.current}-01-01`, `${yearRef.current}-12-31`, nextEntryId),
+        ...r.fields,
+        ...r.values,
+      }));
+      return untouched ? made : [...prev, ...made];
+    });
+
+  /** "+" ở đầu dòng — chèn một dòng TRỐNG ngay bên dưới (thời gian mặc định 1/1 – 31/12 của năm đang chọn). */
+  const addEntryAfter = (id: number) =>
     setEntries((prev) => {
       const idx = prev.findIndex((e) => e.id === id);
-      if (idx === -1) return prev;
-      const source = prev[idx];
-      const fromMs = parseISO(source.effectiveFrom).getTime();
-      const toMs = parseISO(source.effectiveTo).getTime();
-      const totalDays = Math.round((toMs - fromMs) / ONE_DAY_MS);
-      if (!(totalDays > 0)) {
-        toast.error("Khoảng thời gian này chỉ có 1 ngày, không tách được.");
-        return prev;
-      }
-      const midMs = fromMs + Math.floor(totalDays / 2) * ONE_DAY_MS;
-      const firstTo = toISO(new Date(midMs));
-      const secondFrom = toISO(new Date(midMs + ONE_DAY_MS));
-      const updatedSource: Entry = { ...source, effectiveTo: firstTo };
-      const copy: Entry = {
-        ...source,
-        id: nextEntryId(),
-        // KHÔNG kế thừa originalId: đây là dòng MỚI, chưa gắn với bản ghi
-        // nào — hai dòng cùng trỏ một originalId sẽ đụng nhau lúc lưu (cả
-        // hai cùng cố UPDATE một id).
-        originalId: undefined,
-        effectiveFrom: secondFrom,
-        effectiveTo: source.effectiveTo,
-      };
+      const blank = emptyEntry(`${yearRef.current}-01-01`, `${yearRef.current}-12-31`, nextEntryId);
+      if (idx === -1) return [...prev, blank];
       const next = [...prev];
-      next.splice(idx, 1, updatedSource, copy);
+      next.splice(idx + 1, 0, blank);
       return next;
     });
 
   const validate = (): string | null => {
     if (entries.length === 0) return "Chưa có dòng nào.";
+    if (mode === "copy" && year === sourceYearRef.current) return `Chọn năm khác năm nguồn (${year}) để sao chép.`;
     for (let i = 0; i < entries.length; i++) {
       const e = entries[i];
       if (!e.composedKey.trim()) {
@@ -560,145 +702,168 @@ export function SurveyStandardAddModal({
     }
   };
 
+  const title =
+    mode === "view"
+      ? `Chi tiết ${variant.title}`
+      : mode === "edit"
+        ? `Sửa ${variant.title}`
+        : mode === "copy"
+          ? `Sao chép ${variant.title}`
+          : `Thêm mới ${variant.title}`;
+  const subtitle =
+    mode === "view"
+      ? "Xem lại — bấm nút Sửa ở bảng danh mục nếu cần chỉnh."
+      : mode === "edit"
+        ? "Sửa xong bấm Lưu thay đổi — hệ thay toàn bộ các dòng này bằng dữ liệu mới."
+        : mode === "copy"
+          ? "Chọn năm đích — các dòng của năm nguồn được nạp sang năm mới (ngày dời theo năm), chỉnh nếu cần rồi bấm Xác nhận."
+          : `Có thể thêm nhiều dòng ${variant.title} và lưu một lần`;
+
+  /** Ô tiêu đề của một cột lá (kèm tay nắm kéo độ rộng); `rowSpan` = 2 với cột đứng một mình, 1 với cột con của nhóm. */
+  const hid = (k: string) => layout.hidden.has(k);
+  const leafTh = (key: string, rowSpan: 1 | 2) => (
+    <th key={key} hidden={hid(key)} rowSpan={rowSpan} style={{ position: "relative", textAlign: "center" }}>
+      {key === "key" ? "" : stdCols.find((c) => c.key === key)?.label}
+      <ColResizer colKey={key} layout={layout} />
+    </th>
+  );
+  const earthKeys = ["earthM3", "earthDesignVolume", "earthDeviation", "earthTon", "earthHaulDistance", "earthBulkDensity", "earthTkm"];
+  const coalKeys = ["coalM3", "coalBulkDensity", "coalTon", "coalDesignVolume", "coalDeviation", "coalHaulDistance", "coalTkm"];
+  const keyKeys = ["seamGroup", "benchGroup", "excavator", "mudMark", "excavationArea", "suffix"];
+  // số cột ĐANG HIỆN của từng nhóm tiêu đề (cột bị ẩn thì tiêu đề nhóm co lại; hết cột thì ẩn luôn tiêu đề nhóm)
+  const shownIn = (keys: string[]) => keys.filter((k) => !hid(k)).length;
+  const shownTotal = editCols.reduce((s, c) => (hid(c.key) ? s : s + layout.widthOf(c.key)), 0);
+
   return (
     <div
-      className={`fixed inset-0 z-[100] flex items-center justify-center bg-black/40 ${isFullscreen ? "" : "p-4"}`}
+      className="tkc-modal-overlay"
+      style={isFullscreen ? { padding: 0 } : isReadOnly ? { padding: 8 } : undefined}
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
     >
       <div
-        className={
-          isFullscreen
-            ? "flex h-screen w-screen flex-col overflow-hidden bg-white dark:bg-gray-900"
-            : "flex max-h-[90vh] w-full max-w-[1700px] flex-col overflow-hidden rounded-xl bg-white shadow-xl dark:bg-gray-900"
-        }
+        className="modal"
+        style={isFullscreen ? { width: "100%", height: "100%", maxHeight: "100%", borderRadius: 0 } : { width: isReadOnly ? "fit-content" : "min(1700px, 100%)", ...(isReadOnly ? { minWidth: "min(760px, 98vw)", maxWidth: "98vw", maxHeight: "96vh" } : null) }}
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
       >
         {/* Tiêu đề */}
-        <div className="flex items-start justify-between border-b border-gray-200 dark:border-gray-800 px-6 py-4">
+        <div className="modal-header" style={isReadOnly ? { padding: "10px 18px" } : undefined}>
           <div>
-            <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">
-              {mode === "view"
-                ? `Chi tiết ${variant.title}`
-                : mode === "edit"
-                  ? `Sửa ${variant.title}`
-                  : `Thêm mới ${variant.title}`}
-              {records?.length === 1 && (
-                <span className="ml-2 font-mono text-sm font-semibold text-gray-400">
+            <h2>
+              {title}
+              {mode !== "copy" && records?.length === 1 && (
+                <span style={{ marginLeft: 8, fontFamily: "monospace", fontSize: 13, fontWeight: 600, color: "#8aa0bd" }}>
                   {formatStdCode(records[0].id)}
                 </span>
               )}
             </h2>
-            <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-              {mode === "view"
-                ? "Xem lại — bấm nút Sửa ở bảng danh mục nếu cần chỉnh."
-                : mode === "edit"
-                  ? "Sửa xong bấm Lưu thay đổi — hệ thay toàn bộ các dòng này bằng dữ liệu mới."
-                  : `Có thể thêm nhiều dòng ${variant.title} và lưu một lần`}
-            </p>
+            {!isReadOnly && <p>{subtitle}</p>}
           </div>
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => setIsFullscreen((v) => !v)}
-              title={isFullscreen ? "Thu nhỏ" : "Toàn màn hình"}
-              className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800"
-            >
-              {isFullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
-            </button>
-            <button
-              onClick={onClose}
-              className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800"
-            >
-              <X className="h-5 w-5" />
-            </button>
-          </div>
+          <button
+            className="close-modal"
+            style={{ marginLeft: "auto", marginRight: 6 }}
+            aria-label={isFullscreen ? "Thu nhỏ cửa sổ" : "Phóng to cửa sổ"}
+            title={isFullscreen ? "Thu nhỏ cửa sổ" : "Phóng to cửa sổ"}
+            onClick={() => setIsFullscreen((v) => !v)}
+          >
+            <DIcon name={isFullscreen ? "minimize" : "maximize"} />
+          </button>
+          <button className="close-modal" aria-label="Đóng" onClick={onClose}>
+            <DIcon name="x" />
+          </button>
         </div>
 
         {/* Thân */}
-        <div className="flex-1 overflow-y-auto px-6 py-4">
+        <div
+          className="modal-body"
+          style={isReadOnly ? { display: "flex", flexDirection: "column", overflow: "hidden", minHeight: 0, padding: "8px 14px", flex: "1 1 auto" } : undefined}
+        >
           {/* Thời gian mặc định — chỉ áp cho dòng MỚI thêm sau đó, không cần khi chỉ xem */}
           {!isReadOnly && (
-            <div className="mb-4 flex flex-wrap items-end gap-4">
-              <Field label="Thời gian * (năm)">
-                <Input
-                  type="number"
+            <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-end", gap: 14, marginBottom: 16 }}>
+              <div className="form-group" style={{ width: 140 }}>
+                <label>Thời gian *</label>
+                <select
+                  className="field"
                   value={year}
-                  onChange={(e) => setYear(Number(e.target.value))}
-                  className="h-9 w-[110px] text-sm"
-                />
-              </Field>
-              <p className="pb-2 text-xs text-gray-500 dark:text-gray-400">
-                Mặc định 1/1 – 31/12 của năm này cho dòng thêm mới — dòng đã có giữ nguyên thời
-                gian đã sửa. Bấm "+" ở mỗi dòng để tách một khoảng thời gian thành hai khoảng
-                không trùng nhau, chi tiết hơn trong năm.
-              </p>
+                  onChange={(e) => {
+                    const y = Number(e.target.value);
+                    setYear(y);
+                    // Bảng không còn cột Thời gian: năm đã chọn quyết định ngày của MỌI dòng (giữ nguyên ngày/tháng, chỉ đổi năm)
+                    setEntries((prev) => prev.map((en) => ({ ...en, effectiveFrom: shiftToYear(en.effectiveFrom, y), effectiveTo: shiftToYear(en.effectiveTo, y) })));
+                  }}
+                >
+                  {yearOptions.map((y) => (
+                    <option key={y} value={y}>
+                      {y}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
           )}
 
-          <p className="mb-3 text-sm text-gray-600 dark:text-gray-400">
-            Tổng số{" "}
-            <span className="font-semibold text-blue-700 dark:text-blue-400">
-              {variant.title}: {entries.length}
-            </span>
-          </p>
+          {!isReadOnly && contiguityIssue && <p className="std-warn">⚠ {contiguityIssue}</p>}
 
-          {!isReadOnly && contiguityIssue && (
-            <p className="mb-3 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-950/30 dark:text-amber-300">
-              ⚠ {contiguityIssue}
-            </p>
-          )}
+          {isReadOnly ? (
+            <ViewGrid columns={viewCols} rows={entries} textOf={viewText} storageKey={`view:std-${catalogType}`} />
+          ) : (
+          <>
+          {/* Thanh công cụ của bảng nhập: Thêm dòng + Hiển thị bảng (như cửa sổ Chủng loại hàng) */}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+            {/* Chỉnh sửa: không thêm dòng mới (chỉ sửa các dòng của năm đã chọn) */}
+            {!isReadOnly && mode !== "edit" && (
+              <button className="btn add-row-btn" style={{ margin: 0 }} onClick={addEntry}>
+                <DIcon name="plus" /> Thêm dòng
+              </button>
+            )}
+            {mode === "create" && (
+              <button className="btn" style={{ margin: 0 }} onClick={() => setQuickOpen(true)} title="Dán ảnh chụp Excel hoặc chọn file Excel để tách khoá nhanh">
+                Nhập liệu thông minh (Ảnh/Excel)
+              </button>
+            )}
+            <ColumnsMenuButton layout={layout} columns={editCols} />
+            <TableLayoutButton layout={layout} columns={editCols} />
+          </div>
 
-          <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
-            <table className={`w-full border-collapse text-sm ${variant.hasCoal ? "min-w-[2050px]" : "min-w-[1350px]"}`}>
+          {/* bảng tự cuộn trong khung riêng → tiêu đề dính sát mép trên khung, không hở (cuộn bằng thanh của chính khung bảng) */}
+          <div className="modal-table-scroll entry-clean-wrap" style={{ overflow: "auto", maxHeight: isFullscreen ? "calc(100vh - 330px)" : "calc(100vh - 370px)" }}>
+            <table
+              className={`entry-table entry-clean ${layout.tableClass}`}
+              style={{ tableLayout: "fixed", width: STT_W + shownTotal, minWidth: 0 }}
+            >
+              <colgroup>
+                <col style={{ width: STT_W }} />
+                {editCols.map((c) => (
+                  <col key={c.key} hidden={hid(c.key)} style={{ width: layout.widthOf(c.key) }} />
+                ))}
+              </colgroup>
               <thead>
-                <tr className="bg-gray-100 dark:bg-gray-900 text-center text-xs font-bold text-gray-800 dark:text-gray-100">
-                  <th rowSpan={2} className="w-16 border-b border-r border-gray-200 dark:border-gray-700 px-2 py-2 align-middle">
-                    #
+                <tr>
+                  <th rowSpan={2} style={{ textAlign: "center" }}>
+                    STT
                   </th>
-                  <th rowSpan={2} className="border-b border-r border-gray-200 dark:border-gray-700 px-2 py-2 align-middle min-w-[210px]">
-                    Thời gian
-                  </th>
-                  <th colSpan={6} className="border-b border-r border-gray-200 dark:border-gray-700 px-2 py-2">
+                  <th colSpan={Math.max(1, shownIn(keyKeys))} hidden={shownIn(keyKeys) === 0} style={{ textAlign: "center" }}>
                     Nhóm vỉa + Máy xúc
                   </th>
-                  <th rowSpan={2} className="border-b border-r border-gray-200 dark:border-gray-700 px-2 py-2 align-middle min-w-[190px]">
-                    Khoá
-                  </th>
-                  <th colSpan={7} className="border-b border-r border-gray-200 dark:border-gray-700 px-2 py-2">
+                  {leafTh("key", 2)}
+                  <th colSpan={Math.max(1, shownIn(earthKeys))} hidden={shownIn(earthKeys) === 0} style={{ textAlign: "center" }}>
                     {variant.earthLabel}
                   </th>
                   {variant.hasCoal && (
-                    <th colSpan={7} className="border-b border-r border-gray-200 dark:border-gray-700 px-2 py-2">
+                    <th colSpan={Math.max(1, shownIn(coalKeys))} hidden={shownIn(coalKeys) === 0} style={{ textAlign: "center" }}>
                       Than SX
                     </th>
                   )}
-                  <th rowSpan={2} className="border-b border-r border-gray-200 dark:border-gray-700 px-2 py-2 align-middle min-w-[140px]">
-                    Ghi chú
-                  </th>
-                  <th rowSpan={2} className="w-10 border-b border-gray-200 dark:border-gray-700" />
+                  {leafTh("note", 2)}
                 </tr>
-                <tr className="bg-gray-50 dark:bg-gray-900/60 text-center text-[11px] font-semibold text-gray-600 dark:text-gray-300">
-                  <th className="border-b border-r border-gray-200 dark:border-gray-700 px-2 py-1.5 min-w-[110px]">Nhóm vỉa</th>
-                  <th className="border-b border-r border-gray-200 dark:border-gray-700 px-2 py-1.5 min-w-[90px]">Nhóm tầng</th>
-                  <th className="border-b border-r border-gray-200 dark:border-gray-700 px-2 py-1.5 min-w-[100px]">Máy xúc</th>
-                  <th className="border-b border-r border-gray-200 dark:border-gray-700 px-2 py-1.5 min-w-[100px]">Ký hiệu bùn</th>
-                  <th className="border-b border-r border-gray-200 dark:border-gray-700 px-2 py-1.5 min-w-[110px]">Khu vực xúc</th>
-                  <th className="border-b border-r border-gray-200 dark:border-gray-700 px-2 py-1.5 min-w-[90px]">Hậu tố</th>
-                  <th className="border-b border-r border-gray-200 dark:border-gray-700 px-2 py-1.5 min-w-[100px]">{variant.earthLabel} (m3)</th>
-                  <th className="border-b border-r border-gray-200 dark:border-gray-700 px-2 py-1.5 min-w-[90px]">V Tke</th>
-                  <th className="border-b border-r border-gray-200 dark:border-gray-700 px-2 py-1.5 min-w-[90px]">Clech</th>
-                  <th className="border-b border-r border-gray-200 dark:border-gray-700 px-2 py-1.5 min-w-[100px]">{variant.earthLabel} (tấn)</th>
-                  <th className="border-b border-r border-gray-200 dark:border-gray-700 px-2 py-1.5 min-w-[90px]">CD đất</th>
-                  <th className="border-b border-r border-gray-200 dark:border-gray-700 px-2 py-1.5 min-w-[120px]">Thể trọng đất (TĐ)</th>
-                  <th className="border-b border-r border-gray-200 dark:border-gray-700 px-2 py-1.5 min-w-[100px]">{variant.earthLabel} (tkm)</th>
-                  {variant.hasCoal && (
-                    <>
-                      <th className="border-b border-r border-gray-200 dark:border-gray-700 px-2 py-1.5 min-w-[100px]">Than SX (m3)</th>
-                      <th className="border-b border-r border-gray-200 dark:border-gray-700 px-2 py-1.5 min-w-[120px]">Thể trọng than (TĐ)</th>
-                      <th className="border-b border-r border-gray-200 dark:border-gray-700 px-2 py-1.5 min-w-[100px]">Than SX (tấn)</th>
-                      <th className="border-b border-r border-gray-200 dark:border-gray-700 px-2 py-1.5 min-w-[90px]">Q Tke</th>
-                      <th className="border-b border-r border-gray-200 dark:border-gray-700 px-2 py-1.5 min-w-[90px]">Clech</th>
-                      <th className="border-b border-r border-gray-200 dark:border-gray-700 px-2 py-1.5 min-w-[90px]">CD than</th>
-                      <th className="border-b border-r border-gray-200 dark:border-gray-700 px-2 py-1.5 min-w-[100px]">Than SX (Tkm)</th>
-                    </>
-                  )}
+                <tr>
+                  {keyKeys.map((k) => leafTh(k, 1))}
+                  {earthKeys.map((k) => leafTh(k, 1))}
+                  {variant.hasCoal && coalKeys.map((k) => leafTh(k, 1))}
                 </tr>
               </thead>
               <tbody>
@@ -710,59 +875,59 @@ export function SurveyStandardAddModal({
                     seamGroups={seamGroups}
                     excavationAreas={excavationAreas}
                     excavators={excavators}
+                    mudMarks={mudMarks}
+                    suffixes={suffixes}
                     readOnly={isReadOnly}
+                    lockRows={mode === "edit"}
+                    hidden={layout.hidden}
                     hasCoal={variant.hasCoal}
                     canRemove={entries.length > 1}
                     onRemove={() => removeEntry(e.id)}
-                    onDuplicate={() => duplicateEntry(e.id)}
+                    onAddBelow={() => addEntryAfter(e.id)}
                     onFieldChange={(field, value) => setField(e.id, field, value)}
+                    rowProps={isReadOnly ? undefined : dnd.rowProps(i)}
+                    dragHandleProps={isReadOnly ? undefined : dnd.handleProps(i)}
                   />
                 ))}
               </tbody>
             </table>
           </div>
+          </>
+          )}
 
           {!isReadOnly && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={addEntry}
-              className="mt-3 gap-1.5 text-sm text-blue-700 hover:bg-blue-50 dark:text-blue-400"
-            >
-              <Plus className="h-4 w-4" />
-              Thêm dòng mới (trống)
-            </Button>
-          )}
-
-          {error && (
-            <p className="mt-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-300">
-              {error}
+            <p className="entry-total">
+              Tổng số <strong>{variant.title}: {entries.length}</strong>
             </p>
           )}
+
+          {error && <div className="form-error">{error}</div>}
         </div>
 
+        {quickOpen && (
+          <StdQuickImportDialog
+            catalogs={{ seamGroups, excavators, excavationAreas, mudMarks, suffixes }}
+            valueCols={valueCols}
+            onAdd={addQuickRows}
+            onCatalogsChanged={() => setCatalogRev((v) => v + 1)}
+            onClose={() => setQuickOpen(false)}
+          />
+        )}
+
         {/* Chân */}
-        <div className="flex justify-end gap-3 border-t border-gray-200 dark:border-gray-800 px-6 py-4">
+        <div className="modal-footer" style={isReadOnly ? { padding: "8px 18px" } : undefined}>
           {isReadOnly ? (
-            <Button variant="outline" onClick={onClose}>
+            <button className="btn" onClick={onClose}>
               Đóng
-            </Button>
+            </button>
           ) : (
             <>
-              <Button variant="outline" onClick={onClose} disabled={submitting}>
+              <button className="btn" onClick={onClose} disabled={submitting}>
                 Huỷ
-              </Button>
-              <Button
-                onClick={handleSubmit}
-                disabled={submitting}
-                className="bg-blue-600 font-semibold text-white hover:bg-blue-700"
-              >
-                {submitting
-                  ? "Đang lưu..."
-                  : mode === "edit"
-                    ? "Lưu thay đổi"
-                    : "Xác nhận"}
-              </Button>
+              </button>
+              <button className="btn btn-primary" onClick={handleSubmit} disabled={submitting}>
+                {submitting ? "Đang lưu..." : mode === "edit" ? "Lưu thay đổi" : "Xác nhận"}
+              </button>
             </>
           )}
         </div>
@@ -777,242 +942,196 @@ function EntryRow({
   seamGroups,
   excavationAreas,
   excavators,
+  mudMarks,
+  suffixes,
   readOnly,
+  lockRows,
+  hidden,
   hasCoal,
   canRemove,
   onRemove,
-  onDuplicate,
+  onAddBelow,
   onFieldChange,
+  rowProps,
+  dragHandleProps,
 }: {
   entry: Entry;
   index: number;
   seamGroups: NamedOption[];
   excavationAreas: NamedOption[];
   excavators: NamedOption[];
+  mudMarks: NamedOption[];
+  suffixes: SuffixOption[];
   readOnly: boolean;
+  /** Chỉnh sửa: chỉ sửa dữ liệu đã có — ẩn nút thêm/xoá dòng */
+  lockRows?: boolean;
+  /** cột đang ẩn (nút "Hiển thị cột") — khoá cột của bảng nhập */
+  hidden: Set<string>;
   hasCoal: boolean;
   canRemove: boolean;
   onRemove: () => void;
-  onDuplicate: () => void;
+  onAddBelow: () => void;
   onFieldChange: (field: keyof Omit<Entry, "id">, value: string) => void;
+  /** kéo thả đổi vị trí dòng (chỉ create/edit): thuộc tính của `<tr>` và của tay nắm ở ô STT */
+  rowProps?: React.HTMLAttributes<HTMLTableRowElement>;
+  dragHandleProps?: React.HTMLAttributes<HTMLElement>;
 }) {
-  const zebra = index % 2 === 0 ? "bg-white dark:bg-gray-950" : "bg-gray-50/50 dark:bg-gray-900/40";
-  const cellCls = "border-b border-r border-gray-200 dark:border-gray-700 px-2 py-1.5";
-
   return (
-    <tr className={zebra}>
-      <td className={`${cellCls} text-center align-top`}>
-        <div className="flex items-center justify-center gap-1 pt-1">
-          <span className="font-semibold text-gray-500">{index + 1}</span>
-          {!readOnly && (
-            <button
-              onClick={onDuplicate}
-              title="Tách dòng này thành hai khoảng thời gian không trùng nhau"
-              className="rounded p-0.5 text-gray-400 hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-blue-950/30"
-            >
-              <Plus className="h-3.5 w-3.5" />
-            </button>
+    <tr {...rowProps}>
+      <td style={{ textAlign: "center", paddingTop: readOnly ? 12 : 9 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 2 }}>
+          {dragHandleProps && (
+            <span className="dnd-handle" {...dragHandleProps} title="Kéo để đổi vị trí" aria-label="Kéo để đổi vị trí">
+              <DIcon name="grip" />
+            </span>
+          )}
+          <span style={{ fontWeight: 700, color: "#5b6f8f", minWidth: 18 }}>{index + 1}</span>
+          {!readOnly && !lockRows && (
+            <span className="time-actions">
+              <button className="icon-mini" onClick={onAddBelow} title="Thêm dòng vào bên dưới" aria-label="Thêm dòng vào bên dưới">
+                <DIcon name="plus" />
+              </button>
+              {canRemove && (
+                <button className="icon-mini x" onClick={onRemove} title="Xoá dòng này" aria-label="Xoá dòng này">
+                  <DIcon name="x" />
+                </button>
+              )}
+            </span>
           )}
         </div>
       </td>
 
-      <td className={`${cellCls} align-top`}>
-        {readOnly ? (
-          <span className="px-1 text-gray-700 dark:text-gray-300">
-            {formatVN(entry.effectiveFrom)} – {formatVN(entry.effectiveTo)}
-          </span>
-        ) : (
-          <div className="flex items-center gap-1">
-            <Input
-              type="date"
-              value={entry.effectiveFrom}
-              onChange={(e) => onFieldChange("effectiveFrom", e.target.value)}
-              className="h-9 text-xs"
-            />
-            <span className="text-gray-400">–</span>
-            <Input
-              type="date"
-              value={entry.effectiveTo}
-              onChange={(e) => onFieldChange("effectiveTo", e.target.value)}
-              className="h-9 text-xs"
-            />
-          </div>
-        )}
-      </td>
-
       {readOnly ? (
         <>
-          <LockedCell value={seamGroups.find((s) => s.code === entry.seamGroup)?.name || entry.seamGroup} />
-          <LockedCell value={entry.benchGroup} />
-          <LockedCell value={entry.excavator} />
-          <LockedCell value={entry.mudMark} />
-          <LockedCell
-            value={excavationAreas.find((a) => a.code === entry.excavationArea)?.name || entry.excavationArea}
-          />
-          <LockedCell value={entry.suffix} />
+          <LockedCell hidden={hidden.has("seamGroup")} value={seamGroups.find((s) => s.code === entry.seamGroup)?.name || entry.seamGroup} />
+          <LockedCell hidden={hidden.has("benchGroup")} value={entry.benchGroup} />
+          <LockedCell hidden={hidden.has("excavator")} value={entry.excavator} />
+          <LockedCell hidden={hidden.has("mudMark")} value={entry.mudMark} />
+          <LockedCell hidden={hidden.has("excavationArea")} value={entry.excavationArea} />
+          <LockedCell hidden={hidden.has("suffix")} value={entry.suffix} />
         </>
       ) : (
         <>
-          <td className={`${cellCls} align-top min-w-[110px]`}>
-            <select
-              value={entry.seamGroup}
-              onChange={(e) => onFieldChange("seamGroup", e.target.value)}
-              className="h-9 w-full rounded-md border bg-transparent px-1.5 text-xs"
-            >
+          <td hidden={hidden.has("seamGroup")}>
+            <select className="field" value={entry.seamGroup} onChange={(e) => onFieldChange("seamGroup", e.target.value)}>
               <option value="">—</option>
               {seamGroups.map((s) => (
-                <option key={s.id} value={s.code}>{s.name}</option>
+                <option key={s.id} value={s.code}>
+                  {s.name}
+                </option>
               ))}
             </select>
           </td>
-          <td className={`${cellCls} align-top`}>
-            <Input
+          <td hidden={hidden.has("benchGroup")}>
+            <input
+              className="field"
               type="number"
               step="any"
               value={entry.benchGroup}
               onChange={(e) => onFieldChange("benchGroup", e.target.value)}
               placeholder="75"
-              className="h-9 text-xs"
             />
           </td>
-          <td className={`${cellCls} align-top`}>
-            <select
-              value={entry.excavator}
-              onChange={(e) => onFieldChange("excavator", e.target.value)}
-              className="h-9 w-full rounded-md border bg-transparent px-1.5 text-xs"
-            >
+          <td hidden={hidden.has("excavator")}>
+            <select className="field" value={entry.excavator} onChange={(e) => onFieldChange("excavator", e.target.value)}>
               <option value="">—</option>
               {excavators.map((m) => (
-                <option key={m.id} value={m.code}>{m.code}</option>
+                <option key={m.id} value={m.code}>
+                  {m.code}
+                </option>
               ))}
             </select>
           </td>
-          <td className={`${cellCls} align-top`}>
-            <Input
-              value={entry.mudMark}
-              onChange={(e) => onFieldChange("mudMark", e.target.value)}
-              placeholder="vd Bun"
-              className="h-9 text-xs"
-            />
+          <td hidden={hidden.has("mudMark")}>
+            <select className="field" value={entry.mudMark} onChange={(e) => onFieldChange("mudMark", e.target.value)}>
+              <option value="">—</option>
+              {/* giá trị cũ gõ tay chưa có trong danh mục Ký hiệu bùn vẫn được giữ để không mất dữ liệu */}
+              {entry.mudMark && !mudMarks.some((m) => m.name === entry.mudMark) && <option value={entry.mudMark}>{entry.mudMark}</option>}
+              {mudMarks.map((m) => (
+                <option key={m.id} value={m.name}>
+                  {m.name}
+                </option>
+              ))}
+            </select>
           </td>
-          <td className={`${cellCls} align-top`}>
-            <select
-              value={entry.excavationArea}
-              onChange={(e) => onFieldChange("excavationArea", e.target.value)}
-              className="h-9 w-full rounded-md border bg-transparent px-1.5 text-xs"
-            >
+          <td hidden={hidden.has("excavationArea")}>
+            <select className="field" value={entry.excavationArea} onChange={(e) => onFieldChange("excavationArea", e.target.value)}>
               <option value="">—</option>
               {excavationAreas.map((a) => (
-                <option key={a.id} value={a.code}>{a.name}</option>
+                <option key={a.id} value={a.code}>
+                  {a.code}
+                </option>
               ))}
             </select>
           </td>
-          <td className={`${cellCls} align-top`}>
-            <Input
-              value={entry.suffix}
-              onChange={(e) => onFieldChange("suffix", e.target.value)}
-              placeholder="vd BK"
-              className="h-9 text-xs"
-            />
+          <td hidden={hidden.has("suffix")}>
+            <select className="field" value={entry.suffix} onChange={(e) => onFieldChange("suffix", e.target.value)}>
+              <option value="">—</option>
+              {/* giá trị cũ gõ tay chưa có trong danh mục Hậu tố vẫn được giữ để không mất dữ liệu */}
+              {entry.suffix && !suffixes.some((s) => s.suffix === entry.suffix) && <option value={entry.suffix}>{entry.suffix}</option>}
+              {suffixes.map((s) => (
+                <option key={s.id} value={s.suffix}>
+                  {s.suffix}
+                </option>
+              ))}
+            </select>
           </td>
         </>
       )}
 
       {/* Cột Khoá — luôn hiện ngay cạnh sáu ô ghép, không phải cuộn ngang mới thấy */}
-      <td className={`${cellCls} align-top`}>
-        <span className="break-all font-mono text-xs font-semibold text-blue-600 dark:text-blue-400">
+      <td hidden={hidden.has("key")} style={{ paddingTop: 11 }}>
+        <span style={{ wordBreak: "break-all", fontFamily: "monospace", fontSize: 12, fontWeight: 700, color: "#0954c7" }}>
           {entry.composedKey || (
-            <span className="font-sans italic font-normal text-gray-400">(chưa đủ thông tin)</span>
+            <span style={{ fontFamily: "Arial, Helvetica, sans-serif", fontStyle: "italic", fontWeight: 400, color: "#8aa0bd" }}>(chưa đủ thông tin)</span>
           )}
         </span>
       </td>
 
-      <NumCell readOnly={readOnly} value={entry.earthM3} onChange={(v) => onFieldChange("earthM3", v)} />
-      <NumCell readOnly={readOnly} value={entry.earthDesignVolume} onChange={(v) => onFieldChange("earthDesignVolume", v)} />
-      <NumCell readOnly={readOnly} value={entry.earthDeviation} onChange={(v) => onFieldChange("earthDeviation", v)} />
-      <NumCell readOnly={readOnly} value={entry.earthTon} onChange={(v) => onFieldChange("earthTon", v)} />
-      <NumCell readOnly={readOnly} value={entry.earthHaulDistance} onChange={(v) => onFieldChange("earthHaulDistance", v)} />
-      <NumCell readOnly={readOnly} value={entry.earthBulkDensity} onChange={(v) => onFieldChange("earthBulkDensity", v)} />
-      <NumCell readOnly={readOnly} value={entry.earthTkm} onChange={(v) => onFieldChange("earthTkm", v)} />
+      <NumCell hidden={hidden.has("earthM3")} readOnly={readOnly} value={entry.earthM3} onChange={(v) => onFieldChange("earthM3", v)} />
+      <NumCell hidden={hidden.has("earthDesignVolume")} readOnly={readOnly} value={entry.earthDesignVolume} onChange={(v) => onFieldChange("earthDesignVolume", v)} />
+      <NumCell hidden={hidden.has("earthDeviation")} readOnly={readOnly} value={entry.earthDeviation} onChange={(v) => onFieldChange("earthDeviation", v)} />
+      <NumCell hidden={hidden.has("earthTon")} readOnly={readOnly} value={entry.earthTon} onChange={(v) => onFieldChange("earthTon", v)} />
+      <NumCell hidden={hidden.has("earthHaulDistance")} readOnly={readOnly} value={entry.earthHaulDistance} onChange={(v) => onFieldChange("earthHaulDistance", v)} />
+      <NumCell hidden={hidden.has("earthBulkDensity")} readOnly={readOnly} value={entry.earthBulkDensity} onChange={(v) => onFieldChange("earthBulkDensity", v)} />
+      <NumCell hidden={hidden.has("earthTkm")} readOnly={readOnly} value={entry.earthTkm} onChange={(v) => onFieldChange("earthTkm", v)} />
 
       {hasCoal && (
         <>
-          <NumCell readOnly={readOnly} value={entry.coalM3} onChange={(v) => onFieldChange("coalM3", v)} />
-          <NumCell readOnly={readOnly} value={entry.coalBulkDensity} onChange={(v) => onFieldChange("coalBulkDensity", v)} />
-          <NumCell readOnly={readOnly} value={entry.coalTon} onChange={(v) => onFieldChange("coalTon", v)} />
-          <NumCell readOnly={readOnly} value={entry.coalDesignVolume} onChange={(v) => onFieldChange("coalDesignVolume", v)} />
-          <NumCell readOnly={readOnly} value={entry.coalDeviation} onChange={(v) => onFieldChange("coalDeviation", v)} />
-          <NumCell readOnly={readOnly} value={entry.coalHaulDistance} onChange={(v) => onFieldChange("coalHaulDistance", v)} />
-          <NumCell readOnly={readOnly} value={entry.coalTkm} onChange={(v) => onFieldChange("coalTkm", v)} />
+          <NumCell hidden={hidden.has("coalM3")} readOnly={readOnly} value={entry.coalM3} onChange={(v) => onFieldChange("coalM3", v)} />
+          <NumCell hidden={hidden.has("coalBulkDensity")} readOnly={readOnly} value={entry.coalBulkDensity} onChange={(v) => onFieldChange("coalBulkDensity", v)} />
+          <NumCell hidden={hidden.has("coalTon")} readOnly={readOnly} value={entry.coalTon} onChange={(v) => onFieldChange("coalTon", v)} />
+          <NumCell hidden={hidden.has("coalDesignVolume")} readOnly={readOnly} value={entry.coalDesignVolume} onChange={(v) => onFieldChange("coalDesignVolume", v)} />
+          <NumCell hidden={hidden.has("coalDeviation")} readOnly={readOnly} value={entry.coalDeviation} onChange={(v) => onFieldChange("coalDeviation", v)} />
+          <NumCell hidden={hidden.has("coalHaulDistance")} readOnly={readOnly} value={entry.coalHaulDistance} onChange={(v) => onFieldChange("coalHaulDistance", v)} />
+          <NumCell hidden={hidden.has("coalTkm")} readOnly={readOnly} value={entry.coalTkm} onChange={(v) => onFieldChange("coalTkm", v)} />
         </>
       )}
 
-      <td className={cellCls}>
+      <td hidden={hidden.has("note")}>
         {readOnly ? (
-          <span className="px-1 text-gray-500">{entry.note || "—"}</span>
+          <span className="entry-text">{entry.note || "—"}</span>
         ) : (
-          <Input
-            value={entry.note}
-            onChange={(e) => onFieldChange("note", e.target.value)}
-            className="h-9 text-xs"
-          />
-        )}
-      </td>
-      <td className="border-b border-gray-200 dark:border-gray-700 px-1.5 py-1.5 text-center">
-        {!readOnly && canRemove && (
-          <button
-            onClick={onRemove}
-            title="Xoá dòng này"
-            className="rounded p-1 text-red-500 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950/30"
-          >
-            <Trash2 className="h-4 w-4" />
-          </button>
+          <input className="field" value={entry.note} onChange={(e) => onFieldChange("note", e.target.value)} />
         )}
       </td>
     </tr>
   );
 }
 
-function NumCell({
-  value,
-  onChange,
-  readOnly,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  readOnly?: boolean;
-}) {
+function NumCell({ value, onChange, readOnly, hidden }: { value: string; onChange: (v: string) => void; readOnly?: boolean; hidden?: boolean }) {
   return (
-    <td className="border-b border-r border-gray-200 dark:border-gray-700 px-2 py-1.5">
+    <td hidden={hidden}>
       {readOnly ? (
-        <span className="px-1">{value || "—"}</span>
+        <span className="entry-text">{value || "—"}</span>
       ) : (
-        <Input
-          type="number"
-          step="any"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          className="h-9 text-xs"
-        />
+        <input className="field" type="number" step="any" value={value} onChange={(e) => onChange(e.target.value)} />
       )}
     </td>
   );
 }
 
 /** Một ô trong sáu ô ghép khoá khi bị khoá (Xem, hoặc Sửa một dòng đã lưu) — hiện giá trị THẬT, không sửa được. */
-function LockedCell({ value }: { value: string }) {
-  return (
-    <td className="border-b border-r border-gray-200 dark:border-gray-700 px-2 py-1.5 align-top min-w-[100px]">
-      <span className="px-1 text-gray-700 dark:text-gray-300">{value || "—"}</span>
-    </td>
-  );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="flex flex-col gap-1">
-      <span className="text-xs font-medium text-gray-600 dark:text-gray-400">{label}</span>
-      {children}
-    </div>
-  );
+function LockedCell({ value, hidden }: { value: string; hidden?: boolean }) {
+  return <td hidden={hidden} className="entry-text">{value || "—"}</td>;
 }

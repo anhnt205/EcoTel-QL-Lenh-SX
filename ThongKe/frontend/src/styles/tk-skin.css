@@ -1,0 +1,139 @@
+/*
+ * "Skin" theo THIẾT KẾ (quan_ly_chung_loai_hang_than_cao_son.html) cho các màn Thống kê dựng bằng Tailwind/shadcn:
+ * Nhập liệu Khai thác, Nhập liệu Vận tải, Thống thê sản lượng (báo cáo), Đối chiếu...
+ * Gắn class `tk-skin` vào thẻ gốc của trang. Chỉ ĐỔI KIỂU (phông Arial 13px, nền xanh nhạt, thẻ trắng bo 15px, bảng đầu xanh
+ * gradient, dòng xen kẽ, nút/ô nhập bo 7px) — không đổi bố cục hay chức năng. Dùng `!important` có chủ đích để thắng các
+ * utility Tailwind rải trong từng trang.
+ */
+.tk-skin {
+  font-family: Arial, Helvetica, sans-serif !important;
+  font-size: 13px;
+  color: #162d51;
+  background: radial-gradient(ellipse at 50% -30%, #e2efff, transparent 55%), #edf4fd !important;
+  min-height: 100%;
+}
+.tk-skin *, .tk-skin *::before, .tk-skin *::after { font-family: inherit; }
+
+/* Tiêu đề trang */
+.tk-skin h1 { color: #0e2c5d !important; font-size: 22px !important; letter-spacing: -.4px; font-weight: 700 !important; }
+.tk-skin h1 + p { color: #5e7392 !important; font-size: 13px !important; }
+.tk-skin .tks-heading-icon { color: #1263e7 !important; background: #eaf3ff !important; border-radius: 11px !important; }
+
+/* Thẻ trắng (thanh lọc, khối nội dung) */
+.tk-skin .rounded-xl.border, .tk-skin .rounded-lg.border.bg-white {
+  border-color: #e2eaf5 !important;
+  border-radius: 15px !important;
+  box-shadow: 0 5px 16px rgba(24, 69, 129, .08) !important;
+}
+
+/* Nút */
+.tk-skin [data-slot="button"] { border-radius: 7px !important; font-weight: 700; }
+.tk-skin [data-slot="button"].bg-blue-600, .tk-skin [data-slot="button"].bg-primary { background: linear-gradient(120deg, #0862e5, #1769e7) !important; border-color: #0862e5 !important; }
+.tk-skin [data-slot="button"][class*="border-red"] { border-color: #ffc0c7 !important; color: #d82e40 !important; background: #fffafa !important; }
+
+/* Ô nhập / ô chọn */
+.tk-skin input:not([type="checkbox"]):not([type="radio"]), .tk-skin select, .tk-skin textarea, .tk-skin [data-slot="select-trigger"] {
+  border-color: #bfd1e8 !important;
+  border-radius: 7px !important;
+}
+
+/* Bảng (shadcn Table) */
+.tk-skin [data-slot="table-container"] {
+  border: 1px solid #d6e3f3 !important;
+  border-radius: 10px !important;
+  box-shadow: none !important;
+  background: #fff;
+}
+.tk-skin [data-slot="table"] { font-size: 13px !important; border-collapse: separate !important; border-spacing: 0; }
+.tk-skin [data-slot="table-header"], .tk-skin [data-slot="table-header"] [data-slot="table-row"] {
+  background: linear-gradient(180deg, #0860d9, #064caf) !important;
+  border-color: #3a83e3 !important;
+  color: #fff !important;
+}
+.tk-skin [data-slot="table-head"] {
+  background: transparent !important;
+  color: #fff !important;
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  border-right: 1px solid #3a83e3 !important;
+  border-color: #3a83e3 !important;
+}
+.tk-skin [data-slot="table-head"] button { color: #fff !important; }
+.tk-skin [data-slot="table-body"] [data-slot="table-row"]:nth-child(even) { background: #eef5ff !important; }
+.tk-skin [data-slot="table-body"] [data-slot="table-row"]:nth-child(odd) { background: #fff !important; }
+.tk-skin [data-slot="table-body"] [data-slot="table-row"]:hover { background: #e1eeff !important; }
+.tk-skin [data-slot="table-cell"] {
+  font-size: 13px !important;
+  color: #223653;
+  border-color: #dce6f3 !important;
+}
+
+/* Cột đổi độ rộng bằng cách kéo (TanStack) */
+.tk-skin [data-slot="table-head"] { position: relative; }
+.tk-skin .tks-resizer { position: absolute; top: 0; right: -4px; bottom: 0; width: 9px; cursor: col-resize; z-index: 6; user-select: none; touch-action: none; }
+.tk-skin .tks-resizer::after { content: ""; position: absolute; top: 22%; bottom: 22%; left: 4px; width: 2px; border-radius: 2px; background: rgba(255,255,255,.3); }
+.tk-skin .tks-resizer:hover::after, .tk-skin .tks-resizer.is-resizing::after { background: #fff; }
+
+/* Chiều cao hàng do người dùng chọn */
+.tk-skin .rows-compact [data-slot="table-cell"] { padding-top: 2px !important; padding-bottom: 2px !important; }
+.tk-skin .rows-tall [data-slot="table-cell"] { padding-top: 12px !important; padding-bottom: 12px !important; white-space: normal !important; }
+
+/* Nền: để lộ nền xanh nhạt của thiết kế qua vùng nội dung */
+.tk-skin main { background: transparent !important; }
+.tk-skin [class*="bg-slate-50"] { background: transparent !important; }
+
+/* Nút + hộp "Hiển thị bảng" của các bảng TanStack */
+.tks-pop { position: fixed; z-index: 1500; width: 320px; padding: 14px; background: #fff; border: 1px solid #bfd1e8; border-radius: 11px; box-shadow: 0 12px 32px rgba(8,40,100,.24); font-family: Arial, Helvetica, sans-serif; font-size: 13px; color: #223b60; }
+.tks-pop-title { font-size: 15px; font-weight: 700; color: #0e2c5d; margin-bottom: 8px; }
+.tks-sec { font-weight: 700; color: #33496d; margin: 12px 0 7px; }
+.tks-chips { display: flex; flex-wrap: wrap; gap: 7px; }
+.tks-chip { height: 30px; padding: 0 12px; border: 1px solid #c2d3ea; border-radius: 7px; background: #fff; color: #234a86; font-weight: 600; cursor: pointer; }
+.tks-chip:hover { background: #eef5ff; }
+.tks-chip.on { background: #1263e7; border-color: #1263e7; color: #fff; }
+.tks-hint { margin-top: 12px; color: #70819d; font-size: 12px; line-height: 1.5; }
+.tks-foot { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid #e4eaf4; }
+.tk-skin .tks-layout-btn { border-color: #c2d3ea !important; color: #234a86; border-radius: 7px !important; }
+
+/* Bảng báo cáo thống kê (bảng HTML tự dựng, cột cố định + kéo cột) theo thiết kế */
+.tk-skin table.tks-grid { border-collapse: separate; border-spacing: 0; font-size: 13px; }
+.tk-skin table.tks-grid thead th { background: linear-gradient(180deg, #0860d9, #064caf) !important; color: #fff !important; font-weight: 700 !important; border-color: #3a83e3 !important; height: 43px; padding-top: 0 !important; padding-bottom: 0 !important; position: sticky; overflow: hidden; text-overflow: ellipsis; }
+.tk-skin table.tks-grid thead th span { color: rgba(255, 255, 255, .72) !important; }
+.tk-skin table.tks-grid thead th svg { color: #fff !important; }
+.tk-skin table.tks-grid tbody td { background: #fff !important; color: #223653; border-color: #dce6f3 !important; }
+.tk-skin table.tks-grid tbody tr:nth-child(even) td { background: #eef5ff !important; }
+.tk-skin table.tks-grid tbody tr:hover td { background: #e1eeff !important; }
+.tk-skin table.tks-grid tbody td:first-child { color: #1a4f9d !important; }
+.tk-skin .rows-compact table.tks-grid tbody td { padding-top: 2px !important; padding-bottom: 2px !important; }
+.tk-skin .rows-tall table.tks-grid tbody td { padding-top: 12px !important; padding-bottom: 12px !important; white-space: normal !important; line-height: 1.4; }
+.tk-skin table.tks-grid thead th > .tks-resizer { right: -4px; }
+
+/* ── Bảng Đối chiếu: mỗi VÙNG một gam màu để dễ phân biệt ─────────────────────────────────────────────── */
+.tk-skin .tks-recon [data-slot="table-header"],
+.tk-skin .tks-recon [data-slot="table-header"] [data-slot="table-row"] { background: transparent !important; }
+.tk-skin .tks-recon [data-slot="table-head"] { color: #fff !important; border-color: rgba(255, 255, 255, .35) !important; }
+.tk-skin .tks-recon [data-slot="table-head"] * { color: #fff !important; border-color: rgba(255, 255, 255, .3) !important; }
+.tk-skin .tks-recon [data-slot="table-head"] .bg-gray-50, .tk-skin .tks-recon [data-slot="table-head"] [class*="dark:bg-gray-900"] { background: transparent !important; }
+.tk-skin .tks-recon [data-slot="table-head"][data-zone="common"] { background: linear-gradient(180deg, #0b3b8a, #0a2f6e) !important; }
+.tk-skin .tks-recon [data-slot="table-head"][data-zone="transport"] { background: linear-gradient(180deg, #12936a, #0c7352) !important; }
+.tk-skin .tks-recon [data-slot="table-head"][data-zone="mining"] { background: linear-gradient(180deg, #1597cc, #0d739f) !important; }
+.tk-skin .tks-recon [data-slot="table-head"][data-zone="result"] { background: linear-gradient(180deg, #7d52d6, #6139b4) !important; }
+.tk-skin .tks-recon [data-slot="table-head"][data-zone="action"] { background: linear-gradient(180deg, #5a708c, #42566e) !important; }
+
+/* Dòng: nền trong suốt để màu TRẠNG THÁI (đỏ/vàng/đã chọn) ở cấp ô thắng; ô không có trạng thái thì nhuộm nhạt theo vùng */
+.tk-skin .tks-recon [data-slot="table-body"] [data-slot="table-row"] { background: transparent !important; }
+.tk-skin .tks-recon [data-slot="table-cell"] { border-color: #dce6f3 !important; }
+.tk-skin .tks-recon [data-slot="table-cell"][data-zone="common"]:not([data-status]) { background: #f1f6ff !important; }
+.tk-skin .tks-recon [data-slot="table-cell"][data-zone="transport"]:not([data-status]) { background: #effaf4 !important; }
+.tk-skin .tks-recon [data-slot="table-cell"][data-zone="mining"]:not([data-status]) { background: #eef8fd !important; }
+.tk-skin .tks-recon [data-slot="table-cell"][data-zone="result"]:not([data-status]) { background: #f5f1fd !important; }
+.tk-skin .tks-recon [data-slot="table-cell"][data-zone="action"]:not([data-status]) { background: #f3f5f8 !important; }
+.tk-skin .tks-recon [data-slot="table-row"]:hover [data-slot="table-cell"]:not([data-status]) { filter: brightness(.96); }
+/* Ngăn cách rõ giữa các vùng */
+.tk-skin .tks-recon [data-slot="table-head"][data-zone], .tk-skin .tks-recon [data-slot="table-cell"][data-zone] { border-right-width: 1px; }
+
+/* Nút ba chấm lọc theo cột (tiêu đề bảng) + ô nhập */
+.tks-filter-btn { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); width: 20px; height: 24px; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 5px; background: transparent; color: #fff; opacity: .85; cursor: pointer; z-index: 7; }
+.tks-filter-btn:hover { background: rgba(255,255,255,.22); opacity: 1; }
+.tks-filter-btn.active { background: #ffd54a; color: #08306b; opacity: 1; }
+.tks-filter-input { width: 100%; height: 34px; padding: 0 10px; border: 1px solid #bfd1e8; border-radius: 6px; outline: none; font: inherit; }
+.tks-filter-input:focus { border-color: #3886f8; box-shadow: 0 0 0 3px #dcecff; }

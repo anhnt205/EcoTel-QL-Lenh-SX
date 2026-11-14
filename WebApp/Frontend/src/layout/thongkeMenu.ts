@@ -27,13 +27,24 @@ export interface TkMenuGroup {
 }
 
 const TK_LEGACY_ROLES = ["admin", "manager", "dispatcher"] as const;
+/** Nhóm do Điều phối quản lý hẳn (phòng ban, chức vụ, nhân viên, công việc, biện pháp an toàn). */
+const UNIT_GROUP_LABEL = "Đơn vị";
+
+/** Thứ tự nhóm trong menu Danh mục gộp (nhóm rỗng sau khi lọc quyền bị bỏ). */
+const MERGED_GROUP_ORDER = [
+  "Loại hàng",
+  "Vị trí",
+  "Thiết bị",
+  "Số Trắc địa",
+  UNIT_GROUP_LABEL,
+  "Danh mục khác",
+] as const;
 
 // Các mục cấp cao nhất (không nằm trong nhóm danh mục).
 export const TK_TOP_ITEMS: TkMenuItem[] = [
   { text: "Nhập liệu Khai thác", to: "/nhap-lieu/khai-thac", module: "tk-entry-mining" },
   { text: "Nhập liệu Vận tải", to: "/nhap-lieu/van-tai", module: "tk-entry-transport" },
-  { text: "Định mức nhiên liệu", to: "/danh-muc/dinh-muc-nhien-lieu", module: "tk-fuel-norm" },
-  { text: "Áp Trắc Địa", to: "/danh-muc/ap-tracdia", module: "tk-survey" },
+  // "Định mức nhiên liệu" và "Áp Trắc địa" nay nằm TRONG menu Danh mục (nhóm Thiết bị / Số Trắc địa) — chủ dự án chốt 2026-11-09.
   { text: "Đối chiếu", to: "/nhap-lieu/doi-chieu", module: "tk-reconciliation" },
   // Trang 2 tab (Sản lượng thống kê | Báo chuyến) — xem pages/thongke/OutputStats.tsx
   {
@@ -47,13 +58,19 @@ export const TK_TOP_ITEMS: TkMenuItem[] = [
 
 // Nhóm "Danh mục" của Thống kê — danh mục gốc dùng chung, Điều phối chỉ giữ bản sao chỉ-đọc.
 // KHÔNG gồm Phòng ban / Chức vụ / Tài khoản: ba mục này Điều phối quản lý hẳn (kèm phân quyền).
+// Bố cục nhóm/thứ tự do chủ dự án chốt 2026-11-09 (xem MERGED_GROUP_ORDER bên dưới cho thứ tự nhóm).
 export const TK_CATALOG_GROUPS: TkMenuGroup[] = [
   {
-    label: "Vật liệu, hàng hoá",
+    label: "Loại hàng",
     items: [
       { text: "Chủng loại hàng", to: "/danh-muc/chung-loai-hang", module: "tk-cargo-types" },
       { text: "Nhóm chủng loại hàng", to: "/danh-muc/nhom-chung-loai-hang", module: "tk-cargo-groups" },
+      { text: "Phân loại", to: "/danh-muc/phan-loai", module: "tk-classifications" },
+      { text: "Ký hiệu bùn", to: "/danh-muc/ky-hieu-bun", module: "tk-mud-marks" },
       { text: "Sản phẩm nghiệm thu", to: "/danh-muc/san-pham-nghiem-thu", module: "tk-acceptance-products" },
+      { text: "TTL CLH", to: "/danh-muc/ttl-clh", module: "tk-ttl-clh" },
+      { text: "Mô hình", to: "/danh-muc/mo-hinh", module: "tk-model-periods" },
+      { text: "Tỷ trọng", to: "/danh-muc/ty-trong", module: "tk-density" },
     ],
   },
   {
@@ -63,40 +80,38 @@ export const TK_CATALOG_GROUPS: TkMenuGroup[] = [
       { text: "Nơi dỡ tải", to: "/danh-muc/noi-do-tai", module: "tk-unloading-points" },
       { text: "Nơi chất tải", to: "/danh-muc/noi-chat-tai", module: "tk-pickup-points" },
       { text: "Khu vực xúc", to: "/danh-muc/khu-vuc-xuc", module: "tk-excavation-areas" },
+      { text: "Nhóm vỉa", to: "/danh-muc/nhom-via", module: "tk-seam-groups" },
     ],
   },
   {
     label: "Thiết bị",
     items: [
-      { text: "Thông tin xe", to: "/danh-muc/thong-tin-xe", module: "tk-devices-vehicle" },
-      { text: "Thông tin máy", to: "/danh-muc/thong-tin-may", module: "tk-devices-machine" },
+      { text: "Xe", to: "/danh-muc/thong-tin-xe", module: "tk-devices-vehicle" },
+      { text: "Máy", to: "/danh-muc/thong-tin-may", module: "tk-devices-machine" },
       { text: "Chủng loại xe", to: "/danh-muc/chung-loai-xe", module: "tk-vehicle-types" },
-      { text: "Nhóm hạng xe", to: "/danh-muc/nhom-hang-xe", module: "tk-vehicle-rank-groups" },
+      { text: "Chủng loại xe + DMNL", to: "/danh-muc/chung-loai-xe-dmnl", module: "tk-fuel-classes" },
       { text: "Hạng xe", to: "/danh-muc/hang-xe", module: "tk-vehicle-ranks" },
+      { text: "Nhóm hạng xe", to: "/danh-muc/nhom-hang-xe", module: "tk-vehicle-rank-groups" },
+      { text: "Năng suất xe", to: "/danh-muc/nang-suat-xe", module: "tk-matrix-996" },
+      { text: "Định mức nhiên liệu", to: "/danh-muc/dinh-muc-nhien-lieu", module: "tk-fuel-norm" },
     ],
   },
   {
-    label: "Số trắc địa (STD)",
+    label: "Số Trắc địa",
     items: [
       { text: "STD (Đất CN)", to: "/danh-muc/std-dat-cn", module: "tk-std-industrial" },
       { text: "STD (Đất SX/Than SX)", to: "/danh-muc/std-dat-sx-than-sx", module: "tk-std-production" },
+      { text: "Áp Trắc địa", to: "/danh-muc/ap-tracdia", module: "tk-survey" },
     ],
   },
   {
     label: "Danh mục khác",
     items: [
-      { text: "TTL CLH", to: "/danh-muc/ttl-clh", module: "tk-ttl-clh" },
-      { text: "Nhóm vỉa", to: "/danh-muc/nhom-via", module: "tk-seam-groups" },
-      { text: "Chủng loại xe + DMNL", to: "/danh-muc/chung-loai-xe-dmnl", module: "tk-fuel-classes" },
-      { text: "Hệ số", to: "/danh-muc/he-so", module: "tk-coefficients" },
+      { text: "Hệ số điều chỉnh", to: "/danh-muc/he-so", module: "tk-coefficients" },
+      { text: "Hệ số điều chỉnh DMNL", to: "/danh-muc/hs-dieu-chinh-nldm", module: "tk-matrix-nldm" },
       { text: "Kỳ báo cáo", to: "/danh-muc/ky-bao-cao", module: "tk-report-periods" },
-      { text: "Mô hình", to: "/danh-muc/mo-hinh", module: "tk-model-periods" },
-      { text: "Năng suất xe (996)", to: "/danh-muc/nang-suat-xe", module: "tk-matrix-996" },
-      { text: "HS điều chỉnh NLĐM", to: "/danh-muc/hs-dieu-chinh-nldm", module: "tk-matrix-nldm" },
-      { text: "Tỷ trọng", to: "/danh-muc/ty-trong", module: "tk-density" },
-      { text: "Thuộc tính SL — Xe", to: "/danh-muc/thuoc-tinh-san-luong-xe", module: "tk-attrs-vehicle" },
-      { text: "Thuộc tính SL — Máy xúc", to: "/danh-muc/thuoc-tinh-san-luong-may", module: "tk-attrs-machine" },
       { text: "Ca làm việc", to: "/danh-muc/ca-lam-viec", module: "tk-shifts" },
+      { text: "Hậu tố", to: "/danh-muc/hau-to", module: "tk-suffixes" },
     ],
   },
 ];
@@ -120,8 +135,8 @@ export const CATALOG_PATHS_MOVED_TO_TK = ["/shifts", "/deviceTypes", "/deviceMod
 // MỘT menu "Danh mục" duy nhất.
 //
 // Thanh menu: Tổng quan | Lệnh sản xuất | [Công việc của tôi] |
-//   Nhập liệu Khai thác | Nhập liệu Vận tải | DANH MỤC (gộp) | Định mức nhiên liệu |
-//   Áp Trắc Địa | Đối chiếu | Thống kê sản lượng | Báo cáo | Hệ thống
+//   Nhập liệu Khai thác | Nhập liệu Vận tải | DANH MỤC (gộp, gồm Định mức nhiên liệu và Áp Trắc địa) |
+//   Đối chiếu | Thống kê sản lượng | Báo cáo | Hệ thống
 // ---------------------------------------------------------------------------
 
 /** Mục Thống kê đứng TRƯỚC menu Danh mục (theo thứ tự thanh menu của PM Thống kê). */
@@ -164,40 +179,18 @@ const ADM = ["admin", "manager"] as const;
 const ADM_DISP = ["admin", "manager", "dispatcher"] as const;
 
 /**
- * Các mục danh mục CHỈ Điều phối có (hoặc phần vận hành của danh mục dùng chung), xếp vào nhóm tương ứng của
- * Thống kê. Nhãn ghi rõ "(Điều phối)" ở mục vận hành để không nhầm với mục cùng tên của Thống kê.
+ * Các mục danh mục do ĐIỀU PHỐI quản lý, xếp theo nhóm (khoá = tên nhóm). Bố cục chốt 2026-11-09:
+ *  - nhóm "Đơn vị": Phòng ban, Chức vụ, Nhân viên, Công việc, Biện pháp an toàn;
+ *  - các mục vận hành trùng tên với mục Thống kê (Vật liệu, Điểm đổ tải, Xe/Máy trạng thái vị trí, Cung độ, Mô hình xe)
+ *    không có trong bố cục chốt nên gom tạm xuống nhóm cuối, nhãn ghi "(Điều phối)" để không nhầm.
  */
-const DPMM_EXTRAS: Record<string, DpmmCatalogItem[]> = {
-  "Vật liệu, hàng hoá": [
-    { text: "Vật liệu — tỷ trọng (Điều phối)", path: "/materials", module: "materials", roles: ADM },
-  ],
-  "Vị trí": [
-    { text: "Điểm đổ tải — khoảng cách, toạ độ (Điều phối)", path: "/locations", module: "locations", roles: ADM },
-  ],
-  "Thiết bị": [
-    { text: "Xe — trạng thái, vị trí (Điều phối)", path: "/vehicles", module: "device-vehicles", roles: ADM_DISP },
-    { text: "Máy — trạng thái, vị trí (Điều phối)", path: "/machines", module: "device-machines", roles: ADM_DISP },
-  ],
-};
-
-/** Nhóm "Danh mục Hệ thống": do Điều phối quản lý hẳn (phòng ban, chức vụ, cán bộ nhân viên + phân quyền). */
-const SYSTEM_GROUP: { label: string; items: DpmmCatalogItem[] } = {
-  label: "Danh mục Hệ thống",
-  items: [
+const DPMM_GROUP_ITEMS: Record<string, DpmmCatalogItem[]> = {
+  [UNIT_GROUP_LABEL]: [
     { text: "Phòng ban", path: "/departments", module: "departments", roles: ADM_DISP },
     { text: "Chức vụ", path: "/positions", module: "positions", roles: ADM },
-    { text: "Cán bộ nhân viên", path: "/users", module: "users", roles: ADM_DISP },
-  ],
-};
-
-/** Nhóm chỉ có ở Điều phối (giao ca, cung độ, mô hình). */
-const DPMM_ONLY_GROUP: { label: string; items: DpmmCatalogItem[] } = {
-  label: "Giao ca & vận hành (Điều phối)",
-  items: [
+    { text: "Nhân viên", path: "/users", module: "users", roles: ADM_DISP },
     { text: "Công việc", path: "/jobs", module: "jobs", roles: ADM },
     { text: "Biện pháp an toàn", path: "/safetyMeasures", module: "safety-measures", roles: ADM },
-    { text: "Cung độ", path: "/travelLog", module: "travel-logs", roles: ADM },
-    { text: "Mô hình xe", path: "/models", module: "models", roles: ADM_DISP },
   ],
 };
 
@@ -210,24 +203,19 @@ const dpmmItem = (i: DpmmCatalogItem): MergedCatalogItem => ({
 
 /**
  * Menu "Danh mục" gộp, đã lọc theo quyền của người dùng (`user`: kết quả /auth/me gồm role, permissionMode,
- * permissions). Nhóm rỗng bị bỏ. Thứ tự nhóm theo Thống kê, nhóm "Danh mục Hệ thống" rồi nhóm chỉ-Điều-phối ở cuối.
+ * permissions). Nhóm rỗng bị bỏ. Thứ tự nhóm theo MERGED_GROUP_ORDER; trong mỗi nhóm mục Thống kê đứng trước,
+ * mục Điều phối đứng sau.
  */
 export function buildMergedCatalog(user: any): MergedCatalogGroup[] {
-  const groups: MergedCatalogGroup[] = TK_CATALOG_GROUPS.map((g) => {
-    const tk: MergedCatalogItem[] = g.items
+  const groups: MergedCatalogGroup[] = MERGED_GROUP_ORDER.map((label) => {
+    const tk: MergedCatalogItem[] = (TK_CATALOG_GROUPS.find((g) => g.label === label)?.items ?? [])
       .filter((i) => allowModule(user, i.module, TK_LEGACY_ROLES))
       .map((i) => ({ text: i.text, path: tkPageRoute(i.to), source: "thongke" as const, module: i.module }));
-    const dp: MergedCatalogItem[] = (DPMM_EXTRAS[g.label] || [])
+    const dp: MergedCatalogItem[] = (DPMM_GROUP_ITEMS[label] ?? [])
       .filter((i) => allowModule(user, i.module, i.roles))
       .map(dpmmItem);
-    return { label: g.label, items: [...tk, ...dp] };
+    return { label, items: [...tk, ...dp] };
   });
-  for (const extra of [SYSTEM_GROUP, DPMM_ONLY_GROUP]) {
-    groups.push({
-      label: extra.label,
-      items: extra.items.filter((i) => allowModule(user, i.module, i.roles)).map(dpmmItem),
-    });
-  }
   return groups.filter((g) => g.items.length > 0);
 }
 

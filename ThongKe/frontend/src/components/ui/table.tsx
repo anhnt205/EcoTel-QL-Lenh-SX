@@ -2,6 +2,9 @@ import * as React from "react";
 
 import { cn } from "@/utils/cn";
 
+/** Số dòng hiển thị tối đa không cuộn; nhiều hơn thì khung giữ chiều cao 15 dòng và cuộn dọc (tiêu đề đứng yên). */
+const VISIBLE_ROWS = 15;
+
 function Table({
   className,
   containerClassName,
@@ -11,14 +14,42 @@ function Table({
   containerClassName?: string;
   containerStyle?: React.CSSProperties;
 }) {
+  const boxRef = React.useRef<HTMLDivElement>(null);
+  const [cap, setCap] = React.useState<number | undefined>(undefined);
+  const hasOwnMax = containerStyle?.maxHeight != null;
+
+  // Đo tiêu đề + 15 dòng đầu thực tế (độ cao dòng khác nhau theo từng bảng) → đặt max-height cho khung; ≤15 dòng thì không giới hạn.
+  React.useLayoutEffect(() => {
+    const box = boxRef.current;
+    if (!box || hasOwnMax) return;
+    const measure = () => {
+      // bảng "chảy theo trang" (overflow visible) hoặc khung tự co giãn theo màn hình (flex-1, toàn màn hình) thì không giới hạn
+      if (getComputedStyle(box).overflowX === "visible" || box.classList.contains("flex-1")) return setCap((c) => (c === undefined ? c : undefined));
+      const rows = box.querySelectorAll<HTMLElement>(":scope > table > tbody > tr");
+      if (rows.length <= VISIBLE_ROWS) return setCap((c) => (c === undefined ? c : undefined));
+      const head = box.querySelector<HTMLElement>(":scope > table > thead");
+      let h = head?.offsetHeight ?? 0;
+      for (let i = 0; i < VISIBLE_ROWS; i++) h += rows[i].offsetHeight;
+      const next = h + 14; // chỗ cho thanh cuộn ngang + viền
+      setCap((c) => (c === next ? c : next));
+    };
+    measure();
+    const tbl = box.querySelector("table");
+    const ro = tbl ? new ResizeObserver(measure) : undefined;
+    if (tbl) ro?.observe(tbl);
+    return () => ro?.disconnect();
+  }, [hasOwnMax]);
+
   return (
     <div
+      ref={boxRef}
       data-slot="table-container"
+      data-capped={cap !== undefined ? "true" : undefined}
       className={cn(
-        "relative w-full overflow-x-auto rounded-xl border border-zinc-200/80 bg-white shadow-2xs",
+        "relative w-full overflow-x-auto rounded-xl border border-[#8fa9cc] bg-white shadow-2xs",
         containerClassName,
       )}
-      style={containerStyle}
+      style={cap !== undefined ? { ...containerStyle, maxHeight: cap, overflowY: "auto" } : containerStyle}
     >
       <table
         data-slot="table"
@@ -50,7 +81,7 @@ function TableBody({ className, ...props }: React.ComponentProps<"tbody">) {
     <tbody
       data-slot="table-body"
       className={cn(
-        "[&_tr:last-child]:border-0 divide-y divide-zinc-100",
+        "[&_tr:last-child]:border-0 divide-y divide-[#b4c8e2]",
         className,
       )}
       {...props}
@@ -76,7 +107,7 @@ function TableRow({ className, ...props }: React.ComponentProps<"tr">) {
     <tr
       data-slot="table-row"
       className={cn(
-        "border-b border-zinc-100/80 transition-colors hover:bg-zinc-50/80 has-aria-expanded:bg-zinc-50/80 data-[state=selected]:bg-amber-50/50",
+        "border-b border-[#b4c8e2] transition-colors hover:bg-zinc-50/80 has-aria-expanded:bg-zinc-50/80 data-[state=selected]:bg-amber-50/50",
         className,
       )}
       {...props}
@@ -89,7 +120,7 @@ function TableHead({ className, ...props }: React.ComponentProps<"th">) {
     <th
       data-slot="table-head"
       className={cn(
-        "h-11 px-4 py-3 text-left align-middle text-sm font-bold tracking-wider text-slate-800 dark:text-slate-100 whitespace-nowrap [&:has([role=checkbox])]:pr-0",
+        "h-11 px-4 py-3 text-left align-middle text-sm font-bold tracking-wider text-slate-800 dark:text-slate-100 whitespace-nowrap border-r border-black/30 last:border-r-0 [&:has([role=checkbox])]:pr-0",
         className,
       )}
       {...props}
@@ -102,7 +133,7 @@ function TableCell({ className, ...props }: React.ComponentProps<"td">) {
     <td
       data-slot="table-cell"
       className={cn(
-        "px-4 py-3.5 align-middle text-sm text-zinc-700 whitespace-nowrap [&:has([role=checkbox])]:pr-0",
+        "px-4 py-3.5 align-middle text-sm text-zinc-700 whitespace-nowrap border-r border-[#b4c8e2] last:border-r-0 [&:has([role=checkbox])]:pr-0",
         className,
       )}
       {...props}

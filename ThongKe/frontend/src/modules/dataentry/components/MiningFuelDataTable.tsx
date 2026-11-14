@@ -1,3 +1,5 @@
+import RowsPerPage, { PageArrows } from "@/components/table/RowsPerPage";
+import { displayTextFilter, useTanstackLayout } from "@/components/table/useTanstackLayout";
 import React, { useState } from "react";
 import {
   useReactTable,
@@ -21,23 +23,12 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
-  ChevronLeft,
-  ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
   Columns3,
 } from "lucide-react";
 
@@ -63,23 +54,30 @@ export const MiningFuelDataTable: React.FC<MiningFuelDataTableProps> = ({
     [selectedIds, onToggleSelectAll, onToggleSelectRow],
   );
 
+  const layout = useTanstackLayout("mining-fuel");
   const table = useReactTable({
     data,
     columns,
     state: {
+      columnSizing: layout.columnSizing,
       sorting,
       columnVisibility,
     },
     onSortingChange: setSorting,
+    onColumnSizingChange: layout.setColumnSizing,
+    enableColumnResizing: true,
+    columnResizeMode: "onChange",
     onColumnVisibilityChange: setColumnVisibility,
     getCoreRowModel: getCoreRowModel(),
+    // lọc theo cột (nút ba chấm ở tiêu đề): so khớp chứa, không phân biệt hoa thường, dùng được cho cả cột số
+    defaultColumn: { filterFn: displayTextFilter },
     getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     getRowId: (row, relativeIndex) => `${row.id || "fuel"}_f_${relativeIndex}`,
     initialState: {
       pagination: {
-        pageSize: 20,
+        pageSize: 15,
       },
     },
   });
@@ -95,15 +93,19 @@ export const MiningFuelDataTable: React.FC<MiningFuelDataTableProps> = ({
           </strong>
         </span>
 
+        <div className="flex items-center gap-2">
+        {layout.button}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
               variant="outline"
               size="sm"
-              className="h-7 text-xs gap-1.5 bg-white dark:bg-gray-900"
+              className="h-7 w-7 p-0 bg-white dark:bg-gray-900"
+              title="Hiển thị cột"
+              aria-label="Hiển thị cột"
             >
               <Columns3 className="w-3.5 h-3.5" />
-              <span>Hiển thị cột</span>
+
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48">
@@ -130,10 +132,11 @@ export const MiningFuelDataTable: React.FC<MiningFuelDataTableProps> = ({
               })}
           </DropdownMenuContent>
         </DropdownMenu>
+        </div>
       </div>
 
       {/* Main Data Table */}
-      <div className="border border-gray-200 dark:border-gray-800 rounded-lg overflow-x-auto bg-white dark:bg-gray-900 shadow-sm">
+      <div ref={layout.containerRef} className={`${layout.rowClass} border border-gray-200 dark:border-gray-800 rounded-lg overflow-x-auto bg-white dark:bg-gray-900 shadow-sm`}>
         <Table
           className="text-xs border-collapse"
           style={{ width: "100%", minWidth: table.getTotalSize(), tableLayout: "fixed" }}
@@ -153,7 +156,8 @@ export const MiningFuelDataTable: React.FC<MiningFuelDataTableProps> = ({
                   <TableHead
                     key={header.id}
                     colSpan={header.colSpan}
-                    style={{ width: header.getSize() }}
+                    style={{ width: header.getSize(), position: "relative", paddingRight: header.column.getCanFilter() ? 22 : undefined }}
+                    data-col={header.column.id}
                     className="px-1.5 py-1.5 text-center border-r border-blue-400/60 dark:border-blue-400/60 text-white font-bold whitespace-normal break-words leading-tight align-middle min-h-[36px] overflow-hidden [&_button]:text-white [&_button]:hover:text-white [&_button]:hover:bg-blue-600/50"
                   >
                     {header.isPlaceholder
@@ -162,6 +166,8 @@ export const MiningFuelDataTable: React.FC<MiningFuelDataTableProps> = ({
                           header.column.columnDef.header,
                           header.getContext(),
                         )}
+                    {layout.filterButton(header)}
+                    {layout.resizer(header)}
                   </TableHead>
                 ))}
               </TableRow>
@@ -186,6 +192,7 @@ export const MiningFuelDataTable: React.FC<MiningFuelDataTableProps> = ({
                       <TableCell
                         key={cell.id}
                         style={{ width: cell.column.getSize() }}
+                        data-col={cell.column.id}
                         className="px-2 py-2 text-center border-r border-gray-100 dark:border-gray-800/60 whitespace-nowrap overflow-hidden text-ellipsis"
                       >
                         {flexRender(
@@ -212,76 +219,16 @@ export const MiningFuelDataTable: React.FC<MiningFuelDataTableProps> = ({
       </div>
 
       {/* Pagination Bar */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-1 text-xs text-gray-600 dark:text-gray-400">
-        <div className="flex items-center gap-2">
-          <span>Hiển thị</span>
-          <Select
-            value={String(table.getState().pagination.pageSize)}
-            onValueChange={(v) => table.setPageSize(Number(v))}
-          >
-            <SelectTrigger className="h-7 text-xs w-40 bg-white dark:bg-gray-900">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="10">10</SelectItem>
-              <SelectItem value="20">20</SelectItem>
-              <SelectItem value="50">50</SelectItem>
-            </SelectContent>
-          </Select>
-          <span>
-            trên tổng số{" "}
-            <strong className="text-gray-900 dark:text-gray-100">
-              {data.length}
-            </strong>{" "}
-            bản ghi
-          </span>
-        </div>
+      <div className="flex flex-col sm:flex-row items-center justify-end gap-2 pt-1 text-xs text-gray-600 dark:text-gray-400">
+        <RowsPerPage
+          value={table.getState().pagination.pageSize}
+          onChange={(n) => table.setPageSize(n)}
+          from={table.getFilteredRowModel().rows.length ? table.getState().pagination.pageIndex * table.getState().pagination.pageSize + 1 : 0}
+          to={Math.min((table.getState().pagination.pageIndex + 1) * table.getState().pagination.pageSize, table.getFilteredRowModel().rows.length)}
+          total={table.getFilteredRowModel().rows.length}
+        />
 
-        {/* Page controls */}
-        <div className="flex items-center gap-1">
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={!table.getCanPreviousPage()}
-            onClick={() => table.setPageIndex(0)}
-            className="h-7 w-7 p-0"
-          >
-            <ChevronsLeft className="w-3.5 h-3.5" />
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={!table.getCanPreviousPage()}
-            onClick={() => table.previousPage()}
-            className="h-7 w-7 p-0"
-          >
-            <ChevronLeft className="w-3.5 h-3.5" />
-          </Button>
-
-          <span className="px-2 text-xs font-semibold">
-            Trang {table.getState().pagination.pageIndex + 1} /{" "}
-            {table.getPageCount() || 1}
-          </span>
-
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={!table.getCanNextPage()}
-            onClick={() => table.nextPage()}
-            className="h-7 w-7 p-0"
-          >
-            <ChevronRight className="w-3.5 h-3.5" />
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={!table.getCanNextPage()}
-            onClick={() => table.setPageIndex(table.getPageCount() - 1)}
-            className="h-7 w-7 p-0"
-          >
-            <ChevronsRight className="w-3.5 h-3.5" />
-          </Button>
-        </div>
+        <PageArrows canPrev={table.getCanPreviousPage()} canNext={table.getCanNextPage()} onPrev={() => table.previousPage()} onNext={() => table.nextPage()} onFirst={() => table.setPageIndex(0)} onLast={() => table.setPageIndex(Math.max(0, table.getPageCount() - 1))} />
       </div>
     </div>
   );

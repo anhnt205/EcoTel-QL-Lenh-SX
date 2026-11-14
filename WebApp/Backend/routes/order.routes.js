@@ -26,6 +26,7 @@ const xlsx = require("xlsx");
 const dayjs = require("dayjs");
 const Device = require("../models/Device");
 const DeviceType = require("../models/DeviceType");
+const Location = require("../models/Location");
 
 const { verifyToken, restrictTo } = require("../middleware/auth.middleware");
 const { paginateQuery } = require("../utils/pagination");
@@ -37,21 +38,55 @@ const {
   frozenEditDecision,
 } = require("../services/orderSnapshot");
 const { freezeOrder } = require("../services/orderFreeze");
-const { safeRegex } = require("../utils/escapeRegex");
+const { safeRegex, escapeRegex } = require("../utils/escapeRegex");
 
-router.get("/", verifyToken, async (req, res, next) => {
-  try {
+/**
+ * Dựng bộ lọc (query Mongo) cho danh sách lệnh sản xuất từ tham số URL.
+ * Dùng chung cho: danh sách lệnh (GET /) và danh sách giá trị của một cột (GET /column-values,
+ * bộ lọc kiểu Excel). `skipField` = cột đang mở hộp lọc → bỏ chính bộ lọc của cột đó (giống Excel),
+ * các bộ lọc khác vẫn áp dụng.
+ *
+ * Mỗi cột lọc được theo 2 cách: `field=chuỗi` (chứa chuỗi, không phân biệt hoa thường) hoặc
+ * `field__in=["giá trị 1","giá trị 2"]` (khớp đúng một trong các giá trị đã tick).
+ */
+async function buildOrderListQuery(req, skipField) {
     const user = req.user;
     const query = {};
+    const qs = { ...req.query };
+    if (skipField) {
+      delete qs[skipField];
+      delete qs[`${skipField}__in`];
+    }
+    const multiOf = (f) => {
+      const raw = qs[`${f}__in`];
+      if (!raw) return null;
+      try {
+        const a = JSON.parse(raw);
+        return Array.isArray(a) ? a.map(String) : null;
+      } catch (e) {
+        return null;
+      }
+    };
+    const hasF = (f) => Boolean(qs[f]) || multiOf(f) !== null;
+    const rxF = (f) => {
+      const m = multiOf(f);
+      if (m) {
+        return new RegExp(
+          `^(?:${m.length ? m.map((v) => escapeRegex(v)).join("|") : "(?!)"})$`,
+          "i",
+        );
+      }
+      return safeRegex(qs[f]);
+    };
 
     // ---- Bộ lọc chung ----
-    if (req.query.q) {
-      const regex = safeRegex(req.query.q);
+    if (qs.q) {
+      const regex = safeRegex(qs.q);
 
       // tìm user theo salaryCode
       const matchedUsers = await User.find(
         {
-          $or: [{ salaryCode: req.query.q }, { fullName: regex }],
+          $or: [{ salaryCode: qs.q }, { fullName: regex }],
         },
         { _id: 1 },
       ).lean();
@@ -70,8 +105,8 @@ router.get("/", verifyToken, async (req, res, next) => {
         query._id = null;
       }
     }
-    if (req.query.assignedTo) {
-      const regex = safeRegex(req.query.assignedTo);
+    if (hasF("assignedTo")) {
+      const regex = rxF("assignedTo");
 
       // tìm user theo salaryCode
       const matchedUsers = await User.find(
@@ -83,8 +118,8 @@ router.get("/", verifyToken, async (req, res, next) => {
         $in: userIds.map((id) => new mongoose.Types.ObjectId(id)),
       };
     }
-    if (req.query.createdBy) {
-      const regex = safeRegex(req.query.createdBy);
+    if (hasF("createdBy")) {
+      const regex = rxF("createdBy");
 
       // tìm user theo salaryCode
       const matchedUsers = await User.find(
@@ -96,27 +131,32 @@ router.get("/", verifyToken, async (req, res, next) => {
         $in: userIds.map((id) => new mongoose.Types.ObjectId(id)),
       };
     }
-    if (req.query.salaryCode) {
-      // tìm user theo salaryCode
+    if (hasF("salaryCode")) {
+      // tìm user theo salaryCode — "chứa chuỗi" (gõ dở vẫn lọc được), không phân biệt hoa thường
       const matchedUsers = await User.find(
-        { salaryCode: req.query.salaryCode },
+        { salaryCode: rxF("salaryCode") },
         { _id: 1 },
       ).lean();
-      const userIds = matchedUsers.map((u) => u._id);
+      let userIds = matchedUsers.map((u) => String(u._id));
+      // đang lọc thêm theo "Người nhận lệnh" thì lấy phần chung của hai bộ lọc (không để cái sau ghi đè cái trước)
+      if (query.assignedTo?.$in) {
+        const had = new Set(query.assignedTo.$in.map((id) => String(id)));
+        userIds = userIds.filter((id) => had.has(id));
+      }
       query.assignedTo = {
         $in: userIds.map((id) => new mongoose.Types.ObjectId(id)),
       };
     }
-    if (req.query.job) {
-      const regex = safeRegex(req.query.job);
+    if (hasF("job")) {
+      const regex = rxF("job");
 
       // tìm user theo salaryCode
       const matchedJobs = await Job.find({ name: regex }, { _id: 1 }).lean();
       const jobIds = matchedJobs.map((j) => j._id);
       query.job = { $in: jobIds.map((id) => new mongoose.Types.ObjectId(id)) };
     }
-    if (req.query.device) {
-      const regex = safeRegex(req.query.device);
+    if (hasF("device")) {
+      const regex = rxF("device");
 
       // tìm user theo salaryCode
       const matchedDevices = await Device.find(
@@ -128,8 +168,8 @@ router.get("/", verifyToken, async (req, res, next) => {
         $in: deviceIds.map((id) => new mongoose.Types.ObjectId(id)),
       };
     }
-    if (req.query.material) {
-      const regex = safeRegex(req.query.material);
+    if (hasF("material")) {
+      const regex = rxF("material");
 
       const matchedMaterials = await Material.find(
         { name: regex },
@@ -140,9 +180,44 @@ router.get("/", verifyToken, async (req, res, next) => {
         $in: materialIds.map((id) => new mongoose.Types.ObjectId(id)),
       };
     }
-    if (req.query.shift) {
+    // Các cột còn lại có nút lọc ba chấm: Nội dung lệnh, Thiết bị sửa chữa, Máy xúc, Điểm đổ, Ngày làm việc
+    if (hasF("workContent")) {
+      const regex = rxF("workContent");
+      if (regex) query.workContent = regex;
+    }
+    if (hasF("repairVehicles")) {
+      const regex = rxF("repairVehicles");
+      const ids = (await Device.find({ code: regex }, { _id: 1 }).lean()).map((d) => d._id);
+      query["repairVehicles.device"] = { $in: ids };
+    }
+    if (hasF("excavator")) {
+      const regex = rxF("excavator");
+      const ids = (await Device.find({ code: regex }, { _id: 1 }).lean()).map((d) => d._id);
+      query["excavator.device"] = { $in: ids };
+    }
+    if (hasF("location")) {
+      const regex = rxF("location");
+      const ids = (await Location.find({ name: regex }, { _id: 1 }).lean()).map((l) => l._id);
+      query.location = { $in: ids };
+    }
+    if (hasF("workingDate")) {
+      // gõ theo dạng đang hiển thị (dd-MM-yyyy), "/" cũng được; chứa chuỗi — vd "10-11", "11-2026".
+      // Chọn từ danh sách (workingDate__in) thì khớp đúng các ngày đã tick.
+      const regex = multiOf("workingDate")
+        ? rxF("workingDate")
+        : safeRegex(String(qs.workingDate).trim().replace(/\//g, "-"));
+      if (regex) {
+        query.$expr = {
+          $regexMatch: {
+            input: { $dateToString: { format: "%d-%m-%Y", date: "$workingDate", timezone: "Asia/Ho_Chi_Minh" } },
+            regex: regex.source,
+          },
+        };
+      }
+    }
+    if (hasF("shift")) {
       const matchedShifts = await Shift.find(
-        { name: req.query.shift },
+        { name: rxF("shift") },
         { _id: 1 },
       ).lean();
       const shiftIds = matchedShifts.map((u) => u._id);
@@ -151,17 +226,17 @@ router.get("/", verifyToken, async (req, res, next) => {
       };
     }
 
-    if (req.query.startTime && req.query.endTime) {
-      const endTime = new Date(req.query.endTime);
+    if (qs.startTime && qs.endTime) {
+      const endTime = new Date(qs.endTime);
       endTime.setHours(23, 59, 59, 999);
       query.workingDate = {
-        $gte: new Date(req.query.startTime),
+        $gte: new Date(qs.startTime),
         $lte: new Date(endTime),
       };
-    } else if (req.query.startTime) {
-      query.workingDate = { $gte: new Date(req.query.startTime) };
-    } else if (req.query.endTime) {
-      const endTime = new Date(req.query.endTime);
+    } else if (qs.startTime) {
+      query.workingDate = { $gte: new Date(qs.startTime) };
+    } else if (qs.endTime) {
+      const endTime = new Date(qs.endTime);
       endTime.setHours(23, 59, 59, 999);
       query.workingDate = { $lte: new Date(endTime) };
     }
@@ -181,9 +256,89 @@ router.get("/", verifyToken, async (req, res, next) => {
         { createdBy: { $in: ids } },
       ];
     }
-    if (req.query.department) {
-      query.department = new mongoose.Types.ObjectId(req.query.department);
+    if (qs.department) {
+      query.department = new mongoose.Types.ObjectId(qs.department);
     }
+    return query;
+}
+
+/**
+ * Danh sách giá trị khác nhau của MỘT cột (cho hộp lọc kiểu Excel: tick chọn / tìm kiếm).
+ * Áp mọi bộ lọc hiện hành (ngày, đơn vị, trạng thái, các cột khác) trừ chính cột đang mở.
+ * GET /column-values?field=device&...(cùng tham số với danh sách lệnh)
+ */
+const COLUMN_VALUE_LIMIT = 2000;
+router.get("/column-values", verifyToken, async (req, res) => {
+  try {
+    const field = String(req.query.field || "");
+    const query = await buildOrderListQuery(req, field);
+    if (req.query.status) query.status = req.query.status;
+
+    const byIds = async (ids, Model, pick) => {
+      const docs = await Model.find({ _id: { $in: ids } }, pick.select).lean();
+      return docs.map(pick.value);
+    };
+    let values;
+    switch (field) {
+      case "assignedTo":
+        values = await byIds(await Order.distinct("assignedTo", query), User, { select: "fullName", value: (u) => u.fullName });
+        break;
+      case "salaryCode":
+        values = await byIds(await Order.distinct("assignedTo", query), User, { select: "salaryCode", value: (u) => u.salaryCode });
+        break;
+      case "createdBy":
+        values = await byIds(await Order.distinct("createdBy", query), User, { select: "fullName", value: (u) => u.fullName });
+        break;
+      case "shift":
+        values = await byIds(await Order.distinct("shift", query), Shift, { select: "name", value: (s) => s.name });
+        break;
+      case "job":
+        values = await byIds(await Order.distinct("job", query), Job, { select: "name", value: (j) => j.name });
+        break;
+      case "device":
+        values = await byIds(await Order.distinct("device", query), Device, { select: "code", value: (d) => d.code });
+        break;
+      case "repairVehicles":
+        values = await byIds(await Order.distinct("repairVehicles.device", query), Device, { select: "code", value: (d) => d.code });
+        break;
+      case "excavator":
+        values = await byIds(await Order.distinct("excavator.device", query), Device, { select: "code", value: (d) => d.code });
+        break;
+      case "material":
+        values = await byIds(await Order.distinct("material", query), Material, { select: "name", value: (m) => m.name });
+        break;
+      case "location":
+        values = await byIds(await Order.distinct("location", query), Location, { select: "name", value: (l) => l.name });
+        break;
+      case "workContent":
+        values = await Order.distinct("workContent", query);
+        break;
+      case "workingDate": {
+        const rows = await Order.aggregate([
+          { $match: query },
+          { $group: { _id: { $dateToString: { format: "%Y-%m-%d", date: "$workingDate", timezone: "Asia/Ho_Chi_Minh" } } } },
+          { $sort: { _id: -1 } },
+        ]);
+        // hiển thị đúng dạng cột "Ngày làm việc" (dd-MM-yyyy), mới nhất trước
+        const values = rows.filter((r) => r._id).map((r) => r._id.split("-").reverse().join("-"));
+        return res.status(200).json({ status: "success", values: values.slice(0, COLUMN_VALUE_LIMIT), truncated: values.length > COLUMN_VALUE_LIMIT });
+      }
+      default:
+        return res.status(400).json({ status: "fail", message: "Cột không hỗ trợ lọc" });
+    }
+    const collator = new Intl.Collator("vi", { numeric: true, sensitivity: "base" });
+    const uniq = [...new Set(values.map((v) => String(v ?? "").trim()).filter(Boolean))].sort(collator.compare);
+    res.status(200).json({ status: "success", values: uniq.slice(0, COLUMN_VALUE_LIMIT), truncated: uniq.length > COLUMN_VALUE_LIMIT });
+  } catch (err) {
+    req.logger?.error("❌ Lỗi column-values", err);
+    res.status(500).json({ status: "error", message: "Không lấy được danh sách giá trị" });
+  }
+});
+
+router.get("/", verifyToken, async (req, res, next) => {
+  try {
+    const user = req.user;
+    const query = await buildOrderListQuery(req, null);
 
     // chỉ sort workingDate trong DB
 

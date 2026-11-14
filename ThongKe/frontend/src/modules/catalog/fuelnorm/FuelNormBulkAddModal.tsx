@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Trash2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import DIcon from "../design/DIcon";
+import "@/styles/catalog-design.css";
 import api from "@/config/api.config";
 import {
   FUEL_NORM_SUFFIXES,
@@ -148,135 +148,127 @@ export function FuelNormBulkAddModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/40 p-4">
-      <div className="flex max-h-[85vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl bg-white shadow-xl dark:bg-gray-900">
-        <div className="border-b border-gray-200 px-6 py-4 dark:border-gray-800">
-          <h2 className="text-base font-semibold">Thêm bộ định mức</h2>
-          <p className="text-xs text-muted-foreground">
-            Chọn nhiều Chủng loại xe và Hậu tố — danh sách Cung độ nhập một lần, áp dụng chung cho tất cả tổ hợp đã chọn.
-          </p>
+    <div
+      className="tkc-modal-overlay"
+      style={{ zIndex: 110 }}
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div className="modal" style={{ width: "min(900px, 100%)" }} role="dialog" aria-modal="true" aria-label="Thêm bộ định mức">
+        <div className="modal-header">
+          <div>
+            <h2>Thêm bộ định mức</h2>
+            <p>Chọn nhiều Chủng loại xe và Hậu tố — danh sách Cung độ nhập một lần, áp dụng chung cho tất cả tổ hợp đã chọn.</p>
+          </div>
+          <button className="close-modal" style={{ marginLeft: "auto" }} aria-label="Đóng" onClick={onClose}>
+            <DIcon name="x" />
+          </button>
         </div>
 
-        <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 overflow-auto px-6 py-4 md:grid-cols-2">
-          <div>
-            <label className="mb-1.5 block text-xs font-medium">Chủng loại xe</label>
-            {isLoading ? (
-              <p className="text-sm text-muted-foreground">Đang tải…</p>
-            ) : (
-              <div className="max-h-48 space-y-0.5 overflow-auto rounded-md border p-2">
-                {vehicles.map((v) => (
-                  <label key={v.id} className="flex items-center gap-2 rounded px-2 py-1 text-sm hover:bg-muted/60">
-                    <input
-                      type="checkbox"
-                      className="h-4 w-4 accent-blue-600"
-                      checked={vehicleCodes.has(v.code)}
-                      onChange={() => toggleVehicle(v.code)}
-                    />
-                    <span className="truncate">
-                      {v.name} ({v.code})
-                    </span>
-                    {vehiclesWithData.has(v.code) && (
-                      <span className="ml-auto shrink-0 rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-700 dark:bg-blue-950/30 dark:text-blue-300">
-                        đã có
-                      </span>
-                    )}
-                  </label>
-                ))}
+        <div className="modal-body">
+          <div className="fn-grid">
+            <div className="fn-col">
+              <div className="form-group">
+                <label>Chủng loại xe</label>
+                {isLoading ? (
+                  <p className="entry-empty">Đang tải…</p>
+                ) : (
+                  <div className="fn-box fn-scroll">
+                    {vehicles.map((v) => (
+                      <label key={v.id} className="fn-item">
+                        <input type="checkbox" className="checkbox" checked={vehicleCodes.has(v.code)} onChange={() => toggleVehicle(v.code)} />
+                        <span className="fn-name">
+                          {v.name} ({v.code})
+                        </span>
+                        {vehiclesWithData.has(v.code) && <span className="fn-tag">đã có</span>}
+                      </label>
+                    ))}
+                  </div>
+                )}
               </div>
-            )}
 
-            <label className="mb-1.5 mt-3 block text-xs font-medium">Hậu tố</label>
-            <div className="flex gap-4 rounded-md border p-2.5">
-              {FUEL_NORM_SUFFIXES.map((s) => (
-                <label key={s.value} className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    className="h-4 w-4 accent-blue-600"
-                    checked={suffixes.has(s.value)}
-                    onChange={() => toggleSuffix(s.value)}
-                  />
-                  {s.label}
-                </label>
-              ))}
+              <div className="form-group" style={{ marginTop: 14 }}>
+                <label>Hậu tố</label>
+                <div className="fn-box fn-row">
+                  {FUEL_NORM_SUFFIXES.map((s) => (
+                    <label key={s.value} className="fn-item">
+                      <input type="checkbox" className="checkbox" checked={suffixes.has(s.value)} onChange={() => toggleSuffix(s.value)} />
+                      {s.label}
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {selectedExisting.length > 0 && (
+                <div className="fn-had">
+                  <p className="fn-had-title">Đã có sẵn — cung độ trùng bên phải sẽ tự bỏ qua khi thêm:</p>
+                  {selectedExisting.map((ds) => (
+                    <div key={ds.vehicleSuffixKey} className="fn-had-set">
+                      <div className="fn-had-head">
+                        <strong>{ds.vehicleSuffixKey}</strong>
+                        {onRemoveDataset && (
+                          <button
+                            type="button"
+                            title="Xoá cả bộ này"
+                            className="fn-link-danger"
+                            onClick={() => {
+                              if (window.confirm(`Xoá cả bộ dữ liệu "${ds.vehicleSuffixKey}" và toàn bộ giá trị của nó?`)) {
+                                onRemoveDataset(ds.vehicleSuffixKey);
+                              }
+                            }}
+                          >
+                            Xoá cả bộ
+                          </button>
+                        )}
+                      </div>
+                      <div className="fn-chips">
+                        {ds.columns.map((c) => (
+                          <span key={c.key} className="fn-chip">
+                            {c.distance}
+                            {onRemoveColumn && (
+                              <button type="button" className="fn-chip-x" title="Xoá cung độ này" aria-label="Xoá cung độ này" onClick={() => onRemoveColumn(c.key)}>
+                                <DIcon name="trash" />
+                              </button>
+                            )}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
-            {selectedExisting.length > 0 && (
-              <div className="mt-3 space-y-2 rounded-md border border-blue-200 bg-blue-50/50 p-2.5 dark:border-blue-900/40 dark:bg-blue-950/10">
-                <p className="text-[11px] font-medium text-blue-800 dark:text-blue-300">
-                  Đã có sẵn — cung độ trùng bên phải sẽ tự bỏ qua khi thêm:
-                </p>
-                {selectedExisting.map((ds) => (
-                  <div key={ds.vehicleSuffixKey} className="space-y-1">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold">{ds.vehicleSuffixKey}</span>
-                      {onRemoveDataset && (
-                        <button
-                          type="button"
-                          title="Xoá cả bộ này"
-                          className="text-[10px] text-red-600 hover:underline"
-                          onClick={() => {
-                            if (window.confirm(`Xoá cả bộ dữ liệu "${ds.vehicleSuffixKey}" và toàn bộ giá trị của nó?`)) {
-                              onRemoveDataset(ds.vehicleSuffixKey);
-                            }
-                          }}
-                        >
-                          Xoá cả bộ
-                        </button>
-                      )}
-                    </div>
-                    <div className="flex flex-wrap gap-1">
-                      {ds.columns.map((c) => (
-                        <span
-                          key={c.key}
-                          className="inline-flex items-center gap-1 rounded bg-white px-1.5 py-0.5 text-[10px] dark:bg-gray-800"
-                        >
-                          {c.distance}
-                          {onRemoveColumn && (
-                            <button type="button" title="Xoá cung độ này" onClick={() => onRemoveColumn(c.key)}>
-                              <Trash2 className="h-2.5 w-2.5 text-red-500" />
-                            </button>
-                          )}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                ))}
+            <div className="fn-col">
+              <div className="form-group">
+                <label>Cung độ (mỗi dòng một giá trị, hoặc cách nhau bởi dấu phẩy)</label>
+                <textarea
+                  rows={10}
+                  value={distanceText}
+                  onChange={(e) => setDistanceText(e.target.value)}
+                  placeholder={"0.05\n0.2\n0.4\n0.6\n0.8\n1"}
+                  className="field fn-textarea"
+                />
               </div>
-            )}
+              <p className="entry-total">
+                {vehicleCodes.size} chủng loại xe × {suffixes.size} hậu tố × {distances.filter((d) => !Number.isNaN(d)).length} cung độ ={" "}
+                <strong>{newColumns.length} cột mới</strong>
+                {duplicateCount > 0 && <> ({duplicateCount} đã có, sẽ bỏ qua)</>}
+              </p>
+            </div>
           </div>
 
-          <div>
-            <label className="mb-1.5 block text-xs font-medium">
-              Cung độ (mỗi dòng một giá trị, hoặc cách nhau bởi dấu phẩy)
-            </label>
-            <textarea
-              rows={10}
-              value={distanceText}
-              onChange={(e) => setDistanceText(e.target.value)}
-              placeholder={"0.05\n0.2\n0.4\n0.6\n0.8\n1"}
-              className="w-full resize-y rounded-md border bg-transparent px-3 py-2 font-mono text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-            />
-            <p className="mt-2 text-xs text-muted-foreground">
-              {vehicleCodes.size} chủng loại xe × {suffixes.size} hậu tố × {distances.filter((d) => !Number.isNaN(d)).length} cung độ ={" "}
-              <span className="font-semibold text-blue-700">{newColumns.length} cột mới</span>
-              {duplicateCount > 0 && <> ({duplicateCount} đã có, sẽ bỏ qua)</>}
-            </p>
-          </div>
+          {error && <div className="form-error">{error}</div>}
         </div>
 
-        {error && (
-          <p className="border-t border-red-200 bg-red-50 px-6 py-2 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-300">
-            {error}
-          </p>
-        )}
-
-        <div className="flex justify-end gap-2 border-t border-gray-200 px-6 py-3 dark:border-gray-800">
-          <Button variant="outline" onClick={onClose}>
+        <div className="modal-footer">
+          <button className="btn" onClick={onClose}>
             Huỷ
-          </Button>
-          <Button className="bg-blue-600 text-white hover:bg-blue-700" onClick={submit}>
+          </button>
+          <button className="btn btn-primary" onClick={submit}>
             Thêm{newColumns.length > 0 ? ` (${newColumns.length} cột)` : ""}
-          </Button>
+          </button>
         </div>
       </div>
     </div>

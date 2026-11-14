@@ -17,6 +17,8 @@ public interface DeviceTypeRepository extends JpaRepository<DeviceType, Long> {
 
     Optional<DeviceType> findByExternalNhomTaiSanId(String externalNhomTaiSanId);
 
+    Optional<DeviceType> findFirstByGroupOrderByIdAsc(com.ecotel.thong_ke_cao_son.enums.DeviceGroup group);
+
     @Query("""
         SELECT dt FROM DeviceType dt
         WHERE :keyword IS NULL OR :keyword = ''

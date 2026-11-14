@@ -50,8 +50,9 @@ import CustomDataGrid from "../../../components/Table/CustomDataGrid";
 import { parseAxiosError } from '../../../utils/handleApiError';
 import SearchInput from "../../../components/SearchInput";
 import dayjs from "dayjs";
-import { DatePicker, LocalizationProvider } from "@mui/x-date-pickers";
-import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
+import { LocalizationProvider } from "@mui/x-date-pickers";
+import DatePicker from "../../../components/design/DatePicker";
+import { AdapterDayjs } from "../../../components/design/AdapterDayjs";
 
 interface HistoryTimeSlot {
     id: string;
@@ -429,7 +430,7 @@ export default function MaterialType() {
                                     startIcon={<AddIcon />}
                                     onClick={() => handleOpen()}
                                 >
-                                    Thêm
+                                    Thêm mới
                                 </Button>
                                 <Button
                                     variant="contained"
@@ -520,7 +521,7 @@ export default function MaterialType() {
                                         variant="contained"
                                         startIcon={<UploadFile />}
                                     >
-                                        Tải lên excel
+                                        Tải lên (Excel)
                                     </Button>
                                 </label>
                                 <Button
@@ -529,7 +530,7 @@ export default function MaterialType() {
                                     startIcon={<Download />}
                                     onClick={() => exportExcel.mutate()}
                                 >
-                                    Tải xuống
+                                    Tải xuống (Excel)
                                 </Button>
                             </Box>
                         )}
