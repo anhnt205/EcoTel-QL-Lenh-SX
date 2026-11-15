@@ -34,7 +34,7 @@ import { useAtom } from "jotai";
 import { userAtom } from "../../atoms/userAtoms";
 import { RoleEnum, StatusDeviceEnum } from "../../enums";
 
-const filter = [
+export const filter = [
   "Thuê ngoài AB",
   "Thuê ngoài VN",
   "Thuê ngoài-QM",

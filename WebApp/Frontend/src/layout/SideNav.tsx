@@ -22,6 +22,8 @@ import {
   Dashboard,
   ExpandLess,
   ExpandMore,
+  Menu as MenuIcon,
+  MenuOpen as MenuOpenIcon,
   Notifications,
   WorkOutline,
 } from "@mui/icons-material";
@@ -307,7 +309,42 @@ const SideNav = ({ user, displayName, avatarSrc, notificationCount = 0, onBell, 
           }}
         />
       )}
-      <List sx={{ flex: 1, overflowY: "auto", overflowX: "hidden", p: "14px 12px 28px", position: "relative", scrollbarWidth: "thin" }}>
+      {/* Nút thu gọn / mở rộng ở ĐẦU thanh menu (nút mũi tên nhỏ ở chân menu vẫn còn, cùng trạng thái) */}
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: collapsed ? "center" : "space-between",
+          px: collapsed ? 0.5 : "20px",
+          pt: 1,
+          pb: 0.25,
+          position: "relative",
+          zIndex: 1,
+          flex: "none",
+        }}
+      >
+        {!collapsed && (
+          <Typography sx={{ fontSize: 11, letterSpacing: 1.2, fontWeight: 700, color: "#9db7e0", fontFamily: "Arial, Helvetica, sans-serif" }}>
+            MENU
+          </Typography>
+        )}
+        <Tooltip title={collapsed ? "Mở rộng menu" : "Thu gọn menu"} placement="right">
+          <IconButton
+            size="small"
+            aria-label={collapsed ? "Mở rộng menu" : "Thu gọn menu"}
+            aria-expanded={!collapsed}
+            onClick={() => setSidebarCollapsed(!collapsed)}
+            sx={{
+              color: "#e2e8f0",
+              bgcolor: alpha("#fff", 0.1),
+              "&:hover": { bgcolor: alpha("#fff", 0.2) },
+            }}
+          >
+            {collapsed ? <MenuIcon fontSize="small" /> : <MenuOpenIcon fontSize="small" />}
+          </IconButton>
+        </Tooltip>
+      </Box>
+      <List sx={{ flex: 1, overflowY: "auto", overflowX: "hidden", p: "6px 12px 28px", position: "relative", scrollbarWidth: "thin" }}>
         {entries.map((e) => (isGroup(e) ? groupButton(e) : leafButton(e)))}
       </List>
       {/* Chân menu: thông báo + tài khoản — chỉ khi banner (nơi chứa chúng) đã thu */}

@@ -33,7 +33,7 @@ import localforage from 'localforage';
 import { RoleEnum } from '../../enums';
 
 // Danh sách loại sản lượng
-const productions = [
+export const productions = [
     { key: 'KLD', name: 'Khối lượng đất thực hiện (m³)' },
     { key: 'TLT', name: 'Trọng lượng than thực hiện (tấn)' },
     { key: 'MKS', name: 'Mét khoan sâu (mks)' },
