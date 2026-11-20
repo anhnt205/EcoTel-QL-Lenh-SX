@@ -51,8 +51,15 @@ const SeamGroupsPage = lazy(() => import("@/modules/catalog/pages/SeamGroups"));
 const VehicleTypesPage = lazy(() => import("@/modules/catalog/pages/VehicleTypes"));
 const VehicleRankGroupsPage = lazy(() => import("@/modules/catalog/pages/VehicleRankGroups"));
 const VehicleRanksPage = lazy(() => import("@/modules/catalog/pages/VehicleRanks"));
-const VehicleFuelClassesPage = lazy(() => import("@/modules/catalog/pages/VehicleFuelClasses"));
+const ExcavatorBucketsPage = lazy(() => import("@/modules/catalog/pages/ExcavatorBuckets"));
 const CoefficientsPage = lazy(() => import("@/modules/catalog/pages/Coefficients"));
+const CoalCoefficientsPage = lazy(() => import("@/modules/catalog/pages/CoalCoefficients"));
+const WasteRockCoefficientsPage = lazy(() => import("@/modules/catalog/pages/WasteRockCoefficients"));
+const FuelSeasonFactorsPage = lazy(() => import("@/modules/catalog/pages/FuelFactorPages").then((m) => ({ default: m.FuelSeasonFactors })));
+const FuelRankFactorsPage = lazy(() => import("@/modules/catalog/pages/FuelFactorPages").then((m) => ({ default: m.FuelRankFactors })));
+const FuelRenovationFactorsPage = lazy(() => import("@/modules/catalog/pages/FuelFactorPages").then((m) => ({ default: m.FuelRenovationFactors })));
+const FuelCoalFactorsPage = lazy(() => import("@/modules/catalog/pages/FuelFactorPages").then((m) => ({ default: m.FuelCoalFactors })));
+const FuelBsnlFactorsPage = lazy(() => import("@/modules/catalog/pages/FuelFactorPages").then((m) => ({ default: m.FuelBsnlFactors })));
 const ReportPeriodsPage = lazy(() => import("@/modules/catalog/pages/ReportPeriods"));
 const ModelMatrixPage = lazy(() => import("@/modules/catalog/pages/ModelMatrix"));
 const ModelPeriodsPage = lazy(() => import("@/modules/catalog/model/ModelPeriodsPage"));
@@ -278,10 +285,10 @@ export const mainRoutes = (
         }
       />
       <Route
-        path={ROUTES.DANH_MUC.CHUNG_LOAI_XE_DMNL}
+        path={ROUTES.DANH_MUC.GAU_XUC}
         element={
           <Suspense fallback={<PageLoader />}>
-            <VehicleFuelClassesPage />
+            <ExcavatorBucketsPage />
           </Suspense>
         }
       />
@@ -306,6 +313,62 @@ export const mainRoutes = (
         element={
           <Suspense fallback={<PageLoader />}>
             <CoefficientsPage />
+          </Suspense>
+        }
+      />
+      <Route
+        path={ROUTES.DANH_MUC.HE_SO_THAN}
+        element={
+          <Suspense fallback={<PageLoader />}>
+            <CoalCoefficientsPage />
+          </Suspense>
+        }
+      />
+      <Route
+        path={ROUTES.DANH_MUC.HE_SO_DA_THAI}
+        element={
+          <Suspense fallback={<PageLoader />}>
+            <WasteRockCoefficientsPage />
+          </Suspense>
+        }
+      />
+      <Route
+        path={ROUTES.DANH_MUC.HE_SO_DMNL_MUA}
+        element={
+          <Suspense fallback={<PageLoader />}>
+            <FuelSeasonFactorsPage />
+          </Suspense>
+        }
+      />
+      <Route
+        path={ROUTES.DANH_MUC.HE_SO_DMNL_HANG_XE}
+        element={
+          <Suspense fallback={<PageLoader />}>
+            <FuelRankFactorsPage />
+          </Suspense>
+        }
+      />
+      <Route
+        path={ROUTES.DANH_MUC.HE_SO_DMNL_CAI_TAO_BEN}
+        element={
+          <Suspense fallback={<PageLoader />}>
+            <FuelRenovationFactorsPage />
+          </Suspense>
+        }
+      />
+      <Route
+        path={ROUTES.DANH_MUC.HE_SO_THAN_CNNK}
+        element={
+          <Suspense fallback={<PageLoader />}>
+            <FuelCoalFactorsPage />
+          </Suspense>
+        }
+      />
+      <Route
+        path={ROUTES.DANH_MUC.HE_SO_BSNL}
+        element={
+          <Suspense fallback={<PageLoader />}>
+            <FuelBsnlFactorsPage />
           </Suspense>
         }
       />

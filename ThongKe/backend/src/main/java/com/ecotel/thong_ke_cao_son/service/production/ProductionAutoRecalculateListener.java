@@ -3,9 +3,7 @@ package com.ecotel.thong_ke_cao_son.service.production;
 import com.ecotel.thong_ke_cao_son.event.ReconciliationApprovedEvent;
 import com.ecotel.thong_ke_cao_son.exception.BadRequestException;
 import com.ecotel.thong_ke_cao_son.exception.PeriodNotFullyApprovedException;
-import com.ecotel.thong_ke_cao_son.model.ProductionResult;
 import com.ecotel.thong_ke_cao_son.model.ReportPeriod;
-import com.ecotel.thong_ke_cao_son.repository.ProductionResultRepository;
 import com.ecotel.thong_ke_cao_son.repository.ReportPeriodRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,7 +19,7 @@ import java.util.Set;
  * Chủ dự án chốt 2026-09-10: Đối chiếu duyệt xong thì báo cáo thống kê sản
  * lượng phải TỰ tính luôn, không cần đợi người dùng bấm "Tính lại kỳ" (nút
  * đó vẫn giữ nguyên — dùng khi cần chủ động tính lại, ví dụ sau khi mở khoá
- * kỳ hoặc đổi chế độ TKE).
+ * kỳ hoặc sau khi sửa danh mục/STD).
  *
  * <p>Chạy SAU KHI transaction duyệt đã COMMIT ({@code AFTER_COMMIT}, cùng
  * pattern {@code ReconciliationWebSocketNotifier}) — {@code calculatePeriod}
@@ -66,7 +64,6 @@ import java.util.Set;
 public class ProductionAutoRecalculateListener {
 
     private final ReportPeriodRepository reportPeriodRepository;
-    private final ProductionResultRepository productionResultRepository;
     private final ProductionCalculationService productionCalculationService;
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
@@ -91,15 +88,8 @@ public class ProductionAutoRecalculateListener {
             return;
         }
 
-        // Kỳ chưa từng tính lần nào (chưa có dòng ProductionResult) thì chưa
-        // biết chế độ TKE nào đang áp dụng — mặc định false, giống hành vi
-        // form "Tính lại kỳ" ở frontend khi chưa ai chỉnh gì.
-        boolean tkeMode = productionResultRepository.findFirstByReportPeriod_Id(periodId)
-                .map(ProductionResult::isTkeMode)
-                .orElse(false);
-
         try {
-            productionCalculationService.calculatePeriod(periodId, tkeMode);
+            productionCalculationService.calculatePeriod(periodId);
             log.info("Tự động tính lại sản lượng kỳ {} (id={}) sau khi Đối chiếu duyệt",
                     period.getDisplayName(), periodId);
         } catch (PeriodNotFullyApprovedException e) {

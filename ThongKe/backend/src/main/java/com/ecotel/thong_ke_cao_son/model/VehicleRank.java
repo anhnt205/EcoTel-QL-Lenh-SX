@@ -40,9 +40,20 @@ public class VehicleRank {
      * từ khoá cửa sổ (window function) trong chuẩn SQL, tránh rủi ro xung đột
      * dù PostgreSQL hiện coi nó là non-reserved.
      */
-    @NotNull(message = "Xếp hạng là bắt buộc")
     @Column(name = "rank_order", nullable = false)
-    private Integer rank;
+    private Integer rank = 0;
+
+    /**
+     * Danh mục không còn nhập "Xếp hạng" (2026-11-15) — cột DB giữ NOT NULL nên không nhập thì ghi 0
+     * (không đụng schema trên các môi trường khác; engine không đọc trường này).
+     */
+    @PrePersist
+    @PreUpdate
+    void defaultRank() {
+        if (rank == null) {
+            rank = 0;
+        }
+    }
 
     /** Nhóm hạng xe — khoá ngoại bắt buộc. */
     @ManyToOne(fetch = FetchType.LAZY, optional = false)

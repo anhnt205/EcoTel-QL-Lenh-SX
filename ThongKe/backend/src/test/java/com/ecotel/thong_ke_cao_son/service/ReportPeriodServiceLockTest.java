@@ -56,9 +56,8 @@ class ReportPeriodServiceLockTest {
         return p;
     }
 
-    private static ProductionResult resultRow(boolean tke, String m3, String ton, String tkm) {
+    private static ProductionResult resultRow(String m3, String ton, String tkm) {
         ProductionResult r = new ProductionResult();
-        r.setTkeMode(tke);
         r.setTotalM3(new BigDecimal(m3));
         r.setTotalTon(new BigDecimal(ton));
         r.setTotalTkm(new BigDecimal(tkm));
@@ -102,8 +101,8 @@ class ReportPeriodServiceLockTest {
             ReportPeriod p = openPeriod();
             when(repository.findById(1L)).thenReturn(Optional.of(p));
             when(resultRepository.findAllByPeriod(1L)).thenReturn(List.of(
-                    resultRow(false, "100", "150", "300"),
-                    resultRow(false, "50", "75", "150")));
+                    resultRow("100", "150", "300"),
+                    resultRow("50", "75", "150")));
 
             service().lock(1L, "kt01", "Kỹ thuật 01");
 
@@ -117,7 +116,7 @@ class ReportPeriodServiceLockTest {
             assertThat(audit.getAction()).isEqualTo(ReportPeriodAuditAction.LOCK);
             assertThat(audit.getPerformedByUsername()).isEqualTo("kt01");
             assertThat(audit.getPerformedByFullName()).isEqualTo("Kỹ thuật 01");
-            assertThat(audit.getTkeMode()).isFalse();
+            assertThat(audit.getTkeMode()).isNull();
             assertThat(audit.getTotalM3()).isEqualByComparingTo("150");
             assertThat(audit.getTotalTon()).isEqualByComparingTo("225");
             assertThat(audit.getTotalTkm()).isEqualByComparingTo("450");
@@ -146,7 +145,7 @@ class ReportPeriodServiceLockTest {
             p.setLocked(true);
             when(repository.findById(1L)).thenReturn(Optional.of(p));
             when(resultRepository.findAllByPeriod(1L)).thenReturn(List.of(
-                    resultRow(true, "10", "15", "30")));
+                    resultRow("10", "15", "30")));
 
             service().unlock(1L, "Đổi sang chế độ trắc địa theo yêu cầu Ban GĐ", "admin", "Quản trị");
 
@@ -160,7 +159,7 @@ class ReportPeriodServiceLockTest {
             assertThat(audit.getAction()).isEqualTo(ReportPeriodAuditAction.UNLOCK);
             assertThat(audit.getReason()).isEqualTo("Đổi sang chế độ trắc địa theo yêu cầu Ban GĐ");
             assertThat(audit.getPerformedByUsername()).isEqualTo("admin");
-            assertThat(audit.getTkeMode()).isTrue();
+            assertThat(audit.getTkeMode()).isNull();
         }
     }
 

@@ -65,9 +65,10 @@ export interface TransportTripRow {
   isRainyDay: boolean; // Ngày mưa
   weighedWeightTon: number | ""; // Khối lượng qua cân (tấn)
   provisionalModel: number | ""; // Mô hình (tạm tính)
-  provisionalDensity: number | ""; // Tỷ trọng (tạm tính)
+  provisionalDensity: number | ""; // Tỷ trọng (cập nhật)
   isTraineeVehicle: boolean; // Lái xe bổ túc
   deductionAmount: number | ""; // Trừ vơi (đất-m3, than-tấn)
+  wasteRockTon: number | ""; // Đá thải (tấn) — người dùng tự nhập
 }
 
 // ─── 1 bản ghi = 1 ca phân xưởng vận tải ─────────────────────────────────
@@ -204,6 +205,7 @@ export const TransportHeaderDetailModal: React.FC<
         provisionalDensity: "",
         isTraineeVehicle: false,
         deductionAmount: "",
+        wasteRockTon: "",
       };
     },
     [],
@@ -754,7 +756,7 @@ export const TransportHeaderDetailModal: React.FC<
                     <th className="px-2 py-2 border-r border-b border-gray-200 dark:border-gray-700 text-center min-w-[110px]">
                       Tỷ trọng
                       <br />
-                      (tạm tính)
+                      (cập nhật)
                     </th>
                     <th className="px-2 py-2 border-r border-b border-gray-200 dark:border-gray-700 text-center min-w-[80px]">
                       Lái xe
@@ -765,6 +767,11 @@ export const TransportHeaderDetailModal: React.FC<
                       Trừ vơi
                       <br />
                       (đất-m3, than-tấn)
+                    </th>
+                    <th className="px-2 py-2 border-r border-b border-gray-200 dark:border-gray-700 text-center min-w-[110px]">
+                      Đá thải
+                      <br />
+                      (tấn)
                     </th>
                     <th className="px-2 py-2 border-b border-gray-200 dark:border-gray-700 text-center w-15" />
                   </tr>
@@ -1105,6 +1112,22 @@ export const TransportHeaderDetailModal: React.FC<
                             onChange={(e) =>
                               handleUpdateTrip(tIdx, {
                                 deductionAmount:
+                                  e.target.value === "" ? "" : Number(e.target.value),
+                              })
+                            }
+                            className="h-8 text-xs text-center px-1 w-full"
+                          />
+                        </td>
+
+                        {/* Đá thải (tấn) — người dùng tự nhập */}
+                        <td className="px-1 py-1.5 border-r border-b border-gray-200 dark:border-gray-700">
+                          <Input
+                            type="number"
+                            step="any"
+                            value={trip.wasteRockTon}
+                            onChange={(e) =>
+                              handleUpdateTrip(tIdx, {
+                                wasteRockTon:
                                   e.target.value === "" ? "" : Number(e.target.value),
                               })
                             }

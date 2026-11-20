@@ -2,10 +2,11 @@ package com.ecotel.thong_ke_cao_son.service.production;
 
 import com.ecotel.thong_ke_cao_son.exception.BadRequestException;
 import com.ecotel.thong_ke_cao_son.model.*;
-import com.ecotel.thong_ke_cao_son.repository.CoefficientItemRepository;
+import com.ecotel.thong_ke_cao_son.service.CoalCoefficientService;
 import com.ecotel.thong_ke_cao_son.service.DensityParameterService;
 import com.ecotel.thong_ke_cao_son.service.MatrixCatalogService;
 import com.ecotel.thong_ke_cao_son.service.SeamGroupExcavatorKeys;
+import com.ecotel.thong_ke_cao_son.service.WasteRockCoefficientService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -31,7 +32,7 @@ import java.util.Optional;
  *                    : ROUND( ROUND(Mô hình, Nhóm CLH bắt đầu "D" ? 1 : 3) × Số chuyến
  *                             − (Phân loại = DAT ? Trừ vơi : 0) , 3)
  * AM (Tổng tấn)  = (Tổng m3 × Tỷ trọng − Đá thải − (Phân loại = THAN ? Trừ vơi : 0))
- *                  × (SPNT = than_sx ? hệ số Than tke trừ đá : 1)
+ *                  × (SPNT = than_sx ? Hệ số KCS ÷ Hệ số Than TKE trừ đá (theo tháng) : 1)
  * AN (Tổng Tkm)  = Khối lượng qua cân ≠ 0 ? Khối lượng qua cân × Cung độ
  *                                          : ROUND(Tổng tấn × Cung độ, 4)
  * </pre>
@@ -48,15 +49,13 @@ public class TripBaseCalculator {
     /** Mã lưới Mô hình, khớp {@code backend/seed-matrix-catalogs.sql}. */
     private static final String MATRIX_MO_HINH = "MO_HINH";
 
-    /** Mã hệ số nhân cho than sản xuất (docx dòng 315). */
-    private static final String COEFFICIENT_THAN_SX = "HS.THAN.TRUDA";
-
     private static final BigDecimal TWO_THIRDS =
             new BigDecimal(2).divide(new BigDecimal(3), 10, RoundingMode.HALF_UP);
 
     private final DensityParameterService densityService;
     private final MatrixCatalogService matrixService;
-    private final CoefficientItemRepository coefficientRepository;
+    private final CoalCoefficientService coalCoefficientService;
+    private final WasteRockCoefficientService wasteRockCoefficientService;
 
     public TripBaseResult calculate(TransportReportTrip trip) {
         LocalDate date = productionDateOf(trip);
@@ -81,13 +80,20 @@ public class TripBaseCalculator {
         BigDecimal tripCount = BigDecimal.valueOf(
                 trip.getTripCount() != null ? trip.getTripCount() : 0);
         BigDecimal deduction = nz(trip.getDeductionAmount());
-        BigDecimal wasteRock = nz(trip.getWasteRockTon());
         BigDecimal weighed = nz(trip.getWeighedWeightTon());
 
+        // Đá thải: giá trị người dùng nhập ở Báo chuyến × Tổng KLVC TKE ban đầu CHƯA trừ đá (CK5) — chỉ cho
+        // nhóm chủng loại hàng THANV; nhóm khác = 0. Tính TRƯỚC Tổng KLVC vì Tổng KLVC trừ đá thải (FK5).
+        BigDecimal tonOriginalBeforeWaste =
+                computeTonOriginalBeforeWaste(densityOriginal, model, tripCount, deduction, coal);
+        BigDecimal wasteRock = computeWasteRockTon(trip, cargoType, tonOriginalBeforeWaste);
+        BigDecimal wasteRockM3 = computeWasteRockM3(trip, wasteRock, date);
+
         BigDecimal totalM3 = computeTotalM3(trip, cargoType, model, tripCount, deduction, weighed, density, earth);
-        // Hệ số "Than tke trừ đá" chỉ áp cho than sản xuất (docx dòng 315); tra MỘT lần, dùng cho
-        // cả tổng tấn và KLVC cuối ở chế độ TKE (QĐ-25).
-        BigDecimal coalCoefficient = "than_sx".equalsIgnoreCase(acceptanceProduct) ? coalCoefficient() : null;
+        // Hệ số "Than tke trừ đá" chỉ áp cho than sản xuất (docx dòng 315).
+        // Nhân Hệ số KCS ÷ Hệ số Than TKE trừ đá của THÁNG sản xuất (danh mục Hệ số Than; chưa khai = 1).
+        BigDecimal coalCoefficient = "than_sx".equalsIgnoreCase(acceptanceProduct)
+                ? coalCoefficientService.tonMultiplier(java.time.YearMonth.from(date)) : null;
         BigDecimal totalTon = computeTotalTon(totalM3, density, wasteRock, deduction, coal, coalCoefficient);
         BigDecimal totalTkm = computeTotalTkm(trip, weighed, totalTon);
 
@@ -132,7 +138,64 @@ public class TripBaseCalculator {
                 .cargoTtlCode(CargoCoding.cargoTtlCode(cargoCode, receivingPointName, seamGroupCode))
                 .seamKpmb(CargoCoding.seamKpmb(seamGroupCode))
                 .wasteRockTon(wasteRock)
+                .wasteRockM3(wasteRockM3)
+                .tonOriginalBeforeWaste(tonOriginalBeforeWaste)
                 .build();
+    }
+
+    /** Nhóm chủng loại hàng áp dụng đá thải (cột J của bảng tính). */
+    private static final String WASTE_ROCK_CARGO_GROUP = "THANV";
+
+    /**
+     * CK5 — Tổng KLVC TKE (tấn) ban đầu CHƯA trừ đá:
+     * {@code ROUND(CF × AJ × R − IF(AD = "than", AH, AH × CF), 5)}.
+     *
+     * <p>CF = Tỷ trọng (ban đầu) lấy từ danh mục; chưa có thì trả {@code null} — chỗ gọi quyết định có chặn hay không
+     * (chỉ chặn khi chuyến THANV thật sự nhập đá thải).
+     */
+    private BigDecimal computeTonOriginalBeforeWaste(BigDecimal densityOriginal, BigDecimal model,
+                                                     BigDecimal tripCount, BigDecimal deduction, boolean coal) {
+        if (densityOriginal == null) {
+            return null;
+        }
+        BigDecimal subtracted = coal ? deduction : deduction.multiply(densityOriginal);
+        return densityOriginal.multiply(model).multiply(tripCount).subtract(subtracted)
+                .setScale(5, RoundingMode.HALF_UP);
+    }
+
+    /**
+     * Đá thải (tấn): Nhóm chủng loại hàng ≠ THANV → 0; = THANV → giá trị tự nhập (Báo chuyến) × CK5.
+     * Ba nhánh theo khu vực xúc / nơi dỡ tải của bảng tính đều lấy chính giá trị tự nhập nên không phân nhánh.
+     */
+    private BigDecimal computeWasteRockTon(TransportReportTrip trip, CargoType cargoType, BigDecimal tonOriginalBeforeWaste) {
+        String group = cargoType.getCargoGroup() != null ? cargoType.getCargoGroup().getName() : null;
+        if (group == null || !WASTE_ROCK_CARGO_GROUP.equalsIgnoreCase(group.trim())) {
+            return BigDecimal.ZERO;
+        }
+        BigDecimal value = nz(trip.getWasteRockTon());
+        if (value.signum() == 0) {
+            return BigDecimal.ZERO;
+        }
+        if (tonOriginalBeforeWaste == null) {
+            throw missing(trip, "có nhập Đá thải nhưng chủng loại hàng chưa có Tỷ trọng (quy ẩm) trong danh mục Tỷ trọng"
+                    + " nên không tính được Tổng KLVC TKE ban đầu chưa trừ đá");
+        }
+        return value.multiply(tonOriginalBeforeWaste).setScale(6, RoundingMode.HALF_UP);
+    }
+
+    /**
+     * Đá thải (m3) = Đá thải (tấn) ÷ Hệ số đá thải của KHU VỰC XÚC của chuyến trong tháng sản xuất (danh mục Hệ số đá
+     * thải; bảng tính gốc dùng 2,625 cho KC và 2,617 cho CS). Đá thải (tấn) bằng 0 thì m3 bằng 0; danh mục chưa khai
+     * hệ số cho khu vực + tháng đó thì để TRỐNG (không phải 0, không tự lấy số khác).
+     */
+    private BigDecimal computeWasteRockM3(TransportReportTrip trip, BigDecimal wasteRockTon, LocalDate date) {
+        if (wasteRockTon.signum() == 0) {
+            return BigDecimal.ZERO;
+        }
+        Long areaId = trip.getExcavationArea() != null ? trip.getExcavationArea().getId() : null;
+        return wasteRockCoefficientService.coefficientFor(areaId, java.time.YearMonth.from(date))
+                .map(divisor -> wasteRockTon.divide(divisor, 6, RoundingMode.HALF_UP))
+                .orElse(null);
     }
 
     // ── từng bước ───────────────────────────────────────────────────────────
@@ -283,14 +346,6 @@ public class TripBaseCalculator {
             result = result.multiply(coalCoefficient);
         }
         return result.setScale(6, RoundingMode.HALF_UP);
-    }
-
-    private BigDecimal coalCoefficient() {
-        return coefficientRepository.findByCode(COEFFICIENT_THAN_SX)
-                .map(CoefficientItem::getValue)
-                .orElseThrow(() -> new BadRequestException(
-                        "Danh mục Hệ số chưa có mã \"" + COEFFICIENT_THAN_SX
-                                + "\" (hệ số Than tke trừ đá) — cần cho sản phẩm nghiệm thu than_sx"));
     }
 
     /** AN5 — Tổng Tkm. */

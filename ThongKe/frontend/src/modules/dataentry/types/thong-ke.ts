@@ -34,6 +34,10 @@ export interface TransportRecord {
 
   isRainyDay?: boolean; // Ngày mưa
   isTraineeVehicle?: boolean; // Xe bổ túc
+  weighedWeightTon?: number | null; // KL qua cân (tấn) — nhập ở Báo chuyến Vận tải
+  provisionalModel?: number | null; // Mô hình (tạm tính)
+  provisionalDensity?: number | null; // Tỷ trọng (cập nhật)
+  wasteRockTon?: number | null; // Đá thải (tấn) — người dùng tự nhập ở Báo chuyến Vận tải
 
   initialFuel?: number; // NL tồn đầu
   receivedFuel?: number; // NL lĩnh trong ca

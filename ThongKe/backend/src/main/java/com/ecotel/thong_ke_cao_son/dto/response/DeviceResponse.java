@@ -46,6 +46,8 @@ public class DeviceResponse {
     Long categoryClassId;
     String categoryClassName;
     java.math.BigDecimal bucketCapacity;
+    Long bucketId;
+    String bucketName;
 
     List<String> files;
     Long createdById;

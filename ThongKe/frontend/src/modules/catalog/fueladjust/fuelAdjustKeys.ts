@@ -20,8 +20,17 @@
  * phải hậu tố của dòng; và cột phải so theo NHÓM khu vực, không so mã.
  */
 
-/** Phân loại — hai giá trị duy nhất công thức `AD5` sinh ra (QĐ-10). */
-export type FuelAdjustClassification = "DAT" | "Than";
+/**
+ * Phân loại trong khoá dòng — lấy từ DANH MỤC PHÂN LOẠI (chủ dự án chốt 2026-11-15). Mã `DAT`/`THAN` của danh mục
+ * được quy về đúng giá trị mà công thức `AD5` / engine tính sản lượng tra (`DAT`, `Than`); mã khác giữ nguyên.
+ */
+export type FuelAdjustClassification = string;
+
+/** Giá trị phân loại dùng trong khoá dòng từ MÃ của danh mục Phân loại. */
+export const classificationKeyOf = (code: string): string => {
+  const u = (code ?? "").trim().toUpperCase();
+  return u === "DAT" ? "DAT" : u === "THAN" ? "Than" : (code ?? "").trim();
+};
 
 export const FUEL_ADJUST_CLASSIFICATIONS: {
   value: FuelAdjustClassification;

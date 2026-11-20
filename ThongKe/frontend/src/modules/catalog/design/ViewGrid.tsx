@@ -223,6 +223,7 @@ export default function ViewGrid<T>({
   groupHeader,
   columnGroups,
   showCount = true,
+  emptyText,
 }: {
   columns: ViewColumn[];
   rows: T[];
@@ -240,9 +241,13 @@ export default function ViewGrid<T>({
     filterKey?: string;
     /** Các cột của nhóm để TRỐNG tiêu đề con (không nhãn, không nút sắp xếp/lọc) — thường là cột `filterKey`, đã lọc ngay ở tiêu đề nhóm. */
     blankKeys?: string[];
+    /** Sắc xanh riêng của nhóm (1 đậm, 2 vừa, 3 nhạt) — tô cả ô tiêu đề nhóm lẫn các tiêu đề con. */
+    tone?: 1 | 2 | 3;
   }[];
   /** hiện chữ "Hiển thị N dòng" ở thanh trên (mặc định có) */
   showCount?: boolean;
+  /** chữ hiện khi bảng KHÔNG có dòng dữ liệu nào (mặc định: "Không có dòng nào khớp bộ lọc") */
+  emptyText?: string;
   /** thông tin tóm tắt đặt bên trái thanh trên bảng (vd Năm, Khu vực xúc) */
   summary?: React.ReactNode;
   /** cột "Thao tác" cuối bảng (nút sửa/xóa từng dòng…) — không lọc, không ẩn */
@@ -316,7 +321,7 @@ export default function ViewGrid<T>({
         const members = visible.filter((v) => g.keys.includes(v.key));
         if (members[0].key !== c.key) return null;
         return (
-          <th key={`cg-${g.label}`} colSpan={members.length} style={{ textAlign: "center" }}>
+          <th key={`cg-${g.label}`} colSpan={members.length} data-tone={g.tone} style={{ textAlign: "center" }}>
             {g.filterKey ? (
               <span className="vg-grouphead" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
                 {g.label}
@@ -344,7 +349,7 @@ export default function ViewGrid<T>({
   const renderTh = (c: ViewColumn, rowSpan?: number) => {
 const active = Boolean(filters[c.key]);
 return (
-  <th key={c.key} rowSpan={rowSpan} style={{ position: "relative", textAlign: c.align ?? "left" }}>
+  <th key={c.key} rowSpan={rowSpan} data-tone={columnGroups?.find((g) => g.keys.includes(c.key))?.tone} style={{ position: "relative", textAlign: c.align ?? "left" }}>
     <span className="vg-th" style={c.align === "center" ? { justifyContent: "center", gap: 4 } : undefined}>
       <span className="vg-th-label" title={c.label}>
         {c.label}
@@ -407,7 +412,7 @@ return (
       </div>
 
       <div className="vg-scroll">
-        <table className={`entry-table entry-view ${layout.tableClass}`} style={{ tableLayout: "fixed", width: "100%", minWidth: 52 + (rowActions ? 84 : 0) + (groupEmpty ? 260 : 0) + visible.reduce((s, c) => s + layout.widthOf(c.key), 0) }}>
+        <table className={`entry-table entry-view ${layout.tableClass}`} style={{ tableLayout: "fixed", width: 52 + (rowActions ? 84 : 0) + (groupEmpty ? 260 : 0) + visible.reduce((s, c) => s + layout.widthOf(c.key), 0) }}>
           <colgroup>
             <col style={{ width: 52 }} />
             {visible.map((c) => (
@@ -462,7 +467,7 @@ return (
             {shownRows.length === 0 ? (
               <tr>
                 <td colSpan={visible.length + 1 + (groupEmpty ? 1 : 0) + (rowActions ? 1 : 0)} style={{ textAlign: "center", color: "#7283a0", padding: "18px 8px" }}>
-                  Không có dòng nào khớp bộ lọc
+                  {rows.length === 0 && emptyText ? emptyText : "Không có dòng nào khớp bộ lọc"}
                 </td>
               </tr>
             ) : (

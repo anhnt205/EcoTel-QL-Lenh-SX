@@ -30,6 +30,7 @@ export const newTransportTripRow = (): TransportTripRow => ({
   provisionalDensity: "",
   isTraineeVehicle: false,
   deductionAmount: "",
+  wasteRockTon: "",
 });
 
 interface TransportDraftStore {

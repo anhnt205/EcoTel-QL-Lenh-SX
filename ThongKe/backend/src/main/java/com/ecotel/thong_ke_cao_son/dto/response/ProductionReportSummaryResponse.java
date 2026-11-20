@@ -32,8 +32,6 @@ public class ProductionReportSummaryResponse {
     /** Thời điểm tính gần nhất; null nếu chưa tính. */
     LocalDateTime calculatedAt;
 
-    /** Kỳ được tính ở chế độ TKE (QĐ-03) hay chế độ trắc địa. */
-    Boolean tkeMode;
 
     /**
      * Số chuyến Vận tải của kỳ KHÔNG nằm trong số liệu đã tính vì chưa duyệt đối
@@ -47,6 +45,4 @@ public class ProductionReportSummaryResponse {
     BigDecimal surveyM3;
     BigDecimal surveyTon;
     BigDecimal surveyTkm;
-    BigDecimal finalTon;
-    BigDecimal finalTkm;
 }

@@ -3,12 +3,14 @@ package com.ecotel.thong_ke_cao_son.service.production;
 import com.ecotel.thong_ke_cao_son.dto.response.MatrixGridResponse;
 import com.ecotel.thong_ke_cao_son.enums.LoadLevelType;
 import com.ecotel.thong_ke_cao_son.model.*;
-import com.ecotel.thong_ke_cao_son.repository.CoefficientItemRepository;
+import com.ecotel.thong_ke_cao_son.enums.FuelBsnlType;
+import com.ecotel.thong_ke_cao_son.service.FuelNormFactorService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -45,20 +47,27 @@ public class FuelCalculator {
     private static final String MATRIX_NANG_SUAT = "NANG_SUAT_XE";
     private static final String MATRIX_HS_DIEU_CHINH = "HS_DIEU_CHINH_NLDM";
 
-    /** Mã hệ số bùn trong danh mục Hệ số — ô $BN$2 của bảng tính. */
-    private static final String COEFFICIENT_MUD = "HS.BUN";
-
     private static final BigDecimal THOUSAND = new BigDecimal("1000");
     private static final BigDecimal MAX_DISTANCE_FOR_PRODUCTIVITY = new BigDecimal("8");
 
-    private final CoefficientItemRepository coefficientRepository;
+    private final FuelNormFactorService factorService;
 
     /**
-     * @param grids  ba lưới đã nạp sẵn (DMNL, NANG_SUAT_XE, HS_DIEU_CHINH_NLDM);
-     *               nạp một lần cho cả kỳ thay vì mỗi chuyến một lần
+     * Nạp bộ hệ số ĐMNL / BSNL từ các danh mục (theo mùa, theo hạng xe, theo cải tạo ben, HS Than CN-NK, hệ số BSNL)
+     * MỘT lần cho cả kỳ; truyền vào {@link #calculate} cho từng chuyến.
+     */
+    public FuelNormFactorSet loadFactors() {
+        return factorService.snapshot();
+    }
+
+    /**
+     * @param grids   ba lưới đã nạp sẵn (DMNL, NANG_SUAT_XE, HS_DIEU_CHINH_NLDM);
+     *                nạp một lần cho cả kỳ thay vì mỗi chuyến một lần
+     * @param factors bộ hệ số từ {@link #loadFactors}; {@code null} = danh mục trống (hệ số ĐMNL 1, BSNL 0)
      */
     public FuelResult calculate(TransportReportTrip trip, TripBaseResult base,
-                                java.util.Map<String, MatrixGridResponse> grids) {
+                                java.util.Map<String, MatrixGridResponse> grids, FuelNormFactorSet factors) {
+        if (factors == null) factors = FuelNormFactorSet.empty();
         List<String> warnings = new ArrayList<>();
         FuelResult.FuelResultBuilder out = FuelResult.builder();
 
@@ -101,14 +110,31 @@ public class FuelCalculator {
                     + fuelClassKey + "\" nên bỏ qua nhánh nhiên liệu.");
             return out.warnings(warnings).build();
         }
-        BigDecimal az = interpolated.get().value();
-        out.normInterpolated(az);
+        FuelNormInterpolator.Result interp = interpolated.get();
+        BigDecimal az = interp.value();
+        out.normInterpolated(az)
+           .interpDistanceLow(interp.distanceLow()).interpDistanceHigh(interp.distanceHigh())
+           .interpSlopeLow(interp.slopeLow()).interpSlopeHigh(interp.slopeHigh())
+           .interpNbH1(interp.nbH1()).interpNbH2(interp.nbH2()).interpNb(interp.nb())
+           .interpNaH1(interp.naH1()).interpNaH2(interp.naH2()).interpNa(interp.na());
 
-        // ── BA…BF: bốn hệ số nhân liên tiếp ─────────────────────────────────
-        BigDecimal ba = az.multiply(seasonFactor(base));
-        BigDecimal bc = ba.multiply(vehicleClassFactor(vehicle));
-        BigDecimal bd = bc.multiply(carRenovationFactor(vehicle));
-        BigDecimal be = coalCnNkFactor(trip, vehicle, base);
+        // ── BA…BF: bốn hệ số nhân liên tiếp — lấy từ các DANH MỤC hệ số (chưa khai = 1) ──────────────
+        YearMonth month = YearMonth.from(base.getProductionDate());
+        FuelNormFactorSet.Context ctx = new FuelNormFactorSet.Context(
+                vehicleModel(vehicle), vehicleTypeCode(vehicle), trim(vehicle.getCode()),
+                trip.getCargoType() != null ? trim(trip.getCargoType().getName()) : "",
+                areaGroup, routeDistance, month,
+                isRoda(trip), Boolean.TRUE.equals(trip.getRainyDay()), Boolean.TRUE.equals(trip.getSupplementaryVehicle()));
+
+        BigDecimal ba = az.multiply(factors.seasonFactor(month));
+        BigDecimal bc = ba.multiply(factors.rankFactor(
+                vehicle.getVehicleRank() != null ? vehicle.getVehicleRank().getId() : null, month));
+        // Cải tạo ben: chỉ xe được đánh dấu Cải tạo toa mới nhân hệ số của danh mục
+        BigDecimal bd = bc.multiply("CaiToa".equalsIgnoreCase(trim(vehicle.getCarRenovation()))
+                ? factors.renovationFactor(month) : BigDecimal.ONE);
+        // HS Than (CN-NK) chỉ xét khi SPNT/CN = Than_CN, còn lại bằng 1
+        BigDecimal be = "Than_CN".equalsIgnoreCase(trim(base.getAcceptanceProduct()))
+                ? factors.coalFactor(ctx) : BigDecimal.ONE;
         BigDecimal bf = bd.multiply(be);
 
         out.normSeasonal(scale(ba)).normVehicleClass(scale(bc))
@@ -120,14 +146,14 @@ public class FuelCalculator {
         out.baseConsumption(bg);
 
         // ── BH…BO: tám khoản bù ─────────────────────────────────────────────
-        BigDecimal bh = pct(bg, isRoda(trip) ? new BigDecimal("0.5") : BigDecimal.ZERO);
-        BigDecimal bi = pct(bg, Boolean.TRUE.equals(trip.getRainyDay()) ? new BigDecimal("0.05") : BigDecimal.ZERO);
-        BigDecimal bj = pct(bg, Boolean.TRUE.equals(trip.getSupplementaryVehicle()) ? new BigDecimal("0.04") : BigDecimal.ZERO);
-        BigDecimal bk = pct(bg, maintenanceRate(
-                ProductionKeys.modelColumnKey(vehicleTypeCode(vehicle), areaGroup)));
-        BigDecimal bl = pct(bg, isVehicle965(vehicle) ? new BigDecimal("0.05") : BigDecimal.ZERO);
-        BigDecimal bm = pct(bg, spntRate(trip, vehicle));
-        BigDecimal bn = pct(bg, mudRate(trip, vehicle, warnings));
+        // Mỗi khoản = tỷ lệ của danh mục Hệ số BSNL × Nhiên liệu tiêu hao theo ĐM (BG); chưa khai điều kiện nào = 0.
+        BigDecimal bh = bsnl(bg, factors.bsnl(FuelBsnlType.RODA, ctx));
+        BigDecimal bi = bsnl(bg, factors.bsnl(FuelBsnlType.RAINY_DAY, ctx));
+        BigDecimal bj = bsnl(bg, factors.bsnl(FuelBsnlType.SUPPLEMENTARY, ctx));
+        BigDecimal bk = bsnl(bg, factors.bsnl(FuelBsnlType.MAINTENANCE, ctx));
+        BigDecimal bl = bsnl(bg, factors.bsnl(FuelBsnlType.OTHER, ctx));
+        BigDecimal bm = bsnl(bg, factors.bsnl(FuelBsnlType.SPNT, ctx));
+        BigDecimal bn = bsnl(bg, factors.bsnl(FuelBsnlType.MUD, ctx));
         // BO — "BSNL_Spnt__CN (xe)": bảng tính có TIÊU ĐỀ nhưng KHÔNG có công
         // thức, ô để trống. Chưa có quy tắc nên để 0 và không đoán.
         BigDecimal bo = BigDecimal.ZERO;
@@ -153,108 +179,14 @@ public class FuelCalculator {
         return out.warnings(warnings).build();
     }
 
-    // ── các hệ số ───────────────────────────────────────────────────────────
+    // ── các hệ số: nay lấy từ DANH MỤC (FuelNormFactorSet), không còn hằng số trong code ────────────
 
-    /** BA5 — tháng 6,7,8,9 nhân 1,03; còn lại giữ nguyên. */
-    private BigDecimal seasonFactor(TripBaseResult base) {
-        int month = base.getProductionDate().getMonthValue();
-        return (month >= 6 && month <= 9) ? new BigDecimal("1.03") : BigDecimal.ONE;
-    }
-
-    /** BC5 — hạng xe A/B/C1/khác. */
-    private BigDecimal vehicleClassFactor(Device vehicle) {
-        String cls = vehicleRankCode(vehicle);
-        if ("A".equalsIgnoreCase(cls)) return new BigDecimal("0.97");
-        if ("B".equalsIgnoreCase(cls)) return BigDecimal.ONE;
-        if ("C1".equalsIgnoreCase(cls)) return new BigDecimal("1.04");
-        return new BigDecimal("1.06");
-    }
-
-    /** BD5 — xe đã cải tạo toa nhân 1,03. */
-    private BigDecimal carRenovationFactor(Device vehicle) {
-        return "CaiToa".equalsIgnoreCase(trim(vehicle.getCarRenovation()))
-                ? new BigDecimal("1.03") : BigDecimal.ONE;
-    }
-
-    /**
-     * BE5 — HS Than (CN-NK).
-     *
-     * <p>Docx ghi rõ: <i>"xét theo thứ tự từ trên xuống, thoả mãn điều kiện
-     * nào thì không xét tiếp"</i> — nên đây là chuỗi if/else, không phải các
-     * điều kiện rời.
-     */
-    private BigDecimal coalCnNkFactor(TransportReportTrip trip, Device vehicle, TripBaseResult base) {
-        if (!"Than_CN".equalsIgnoreCase(trim(base.getAcceptanceProduct()))) {
-            return BigDecimal.ONE;
-        }
-        String model = vehicleModel(vehicle);
-        if ("VolvoA40F".equalsIgnoreCase(model) || "VolvoA40G".equalsIgnoreCase(model)) {
-            return new BigDecimal("1.02");
-        }
-        // So theo NHÓM khu vực, không so mã (QĐ-13).
-        String cargoTypeName = trip.getCargoType() != null ? trim(trip.getCargoType().getName()) : "";
-        if (ProductionKeys.AREA_CS.equals(TripBaseCalculator.areaGroupOf(trip))
-                && "SPNT.Baichua".equalsIgnoreCase(cargoTypeName)
-                && startsWith(model, "HD465")) {
-            return new BigDecimal("0.9");
-        }
-        BigDecimal distance = decimal(trip.getTotalRouteDistanceKm());
-        if (distance.compareTo(new BigDecimal("1.5")) < 0 && startsWith(model, "HD465-7R")) {
-            return new BigDecimal("1.15");
-        }
-        return BigDecimal.ONE;
-    }
-
-    /**
-     * BK5 — BSNL SC,BD theo chủng loại xe.
-     *
-     * <p>Bảng tính so trên {@code DF5 = LEFT(DA5, 7)}, tức khoá cột <b>Mô
-     * hình</b> (Chủng loại xe kèm hậu tố khu vực) cắt còn 7 ký tự — KHÔNG
-     * phải khoá ĐMNL. Giữ nguyên cách cắt đó: nhánh so với {@code "HD465-7R"}
-     * (8 ký tự) trong bảng tính vốn không bao giờ đúng, mà xe HD465-7R vẫn
-     * rơi vào nhánh {@code "HD465-7"} nên kết quả không đổi.
-     */
-    private BigDecimal maintenanceRate(String modelColumnKey) {
-        String df = modelColumnKey.length() > 7 ? modelColumnKey.substring(0, 7) : modelColumnKey;
-        if (equalsAny(df, "HD465-7", "CAT773E")) return new BigDecimal("0.01");
-        if (equalsAny(df, "CAT777", "CAT777D", "CAT777E", "HD785-7")) return new BigDecimal("0.005");
-        return new BigDecimal("0.015");
-    }
-
-    /** BL5 — số xe bắt đầu bằng 965. */
-    private boolean isVehicle965(Device vehicle) {
-        return startsWith(trim(vehicle.getCode()), "965");
-    }
-
-    /** BM5 — BSNL SPNT, xét theo CHỦNG LOẠI HÀNG (cột K), không phải nhóm. */
-    private BigDecimal spntRate(TransportReportTrip trip, Device vehicle) {
-        String cargoTypeName = trip.getCargoType() != null ? trim(trip.getCargoType().getName()) : "";
-        if (!equalsAny(cargoTypeName, "spnt_uot.via", "spnt.via")) return BigDecimal.ZERO;
-        String model = vehicleModel(vehicle);
-        return equalsAny(model, "HM400-2R", "VolvoA40F", "VolvoA40G")
-                ? new BigDecimal("0.1") : new BigDecimal("0.15");
-    }
-
-    /** BN5 — BSNL bùn; hệ số do người dùng đặt trong danh mục Hệ số. */
-    private BigDecimal mudRate(TransportReportTrip trip, Device vehicle, List<String> warnings) {
-        if ("HM400-2R".equalsIgnoreCase(vehicleModel(vehicle))) return BigDecimal.ZERO;
-        String cargo = trip.getCargoType() != null ? trim(trip.getCargoType().getName()) : "";
-        boolean isMud = startsWith(cargo, "B.Duot") || startsWith(cargo, "B.Loang")
-                || startsWith(cargo, "DBChan") || startsWith(cargo, "B.Chan")
-                || startsWith(cargo, "B.Tron") || startsWith(cargo, "DBTron");
-        if (!isMud) return BigDecimal.ZERO;
-
-        return coefficientRepository.findByCode(COEFFICIENT_MUD)
-                .map(CoefficientItem::getValue)
-                .orElseGet(() -> {
-                    // Chữ "tính bằng 0" ở đây từng đúng khi hàm này chỉ CẢNH
-                    // BÁO — từ QĐ-04/QĐ-06 (2026-09-07, sau Quality Gate của
-                    // Codex), `warnings` không còn là cảnh báo suông: dòng
-                    // này khiến `calculatePeriod` ném lỗi tổng hợp và KHÔNG
-                    // lưu gì hết, chứ không âm thầm cho hệ số bùn bằng 0 nữa.
-                    warnings.add("Danh mục Hệ số chưa có mã \"" + COEFFICIENT_MUD + "\" (hệ số bùn).");
-                    return BigDecimal.ZERO;
-                });
+    /** Một khoản BSNL = tỷ lệ của danh mục × Nhiên liệu tiêu hao theo ĐM (BG), làm tròn thêm nếu dòng danh mục yêu cầu. */
+    private static BigDecimal bsnl(BigDecimal bg, FuelNormFactorSet.BsnlRate rate) {
+        BigDecimal value = pct(bg, rate.rate());
+        return rate.roundDigits() == null
+                ? value
+                : value.setScale(rate.roundDigits(), RoundingMode.HALF_UP).setScale(6, RoundingMode.HALF_UP);
     }
 
     /**

@@ -24,6 +24,9 @@ public interface DeviceRepository extends JpaRepository<Device, Long> {
 
     boolean existsByCodeAndIdNot(String code, Long id);
 
+    /** Có máy nào đang dùng một trong các gầu xúc này không — chặn xoá gầu xúc đang gán. */
+    boolean existsByBucketIdIn(java.util.Collection<Long> bucketIds);
+
     @Query("""
         SELECT d FROM Device d
         LEFT JOIN d.department dep

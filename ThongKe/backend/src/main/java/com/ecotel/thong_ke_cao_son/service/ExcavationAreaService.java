@@ -23,6 +23,14 @@ public class ExcavationAreaService {
 
     private final ExcavationAreaRepository repository;
     private final ExcavationAreaMapper mapper;
+    private final com.ecotel.thong_ke_cao_son.repository.WasteRockCoefficientRepository wasteRockCoefficientRepository;
+
+    /** Khu vực xúc đã có hệ số đá thải thì không xoá được — báo rõ thay vì lỗi khoá ngoại khó hiểu. */
+    private void ensureNotUsedByWasteRockCoefficient(java.util.Collection<Long> ids) {
+        if (wasteRockCoefficientRepository.existsByExcavationArea_IdIn(ids)) {
+            throw new BadRequestException("Khu vực xúc đang có trong danh mục Hệ số đá thải — xoá dòng hệ số đó trước");
+        }
+    }
 
     @Transactional(readOnly = true)
     public PageResponse<ExcavationAreaResponse> getAll(String keyword, Pageable pageable) {
@@ -76,11 +84,13 @@ public class ExcavationAreaService {
 
     @Transactional
     public void delete(Long id) {
+        ensureNotUsedByWasteRockCoefficient(List.of(id));
         repository.delete(find(id));
     }
 
     @Transactional
     public BulkDeleteResponse bulkDelete(List<Long> ids) {
+        ensureNotUsedByWasteRockCoefficient(ids);
         List<ExcavationArea> found = repository.findAllById(ids);
         repository.deleteAll(found);
         return BulkDeleteResponse.builder()

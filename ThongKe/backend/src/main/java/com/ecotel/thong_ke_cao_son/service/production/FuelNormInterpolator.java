@@ -44,11 +44,27 @@ public final class FuelNormInterpolator {
     private static final int SCALE = 10;
     private static final String COLUMN_SEPARATOR = "_";
 
-    /** Giá trị cùng bốn mốc đã dùng — giữ lại để lần ngược khi số liệu lệch. */
+    /**
+     * Giá trị cùng bốn mốc và các bước trung gian đã dùng — giữ lại để lần ngược khi số liệu lệch.
+     *
+     * <ul>
+     *   <li>{@code distanceLow} = Hb, {@code distanceHigh} = Ha (mốc cung độ kề dưới / kề trên cung độ toàn tuyến);</li>
+     *   <li>{@code slopeLow} = h1, {@code slopeHigh} = h2 (mốc độ dốc kề dưới / kề trên chênh cao thanh toán);</li>
+     *   <li>{@code nbH1}, {@code nbH2} = ô lưới tại cung độ Hb với dốc h1 / h2; {@code nb} = nhiên liệu tương ứng Hb;</li>
+     *   <li>{@code naH1}, {@code naH2} = ô lưới tại cung độ Ha với dốc h1 / h2; {@code na} = nhiên liệu tương ứng Ha;</li>
+     *   <li>{@code value} = Nt, NLĐM tiêu hao cần tìm.</li>
+     * </ul>
+     * Cung độ bằng 0 thì chỉ có {@code value = 0}, các bước còn lại trống.
+     */
     public record Result(
             BigDecimal value,
             BigDecimal distanceLow, BigDecimal distanceHigh,
-            BigDecimal slopeLow, BigDecimal slopeHigh) {}
+            BigDecimal slopeLow, BigDecimal slopeHigh,
+            BigDecimal nbH1, BigDecimal nbH2, BigDecimal nb,
+            BigDecimal naH1, BigDecimal naH2, BigDecimal na) {}
+
+    /** Một bước nội suy theo độ dốc tại một cột cung độ: hai ô lưới và giá trị nội suy giữa chúng. */
+    private record SlopeStep(BigDecimal atH1, BigDecimal atH2, BigDecimal value) {}
 
     /**
      * @param grid          lưới DMNL
@@ -62,7 +78,7 @@ public final class FuelNormInterpolator {
                                                BigDecimal routeDistance, BigDecimal liftHeight) {
         // Cung độ bằng 0 -> ĐMNL bằng 0 (docx dòng 362). Không phải lỗi.
         if (routeDistance == null || routeDistance.signum() == 0) {
-            return Optional.of(new Result(BigDecimal.ZERO, null, null, null, null));
+            return Optional.of(new Result(BigDecimal.ZERO, null, null, null, null, null, null, null, null, null, null));
         }
 
         List<BigDecimal> distances = distanceBandsOf(grid, vehicleKey);
@@ -82,30 +98,35 @@ public final class FuelNormInterpolator {
         if (h1 == null) h1 = h2;
         if (h2 == null) h2 = h1;
 
-        // AV — nội suy theo độ dốc tại cột cung độ THẤP
-        BigDecimal av = interpolateOverSlope(grid, vehicleKey, hb, h1, h2, slope);
-        // AY — nội suy theo độ dốc tại cột cung độ CAO
-        BigDecimal ay = interpolateOverSlope(grid, vehicleKey, ha, h1, h2, slope);
+        // Nb — nhiên liệu tương ứng Hb: nội suy theo độ dốc tại cột cung độ THẤP (từ Nb-h1, Nb-h2)
+        SlopeStep lowStep = interpolateOverSlope(grid, vehicleKey, hb, h1, h2, slope);
+        // Na — nhiên liệu tương ứng Ha: nội suy theo độ dốc tại cột cung độ CAO (từ Na-h1, Na-h2)
+        SlopeStep highStep = interpolateOverSlope(grid, vehicleKey, ha, h1, h2, slope);
+        BigDecimal av = lowStep == null ? null : lowStep.value();
+        BigDecimal ay = highStep == null ? null : highStep.value();
         if (av == null && ay == null) return Optional.empty();
         if (av == null) av = ay;
         if (ay == null) ay = av;
 
+        // Nt — nội suy theo cung độ giữa Nb và Na
         BigDecimal value = linear(routeDistance, hb, ha, av, ay);
-        return Optional.of(new Result(value, hb, ha, h1, h2));
+        return Optional.of(new Result(value, hb, ha, h1, h2,
+                lowStep == null ? null : lowStep.atH1(), lowStep == null ? null : lowStep.atH2(), av,
+                highStep == null ? null : highStep.atH1(), highStep == null ? null : highStep.atH2(), ay));
     }
 
     /** Nội suy hai ô cùng một cột cung độ, khác dòng độ dốc. */
-    private static BigDecimal interpolateOverSlope(MatrixGridResponse grid, String vehicleKey,
-                                                   BigDecimal distanceBand,
-                                                   BigDecimal h1, BigDecimal h2, BigDecimal slope) {
+    private static SlopeStep interpolateOverSlope(MatrixGridResponse grid, String vehicleKey,
+                                                  BigDecimal distanceBand,
+                                                  BigDecimal h1, BigDecimal h2, BigDecimal slope) {
         if (distanceBand == null) return null;
         String colKey = columnKey(vehicleKey, distanceBand);
         BigDecimal at = cellAtSlope(grid, h1, colKey);
         BigDecimal au = cellAtSlope(grid, h2, colKey);
         if (at == null && au == null) return null;
-        if (at == null) return au;
-        if (au == null) return at;
-        return linear(slope, h1, h2, at, au);
+        if (at == null) return new SlopeStep(null, au, au);
+        if (au == null) return new SlopeStep(at, null, at);
+        return new SlopeStep(at, au, linear(slope, h1, h2, at, au));
     }
 
     /**

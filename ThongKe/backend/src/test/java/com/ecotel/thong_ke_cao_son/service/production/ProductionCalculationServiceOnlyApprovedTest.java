@@ -120,7 +120,7 @@ class ProductionCalculationServiceOnlyApprovedTest {
         // stub đầy đủ nên có thể ném lỗi; điều cần chứng minh là gate KHÔNG từ chối và
         // engine chỉ đưa ĐÚNG chuyến đã duyệt vào bước tính.
         try {
-            newService().calculatePeriod(1L, true, true);
+            newService().calculatePeriod(1L, true);
         } catch (Exception e) {
             assertThat(e).as("lỗi (nếu có) phải thuộc bước SAU gate duyệt")
                     .isNotInstanceOf(PeriodNotFullyApprovedException.class);
@@ -139,7 +139,7 @@ class ProductionCalculationServiceOnlyApprovedTest {
         stubOpenPeriodWithTrips(List.of(pending));
         when(reconciliationDecisionRepository.findByTransportReportTrip_IdIn(List.of(1L))).thenReturn(List.of());
 
-        assertThatThrownBy(() -> newService().calculatePeriod(1L, true, true))
+        assertThatThrownBy(() -> newService().calculatePeriod(1L, true))
                 .isInstanceOf(PeriodNotFullyApprovedException.class)
                 .hasMessageContaining("chưa có chuyến Vận tải nào đã duyệt");
 
@@ -156,7 +156,7 @@ class ProductionCalculationServiceOnlyApprovedTest {
         when(reconciliationDecisionRepository.findByTransportReportTrip_IdIn(List.of(1L, 2L)))
                 .thenReturn(List.of(decisionFor(approved, excavationTrip(11L, ApprovalStatus.APPROVED))));
 
-        assertThatThrownBy(() -> newService().calculatePeriod(1L, true))
+        assertThatThrownBy(() -> newService().calculatePeriod(1L))
                 .isInstanceOf(PeriodNotFullyApprovedException.class)
                 .hasMessageContaining("CHƯA ĐƯỢC DUYỆT ĐỐI CHIẾU");
 
@@ -175,7 +175,7 @@ class ProductionCalculationServiceOnlyApprovedTest {
         when(tripRepository.countByReportDateBetween(FROM, TO)).thenReturn(10L);
 
         ProductionReportSummaryResponse summary =
-                new ProductionReportService(resultRepository, periodRepository, tripRepository).getSummary(1L);
+                new ProductionReportService(resultRepository, periodRepository, tripRepository, null).getSummary(1L);
 
         assertThat(summary.getRowCount()).isEqualTo(2);
         assertThat(summary.getUnapprovedTripCount()).isEqualTo(8);
@@ -188,20 +188,10 @@ class ProductionCalculationServiceOnlyApprovedTest {
         when(resultRepository.findAllByPeriod(1L)).thenReturn(List.of());
 
         ProductionReportSummaryResponse summary =
-                new ProductionReportService(resultRepository, periodRepository, tripRepository).getSummary(1L);
+                new ProductionReportService(resultRepository, periodRepository, tripRepository, null).getSummary(1L);
 
         assertThat(summary.getRowCount()).isZero();
         assertThat(summary.getUnapprovedTripCount()).isZero();
-    }
-
-    @Test
-    @DisplayName("TKE: thể trọng quy đổi = tỷ trọng; riêng than_sx nhân thêm hệ số than để KLVC cuối = Tổng KLVC (QĐ-25 phương án A)")
-    void tkeBulkDensityAppliesCoalCoefficientOnlyForCoalSx() {
-        assertThat(ProductionCalculationService.tkeBulkDensity(new java.math.BigDecimal("2.617"), null))
-                .isEqualByComparingTo("2.617");
-        assertThat(ProductionCalculationService.tkeBulkDensity(
-                new java.math.BigDecimal("1.206"), new java.math.BigDecimal("0.893840")))
-                .isEqualByComparingTo("1.07797104"); // 1,206 × 0,89384
     }
 
     @Test
@@ -229,7 +219,7 @@ class ProductionCalculationServiceOnlyApprovedTest {
         org.springframework.test.util.ReflectionTestUtils.setField(service, "entityManager", entityManager);
         when(periodRepository.findById(1L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.calculatePeriod(1L, true, true))
+        assertThatThrownBy(() -> service.calculatePeriod(1L, true))
                 .isInstanceOf(com.ecotel.thong_ke_cao_son.exception.ResourceNotFoundException.class);
 
         org.mockito.InOrder order = org.mockito.Mockito.inOrder(entityManager);

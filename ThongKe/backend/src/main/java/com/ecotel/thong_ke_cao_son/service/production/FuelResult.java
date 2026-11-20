@@ -17,8 +17,20 @@ import java.util.List;
 @Builder
 public class FuelResult {
 
-    /** AZ — ĐMNL nội suy từ lưới DMNL. */
+    /** AZ — ĐMNL nội suy từ lưới DMNL (cột "Nt-NLĐM tiêu hao"). */
     private final BigDecimal normInterpolated;
+
+    /** Các bước nội suy trung gian của AZ — xem {@link FuelNormInterpolator.Result}. */
+    private final BigDecimal interpDistanceLow;   // Hb
+    private final BigDecimal interpDistanceHigh;  // Ha
+    private final BigDecimal interpSlopeLow;      // h1
+    private final BigDecimal interpSlopeHigh;     // h2
+    private final BigDecimal interpNbH1;
+    private final BigDecimal interpNbH2;
+    private final BigDecimal interpNb;
+    private final BigDecimal interpNaH1;
+    private final BigDecimal interpNaH2;
+    private final BigDecimal interpNa;
     /** BA — sau hệ số mùa (tháng 6–9 nhân 1,03). */
     private final BigDecimal normSeasonal;
     /** BC — sau hệ số hạng xe. */

@@ -112,7 +112,7 @@ class ProductionCalculationServiceApprovalGateTest {
         stubOpenPeriodWithTrips(List.of(trip));
         when(reconciliationDecisionRepository.findByTransportReportTrip_IdIn(List.of(1L))).thenReturn(List.of());
 
-        assertThatThrownBy(() -> newService().calculatePeriod(1L, false))
+        assertThatThrownBy(() -> newService().calculatePeriod(1L))
                 .isInstanceOf(PeriodNotFullyApprovedException.class)
                 .hasMessageContaining("CHƯA có chuyến Khai thác ghép cặp");
 
@@ -128,7 +128,7 @@ class ProductionCalculationServiceApprovalGateTest {
         when(reconciliationDecisionRepository.findByTransportReportTrip_IdIn(List.of(1L)))
                 .thenReturn(List.of(decisionFor(trip, excavation)));
 
-        assertThatThrownBy(() -> newService().calculatePeriod(1L, false))
+        assertThatThrownBy(() -> newService().calculatePeriod(1L))
                 .isInstanceOf(PeriodNotFullyApprovedException.class)
                 .hasMessageContaining("CHƯA được duyệt");
 
@@ -150,7 +150,7 @@ class ProductionCalculationServiceApprovalGateTest {
         // minh CHỈ là: đã qua được gate duyệt (resultRepository.deleteByPeriod
         // đã chạy — dòng NGAY SAU gate, TRƯỚC toàn bộ phần tính toán).
         try {
-            newService().calculatePeriod(1L, false);
+            newService().calculatePeriod(1L);
         } catch (Exception e) {
             assertThat(e).as("nếu có lỗi thì phải là lỗi bước SAU gate duyệt, không phải lỗi duyệt đối chiếu")
                     .isNotInstanceOf(PeriodNotFullyApprovedException.class);

@@ -82,12 +82,13 @@ describe("menu Danh mục gộp (Thống kê + Điều phối)", () => {
     ]);
     expect(texts("Vị trí")).toEqual(["Nơi nhận tải", "Nơi dỡ tải", "Nơi chất tải", "Khu vực xúc", "Nhóm vỉa"]);
     expect(texts("Thiết bị")).toEqual([
-      "Xe", "Máy", "Chủng loại xe", "Chủng loại xe + DMNL", "Hạng xe", "Nhóm hạng xe", "Năng suất xe", "Định mức nhiên liệu",
+      "Xe", "Máy", "Chủng loại xe", "Hạng xe/máy", "Nhóm hạng xe/máy", "Gầu xúc", "Năng suất xe", "Định mức nhiên liệu",
     ]);
     expect(texts("Số Trắc địa")).toEqual(["STD (Đất CN)", "STD (Đất SX/Than SX)", "Áp Trắc địa"]);
     expect(texts("Đơn vị")).toEqual(["Phòng ban", "Chức vụ", "Nhân viên", "Công việc", "Biện pháp an toàn"]);
     expect(texts("Danh mục khác")).toEqual([
-      "Hệ số điều chỉnh", "Hệ số điều chỉnh DMNL", "Kỳ báo cáo", "Ca làm việc", "Hậu tố",
+      "Hệ số điều chỉnh", "Hệ số Than TKE trừ đá / KCS", "Hệ số đá thải", "Hệ số ĐMNL theo mùa", "Hệ số ĐMNL theo hạng xe",
+      "Hệ số ĐMNL theo cải tạo ben", "Hệ số Than (CN-NK)", "Hệ số BSNL", "Hệ số điều chỉnh DMNL", "Kỳ báo cáo", "Ca làm việc", "Hậu tố",
     ]);
   });
 

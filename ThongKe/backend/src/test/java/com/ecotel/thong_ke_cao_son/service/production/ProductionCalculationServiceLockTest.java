@@ -77,7 +77,7 @@ class ProductionCalculationServiceLockTest {
                     LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 7), true);
             when(periodRepository.findById(1L)).thenReturn(Optional.of(locked));
 
-            assertThatThrownBy(() -> newService().calculatePeriod(1L, false))
+            assertThatThrownBy(() -> newService().calculatePeriod(1L))
                     .isInstanceOf(BadRequestException.class)
                     .hasMessageContaining("đã chốt");
 
@@ -96,7 +96,7 @@ class ProductionCalculationServiceLockTest {
             when(tripRepository.findByReportDateBetween(from, to)).thenReturn(List.of());
 
             // Không chốt, không hở -> đi tiếp tới bước "chưa có chuyến nào" (khác lỗi khoá/hở).
-            assertThatThrownBy(() -> newService().calculatePeriod(1L, false))
+            assertThatThrownBy(() -> newService().calculatePeriod(1L))
                     .isInstanceOf(BadRequestException.class)
                     .hasMessageContaining("chưa có chuyến vận tải nào");
         }
@@ -116,7 +116,7 @@ class ProductionCalculationServiceLockTest {
             when(periodRepository.findByYearAndMonthOrderByPeriodIndexAsc(2026, 8))
                     .thenReturn(List.of(onlyPeriod));
 
-            assertThatThrownBy(() -> newService().calculatePeriod(1L, false))
+            assertThatThrownBy(() -> newService().calculatePeriod(1L))
                     .isInstanceOf(BadRequestException.class)
                     .hasMessageContaining("HỞ")
                     .hasMessageContaining("2026-08-08");
@@ -137,7 +137,7 @@ class ProductionCalculationServiceLockTest {
             when(periodRepository.findByYearAndMonthOrderByPeriodIndexAsc(2026, 8))
                     .thenReturn(List.of(firstPeriod, lastPeriod));
 
-            assertThatThrownBy(() -> newService().calculatePeriod(1L, false))
+            assertThatThrownBy(() -> newService().calculatePeriod(1L))
                     .isInstanceOf(BadRequestException.class)
                     .hasMessageContaining("HỞ")
                     .hasMessageContaining("2026-08-08")
@@ -156,7 +156,7 @@ class ProductionCalculationServiceLockTest {
             when(tripRepository.findByReportDateBetween(from, to)).thenReturn(List.of());
 
             // Đi tiếp qua vòng kiểm tra hở, dừng ở bước sau (khác thông báo "HỞ").
-            assertThatThrownBy(() -> newService().calculatePeriod(1L, false))
+            assertThatThrownBy(() -> newService().calculatePeriod(1L))
                     .isInstanceOf(BadRequestException.class)
                     .hasMessageContaining("chưa có chuyến vận tải nào");
         }

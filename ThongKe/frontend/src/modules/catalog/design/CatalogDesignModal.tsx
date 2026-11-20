@@ -5,6 +5,8 @@ import { createCatalogService } from "../catalogService";
 import type { CatalogConfig, CatalogField } from "../types";
 import DIcon from "./DIcon";
 import { DatePickerString } from "@/components/common/DatePickerString";
+import { MonthRangePicker } from "./MonthInput";
+import { MultiPickCell } from "./MultiPickCell";
 import { ColResizer, TableLayoutButton, useTableLayout } from "./tableLayout";
 import { moveItem, useRowDnD } from "./useRowDnD";
 import { CatalogQuickImportDialog } from "../CatalogQuickImportDialog";
@@ -13,6 +15,31 @@ type Row = Record<string, string>;
 type Opt = { value: string; label: string };
 
 const emptyRow = (fields: CatalogField[]): Row => Object.fromEntries(fields.map((f) => [f.key, ""]));
+
+/**
+ * Cột `monthRange` ("Thời gian"): giá trị chuỗi "MM/yyyy - MM/yyyy" ↔ hai ô chọn tháng (giá trị "yyyy-MM").
+ * Cho phép dạng dở dang ("09/2026 - ") trong lúc người dùng đang chọn.
+ */
+const MONTH_RANGE_RE = /^\s*(?:(\d{1,2})\s*\/\s*(\d{4}))?\s*[-–—]\s*(?:(\d{1,2})\s*\/\s*(\d{4}))?\s*$/;
+
+function splitMonthRange(value: string): [string, string] {
+  const m = MONTH_RANGE_RE.exec(value ?? "");
+  if (!m) return ["", ""];
+  const iso = (mo?: string, yr?: string) => (mo && yr ? `${yr}-${mo.padStart(2, "0")}` : "");
+  return [iso(m[1], m[2]), iso(m[3], m[4])];
+}
+
+function joinMonthRange(from: string, to: string): string {
+  if (!from && !to) return "";
+  const fmt = (iso: string) => (iso ? `${iso.slice(5, 7)}/${iso.slice(0, 4)}` : "");
+  return `${fmt(from)} - ${fmt(to)}`;
+}
+
+/** Đã chọn đủ cả hai tháng chưa. */
+const isMonthRangeComplete = (value: string): boolean => {
+  const [a, b] = splitMonthRange(value);
+  return !!a && !!b;
+};
 
 /** Khung cửa sổ theo thiết kế (nền mờ, bo 14px, tiêu đề + mô tả, chân Hủy / Xác nhận). */
 function Shell({
@@ -210,6 +237,37 @@ export function CatalogDesignModal({
       });
   }, [fields, service]);
 
+  // nguồn cho các ô chọn NHIỀU giá trị (Chủng loại xe / Chủng loại hàng / Số xe)
+  const [multiOptions, setMultiOptions] = useState<Record<string, string[]>>({});
+  useEffect(() => {
+    const listOf = (res: { data?: { data?: { content?: unknown[] } | unknown[] } }): Record<string, unknown>[] => {
+      const d = res.data?.data;
+      return ((Array.isArray(d) ? d : d?.content) ?? []) as Record<string, unknown>[];
+    };
+    const uniqueSorted = (xs: string[]) => Array.from(new Set(xs.map((s) => s.trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b));
+    const sources = new Set(fields.map((f) => f.multiSource).filter(Boolean));
+    sources.forEach(async (src) => {
+      try {
+        let values: string[] = [];
+        if (src === "vehicleTypes") {
+          // Chủng loại xe khớp với mã Chủng loại xe HOẶC Chủng loại xe (NL) của xe → cho chọn cả hai danh mục
+          const [a, b] = await Promise.all([
+            api.get("/vehicle-types", { params: { size: 500 } }),
+            api.get("/vehicle-fuel-classes", { params: { size: 500 } }),
+          ]);
+          values = [...listOf(a), ...listOf(b)].map((x) => String(x.code ?? ""));
+        } else if (src === "cargoTypes") {
+          values = listOf(await api.get("/cargo-types", { params: { size: 1000 } })).map((x) => String(x.name ?? ""));
+        } else if (src === "vehicles") {
+          values = listOf(await api.get("/devices", { params: { categoryGroup: "XE", size: 1000 } })).map((x) => String(x.code ?? ""));
+        }
+        setMultiOptions((p) => ({ ...p, [src as string]: uniqueSorted(values) }));
+      } catch {
+        setMultiOptions((p) => ({ ...p, [src as string]: [] }));
+      }
+    });
+  }, [fields]);
+
   /** Thêm các dòng từ Nhập liệu thông minh (ảnh/Excel) — cả khi Thêm mới lẫn Chỉnh sửa (dòng thêm là bản ghi mới); nếu bảng chỉ có một dòng trống chưa nhập gì thì thay luôn dòng đó. */
   const addQuickRows = (added: Row[]) =>
     setRows((prev) => {
@@ -239,6 +297,9 @@ export function CatalogDesignModal({
     for (let i = 0; i < rows.length; i++) {
       for (const f of fields) {
         if (f.required && !(rows[i][f.key] ?? "").trim()) return `Dòng ${i + 1}: "${f.label}" là bắt buộc.`;
+        if (f.type === "monthRange" && (rows[i][f.key] ?? "").trim() && !isMonthRangeComplete(rows[i][f.key])) {
+          return `Dòng ${i + 1}: "${f.label}" cần chọn đủ tháng/năm bắt đầu và tháng/năm kết thúc.`;
+        }
       }
     }
     if (codeField) {
@@ -308,6 +369,29 @@ export function CatalogDesignModal({
             </option>
           ))}
         </select>
+      );
+    }
+    if (f.type === "monthRange") {
+      const [from, to] = splitMonthRange(row[f.key] ?? "");
+      // Dùng lại đúng ô chọn khoảng tháng của Mô hình / Tỷ trọng (một ô, bấm hai lần: tháng bắt đầu rồi tháng kết thúc).
+      return (
+        <div id={id}>
+          <MonthRangePicker
+            from={from ? `${from}-01` : ""}
+            to={to ? `${to}-01` : ""}
+            onChange={(a, b) => setCell(i, f.key, joinMonthRange(a.slice(0, 7), b.slice(0, 7)))}
+          />
+        </div>
+      );
+    }
+    if (f.type === "text" && f.multiSource) {
+      return (
+        <MultiPickCell
+          value={row[f.key] ?? ""}
+          onChange={(v) => setCell(i, f.key, v)}
+          options={multiOptions[f.multiSource] ?? []}
+          placeholder={f.placeholder}
+        />
       );
     }
     if (f.type === "date") {

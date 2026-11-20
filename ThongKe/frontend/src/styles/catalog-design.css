@@ -83,7 +83,7 @@
 .tkc .data-table th.sortable:hover { background: #0b5dca; }
 .tkc .th-inner { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
 .tkc .sort-icon { width: 13px; height: 13px; opacity: .75; }
-.tkc .th-label { display: flex; align-items: center; gap: 5px; min-width: 0; white-space: nowrap; overflow: visible; }
+.tkc .th-label { display: block; flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tkc .th-tools { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
 .tkc .col-filter-btn { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 24px; padding: 0; border: 0; border-radius: 5px; background: transparent; color: #fff; cursor: pointer; opacity: .8; }
 .tkc .col-filter-btn:hover { background: rgba(255,255,255,.2); opacity: 1; }
@@ -482,3 +482,38 @@
 .tkc-modal-overlay .entry-table.entry-view thead tr:nth-child(2) th { top: 36px !important; }
 .tkc-modal-overlay.vg-inline .entry-table.entry-view thead tr:nth-child(2) th { top: 43px !important; }
 .tkc-modal-overlay .vg-grouphead { font-weight: 700; white-space: nowrap; }
+
+/* ===== Áp Trắc địa (m3-tấn-tkm): bộ lọc + danh sách tháng + bảng xem (đồng bộ với các bảng danh mục) ===== */
+.tkc .ap-filters { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 16px; margin-bottom: 16px; }
+.tkc .ap-field { display: flex; flex-direction: column; gap: 5px; }
+.tkc .ap-field > span { font-size: 12.5px; font-weight: 600; color: #33496d; }
+.tkc .ap-year { display: flex; align-items: center; gap: 8px; }
+.tkc .ap-input { height: 39px; width: 120px; padding: 0 11px; border: 1px solid #c2d3ea; border-radius: 7px; background: #fff; color: #294267; outline: none; }
+.tkc .ap-input:focus, .tkc .ap-select:focus { border-color: #3886f8; box-shadow: 0 0 0 3px #dcecff; }
+.tkc .ap-select { min-width: 240px; }
+.tkc .ap-body { display: flex; gap: 14px; align-items: flex-start; padding-bottom: 14px; }
+.tkc .ap-months { width: 200px; flex: none; border: 1px solid #8fa9cc; border-radius: 10px; overflow: hidden; background: #fff; }
+.tkc .ap-months button { display: flex; align-items: center; gap: 8px; width: 100%; height: 39px; padding: 0 12px; border: 0; border-bottom: 1px solid #d5e2f3; background: #fff; color: #294267; font: inherit; cursor: pointer; text-align: left; }
+.tkc .ap-months button:nth-child(even) { background: #f5f9ff; }
+.tkc .ap-months button:last-child { border-bottom: 0; }
+.tkc .ap-months button:hover { background: #e1eeff; }
+.tkc .ap-months button.on { background: #e1eeff; color: #0954c7; font-weight: 700; box-shadow: inset 3px 0 0 #0862e5; }
+.tkc .ap-months .ap-m-no { width: 18px; color: #7f95b6; font-weight: 600; }
+.tkc .ap-months .ap-m-label { flex: 1; }
+.tkc .ap-months svg { width: 16px; height: 16px; color: #7f95b6; }
+.tkc .ap-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+.tkc .ap-main-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.tkc .ap-main-head h2 { margin: 0; font-size: 15px; font-weight: 700; color: #113f8b; }
+.tkc .ap-grid.vg-inline .vg { padding: 0; }
+.tkc .ap-grid.vg-inline .vg-scroll { max-height: 62vh; }
+
+/* Nhóm cột nhiều sắc xanh (ViewGrid columnGroups[].tone): 1 đậm — 2 vừa — 3 nhạt */
+.tkc-modal-overlay.vg-inline .entry-table.entry-view th[data-tone="1"] { background: linear-gradient(180deg, #0a3f9a, #072f78); border-right-color: #2f66bd; }
+.tkc-modal-overlay.vg-inline .entry-table.entry-view th[data-tone="2"] { background: linear-gradient(180deg, #1b78e6, #1360c9); border-right-color: #5b9cf0; }
+.tkc-modal-overlay.vg-inline .entry-table.entry-view th[data-tone="3"] { background: linear-gradient(180deg, #4ea3f5, #3a8ae0); border-right-color: #86bdf8; }
+
+/* HS điều chỉnh NLĐM: cột "HSNL điều chỉnh (năm)" đứng TRƯỚC Tháng 1, tiêu đề không xuống dòng/bị cắt */
+.tkc-modal-overlay .entry-table th.fa-yearly { white-space: nowrap; }
+
+/* Cột kéo hẹp được hơn chiều rộng nhãn: tiêu đề cột bảng nhập tự cắt "…" thay vì tràn sang cột bên cạnh (chừa 5px cho tay nắm kéo ở mép phải) */
+.tkc-modal-overlay .entry-table th { overflow: clip; overflow-clip-margin: 5px; text-overflow: ellipsis; }

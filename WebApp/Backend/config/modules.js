@@ -63,8 +63,9 @@ const MODULES = [
   m("tk-devices-vehicle", "Thông tin xe", G_DEVICE, ADM_DISP, ["devices"]),
   m("tk-devices-machine", "Thông tin máy", G_DEVICE, ADM_DISP, ["devices"]),
   m("tk-vehicle-types", "Chủng loại xe", G_DEVICE, ADM_DISP, ["vehicle-types"]),
-  m("tk-vehicle-rank-groups", "Nhóm hạng xe", G_DEVICE, ADM_DISP, ["vehicle-rank-groups"]),
-  m("tk-vehicle-ranks", "Hạng xe", G_DEVICE, ADM_DISP, ["vehicle-ranks"]),
+  m("tk-vehicle-rank-groups", "Nhóm hạng xe/máy", G_DEVICE, ADM_DISP, ["vehicle-rank-groups"]),
+  m("tk-vehicle-ranks", "Hạng xe/máy", G_DEVICE, ADM_DISP, ["vehicle-ranks"]),
+  m("tk-excavator-buckets", "Gầu xúc", G_DEVICE, ADM_DISP, ["excavator-buckets"]),
   m("device-vehicles", "Xe — trạng thái, vị trí (Điều phối)", G_DEVICE, ADM_DISP),
   m("device-machines", "Máy — trạng thái, vị trí (Điều phối)", G_DEVICE, ADM_DISP),
 
@@ -75,8 +76,16 @@ const MODULES = [
   // --- Danh mục: Khác ---
   m("tk-ttl-clh", "TTL CLH", G_OTHER, ADM_DISP, ["ttl-clh-items"]),
   m("tk-seam-groups", "Nhóm vỉa", G_OTHER, ADM_DISP, ["seam-groups"]),
-  m("tk-fuel-classes", "Chủng loại xe + DMNL", G_OTHER, ADM_DISP, ["vehicle-fuel-classes"]),
+  // Đã bỏ khỏi menu (2026-11-15) nhưng GIỮ module: quyền đọc "vehicle-fuel-classes" vẫn cần cho ô chọn Chủng loại xe (NL), ĐMNL, Mô hình.
+  m("tk-fuel-classes", "Chủng loại xe (NL) — dữ liệu tham chiếu, ẩn menu", G_OTHER, ADM_DISP, ["vehicle-fuel-classes"]),
   m("tk-coefficients", "Hệ số", G_OTHER, ADM_DISP, ["coefficients"]),
+  m("tk-coal-coefficients", "Hệ số Than TKE trừ đá / KCS", G_OTHER, ADM_DISP, ["coal-coefficients"]),
+  m("tk-waste-rock-coefficients", "Hệ số đá thải", G_OTHER, ADM_DISP, ["waste-rock-coefficients"]),
+  m("tk-fuel-season-factors", "Hệ số ĐMNL theo mùa", G_OTHER, ADM_DISP, ["fuel-season-factors"]),
+  m("tk-fuel-rank-factors", "Hệ số ĐMNL theo hạng xe", G_OTHER, ADM_DISP, ["fuel-rank-factors"]),
+  m("tk-fuel-renovation-factors", "Hệ số ĐMNL theo cải tạo ben", G_OTHER, ADM_DISP, ["fuel-renovation-factors"]),
+  m("tk-fuel-coal-factors", "Hệ số Than (CN-NK)", G_OTHER, ADM_DISP, ["fuel-coal-factors"]),
+  m("tk-fuel-bsnl-factors", "Hệ số BSNL", G_OTHER, ADM_DISP, ["fuel-bsnl-factors"]),
   m("tk-report-periods", "Kỳ báo cáo", G_OTHER, ADM_DISP, ["report-periods"]),
   m("tk-model-periods", "Mô hình", G_OTHER, ADM_DISP, ["model-periods"]),
   m("tk-matrix-996", "Năng suất xe (996)", G_OTHER, ADM_DISP, ["matrix-catalogs"]),
@@ -111,7 +120,8 @@ const TK_RESOURCES = [
   "model-periods", "pickup-points", "production", "receiving-points", "report-periods",
   "seam-groups", "survey-standards", "ttl-clh-items", "unloading-points",
   "vehicle-category-classes", "vehicle-fuel-classes", "vehicle-rank-groups", "vehicle-ranks",
-  "vehicle-types",
+  "vehicle-types", "excavator-buckets", "coal-coefficients", "waste-rock-coefficients",
+  "fuel-season-factors", "fuel-rank-factors", "fuel-renovation-factors", "fuel-coal-factors", "fuel-bsnl-factors",
 ];
 
 const isTkModule = (key) => key.startsWith("tk-");

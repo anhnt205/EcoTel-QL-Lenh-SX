@@ -690,7 +690,7 @@ export function ModelAddModal({
             <div className="modal-table-scroll entry-clean-wrap">
               <table
                 className={`entry-table entry-clean ${layout.tableClass}`}
-                style={{ tableLayout: "fixed", width: "100%", minWidth: 76 + shownWidth }}
+                style={{ tableLayout: "fixed", width: 76 + shownWidth }}
               >
                 <colgroup>
                   <col style={{ width: 76 }} />

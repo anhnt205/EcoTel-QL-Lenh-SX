@@ -997,3 +997,47 @@ Báo cáo, kỳ chưa tính → 0); các test cổng duyệt cũ không đổi.
 - **Phân loại** (`/api/classifications`, bảng `classifications` đã có sẵn từ 06/09): QĐ-20 đã gỡ khỏi menu nhưng cố ý giữ backend — nay bật lại menu + route `/danh-muc/phan-loai`.
 - **Loại hàng** (danh mục nhỏ mới): đã làm rồi GỠ lại cùng ngày theo yêu cầu chủ dự án — chỉ còn backend `cargo_categories` (rỗng, không dùng), không có menu/route.
 - Cả hai nằm trong nhóm menu "Vật liệu, hàng hoá". **Chưa có khoá ngoại/công thức nào đọc** hai danh mục này (engine vẫn tự suy Phân loại DAT/Than theo QĐ-10) — chỉ là danh mục tra cứu độc lập cho tới khi có yêu cầu gắn vào nghiệp vụ.
+
+## QĐ-27 (2026-11-16) — BỎ chế độ TKE và BỎ lượt 3 (Tấn cuối cùng / Tkm cuối cùng)
+
+Chủ dự án chốt trực tiếp: **bỏ chế độ TKE** (QĐ-03 phần "chế độ TKE", QĐ-25 phương án A về thể trọng TKE) và **bỏ Tấn cuối cùng / Tkm cuối cùng** vì chốt Báo chuyến là chốt luôn Thống kê sản lượng.
+
+- Engine chỉ còn: lượt 1 (AL/AM/AN) → rào chắn 1 (AP Tdia: HS = STD ÷ Σ m3/tấn/tkm của khoá) → lượt 2 (m3/tấn/tkm trắc địa). Không còn rào chắn 2 (Ap Tkm) và lượt 3. Kỳ nào cũng tính theo số trắc địa → thiếu STD là lỗi nghiệp vụ (QĐ-04).
+- API `/production/calculate` bỏ tham số `tkeMode`; `calculatePeriod(periodId[, onlyApproved])`.
+- Các cột `production_results.tke_mode / final_ton / final_tkm` và `survey_coefficients.kind = AP_TKM` GIỮ trong DB (dữ liệu cũ), không ghi mới.
+- HSTĐ (m3/tấn/tkm) lưu = HS của AP Tdia, trùng con số màn Áp Trắc địa.
+- Tác động dữ liệu hiện có: 9.840 dòng tháng 9/2026 đang là kết quả chế độ TKE; chúng đổi sang chế độ trắc địa khi kỳ được tính lại (tự động sau Đối chiếu duyệt hoặc bấm tính lại) — cần đủ STD cho mọi khoá, kỳ đã chốt phải mở khoá mới tính lại.
+
+### Bổ sung QĐ-27 (2026-11-16) — Áp hệ số trắc địa theo từng chỉ tiêu
+Mỗi chuyến tính m3, tấn, tkm → cộng theo khoá (chính là bảng Áp trắc địa) → ba hệ số HSTĐ = STD ÷ tổng tương ứng → áp ngược **đúng hệ số của chỉ tiêu đó** cho từng chuyến:
+`m3 trắc địa = m3 × HS m3`, `tấn trắc địa = tấn × HS tấn`, `tkm trắc địa = tkm × HS tkm`. Hai màn (Áp trắc địa, Thống kê sản lượng) là MỘT dữ liệu; tổng mỗi khoá khớp STD cả ba chỉ tiêu. Thể trọng (TĐ) chỉ còn là cột tham chiếu, không còn tham gia phép tính tấn. Chuyến CTNB giữ cách cũ (nhân hệ số chênh lệch riêng).
+
+## QĐ-28 (2026-11-16) — Danh mục "Hệ số Than TKE trừ đá / KCS" (theo tháng)
+
+Chủ dự án chốt (đọc hàm Excel `=(AL*AI-FK-IF(AD="THAN";AH;0))*IF(AG="than_sx";$AM$3;1)` và bảng): Tổng KLVC (tấn) của chuyến có Sản phẩm nghiệm thu `than_sx` nhân với `$AM$3` = **Hệ số KCS ÷ Hệ số Than TKE trừ đá** (190.993,45 ÷ 190.935,02 = 1,00031). Hai hệ số là số liệu THEO THỜI GIAN → danh mục mới `coal_coefficients`: MỘT cột **Thời gian** (chọn tháng/năm – tháng/năm, bao gồm cả hai đầu, lưu `effective_from`/`effective_to` = ngày đầu tháng), Hệ số Than TKE trừ đá, Hệ số KCS, Ghi chú; API `/api/coal-coefficients`, quyền `coal-coefficients`. Các dòng không được chồng lấn thời gian.
+- Tháng không thuộc dòng nào → hệ số nhân = 1 (giữ nguyên số tấn); Hệ số Than TKE trừ đá = 0 → lỗi nghiệp vụ.
+- Nhập liệu do chủ dự án tự làm (2026-11-16) — danh mục để TRỐNG, không có số seed.
+- Thay hệ số `HS.THAN.TRUDA` = 0,893840 của danh mục "Hệ số" cũ — đó chỉ là GIẢ ĐỊNH của điều phối suy từ dữ liệu, không phải số của bảng tính; không còn được engine đọc.
+- Chỉ `than_sx` nhân hệ số (đúng công thức Excel); `Than_CN` không nhân.
+
+## QĐ-29 (2026-11-16) — Đá thải, Tổng km vận chuyển, danh mục Hệ số đá thải
+
+Chủ dự án chốt trực tiếp:
+- **Ô nhập Báo chuyến "Đá thải (tấn)"** (trường `waste_rock_ton` của chuyến vận tải, người dùng tự nhập) — trước đây có cột DB/API nhưng không có ô nhập trên giao diện.
+- **Đá thải (tấn)** (cột bảng thống kê): Nhóm chủng loại hàng ≠ `THANV` → 0; = `THANV` → **giá trị tự nhập × Tổng KLVC TKE ban đầu chưa trừ đá (CK)**. Ba nhánh theo khu vực xúc / 2 ký tự cuối Nơi dỡ tải đều lấy chính giá trị tự nhập nên không phân nhánh. Tổng KLVC (tấn) trừ đúng Đá thải (tấn) này (`FK5`).
+- **CK** = `ROUND(Tỷ trọng ban đầu × Mô hình × Số chuyến − IF(Phân loại = THAN, Trừ vơi, Trừ vơi × Tỷ trọng ban đầu), 5)` (công thức `CK5` của bảng tính, khớp QĐ-02); hiện ở cột "Tổng KLVC TE (tấn- ban đầu, chưa trừ đá)". Chuyến THANV có nhập đá thải mà chủng loại hàng chưa có Tỷ trọng (quy ẩm) trong danh mục → lỗi nghiệp vụ.
+- **Đá thải (m3)** = Đá thải (tấn) ÷ **Hệ số đá thải** của KHU VỰC XÚC của chuyến trong tháng sản xuất. Hệ số lấy từ danh mục mới `waste_rock_coefficients` (Thời gian tháng/năm – tháng/năm, Khu vực xúc, Hệ số đá thải; API `/api/waste-rock-coefficients`, quyền `waste-rock-coefficients`) — 2,625 / 2,617 của bảng tính KHÔNG còn nằm cứng trong code, chủ dự án tự khai. Chưa có dòng cho khu vực + tháng → Đá thải (m3) để TRỐNG (không phải 0); cùng khu vực không được chồng lấn thời gian; khu vực xúc đã có hệ số thì không xoá được.
+- **Tổng km vận chuyển** = Cung độ toàn tuyến × Số chuyến.
+
+## QĐ-30 (2026-11-16) — Hệ số ĐMNL và BSNL "tạo động" (năm danh mục)
+
+Chủ dự án chốt: các hằng số của chuỗi ĐMNL và BSNL không nằm cứng trong code nữa mà khai ở **năm danh mục** (cùng bảng `fuel_norm_factors`, API `/api/fuel-{season,rank,renovation,coal,bsnl}-factors`, quyền cùng tên, mục "Danh mục khác"):
+1. **Hệ số ĐMNL theo mùa** (Thời gian, hệ số) — trước: tháng 6–9 → 1,03.
+2. **Hệ số ĐMNL theo hạng xe** (Thời gian, Hạng xe/máy, hệ số) — trước: A 0,97 · B 1 · C1 1,04 · khác 1,06.
+3. **Hệ số ĐMNL theo cải tạo ben** (Thời gian, hệ số) — nhân khi xe đánh dấu Cải tạo toa; trước: 1,03.
+4. **Hệ số Than (CN-NK)** (Thời gian, Chủng loại xe, Chủng loại hàng, Khu vực xúc nhóm CS/KC, Cung độ nhỏ hơn, Thứ tự xét, hệ số) — chỉ chuyến SPNT/CN = Than_CN; dòng thoả đầu tiên theo thứ tự xét thắng; trước: VolvoA40F/G 1,02 · CS+SPNT.Baichua+HD465* 0,9 · cung độ < 1,5 + HD465-7R 1,15.
+5. **Hệ số BSNL** (Thời gian, Loại BSNL = Roda / Ngày mưa / Bổ túc / SC, BD / Khác / SPNT / Bùn, Chủng loại xe, Số xe, Chủng loại hàng, Thứ tự xét, Làm tròn, Tỷ lệ) — mỗi khoản = tỷ lệ × Nhiên liệu tiêu hao theo ĐM; Roda/Ngày mưa/Bổ túc chỉ khi chuyến có cờ.
+
+Quy tắc chung: **chưa khai = mặc định** — hệ số ĐMNL = 1, BSNL = 0 (kết quả tính kỳ kèm lời nhắc nhóm nào chưa có dòng). Điều kiện dạng chữ nhận nhiều giá trị cách nhau `,`/`;`, dấu `*` ở cuối = "bắt đầu bằng", không phân biệt hoa thường; Chủng loại xe khớp với mã Chủng loại xe (NL) HOẶC Chủng loại xe của xe. Nhóm theo mùa / hạng xe / cải tạo ben không được chồng lấn thời gian. Thay thế: `HS.BUN` (danh mục Hệ số cũ) — chỉ còn ghi chú "không còn dùng". Danh mục để TRỐNG, chủ dự án tự nhập.
+
+**Bổ sung QĐ-30 (2026-11-19) — trường theo từng loại/dạng điều kiện.** Màn Hệ số BSNL tách tab theo 7 loại, màn Hệ số Than (CN-NK) tách tab theo 3 dạng điều kiện; mỗi tab chỉ có các trường phù hợp, backend xoá trắng trường không thuộc loại/dạng đó (không để điều kiện ẩn ảnh hưởng tính toán). BSNL: Roda / Ngày mưa / Bổ túc chỉ có Thời gian + Tỷ lệ (đã có cờ riêng của chuyến); SC, BD = + Chủng loại xe, Thứ tự xét; Khác = + Số xe, Thứ tự xét; SPNT = + Chủng loại xe, Chủng loại hàng, Thứ tự xét; Bùn = như SPNT + Làm tròn. HS Than: (1) Chủng loại xe; (2) Khu vực xúc CS/KC + Chủng loại hàng + Chủng loại xe; (3) Cung độ nhỏ hơn + Chủng loại xe; thứ tự xét chính là thứ tự 1 → 2 → 3 (thoả dạng nào thì không xét tiếp), không còn ô Thứ tự xét. Cột mới `fuel_norm_factors.coal_condition`.

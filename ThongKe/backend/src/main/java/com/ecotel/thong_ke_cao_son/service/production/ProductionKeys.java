@@ -141,6 +141,17 @@ public final class ProductionKeys {
     }
 
     /**
+     * Cột "Chủng loại xe + Nhóm hạng xe" = {@code Chủng loại xe & "_" & Nhóm hạng xe} (A, B, C), vd {@code HM400-2R_C}
+     * (chủ dự án chốt 2026-11-16). Cùng dạng với {@link #vehicleTypeRankKey} nhưng lấy NHÓM hạng xe của danh mục
+     * (không suy từ chữ đầu của Hạng xe). Thiếu Chủng loại xe thì trả chuỗi rỗng.
+     */
+    public static String vehicleTypeRankGroupKey(String vehicleTypeCode, String rankGroupCode) {
+        String type = trim(vehicleTypeCode);
+        if (type.isEmpty()) return "";
+        return type + "_" + trim(rankGroupCode);
+    }
+
+    /**
      * Phần XE của khoá cột lưới <b>Định mức nhiên liệu</b> — cột {@code DE}
      * ("LoaiXe_DMNL") của bảng tính.
      *

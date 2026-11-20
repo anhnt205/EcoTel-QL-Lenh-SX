@@ -2,7 +2,7 @@ import { useSyncExternalStore } from "react";
 
 /**
  * Cài đặt hiển thị bảng DÙNG CHUNG cho TẤT CẢ bảng (lưu ở trình duyệt, phát tới mọi bảng đang mở ngay lập tức):
- *  - `scale`: kéo thanh trượt "cỡ cột tất cả bảng" (50–200%) — nhân với bề rộng cột của MỌI bảng cùng lúc.
+ *  - `scale`: kéo thanh trượt "cỡ cột tất cả bảng" (20–200%; cột không bao giờ hẹp hơn 60px) — nhân với bề rộng cột của MỌI bảng cùng lúc.
  *  - `applyAll`: bật thì kiểu cột + chiều cao hàng chọn ở nút "Hiển thị bảng" áp cho mọi bảng (thay vì chỉ bảng đang mở).
  * Dùng bởi cả hai bộ điều chỉnh bảng: `modules/catalog/design/tableLayout.tsx` và `components/table/useTanstackLayout.tsx`.
  */
@@ -19,7 +19,7 @@ export interface GlobalTableLayout {
   rev: number;
 }
 
-export const SCALE_MIN = 50;
+export const SCALE_MIN = 20;
 export const SCALE_MAX = 200;
 const KEY = "tk-table-layout-global";
 const DEFAULT: GlobalTableLayout = { applyAll: false, colPreset: "fit", rowPreset: "normal", scale: 100, rev: 0 };

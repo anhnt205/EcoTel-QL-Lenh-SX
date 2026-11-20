@@ -34,6 +34,7 @@ public final class PermissionResources {
             "receiving-points", "report-periods", "seam-groups", "survey-standards",
             "ttl-clh-items", "unloading-points", "vehicle-category-classes",
             "vehicle-fuel-classes", "vehicle-rank-groups", "vehicle-ranks",
-            "vehicle-types"
+            "vehicle-types", "excavator-buckets", "coal-coefficients", "waste-rock-coefficients",
+            "fuel-season-factors", "fuel-rank-factors", "fuel-renovation-factors", "fuel-coal-factors", "fuel-bsnl-factors"
     );
 }

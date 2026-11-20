@@ -15,7 +15,7 @@ public class VehicleRankRequest {
     @NotBlank(message = "Mã hạng xe là bắt buộc")
     String code;
 
-    @NotNull(message = "Xếp hạng là bắt buộc")
+    /** Không còn nhập (2026-11-15); để trống = 0. */
     Integer rank;
 
     @NotNull(message = "Nhóm hạng xe là bắt buộc")

@@ -14,6 +14,9 @@ export interface ProductionReportRow {
   cargoGroupName: string | null;
   tripCount: number | null;
   routeDistanceKm: number | null;
+  seamGroupName: string | null;
+  benchGroup: string | null;
+  mudMark: string | null;
   seamGroupExcavatorKey: string | null;
   acceptanceProduct: string | null;
   totalM3: number | null;
@@ -22,15 +25,12 @@ export interface ProductionReportRow {
   surveyM3: number | null;
   surveyTon: number | null;
   surveyTkm: number | null;
-  finalTon: number | null;
-  finalTkm: number | null;
   densityUsed: number | null;
   modelUsed: number | null;
   bulkDensityUsed: number | null;
   hsM3: number | null;
   hsTon: number | null;
   hsTkm: number | null;
-  tkeMode: boolean;
   densityOriginal: number | null;
   densityNoMoisture: number | null;
   totalM3Original: number | null;
@@ -39,6 +39,64 @@ export interface ProductionReportRow {
   cargoCode: string | null;
   cargoTtlCode: string | null;
   seamKpmb: string | null;
+  receivingFloor: number | null;
+  unloadingFloor: string | null;
+  routeLiftM: number | null;
+  localSlopeDistanceKm: number | null;
+  weighedWeightTon: number | null;
+  provisionalModel: number | null;
+  provisionalDensity: number | null;
+  deductionAmount: number | null;
+  ctnbFactor: number | null;
+  wasteRockTon: number | null;
+  wasteRockM3: number | null;
+  totalTonOriginalBeforeWaste: number | null;
+  totalKmTransport: number | null;
+  apHsM3: number | null;
+  apHsTon: number | null;
+  apHsTkm: number | null;
+  fuelPaymentLift: number | null;
+  rainyDay: boolean;
+  supplementaryVehicle: boolean;
+  loadLevel: string | null;
+  cargoSpntCn: string | null;
+  vehicleNumber: string | null;
+  vehicleCarRenovation: string | null;
+  vehicleTypeName: string | null;
+  vehicleCategoryClassName: string | null;
+  vehicleRankName: string | null;
+  vehicleRankGroupName: string | null;
+  vehicleDepartmentName: string | null;
+  vehicleFuelClassName: string | null;
+  vehicleTypeRankGroupKey: string | null;
+  vehicleFuelNormKey: string | null;
+  excavatorNumber: string | null;
+  excavatorTypeName: string | null;
+  excavatorRankName: string | null;
+  excavatorBucketName: string | null;
+  excavatorDepartmentName: string | null;
+  fuelHb: number | null;
+  fuelHa: number | null;
+  fuelH1: number | null;
+  fuelH2: number | null;
+  fuelNbH1: number | null;
+  fuelNbH2: number | null;
+  fuelNb: number | null;
+  fuelNaH1: number | null;
+  fuelNaH2: number | null;
+  fuelNa: number | null;
+  fuelNt: number | null;
+  fuelNormSeasonal: number | null;
+  fuelNormVehicleClass: number | null;
+  fuelNormCarRenovation: number | null;
+  fuelCoalCnNkFactor: number | null;
+  bsnlRoda: number | null;
+  bsnlRainyDay: number | null;
+  bsnlSupplementary: number | null;
+  bsnlMaintenance: number | null;
+  bsnlOther: number | null;
+  bsnlSpnt: number | null;
+  bsnlMud: number | null;
   fuelNorm: number | null;
   fuelBaseConsumption: number | null;
   fuelTotalBeforeAdjustment: number | null;
@@ -55,7 +113,6 @@ export interface ProductionReportSummary {
   /** 0 nghĩa là kỳ CHƯA được tính lần nào — khác với đã tính và ra 0. */
   rowCount: number;
   calculatedAt: string | null;
-  tkeMode: boolean | null;
   /** QĐ-25: số chuyến Vận tải của kỳ KHÔNG nằm trong số liệu vì chưa duyệt đối chiếu. */
   unapprovedTripCount?: number;
   totalM3: number;
@@ -64,14 +121,11 @@ export interface ProductionReportSummary {
   surveyM3: number;
   surveyTon: number;
   surveyTkm: number;
-  finalTon: number;
-  finalTkm: number;
 }
 
 export interface CalculationSummary {
   tripCount: number;
   coefficientRowCount: number;
-  tkeMode: boolean;
   warnings: string[];
   /** QĐ-25: số chuyến chưa duyệt bị bỏ qua khi tính ở chế độ "chỉ tính chuyến đã duyệt". */
   excludedTripCount?: number;
@@ -99,7 +153,6 @@ export interface ReportPeriodAudit {
   performedByFullName: string | null;
   performedAt: string;
   reason: string | null;
-  tkeMode: boolean | null;
   totalM3: number | null;
   totalTon: number | null;
   totalTkm: number | null;
@@ -185,15 +238,18 @@ export const productionService = {
   allRows: async (periodId: number): Promise<ProductionReportRow[]> =>
     unwrap(await api.get("/production/results/all", { params: { periodId } })) ?? [],
 
+  /** Dòng thống kê theo khoảng NGÀY sản xuất (không theo kỳ) — bảng xem Báo cáo thống kê. */
+  rowsByDate: async (fromDate: string, toDate: string): Promise<ProductionReportRow[]> =>
+    unwrap(await api.get("/production/results/by-date", { params: { fromDate, toDate } })) ?? [],
+
   coefficients: async (periodId: number): Promise<SurveyCoefficientRow[]> =>
     unwrap(await api.get("/production/survey-coefficients", { params: { periodId } })) ?? [],
 
   calculate: async (
     periodId: number,
-    tkeMode: boolean,
     onlyApproved = false,
   ): Promise<CalculationSummary> =>
-    unwrap(await api.post("/production/calculate", null, { params: { periodId, tkeMode, onlyApproved } })),
+    unwrap(await api.post("/production/calculate", null, { params: { periodId, onlyApproved } })),
 
   /** Chốt kỳ (QĐ-03) — đóng băng kết quả, chặn "Tính lại" cho tới khi mở khoá. */
   lockPeriod: async (periodId: number): Promise<ReportPeriodOption> =>

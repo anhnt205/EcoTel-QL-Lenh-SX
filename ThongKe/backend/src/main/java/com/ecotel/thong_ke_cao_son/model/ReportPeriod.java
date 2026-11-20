@@ -32,10 +32,8 @@ import java.time.LocalDateTime;
  * phải mở khoá trước (endpoint riêng, quyền riêng, bắt buộc lý do, xem
  * {@link ReportPeriodAudit}). {@code stale} bật lên khi mở khoá và tắt khi
  * chốt lại — đánh dấu "báo cáo đã xuất trước đó trở thành lỗi thời" cho tới
- * khi có bản chốt mới. KHÔNG có trường {@code tkeMode} riêng ở đây: chế độ
- * đang áp dụng đọc thẳng từ {@code ProductionResult.tkeMode} của dòng bất kỳ
- * trong kỳ (mọi dòng cùng kỳ luôn cùng chế độ) — thêm một bản sao ở đây chỉ
- * tạo thêm một chỗ có thể lệch nhau.
+ * khi có bản chốt mới. (Chế độ TKE đã bỏ 2026-11-16 — không còn khái niệm
+ * "chế độ tính" của kỳ.)
  */
 @Entity
 @Table(

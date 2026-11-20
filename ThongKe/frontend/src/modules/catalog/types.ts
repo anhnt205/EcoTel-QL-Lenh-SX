@@ -10,8 +10,10 @@ export interface CatalogField {
    * `date`   — ô chọn ngày, payload dạng ISO yyyy-MM-dd
    * `select` — combobox; nguồn lấy từ `optionsFrom` (endpoint phụ trả
    *            mảng chuỗi) hoặc `optionsPath` (danh mục khác, dùng id)
+   * `monthRange` — MỘT cột chọn khoảng thời gian "từ tháng/năm - đến tháng/năm"; giá trị
+   *            là chuỗi "MM/yyyy - MM/yyyy" (ở màn nhập kiểu thiết kế hiện hai ô chọn tháng)
    */
-  type: "text" | "number" | "date" | "select" | "checkbox";
+  type: "text" | "number" | "date" | "select" | "checkbox" | "monthRange";
   /** Với checkbox: giá trị lưu khi được tick (bỏ tick = để trống). Mặc định "true". */
   checkedValue?: string;
   /** Với select: hậu tố endpoint trả mảng chuỗi, vd "seam-groups". */
@@ -37,6 +39,12 @@ export interface CatalogField {
    */
   formHidden?: boolean;
   placeholder?: string;
+  /**
+   * Với `text` nhận nhiều giá trị cách nhau bằng dấu phẩy: hiện thành combobox ĐA CHỌN lấy lựa chọn từ danh mục
+   * (`vehicleTypes` = Chủng loại xe + Chủng loại xe (NL), `cargoTypes` = Chủng loại hàng, `vehicles` = Số xe).
+   * Vẫn gõ được mẫu kết thúc bằng `*`. Giá trị lưu vẫn là chuỗi "A, B"; chỗ nào chưa hỗ trợ thì hiện ô chữ như cũ.
+   */
+  multiSource?: "vehicleTypes" | "cargoTypes" | "vehicles";
   /** Với select: danh sách lựa chọn CỐ ĐỊNH (giá trị gửi lên + nhãn hiển thị), vd trạng thái thiết bị. */
   options?: { value: string; label: string }[];
   /** Với select tham chiếu danh mục khác: tham số lọc thêm khi tải lựa chọn, vd { group: "XE" }. */

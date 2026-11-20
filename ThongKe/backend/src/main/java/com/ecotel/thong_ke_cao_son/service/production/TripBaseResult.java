@@ -59,8 +59,7 @@ public class TripBaseResult {
 
     /**
      * Hệ số "Than tke trừ đá" ({@code HS.THAN.TRUDA}) đã nhân vào {@link #totalTon} — chỉ có với
-     * sản phẩm nghiệm thu {@code than_sx}, còn lại null. Giữ lại để chế độ TKE quy đổi KLVC cuối
-     * của than bằng đúng hệ số này (QĐ-25, phương án A).
+     * sản phẩm nghiệm thu {@code than_sx}, còn lại null.
      */
     private final BigDecimal coalCoefficient;
 
@@ -81,6 +80,12 @@ public class TripBaseResult {
     /** CE — Tổng TKE (tkm, không quy ẩm). */
     private final BigDecimal totalTkmNoMoisture;
 
-    /** Đá thải (tấn) đã dùng. */
+    /** Đá thải (tấn) đã tính = giá trị tự nhập × Tổng KLVC TKE ban đầu chưa trừ đá (chỉ nhóm THANV, còn lại 0). */
     private final BigDecimal wasteRockTon;
+
+    /** Đá thải (m3) = Đá thải (tấn) ÷ 2,625 (KC) / 2,617 (CS). */
+    private final BigDecimal wasteRockM3;
+
+    /** CK — Tổng KLVC TKE (tấn) ban đầu chưa trừ đá; null nếu chuyến chưa có Tỷ trọng (ban đầu) trong danh mục. */
+    private final BigDecimal tonOriginalBeforeWaste;
 }

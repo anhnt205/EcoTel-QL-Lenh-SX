@@ -131,7 +131,7 @@ export function useTableLayout<T>(
     const minHead: Record<string, number> = {};
     columns.forEach((c, ci) => {
       const h = measureText(c.label, true) + headerExtra;
-      minHead[c.key] = Math.round(measureText(c.label, true) + 64);
+      minHead[c.key] = MIN_COL_W; // cho kéo cột hẹp tới MIN_COL_W: nhãn tiêu đề tự cắt "…" (không còn giữ cột rộng bằng cả nhãn)
       let w = 0;
       for (const r of rows) {
         const t = textOf(r, c.key);
@@ -174,7 +174,7 @@ export function useTableLayout<T>(
 
   // w là bề rộng HIỂN THỊ (đã nhân cỡ chung) → lưu về bề rộng gốc
   const setWidth = useCallback(
-    (key: string, w: number) => setState((p) => ({ ...p, widths: { ...p.widths, [key]: clamp((w * 100) / scaleRef.current) } })),
+    (key: string, w: number) => setState((p) => ({ ...p, widths: { ...p.widths, [key]: clamp((w * 100) / Math.max(scaleRef.current, 1)) } })),
     [],
   );
   const autoFit = useCallback(

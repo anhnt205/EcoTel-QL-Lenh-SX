@@ -330,7 +330,7 @@ public class ReportPeriodService {
     private ReportPeriodAudit snapshot(ReportPeriod period, ReportPeriodAuditAction action,
                                        String username, String fullName, String reason,
                                        List<ProductionResult> results) {
-        Boolean tkeMode = results.isEmpty() ? null : results.get(0).isTkeMode();
+        // Không ghi chế độ TKE nữa (bỏ 2026-11-16) — cột tke_mode của vết cũ giữ nguyên, vết mới để trống.
         return ReportPeriodAudit.builder()
                 .reportPeriod(period)
                 .action(action)
@@ -338,7 +338,6 @@ public class ReportPeriodService {
                 .performedByFullName(fullName)
                 .performedAt(LocalDateTime.now())
                 .reason(reason)
-                .tkeMode(tkeMode)
                 .totalM3(sum(results, ProductionResult::getTotalM3))
                 .totalTon(sum(results, ProductionResult::getTotalTon))
                 .totalTkm(sum(results, ProductionResult::getTotalTkm))

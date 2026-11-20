@@ -1,5 +1,5 @@
 import * as XLSX from "xlsx";
-import { ALL_REPORT_COLUMNS, formatCell } from "./productionReportColumns";
+import { ALL_REPORT_COLUMNS, cellValue, formatCell } from "./productionReportColumns";
 import type { ProductionReportRow, ProductionReportSummary } from "./productionService";
 
 /**
@@ -19,7 +19,7 @@ export function downloadProductionReport(
   // file còn phải cộng/lọc trên đó.
   const body = rows.map((r) =>
     ALL_REPORT_COLUMNS.map((c) => {
-      const v = r[c.key];
+      const v = cellValue(r, c);
       if (v === null || v === undefined) return "";
       return c.numeric ? Number(v) : String(v);
     }),
@@ -40,7 +40,6 @@ export function downloadProductionReport(
     ["Đến ngày", summary.toDate],
     ["Số ngày của kỳ", summary.dayCount],
     ["Số chuyến", summary.rowCount],
-    ["Chế độ", summary.tkeMode ? "TKE (không áp hệ số trắc địa)" : "Trắc địa"],
     ["Tính lúc", summary.calculatedAt ?? ""],
     [],
     ["Tổng m3", summary.totalM3],
@@ -49,8 +48,6 @@ export function downloadProductionReport(
     ["m3 trắc địa", summary.surveyM3],
     ["tấn trắc địa", summary.surveyTon],
     ["tkm trắc địa", summary.surveyTkm],
-    ["Tấn cuối cùng", summary.finalTon],
-    ["Tkm cuối cùng", summary.finalTkm],
     [],
     ["Lưu ý:"],
     ["- Số ngày của kỳ được ghi kèm vì kỳ cuối tháng ngắn hơn các kỳ khác;"],
@@ -62,6 +59,23 @@ export function downloadProductionReport(
   XLSX.utils.book_append_sheet(wb, info, "ThongTin");
   XLSX.utils.book_append_sheet(wb, sheet, "BaoCaoThongKe");
   XLSX.writeFile(wb, `bao-cao-thong-ke_${summary.fromDate}_${summary.toDate}.xlsx`);
+}
+
+/** Xuất các dòng đang xem (đã lọc) của bảng thống kê theo khoảng ngày — không kèm sheet thông tin kỳ. */
+export function downloadProductionRows(rows: ProductionReportRow[], from: string, to: string): void {
+  const headerRow = ALL_REPORT_COLUMNS.map((c) => c.label);
+  const body = rows.map((r) => [
+    ...ALL_REPORT_COLUMNS.map((c) => {
+      const v = cellValue(r, c);
+      if (v === null || v === undefined) return "";
+      return c.numeric ? Number(v) : String(v);
+    }),
+  ]);
+  const sheet = XLSX.utils.aoa_to_sheet([headerRow, ...body]);
+  sheet["!cols"] = ALL_REPORT_COLUMNS.map((c) => ({ wch: Math.max(c.label.length + 2, 12) }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, sheet, "ThongKeSanLuong");
+  XLSX.writeFile(wb, `thong-ke-san-luong_${from}_${to}.xlsx`);
 }
 
 /** Chuỗi hiển thị của một ô — dùng lại logic định dạng của bảng. */

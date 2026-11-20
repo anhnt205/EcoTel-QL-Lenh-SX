@@ -10,7 +10,9 @@ import com.ecotel.thong_ke_cao_son.exception.BadRequestException;
 import com.ecotel.thong_ke_cao_son.exception.ResourceNotFoundException;
 import com.ecotel.thong_ke_cao_son.mapper.DeviceMapper;
 import com.ecotel.thong_ke_cao_son.model.Device;
+import com.ecotel.thong_ke_cao_son.model.ExcavatorBucket;
 import com.ecotel.thong_ke_cao_son.repository.DepartmentRepository;
+import com.ecotel.thong_ke_cao_son.repository.ExcavatorBucketRepository;
 import com.ecotel.thong_ke_cao_son.repository.DeviceModelRepository;
 import com.ecotel.thong_ke_cao_son.repository.DeviceRepository;
 import com.ecotel.thong_ke_cao_son.repository.DeviceTypeRepository;
@@ -46,6 +48,7 @@ public class DeviceService {
     private final VehicleCategoryClassRepository categoryClassRepository;
     private final VehicleTypeRepository vehicleTypeRepository;
     private final VehicleRankRepository vehicleRankRepository;
+    private final ExcavatorBucketRepository bucketRepository;
 
     @Transactional(readOnly = true)
     public PageResponse<DeviceResponse> getAll(String keyword, String categoryName, DeviceGroup categoryGroup, Long departmentId, Pageable pageable) {
@@ -155,9 +158,19 @@ public class DeviceService {
                     .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy hạng xe id: " + r.getVehicleRankId())));
             d.setCategoryClass(r.getCategoryClassId() == null ? null : categoryClassRepository.findById(r.getCategoryClassId())
                     .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy chủng loại xe + phân loại id: " + r.getCategoryClassId())));
-        } else if (r.getCategoryGroup() == DeviceGroup.MAY && r.getBucketCapacity() != null) {
-            // Màn Máy không còn cột Gầu xúc: chỉ ghi khi có gửi, KHÔNG xoá giá trị gầu xúc đã có.
-            d.setBucketCapacity(r.getBucketCapacity());
+        } else if (r.getCategoryGroup() == DeviceGroup.MAY) {
+            // Gầu xúc chọn từ danh mục: ô trống = bỏ gán gầu, nhưng KHÔNG xoá dung tích gầu cũ (dữ liệu đồng bộ từ DSMAY).
+            ExcavatorBucket bucket = r.getBucketId() == null ? null : bucketRepository.findById(r.getBucketId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy gầu xúc id: " + r.getBucketId()));
+            d.setBucket(bucket);
+            // Hạng xe/máy: danh mục dùng chung cho Xe và Máy; ô trống = bỏ gán
+            d.setVehicleRank(r.getVehicleRankId() == null ? null : vehicleRankRepository.findById(r.getVehicleRankId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy hạng xe/máy id: " + r.getVehicleRankId())));
+            if (bucket != null && bucket.getCapacity() != null) {
+                d.setBucketCapacity(bucket.getCapacity());
+            } else if (r.getBucketCapacity() != null) {
+                d.setBucketCapacity(r.getBucketCapacity());
+            }
         }
     }
 

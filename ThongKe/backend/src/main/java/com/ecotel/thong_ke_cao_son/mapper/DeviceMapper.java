@@ -26,6 +26,8 @@ public interface DeviceMapper {
     @Mapping(target = "vehicleRankName", source = "vehicleRank.code")
     @Mapping(target = "categoryClassId", source = "categoryClass.id")
     @Mapping(target = "categoryClassName", source = "categoryClass.name")
+    @Mapping(target = "bucketId", source = "bucket.id")
+    @Mapping(target = "bucketName", source = "bucket.name")
     @Mapping(target = "materialId", source = "material.id")
     @Mapping(target = "materialName", source = "material.name")
     @Mapping(target = "createdById", source = "createdBy.id")

@@ -155,6 +155,11 @@ public class Device {
     @Column(name = "bucket_capacity", precision = 19, scale = 6)
     private java.math.BigDecimal bucketCapacity;
 
+    /** Gầu xúc — khoá ngoại tới danh mục Gầu xúc; chọn gầu thì {@link #bucketCapacity} lấy theo dung tích của gầu đó. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "bucket_id")
+    private ExcavatorBucket bucket;
+
     @Column(name = "note", columnDefinition = "TEXT")
     private String note;
 

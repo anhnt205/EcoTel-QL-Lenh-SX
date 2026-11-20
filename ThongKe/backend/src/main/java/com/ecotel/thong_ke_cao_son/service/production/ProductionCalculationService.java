@@ -30,25 +30,27 @@ import java.util.*;
  *
  * Hệ số trắc địa bằng <i>số trắc địa ÷ tổng cộng dồn của cả kỳ</i>, mà tổng
  * ấy lại cộng từ chính kết quả của từng chuyến. Rồi hệ số đó được áp NGƯỢC
- * trở lại từng chuyến. Nên phép tính có <b>ba lượt trên chuyến, xen giữa là
- * hai rào chắn tổng hợp</b> — đọc trực tiếp từ chuỗi công thức thật:
+ * trở lại từng chuyến. Nên phép tính có <b>hai lượt trên chuyến, xen giữa là
+ * một rào chắn tổng hợp</b>:
  *
  * <pre>
  * Lượt 1   AL, AM, AN                       (từng chuyến)
- *   ├─ gộp theo (khoá, SPNT) → sinh AP Tdia; S = STD_m3 ÷ ΣAL
- * Lượt 2   DS = AL × S
- *          DW = DS × Thể trọng (TĐ)
- *          DX = DW × Cung độ                (từng chuyến)
- *   ├─ gộp lần hai       → sinh Ap Tkm; DY = STD_tấn ÷ ΣDW, DZ = STD_tkm ÷ ΣDX
- * Lượt 3   DT = DW × DY,  DU = DX × DZ      (từng chuyến)
+ *   ├─ gộp theo (khoá, SPNT) → sinh AP Tdia; HS = STD ÷ Σ (m3: ΣAL, tấn: ΣAM, tkm: ΣAN)
+ * Lượt 2   DS = AL × HS m3
+ *          DW = AM × HS tấn
+ *          DX = AN × HS tkm                 (từng chuyến; CTNB: nhân hệ số chênh lệch riêng)
  * </pre>
+ *
+ * <p>Tổng DS/DW/DX theo khoá = STD tương ứng, và bảng Áp trắc địa (tổng + hệ số) chính là dữ liệu
+ * của báo cáo thống kê — hai màn là MỘT nguồn (chủ dự án chốt 2026-11-16).
+ *
+ * <p>2026-11-16 (chủ dự án): BỎ chế độ TKE và BỎ lượt 3 (Tấn cuối cùng / Tkm cuối cùng, kèm rào chắn
+ * Ap Tkm) — chốt Báo chuyến là chốt luôn Thống kê sản lượng. Dữ liệu cũ (kỳ đã tính trước đó) còn các
+ * cột đó cho tới khi tính lại.
  *
  * <p>Hệ quả cần nhớ: <b>kết quả của một chuyến phụ thuộc các chuyến khác
  * cùng kỳ.</b> Sửa một chuyến thì phải tính lại cả kỳ, không thể tính bù
  * riêng chuyến đó.
- *
- * <p><b>Chế độ TKE</b> (QĐ-03): mọi hệ số bằng 1, tức bỏ qua hẳn hai rào
- * chắn — chỉ còn lượt 1 rồi quy đổi thẳng.
  */
 @Service
 @RequiredArgsConstructor
@@ -81,16 +83,14 @@ public class ProductionCalculationService {
     public static class CalculationSummary {
         private final int tripCount;
         private final int coefficientRowCount;
-        private final boolean tkeMode;
         private final List<String> warnings;
         /** Số chuyến Vận tải bị BỎ QUA vì chưa duyệt đối chiếu (QĐ-25); luôn 0 ở chế độ nghiêm ngặt. */
         private final int excludedTripCount;
 
-        CalculationSummary(int tripCount, int coefficientRowCount, boolean tkeMode, List<String> warnings,
+        CalculationSummary(int tripCount, int coefficientRowCount, List<String> warnings,
                            int excludedTripCount) {
             this.tripCount = tripCount;
             this.coefficientRowCount = coefficientRowCount;
-            this.tkeMode = tkeMode;
             this.warnings = warnings;
             this.excludedTripCount = excludedTripCount;
         }
@@ -102,8 +102,8 @@ public class ProductionCalculationService {
      * ({@link ProductionAutoRecalculateListener}).
      */
     @Transactional
-    public CalculationSummary calculatePeriod(Long periodId, boolean tkeMode) {
-        return calculatePeriod(periodId, tkeMode, false);
+    public CalculationSummary calculatePeriod(Long periodId) {
+        return calculatePeriod(periodId, false);
     }
 
     /**
@@ -119,7 +119,7 @@ public class ProductionCalculationService {
      *     âm thầm. {@code false} = nghiêm ngặt như QĐ-16 gốc.
      */
     @Transactional
-    public CalculationSummary calculatePeriod(Long periodId, boolean tkeMode, boolean onlyApproved) {
+    public CalculationSummary calculatePeriod(Long periodId, boolean onlyApproved) {
         // Vài chục nghìn thực thể (chuyến + quan hệ + quyết định đối chiếu) nằm trong persistence
         // context suốt lần tính, mà mỗi chuyến lại tra DB (tỷ trọng, hệ số...) → mặc định mỗi truy
         // vấn kích hoạt một lượt auto-flush + dirty-check TOÀN BỘ thực thể đó: chi phí tăng theo
@@ -133,7 +133,7 @@ public class ProductionCalculationService {
             entityManager.setFlushMode(FlushModeType.COMMIT);
         }
         try {
-            return doCalculatePeriod(periodId, tkeMode, onlyApproved);
+            return doCalculatePeriod(periodId, onlyApproved);
         } finally {
             if (entityManager != null && previousFlushMode != null) {
                 entityManager.setFlushMode(previousFlushMode);
@@ -141,15 +141,14 @@ public class ProductionCalculationService {
         }
     }
 
-    private CalculationSummary doCalculatePeriod(Long periodId, boolean tkeMode, boolean onlyApproved) {
+    private CalculationSummary doCalculatePeriod(Long periodId, boolean onlyApproved) {
         ReportPeriod period = periodRepository.findById(periodId).orElseThrow(
                 () -> new ResourceNotFoundException("Không tìm thấy kỳ báo cáo id: " + periodId));
 
-        // QĐ-03: kỳ đã CHỐT là bất biến — không cho tính lại (dù cùng tkeMode
-        // hay đổi mode) cho tới khi mở khoá qua endpoint riêng, có quyền
-        // riêng, ghi vết. Trước 2026-09-07 hàm này chấp nhận đổi tkeMode và
-        // ghi đè kết quả một kỳ đã chốt bất cứ lúc nào, không ai ngăn, không
-        // ai biết. Phát hiện qua Quality Gate của Codex.
+        // QĐ-03: kỳ đã CHỐT là bất biến — không cho tính lại cho tới khi mở
+        // khoá qua endpoint riêng, có quyền riêng, ghi vết. Trước 2026-09-07
+        // hàm này ghi đè kết quả một kỳ đã chốt bất cứ lúc nào, không ai
+        // ngăn, không ai biết. Phát hiện qua Quality Gate của Codex.
         if (period.isLocked()) {
             throw new BadRequestException("Kỳ " + period.getDisplayName()
                     + " đã chốt — mở khoá trước khi tính lại (mục Kỳ báo cáo).");
@@ -256,27 +255,14 @@ public class ProductionCalculationService {
         Map<GroupKey, SurveyCoefficient> apTdia = new LinkedHashMap<>();
         for (Map.Entry<GroupKey, List<TripBaseResult>> e : groups.entrySet()) {
             apTdia.put(e.getKey(),
-                    buildApTdia(period, e.getKey(), e.getValue(), tkeMode, warnings));
+                    buildApTdia(period, e.getKey(), e.getValue(), warnings));
         }
 
         // ── LƯỢT 2 ──────────────────────────────────────────────────────────
         List<Stage2> stage2 = new ArrayList<>();
         for (TripBaseResult r : base) {
             GroupKey gk = new GroupKey(r.getSeamGroupExcavatorKey(), r.getAcceptanceProduct());
-            stage2.add(applyStage2(r, apTdia.get(gk), tkeMode, warnings));
-        }
-
-        // ── RÀO CHẮN 2: gộp lần hai → Ap Tkm ────────────────────────────────
-        Map<GroupKey, List<Stage2>> groups2 = new LinkedHashMap<>();
-        for (Stage2 s : stage2) {
-            groups2.computeIfAbsent(
-                    new GroupKey(s.base.getSeamGroupExcavatorKey(), s.base.getAcceptanceProduct()),
-                    k -> new ArrayList<>()).add(s);
-        }
-
-        Map<GroupKey, SurveyCoefficient> apTkm = new LinkedHashMap<>();
-        for (Map.Entry<GroupKey, List<Stage2>> e : groups2.entrySet()) {
-            apTkm.put(e.getKey(), buildApTkm(period, e.getKey(), e.getValue(), tkeMode, warnings));
+            stage2.add(applyStage2(r, apTdia.get(gk), warnings));
         }
 
         // ── Nhánh nhiên liệu: nạp ba lưới MỘT LẦN cho cả kỳ ─────────────────
@@ -293,14 +279,16 @@ public class ProductionCalculationService {
         // Chế độ nghiêm ngặt giữ nguyên QĐ-04/QĐ-06: thiếu là từ chối.
         List<String> fuelWarnings = onlyApproved ? new ArrayList<>() : warnings;
         Map<String, MatrixGridResponse> grids = loadFuelGrids(period.getFromDate(), fuelWarnings);
+        // Hệ số ĐMNL / BSNL từ các danh mục (theo mùa, hạng xe, cải tạo ben, HS Than, BSNL) — nạp MỘT lần cho cả kỳ.
+        FuelNormFactorSet factors = fuelCalculator.loadFactors();
 
-        // ── LƯỢT 3 + lưu kết quả ────────────────────────────────────────────
+        // ── Dựng kết quả từng chuyến (không còn lượt 3) ─────────────────────
         List<ProductionResult> results = new ArrayList<>();
         LocalDateTime now = LocalDateTime.now();
         for (Stage2 s : stage2) {
             GroupKey gk = new GroupKey(s.base.getSeamGroupExcavatorKey(), s.base.getAcceptanceProduct());
-            ProductionResult result = finalise(period, s, apTdia.get(gk), apTkm.get(gk), tkeMode, now);
-            applyFuel(result, s.base(), grids, fuelWarnings);
+            ProductionResult result = buildResult(period, s, apTdia.get(gk), now);
+            applyFuel(result, s.base(), grids, factors, fuelWarnings);
             results.add(result);
         }
 
@@ -319,7 +307,6 @@ public class ProductionCalculationService {
         }
 
         coefficientRepository.saveAll(apTdia.values());
-        coefficientRepository.saveAll(apTkm.values());
         resultRepository.saveAll(results);
 
         // Tính THÀNH CÔNG -> báo cáo đang hiển thị không còn lỗi thời nữa,
@@ -333,20 +320,36 @@ public class ProductionCalculationService {
             periodRepository.save(period);
         }
 
-        log.info("Tính sản lượng kỳ {}: {} chuyến, {} dòng hệ số, TKE={}, bỏ qua {} chuyến chưa duyệt",
-                period.getDisplayName(), results.size(), apTdia.size() + apTkm.size(), tkeMode, excludedTripCount);
+        log.info("Tính sản lượng kỳ {}: {} chuyến, {} dòng hệ số, bỏ qua {} chuyến chưa duyệt",
+                period.getDisplayName(), results.size(), apTdia.size(), excludedTripCount);
 
         List<String> notices = new ArrayList<>(warnings);
         if (onlyApproved && !fuelWarnings.isEmpty()) {
             notices.add(summarizeFuelWarnings(fuelWarnings));
+        }
+        // Danh mục hệ số ĐMNL/BSNL chưa có dòng nào → hệ số đang là mặc định (ĐMNL = 1, BSNL = 0); nói rõ để không ai
+        // đọc nhầm số nhiên liệu là đã áp đủ hệ số.
+        if (factors != null && !factors.missingKinds().isEmpty()) {
+            notices.add("Danh mục hệ số nhiên liệu chưa khai dòng nào: " + factors.missingKinds().stream()
+                    .map(ProductionCalculationService::factorKindLabel).collect(java.util.stream.Collectors.joining(", "))
+                    + " — hệ số ĐMNL đang là 1, BSNL đang là 0 cho các nhóm đó.");
         }
         if (excludedTripCount > 0) {
             notices.add("Kỳ mới được tính trên phần ĐÃ DUYỆT đối chiếu: " + results.size()
                     + " chuyến Vận tải đã tính, " + excludedTripCount
                     + " chuyến chưa duyệt đối chiếu KHÔNG nằm trong số liệu (duyệt thêm rồi tính lại kỳ để đưa vào).");
         }
-        return new CalculationSummary(results.size(), apTdia.size() + apTkm.size(), tkeMode, notices,
-                excludedTripCount);
+        return new CalculationSummary(results.size(), apTdia.size(), notices, excludedTripCount);
+    }
+
+    private static String factorKindLabel(com.ecotel.thong_ke_cao_son.enums.FuelNormFactorKind kind) {
+        return switch (kind) {
+            case SEASON -> "Hệ số ĐMNL theo mùa";
+            case VEHICLE_RANK -> "Hệ số ĐMNL theo hạng xe";
+            case CAR_RENOVATION -> "Hệ số ĐMNL theo cải tạo ben";
+            case COAL_CN_NK -> "Hệ số Than (CN-NK)";
+            case BSNL -> "Hệ số BSNL";
+        };
     }
 
     private static final int MAX_FUEL_REASONS_IN_NOTICE = 5;
@@ -501,9 +504,32 @@ public class ProductionCalculationService {
     }
 
     private void applyFuel(ProductionResult result, TripBaseResult base,
-                           Map<String, MatrixGridResponse> grids, List<String> warnings) {
+                           Map<String, MatrixGridResponse> grids, FuelNormFactorSet factors, List<String> warnings) {
         if (grids.isEmpty()) return;
-        FuelResult fuel = fuelCalculator.calculate(base.getTrip(), base, grids);
+        FuelResult fuel = fuelCalculator.calculate(base.getTrip(), base, grids, factors);
+
+        result.setFuelHb(fuel.getInterpDistanceLow());
+        result.setFuelHa(fuel.getInterpDistanceHigh());
+        result.setFuelH1(fuel.getInterpSlopeLow());
+        result.setFuelH2(fuel.getInterpSlopeHigh());
+        result.setFuelNbH1(fuel.getInterpNbH1());
+        result.setFuelNbH2(fuel.getInterpNbH2());
+        result.setFuelNb(fuel.getInterpNb());
+        result.setFuelNaH1(fuel.getInterpNaH1());
+        result.setFuelNaH2(fuel.getInterpNaH2());
+        result.setFuelNa(fuel.getInterpNa());
+        result.setFuelNt(fuel.getNormInterpolated());
+        result.setBsnlRoda(fuel.getBsnlRoda());
+        result.setBsnlRainyDay(fuel.getBsnlRainyDay());
+        result.setBsnlSupplementary(fuel.getBsnlSupplementary());
+        result.setBsnlMaintenance(fuel.getBsnlMaintenance());
+        result.setBsnlOther(fuel.getBsnlOther());
+        result.setBsnlSpnt(fuel.getBsnlSpnt());
+        result.setBsnlMud(fuel.getBsnlMud());
+        result.setFuelNormSeasonal(fuel.getNormSeasonal());
+        result.setFuelNormVehicleClass(fuel.getNormVehicleClass());
+        result.setFuelNormCarRenovation(fuel.getNormCarRenovation());
+        result.setFuelCoalCnNkFactor(fuel.getCoalCnNkFactor());
 
         result.setFuelNorm(fuel.getNormFinal());
         result.setFuelBaseConsumption(fuel.getBaseConsumption());
@@ -517,7 +543,7 @@ public class ProductionCalculationService {
     // ── rào chắn 1 ──────────────────────────────────────────────────────────
 
     private SurveyCoefficient buildApTdia(ReportPeriod period, GroupKey key,
-                                          List<TripBaseResult> rows, boolean tkeMode,
+                                          List<TripBaseResult> rows,
                                           List<String> warnings) {
         BigDecimal totalM3 = sum(rows, TripBaseResult::getTotalM3);
         BigDecimal totalTon = sum(rows, TripBaseResult::getTotalTon);
@@ -533,14 +559,6 @@ public class ProductionCalculationService {
         c.setTotalTkm(totalTkm);
         c.setTripCount(rows.size());
         c.setGeneratedAt(LocalDateTime.now());
-
-        if (tkeMode) {
-            // Chế độ TKE: không dùng số trắc địa, mọi hệ số bằng 1.
-            c.setHsM3(BigDecimal.ONE);
-            c.setHsTon(BigDecimal.ONE);
-            c.setHsTkm(BigDecimal.ONE);
-            return c;
-        }
 
         Optional<SurveyStandard> std = findStandard(key, period);
         if (std.isEmpty()) {
@@ -575,45 +593,41 @@ public class ProductionCalculationService {
     private record Stage2(TripBaseResult base, BigDecimal ds, BigDecimal dw,
                           BigDecimal dx, BigDecimal bulkDensity) {}
 
-    private Stage2 applyStage2(TripBaseResult r, SurveyCoefficient apTdia, boolean tkeMode,
-                               List<String> warnings) {
+    private Stage2 applyStage2(TripBaseResult r, SurveyCoefficient apTdia, List<String> warnings) {
         TransportReportTrip trip = r.getTrip();
         boolean ctnb = isCtnb(trip);
 
         // Nhánh CTNB dùng hệ số chênh lệch của chính chuyến, KHÔNG dùng hệ số
         // trắc địa — DS5 = IF(LEFT(J5,3)="TCN", AF5*AL5, AL5*S5).
         BigDecimal ctnbFactor = ctnbFactor(trip);
-        BigDecimal hsM3 = tkeMode ? BigDecimal.ONE : nz(apTdia.getHsM3());
+        BigDecimal hsM3 = nz(apTdia.getHsM3());
 
         BigDecimal ds = ctnb
                 ? r.getTotalM3().multiply(ctnbFactor)
                 : r.getTotalM3().multiply(hsM3);
 
-        BigDecimal bulkDensity = resolveBulkDensity(r, tkeMode, warnings);
+        // Thể trọng (TĐ) chỉ còn là cột tham chiếu của báo cáo — không còn tham gia phép tính tấn.
+        BigDecimal bulkDensity = resolveBulkDensity(r, warnings);
 
-        // DW5 = IF(TCN, AM5*AF5, DS5*AC5)
+        // Chủ dự án chốt 2026-11-16: mỗi chuyến tính m3, tấn, tkm → cộng theo khoá (bảng Áp trắc địa)
+        // → ba hệ số HSTĐ (m3, tấn, tkm) → áp NGƯỢC đúng hệ số tương ứng cho từng chuyến. Nhờ vậy
+        // Thống kê sản lượng và Áp trắc địa là MỘT dữ liệu: tổng mỗi khoá khớp STD cả ba chỉ tiêu.
+        // CTNB vẫn nhân hệ số chênh lệch riêng của chuyến (DW5 = IF(TCN, AM5*AF5, …)).
         BigDecimal dw = ctnb
                 ? r.getTotalTon().multiply(ctnbFactor)
-                : ds.multiply(bulkDensity);
+                : r.getTotalTon().multiply(nz(apTdia.getHsTon()));
 
         BigDecimal distance = trip.getTotalRouteDistanceKm() != null
                 ? BigDecimal.valueOf(trip.getTotalRouteDistanceKm()) : BigDecimal.ZERO;
+        BigDecimal dx = ctnb
+                ? dw.multiply(distance)
+                : r.getTotalTkm().multiply(nz(apTdia.getHsTkm()));
 
         return new Stage2(r,
                 ds.setScale(VALUE_SCALE, RoundingMode.HALF_UP),
                 dw.setScale(VALUE_SCALE, RoundingMode.HALF_UP),
-                dw.multiply(distance).setScale(VALUE_SCALE, RoundingMode.HALF_UP),
+                dx.setScale(VALUE_SCALE, RoundingMode.HALF_UP),
                 bulkDensity);
-    }
-
-    /**
-     * Thể trọng quy đổi ở chế độ TKE (QĐ-25, phương án A): tỷ trọng, và với than_sx nhân thêm hệ số
-     * "Than tke trừ đá" ({@code HS.THAN.TRUDA}) — để "KLVC cuối"/"Số trắc địa" của than bằng đúng
-     * "Tổng KLVC (tấn)" đã nhân hệ số đó, không tự mâu thuẫn với {@code total_ton} trên cùng màn hình
-     * (đối soát tháng 9/2026: trước đây chênh +6.564 t, chỉ ở than_sx).
-     */
-    static BigDecimal tkeBulkDensity(BigDecimal density, BigDecimal coalCoefficient) {
-        return coalCoefficient == null ? density : density.multiply(coalCoefficient);
     }
 
     /**
@@ -623,15 +637,10 @@ public class ProductionCalculationService {
      * chính Tỷ trọng thường; {@code Dat_SX}/{@code Than_SX}/{@code Dat_CN}
      * thì lấy cột Thể trọng tương ứng trong danh mục STD; còn lại bằng 0.
      */
-    private BigDecimal resolveBulkDensity(TripBaseResult r, boolean tkeMode, List<String> warnings) {
+    private BigDecimal resolveBulkDensity(TripBaseResult r, List<String> warnings) {
         String product = r.getAcceptanceProduct();
         if (equalsAny(product, "Dat_TCN", "Than_CN")) {
             return r.getDensity();
-        }
-        if (tkeMode) {
-            // Chế độ TKE không đụng tới số trắc địa; dùng tỷ trọng thường để
-            // phép quy đổi vẫn có nghĩa thay vì ra 0.
-            return tkeBulkDensity(r.getDensity(), r.getCoalCoefficient());
         }
         if (!equalsAny(product, "Dat_SX", "Than_SX", "Dat_CN")) {
             // KHÔNG phải tra trượt — đây là quy tắc nghiệp vụ thật (docx dòng
@@ -657,63 +666,10 @@ public class ProductionCalculationService {
         return nz(value);
     }
 
-    // ── rào chắn 2 ──────────────────────────────────────────────────────────
+    // ── dựng kết quả từng chuyến ───────────────────────────────────────────
 
-    private SurveyCoefficient buildApTkm(ReportPeriod period, GroupKey key,
-                                         List<Stage2> rows, boolean tkeMode, List<String> warnings) {
-        BigDecimal totalTon = rows.stream().map(Stage2::dw)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-        BigDecimal totalTkm = rows.stream().map(Stage2::dx)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        SurveyCoefficient c = new SurveyCoefficient();
-        c.setKind(SurveyCoefficient.Kind.AP_TKM);
-        c.setReportPeriod(period);
-        c.setSeamGroupExcavatorKey(key.key());
-        c.setAcceptanceProduct(key.product());
-        c.setTotalTon(totalTon);
-        c.setTotalTkm(totalTkm);
-        c.setTripCount(rows.size());
-        c.setGeneratedAt(LocalDateTime.now());
-
-        if (tkeMode) {
-            c.setHsTon(BigDecimal.ONE);
-            c.setHsTkm(BigDecimal.ONE);
-            return c;
-        }
-
-        Optional<SurveyStandard> std = findStandard(key, period);
-        if (std.isEmpty()) {
-            // Cùng khoá STD với AP_TDIA (rào chắn 1) ở trên — nếu thiếu đã bị
-            // báo ở đó rồi, nhưng ghi lại đây để không phụ thuộc thứ tự gọi
-            // hai hàm; `warnings` khử trùng lặp trước khi ném lỗi tổng hợp.
-            warnings.add("Chưa khai báo STD cho khoá \"" + key.key()
-                    + "\" / " + key.product() + ".");
-            c.setHsTon(BigDecimal.ZERO);
-            c.setHsTkm(BigDecimal.ZERO);
-            return c;
-        }
-        SurveyStandard s = std.get();
-        boolean coalBlock = isCoalProduct(key.product());
-        c.setSurveyTon(coalBlock ? s.getCoalTon() : s.getEarthTon());
-        c.setSurveyTkm(coalBlock ? s.getCoalTkm() : s.getEarthTkm());
-        c.setHsTon(ratio(c.getSurveyTon(), totalTon));
-        c.setHsTkm(ratio(c.getSurveyTkm(), totalTkm));
-        return c;
-    }
-
-    // ── lượt 3 ──────────────────────────────────────────────────────────────
-
-    private ProductionResult finalise(ReportPeriod period, Stage2 s,
-                                      SurveyCoefficient apTdia, SurveyCoefficient apTkm,
-                                      boolean tkeMode, LocalDateTime now) {
+    private ProductionResult buildResult(ReportPeriod period, Stage2 s, SurveyCoefficient apTdia, LocalDateTime now) {
         TripBaseResult r = s.base();
-        boolean ctnb = isCtnb(r.getTrip());
-
-        // DY/DZ bằng 1 ở chế độ TKE và ở nhánh CTNB — chuyến CTNB đã dùng hệ
-        // số chênh lệch riêng ở lượt 2, áp thêm hệ số trắc địa là tính hai lần.
-        BigDecimal hsTon = (tkeMode || ctnb) ? BigDecimal.ONE : nz(apTkm.getHsTon());
-        BigDecimal hsTkm = (tkeMode || ctnb) ? BigDecimal.ONE : nz(apTkm.getHsTkm());
 
         ProductionResult out = new ProductionResult();
         out.setReportPeriod(period);
@@ -726,6 +682,9 @@ public class ProductionCalculationService {
         out.setTotalM3Original(r.getTotalM3Original());
         out.setTotalTonNoMoisture(r.getTotalTonNoMoisture());
         out.setTotalTkmNoMoisture(r.getTotalTkmNoMoisture());
+        out.setTotalTonOriginalBeforeWaste(r.getTonOriginalBeforeWaste());
+        out.setWasteRockTon(r.getWasteRockTon());
+        out.setWasteRockM3(r.getWasteRockM3());
         out.setCargoCode(r.getCargoCode());
         out.setCargoTtlCode(r.getCargoTtlCode());
         out.setSeamKpmb(r.getSeamKpmb());
@@ -738,16 +697,13 @@ public class ProductionCalculationService {
         out.setSurveyTon(s.dw());
         out.setSurveyTkm(s.dx());
 
-        out.setFinalTon(s.dw().multiply(hsTon).setScale(VALUE_SCALE, RoundingMode.HALF_UP));
-        out.setFinalTkm(s.dx().multiply(hsTkm).setScale(VALUE_SCALE, RoundingMode.HALF_UP));
-
         out.setDensityUsed(r.getDensity());
         out.setModelUsed(r.getModel());
         out.setBulkDensityUsed(s.bulkDensity());
-        out.setHsM3(tkeMode ? BigDecimal.ONE : nz(apTdia.getHsM3()));
-        out.setHsTon(hsTon);
-        out.setHsTkm(hsTkm);
-        out.setTkeMode(tkeMode);
+        // HSTĐ = số trắc địa ÷ tổng của khoá (cùng con số ở màn Áp Trắc địa); không còn hệ số lượt 3.
+        out.setHsM3(nz(apTdia.getHsM3()));
+        out.setHsTon(nz(apTdia.getHsTon()));
+        out.setHsTkm(nz(apTdia.getHsTkm()));
         out.setCalculatedAt(now);
         return out;
     }
@@ -780,7 +736,7 @@ public class ProductionCalculationService {
     }
 
     /** AF5 — HS áp cho than CTNB: bằng 1 khi hệ số chênh lệch bằng 0/trống. */
-    private static BigDecimal ctnbFactor(TransportReportTrip trip) {
+    static BigDecimal ctnbFactor(TransportReportTrip trip) {
         BigDecimal v = trip.getCtnbDeviationCoefficient();
         return (v == null || v.signum() == 0) ? BigDecimal.ONE : v;
     }

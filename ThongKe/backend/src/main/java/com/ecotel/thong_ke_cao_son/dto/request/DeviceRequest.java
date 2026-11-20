@@ -58,4 +58,6 @@ public class DeviceRequest {
     /** Chủng loại xe + Phân loại. */
     Long categoryClassId;
     java.math.BigDecimal bucketCapacity;
+    /** Gầu xúc (danh mục Gầu xúc) — chỉ dùng cho máy. */
+    Long bucketId;
 }

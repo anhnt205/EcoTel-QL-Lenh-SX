@@ -10,18 +10,9 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
-import java.util.Optional;
 
 @Repository
 public interface ProductionResultRepository extends JpaRepository<ProductionResult, Long> {
-
-    /**
-     * 1 dòng bất kỳ của kỳ — chỉ để đọc {@code tkeMode} đang áp dụng (mọi
-     * dòng cùng kỳ luôn cùng chế độ, xem javadoc {@code ReportPeriod}). Dùng
-     * khi tự động tính lại (không có người dùng bấm nút chọn chế độ) —
-     * {@code ProductionAutoRecalculateListener}.
-     */
-    Optional<ProductionResult> findFirstByReportPeriod_Id(Long periodId);
 
     @Query("""
         SELECT r FROM ProductionResult r
@@ -56,6 +47,29 @@ public interface ProductionResultRepository extends JpaRepository<ProductionResu
         ORDER BY r.productionDate, r.id
         """)
     List<ProductionResult> findAllByPeriod(@Param("periodId") Long periodId);
+
+    /**
+     * Toàn bộ dòng có ngày sản xuất trong khoảng — KHÔNG phụ thuộc kỳ. Cho màn xem Báo cáo thống kê
+     * (bảng thống kê sau khi đã có số liệu); nạp sẵn ngữ cảnh chuyến như {@link #findAllByPeriod}.
+     */
+    @Query("""
+        SELECT r FROM ProductionResult r
+        JOIN FETCH r.transportTrip t
+        JOIN FETCH t.transportReport rep
+        LEFT JOIN FETCH rep.shift
+        LEFT JOIN FETCH rep.vehicle
+        LEFT JOIN FETCH t.excavator
+        LEFT JOIN FETCH t.excavationArea
+        LEFT JOIN FETCH t.loadingPoint lp
+        LEFT JOIN FETCH lp.seamGroup
+        LEFT JOIN FETCH t.unloadingPoint
+        LEFT JOIN FETCH t.cargoType
+        LEFT JOIN FETCH t.cargoGroup
+        WHERE r.productionDate BETWEEN :fromDate AND :toDate
+        ORDER BY r.productionDate, r.id
+        """)
+    List<ProductionResult> findAllByProductionDateBetween(@Param("fromDate") java.time.LocalDate fromDate,
+                                                          @Param("toDate") java.time.LocalDate toDate);
 
     @Modifying
     @Query("DELETE FROM ProductionResult r WHERE r.reportPeriod.id = :periodId")

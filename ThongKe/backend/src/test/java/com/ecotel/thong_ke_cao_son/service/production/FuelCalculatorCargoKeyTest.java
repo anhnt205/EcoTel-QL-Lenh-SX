@@ -2,7 +2,7 @@ package com.ecotel.thong_ke_cao_son.service.production;
 
 import com.ecotel.thong_ke_cao_son.dto.response.MatrixGridResponse;
 import com.ecotel.thong_ke_cao_son.model.*;
-import com.ecotel.thong_ke_cao_son.repository.CoefficientItemRepository;
+import com.ecotel.thong_ke_cao_son.service.FuelNormFactorService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -24,7 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @ExtendWith(MockitoExtension.class)
 class FuelCalculatorCargoKeyTest {
 
-    @Mock private CoefficientItemRepository coefficientRepository;
+    @Mock private FuelNormFactorService factorService;
 
     private static TransportReportTrip trip(String cargoCode, String cargoName, String unloading) {
         VehicleFuelClass fuelClass = new VehicleFuelClass();
@@ -59,8 +59,8 @@ class FuelCalculatorCargoKeyTest {
         MatrixGridResponse emptyGrid = MatrixGridResponse.builder()
                 .rows(List.of()).cols(List.of()).cells(Map.of()).build();
         TripBaseResult base = TripBaseResult.builder().acceptanceProduct(acceptanceProduct).build();
-        return new FuelCalculator(coefficientRepository)
-                .calculate(trip, base, Map.of("DMNL", emptyGrid)).getWarnings();
+        return new FuelCalculator(factorService)
+                .calculate(trip, base, Map.of("DMNL", emptyGrid), FuelNormFactorSet.empty()).getWarnings();
     }
 
     @Test

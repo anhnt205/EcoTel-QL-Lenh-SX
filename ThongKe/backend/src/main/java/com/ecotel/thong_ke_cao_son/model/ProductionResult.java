@@ -89,11 +89,11 @@ public class ProductionResult {
 
     // ── Lượt 3: đã áp thêm hệ số của Ap Tkm ─────────────────────────────────
 
-    /** DT — tấn cuối cùng. */
+    /** @deprecated 2026-11-16 — đã bỏ lượt 3; chỉ còn ở dữ liệu cũ (DT — tấn cuối cùng). */
     @Column(name = "final_ton", precision = 19, scale = 6)
     private BigDecimal finalTon;
 
-    /** DU — tkm cuối cùng. */
+    /** @deprecated 2026-11-16 — đã bỏ lượt 3; chỉ còn ở dữ liệu cũ (DU — tkm cuối cùng). */
     @Column(name = "final_tkm", precision = 19, scale = 6)
     private BigDecimal finalTkm;
 
@@ -142,6 +142,20 @@ public class ProductionResult {
     @Column(name = "total_tkm_no_moisture", precision = 19, scale = 6)
     private BigDecimal totalTkmNoMoisture;
 
+    // ── Đá thải (cột FK/FJ) và CK ───────────────────────────────────────────
+
+    /** CK — Tổng KLVC TKE (tấn) ban đầu chưa trừ đá. */
+    @Column(name = "total_ton_original_before_waste", precision = 19, scale = 6)
+    private BigDecimal totalTonOriginalBeforeWaste;
+
+    /** FK — Đá thải (tấn) = giá trị tự nhập (Báo chuyến) × CK, chỉ nhóm THANV. */
+    @Column(name = "waste_rock_ton", precision = 19, scale = 6)
+    private BigDecimal wasteRockTon;
+
+    /** FJ — Đá thải (m3) = Đá thải (tấn) ÷ 2,625 (KC) / 2,617 (CS). */
+    @Column(name = "waste_rock_m3", precision = 19, scale = 6)
+    private BigDecimal wasteRockM3;
+
     // ── Mã hoá hàng (cột BT/BU/BV) ──────────────────────────────────────────
 
     /** BT — Mã hoá hàng. */
@@ -178,7 +192,94 @@ public class ProductionResult {
     @Column(name = "productivity_norm", precision = 19, scale = 6)
     private BigDecimal productivityNorm;
 
-    /** Chạy ở chế độ TKE (QĐ-03) — khi đó mọi hệ số trắc địa bằng 1. */
+    // ── Nội suy định mức nhiên liệu (các bước trung gian của AZ) ─────────────
+
+    /** Hb — Cung độ cận trên: mốc cung độ lớn nhất còn ≤ cung độ toàn tuyến (cột cung độ của bảng ĐM). */
+    @Column(name = "fuel_hb", precision = 19, scale = 6)
+    private BigDecimal fuelHb;
+
+    /** Ha — Cung độ cận dưới: mốc cung độ nhỏ nhất còn ≥ cung độ toàn tuyến. */
+    @Column(name = "fuel_ha", precision = 19, scale = 6)
+    private BigDecimal fuelHa;
+
+    /** h1 — Dốc cận trước: mốc độ dốc lớn nhất còn ≤ chênh cao thanh toán. */
+    @Column(name = "fuel_h1", precision = 19, scale = 6)
+    private BigDecimal fuelH1;
+
+    /** h2 — Dốc cận sau: mốc độ dốc nhỏ nhất còn ≥ chênh cao thanh toán. */
+    @Column(name = "fuel_h2", precision = 19, scale = 6)
+    private BigDecimal fuelH2;
+
+    /** Nb-h1 — ô lưới DMNL (Chủng loại xe + DMNL + Hb) tại dốc h1. */
+    @Column(name = "fuel_nb_h1", precision = 19, scale = 6)
+    private BigDecimal fuelNbH1;
+
+    /** Nb-h2 — ô lưới DMNL (Chủng loại xe + DMNL + Hb) tại dốc h2. */
+    @Column(name = "fuel_nb_h2", precision = 19, scale = 6)
+    private BigDecimal fuelNbH2;
+
+    /** Nb — nhiên liệu tương ứng Hb (nội suy theo dốc giữa Nb-h1 và Nb-h2). */
+    @Column(name = "fuel_nb", precision = 19, scale = 6)
+    private BigDecimal fuelNb;
+
+    /** Na-h1 — ô lưới DMNL (Chủng loại xe + DMNL + Ha) tại dốc h1. */
+    @Column(name = "fuel_na_h1", precision = 19, scale = 6)
+    private BigDecimal fuelNaH1;
+
+    /** Na-h2 — ô lưới DMNL (Chủng loại xe + DMNL + Ha) tại dốc h2. */
+    @Column(name = "fuel_na_h2", precision = 19, scale = 6)
+    private BigDecimal fuelNaH2;
+
+    /** Na — nhiên liệu tương ứng Ha (nội suy theo dốc giữa Na-h1 và Na-h2). */
+    @Column(name = "fuel_na", precision = 19, scale = 6)
+    private BigDecimal fuelNa;
+
+    /** Nt — NLĐM tiêu hao cần tìm (nội suy theo cung độ giữa Nb và Na). */
+    @Column(name = "fuel_nt", precision = 19, scale = 6)
+    private BigDecimal fuelNt;
+
+    // ── Chuỗi hệ số của ĐMNL: Nt → mùa → (công ty) → hãng xe → cải tạo ben → × HS Than ─────────
+
+    // ── Tám khoản BSNL (bù sung nhiên liệu, lít) = tỷ lệ của danh mục Hệ số BSNL × Nhiên liệu tiêu hao theo ĐM ─────
+
+    @Column(name = "bsnl_roda", precision = 19, scale = 6)
+    private BigDecimal bsnlRoda;
+
+    @Column(name = "bsnl_rainy_day", precision = 19, scale = 6)
+    private BigDecimal bsnlRainyDay;
+
+    @Column(name = "bsnl_supplementary", precision = 19, scale = 6)
+    private BigDecimal bsnlSupplementary;
+
+    @Column(name = "bsnl_maintenance", precision = 19, scale = 6)
+    private BigDecimal bsnlMaintenance;
+
+    @Column(name = "bsnl_other", precision = 19, scale = 6)
+    private BigDecimal bsnlOther;
+
+    @Column(name = "bsnl_spnt", precision = 19, scale = 6)
+    private BigDecimal bsnlSpnt;
+
+    @Column(name = "bsnl_mud", precision = 19, scale = 6)
+    private BigDecimal bsnlMud;
+
+    /** ĐMNL theo mùa = hệ số mùa (tháng 6–9: 1,03; còn lại 1) × Nt. Cột "ĐMNL (công ty)" bằng đúng giá trị này. */
+    @Column(name = "fuel_norm_seasonal", precision = 19, scale = 6)
+    private BigDecimal fuelNormSeasonal;
+
+    /** ĐMNL hãng xe = ĐMNL công ty × hệ số hạng xe (A 0,97 · B 1 · C1 1,04 · khác 1,06). */
+    @Column(name = "fuel_norm_vehicle_class", precision = 19, scale = 6)
+    private BigDecimal fuelNormVehicleClass;
+
+    /** ĐMNL cải tạo ben = ĐMNL hãng xe × 1,03 nếu xe đã cải tạo toa, không thì bằng ĐMNL hãng xe. */
+    @Column(name = "fuel_norm_car_renovation", precision = 19, scale = 6)
+    private BigDecimal fuelNormCarRenovation;
+
+    /** HS Than (CN-NK): 1 / 1,02 / 0,9 / 1,15 theo SPNT/CN, chủng loại xe, khu vực xúc, chủng loại hàng, cung độ. */
+    @Column(name = "fuel_coal_cn_nk_factor", precision = 19, scale = 6)
+    private BigDecimal fuelCoalCnNkFactor;
+
+    /** @deprecated 2026-11-16 — đã bỏ chế độ TKE; luôn false với kết quả mới (cột DB giữ NOT NULL). */
     @Column(name = "tke_mode", nullable = false)
     private boolean tkeMode = false;
 

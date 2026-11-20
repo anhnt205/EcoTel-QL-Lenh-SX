@@ -78,7 +78,7 @@ export default function FuelAdjustMatrix() {
       renderDetail={(y) => <FuelAdjustYearTable year={y} />}
       onDelete={handleDelete}
       extraSearch={(y) => y.versions.flatMap((v) => v.rows.map((r) => r.key)).join(" ")}
-      extraSearchLabel="chủng loại xe, hạng, phân loại"
+      extraSearchLabel="chủng loại xe, chất lượng, phân loại"
     >
       <FuelAdjustAddModal open={createOpen} mode="create" onClose={() => setCreateOpen(false)} onSaved={refetch} />
       <FuelAdjustAddModal open={!!yearEdit} mode="editYear" versions={yearEdit?.versions} onClose={() => setEditKey(null)} onSaved={refetch} />

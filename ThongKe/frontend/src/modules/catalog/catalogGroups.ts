@@ -24,13 +24,21 @@ export const CATALOG_GROUP_BY_TITLE: Record<string, { group: string; label?: str
   "Chủng loại xe + DMNL": { group: "Thiết bị" },
   "Xe": { group: "Thiết bị" },
   "Máy": { group: "Thiết bị" },
-  "Hạng xe": { group: "Thiết bị" },
-  "Nhóm hạng xe": { group: "Thiết bị" },
+  "Hạng xe/máy": { group: "Thiết bị" },
+  "Nhóm hạng xe/máy": { group: "Thiết bị" },
+  "Gầu xúc": { group: "Thiết bị" },
   // Số Trắc địa
   "STD (Đất CN)": { group: "Số Trắc địa" },
   "STD (Đất SX/Than SX)": { group: "Số Trắc địa" },
   // Danh mục khác
   "Hệ số": { group: "Danh mục khác", label: "Hệ số điều chỉnh" },
+  "Hệ số Than TKE trừ đá / KCS": { group: "Danh mục khác" },
+  "Hệ số đá thải": { group: "Danh mục khác" },
+  "Hệ số ĐMNL theo mùa": { group: "Danh mục khác" },
+  "Hệ số ĐMNL theo hạng xe": { group: "Danh mục khác" },
+  "Hệ số ĐMNL theo cải tạo ben": { group: "Danh mục khác" },
+  "Hệ số Than (CN-NK)": { group: "Danh mục khác" },
+  "Hệ số BSNL": { group: "Danh mục khác" },
   "Kỳ báo cáo": { group: "Danh mục khác" },
   "Ca làm việc": { group: "Danh mục khác" },
 };

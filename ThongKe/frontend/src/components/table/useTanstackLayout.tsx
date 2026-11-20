@@ -120,7 +120,13 @@ export function useTanstackLayout(storageKey: string) {
     for (const k of Object.keys(m)) out[k] = Math.round((m[k] * pct) / 100);
     return out;
   };
-  const columnSizing = useMemo(() => scaleMap(rawSizing, g.scale), [rawSizing, g.scale]);
+  // cỡ cột chung thu nhỏ tới đâu cũng không để cột hẹp hơn MIN_W (nội dung còn đọc/kéo được)
+  const columnSizing = useMemo(() => {
+    const m = scaleMap(rawSizing, g.scale);
+    const out: ColumnSizingState = {};
+    for (const k of Object.keys(m)) out[k] = Math.max(m[k], MIN_W);
+    return out;
+  }, [rawSizing, g.scale]);
   const setColumnSizing = useCallback((u: Updater<ColumnSizingState>) => {
     setRawSizing((prev) => {
       const shown = scaleMap(prev, scaleRef.current);

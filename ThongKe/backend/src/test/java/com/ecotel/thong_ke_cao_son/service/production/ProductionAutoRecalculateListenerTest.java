@@ -8,7 +8,6 @@ import com.ecotel.thong_ke_cao_son.event.ReconciliationApprovedEvent;
 import com.ecotel.thong_ke_cao_son.exception.BadRequestException;
 import com.ecotel.thong_ke_cao_son.exception.PeriodNotFullyApprovedException;
 import com.ecotel.thong_ke_cao_son.model.ReportPeriod;
-import com.ecotel.thong_ke_cao_son.repository.ProductionResultRepository;
 import com.ecotel.thong_ke_cao_son.repository.ReportPeriodRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -44,7 +43,6 @@ import static org.mockito.Mockito.*;
 class ProductionAutoRecalculateListenerTest {
 
     @Mock private ReportPeriodRepository reportPeriodRepository;
-    @Mock private ProductionResultRepository productionResultRepository;
     @Mock private ProductionCalculationService productionCalculationService;
 
     private ListAppender<ILoggingEvent> logAppender;
@@ -73,7 +71,7 @@ class ProductionAutoRecalculateListenerTest {
 
     private ProductionAutoRecalculateListener newListener() {
         return new ProductionAutoRecalculateListener(
-                reportPeriodRepository, productionResultRepository, productionCalculationService);
+                reportPeriodRepository, productionCalculationService);
     }
 
     private static ReportPeriod openPeriod(long id) {
@@ -91,9 +89,8 @@ class ProductionAutoRecalculateListenerTest {
         ReportPeriod period = openPeriod(1L);
         when(reportPeriodRepository.findByDate(reportDate)).thenReturn(Optional.of(period));
         when(reportPeriodRepository.findById(1L)).thenReturn(Optional.of(period));
-        when(productionResultRepository.findFirstByReportPeriod_Id(1L)).thenReturn(Optional.empty());
         doThrow(new PeriodNotFullyApprovedException("còn chuyến chưa duyệt"))
-                .when(productionCalculationService).calculatePeriod(1L, false);
+                .when(productionCalculationService).calculatePeriod(1L);
 
         newListener().onApproved(new ReconciliationApprovedEvent(this, Set.of(reportDate)));
 
@@ -110,9 +107,8 @@ class ProductionAutoRecalculateListenerTest {
         ReportPeriod period = openPeriod(1L);
         when(reportPeriodRepository.findByDate(reportDate)).thenReturn(Optional.of(period));
         when(reportPeriodRepository.findById(1L)).thenReturn(Optional.of(period));
-        when(productionResultRepository.findFirstByReportPeriod_Id(1L)).thenReturn(Optional.empty());
         doThrow(new BadRequestException("Kỳ đã chốt — mở khoá trước khi tính lại"))
-                .when(productionCalculationService).calculatePeriod(1L, false);
+                .when(productionCalculationService).calculatePeriod(1L);
 
         newListener().onApproved(new ReconciliationApprovedEvent(this, Set.of(reportDate)));
 
@@ -131,9 +127,8 @@ class ProductionAutoRecalculateListenerTest {
         ReportPeriod period = openPeriod(1L);
         when(reportPeriodRepository.findByDate(reportDate)).thenReturn(Optional.of(period));
         when(reportPeriodRepository.findById(1L)).thenReturn(Optional.of(period));
-        when(productionResultRepository.findFirstByReportPeriod_Id(1L)).thenReturn(Optional.empty());
         doThrow(new RuntimeException("lỗi lạ không xác định trước"))
-                .when(productionCalculationService).calculatePeriod(1L, false);
+                .when(productionCalculationService).calculatePeriod(1L);
 
         newListener().onApproved(new ReconciliationApprovedEvent(this, Set.of(reportDate)));
 
@@ -149,9 +144,8 @@ class ProductionAutoRecalculateListenerTest {
         period.setStale(true);
         when(reportPeriodRepository.findByDate(reportDate)).thenReturn(Optional.of(period));
         when(reportPeriodRepository.findById(1L)).thenReturn(Optional.of(period));
-        when(productionResultRepository.findFirstByReportPeriod_Id(1L)).thenReturn(Optional.empty());
         doThrow(new BadRequestException("lỗi thật"))
-                .when(productionCalculationService).calculatePeriod(1L, false);
+                .when(productionCalculationService).calculatePeriod(1L);
 
         newListener().onApproved(new ReconciliationApprovedEvent(this, Set.of(reportDate)));
 
@@ -165,11 +159,10 @@ class ProductionAutoRecalculateListenerTest {
         ReportPeriod period = openPeriod(1L);
         when(reportPeriodRepository.findByDate(reportDate)).thenReturn(Optional.of(period));
         when(reportPeriodRepository.findById(1L)).thenReturn(Optional.of(period));
-        when(productionResultRepository.findFirstByReportPeriod_Id(1L)).thenReturn(Optional.empty());
 
         newListener().onApproved(new ReconciliationApprovedEvent(this, Set.of(reportDate)));
 
-        verify(productionCalculationService, times(1)).calculatePeriod(1L, false);
+        verify(productionCalculationService, times(1)).calculatePeriod(1L);
         assertThat(logAppender.list).noneMatch(e -> e.getLevel() == Level.ERROR);
     }
 
@@ -196,10 +189,9 @@ class ProductionAutoRecalculateListenerTest {
         when(reportPeriodRepository.findByDate(d1)).thenReturn(Optional.of(period));
         when(reportPeriodRepository.findByDate(d2)).thenReturn(Optional.of(period));
         when(reportPeriodRepository.findById(1L)).thenReturn(Optional.of(period));
-        when(productionResultRepository.findFirstByReportPeriod_Id(1L)).thenReturn(Optional.empty());
 
         newListener().onApproved(new ReconciliationApprovedEvent(this, Set.of(d1, d2)));
 
-        verify(productionCalculationService, times(1)).calculatePeriod(1L, false);
+        verify(productionCalculationService, times(1)).calculatePeriod(1L);
     }
 }

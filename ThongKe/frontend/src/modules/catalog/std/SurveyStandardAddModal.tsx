@@ -68,7 +68,7 @@ export const buildStdCols = (earth: string, hasCoal: boolean) => [
         { key: "coalDesignVolume", label: "Q Tke" },
         { key: "coalDeviation", label: "Clech" },
         { key: "coalHaulDistance", label: "CD than" },
-        { key: "coalTkm", label: "Than SX (Tkm)" },
+        { key: "coalTkm", label: "Than SX (tkm)" },
       ]
     : []),
   { key: "note", label: "Ghi chú" },

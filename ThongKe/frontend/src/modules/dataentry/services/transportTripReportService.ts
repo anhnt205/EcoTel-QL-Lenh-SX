@@ -14,6 +14,7 @@ export const transportReportTripRequestSchema = z.object({
   provisionalModel: z.number().nullable().optional(),
   provisionalDensity: z.number().nullable().optional(),
   deductionAmount: z.number().nullable().optional(),
+  wasteRockTon: z.number().nullable().optional(),
   excavationAreaId: z
     .number({ message: "Khu vực xúc không hợp lệ" })
     .min(1, "Khu vực xúc là bắt buộc"),
@@ -116,6 +117,7 @@ export interface TransportReportTripResponse {
   provisionalModel?: number | null;
   provisionalDensity?: number | null;
   deductionAmount?: number | null;
+  wasteRockTon?: number | null;
   excavationAreaId: number;
   excavationAreaName: string;
   excavatorDeviceId: number;
@@ -290,6 +292,7 @@ export function buildTransportTripRequestItem(
     provisionalModel: t.provisionalModel === "" ? null : Number(t.provisionalModel),
     provisionalDensity: t.provisionalDensity === "" ? null : Number(t.provisionalDensity),
     deductionAmount: t.deductionAmount === "" ? null : Number(t.deductionAmount),
+    wasteRockTon: t.wasteRockTon === "" ? null : Number(t.wasteRockTon),
     excavationAreaId,
     excavatorDeviceId,
     loadingPointId,
@@ -471,6 +474,7 @@ export function mapReportResponseToDraft(
       provisionalDensity: t.provisionalDensity ?? "",
       isTraineeVehicle: Boolean(t.supplementaryVehicle),
       deductionAmount: t.deductionAmount ?? "",
+      wasteRockTon: t.wasteRockTon ?? "",
     })),
   };
 }
@@ -549,6 +553,7 @@ export function mapTransportTripResponseToDraft(
         provisionalDensity: tripRes.provisionalDensity ?? "",
         isTraineeVehicle: Boolean(tripRes.supplementaryVehicle),
         deductionAmount: tripRes.deductionAmount ?? "",
+        wasteRockTon: tripRes.wasteRockTon ?? "",
       },
     ],
   };
